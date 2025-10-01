@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, Settings, Pen, User, Landmark, Banknote, Package, Info, ArrowRight, ClipboardList } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, Pen, Landmark, Package, ClipboardList, Hash } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
@@ -18,26 +18,11 @@ import { addBank, addBankBranch } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-const SectionTitle = ({ title, onEdit, editingPayment, icon, description }: { title: string, onEdit?: () => void, editingPayment?: boolean, icon?: React.ReactNode, description?: string }) => (
-    <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-             {icon}
-            <div>
-                <h3 className="text-sm font-semibold">{title}</h3>
-                {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            </div>
-        </div>
-        {onEdit && !editingPayment && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Pen className="h-4 w-4"/></Button>}
-    </div>
-);
-
 export const RtgsForm = (props: any) => {
     const { toast } = useToast();
     const {
-        rtgsFor, supplierDetails, setSupplierDetails,
-        isPayeeEditing, setIsPayeeEditing,
-        bankDetails, setBankDetails,
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
+        bankDetails, setBankDetails,
         sixRNo, setSixRNo, sixRDate, setSixRDate,
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
@@ -45,7 +30,7 @@ export const RtgsForm = (props: any) => {
         calcTargetAmount, setCalcTargetAmount,
         minRate, setMinRate, maxRate, setMaxRate,
         selectPaymentAmount,
-        handleEditPayment, // Receive the edit handler
+        handleEditPayment,
     } = props;
     
     const { banks, bankBranches } = useSupplierData();
@@ -136,6 +121,10 @@ export const RtgsForm = (props: any) => {
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                         <div className="space-y-1">
+                            <Label className="text-xs">RTGS SR No.</Label>
+                            <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                              <div className="space-y-1">
                                 <Label className="text-xs">Bank</Label>
@@ -153,13 +142,10 @@ export const RtgsForm = (props: any) => {
                                 <Label className="text-xs">A/C No.</Label>
                                 <Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs font-mono"/>
                             </div>
-                        </div>
-                        <Separator/>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className="space-y-1"><Label className="text-xs">RTGS SR No.</Label><Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/></div>
-                            <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
+                             <div className="space-y-1">
+                                <Label className="text-xs">Check No.</Label>
+                                <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-8 text-xs"/>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -168,11 +154,32 @@ export const RtgsForm = (props: any) => {
             {/* Right Column */}
             <div className="space-y-4">
                  <Card>
+                     <CardHeader>
+                         <CardTitle className="text-base">Payment Calculation</CardTitle>
+                     </CardHeader>
+                     <CardContent className="p-3 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                            <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
+                            <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
+                        </div>
+                         <PaymentCombinationGenerator
+                             calcTargetAmount={calcTargetAmount}
+                             setCalcTargetAmount={setCalcTargetAmount}
+                             minRate={minRate}
+                             setMinRate={setMinRate}
+                             maxRate={maxRate}
+                             setMaxRate={setMaxRate}
+                             selectPaymentAmount={selectPaymentAmount}
+                         />
+                     </CardContent>
+                </Card>
+                 <Card>
                     <CardHeader>
-                        <SectionTitle title="Additional Info" icon={<ClipboardList size={18}/>} />
+                        <CardTitle className="text-base flex items-center gap-2"><ClipboardList size={18}/>Additional Info</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-3">
-                         <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-8 text-xs"/></div>
+                        <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                          <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} onBlur={formatSixRNo} className="h-8 text-xs"/></div>
                          <div className="space-y-1 col-span-2">
                             <Label className="text-xs">6R Date</Label>

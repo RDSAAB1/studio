@@ -149,6 +149,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             if (paymentMethod === 'Online') {
                 prefix = 'P'; padding = 6;
             } else if (paymentMethod === 'RTGS') {
+                // For RTGS, we use rtgsSrNo, so this blur handler is for other payment types.
                 return;
             }
              formattedId = generateReadableId(prefix, num-1, padding);
