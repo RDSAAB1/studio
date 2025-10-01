@@ -144,8 +144,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             let padding = 5;
             if (paymentMethod === 'Online') {
                 prefix = 'P'; padding = 6;
-            } else if (paymentMethod === 'RTGS') {
-                return;
             }
              formattedId = generateReadableId(prefix, num-1, padding);
              setPaymentId(formattedId);
@@ -187,7 +185,11 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     useEffect(() => {
         if (!editingPayment) {
             setPaymentId(getNextPaymentId(paymentMethod as 'Cash'|'Online'|'RTGS'));
-            if (paymentMethod === 'RTGS') setRtgsSrNo(getNextPaymentId('RTGS'));
+            if (paymentMethod === 'RTGS') {
+                setRtgsSrNo(getNextPaymentId('RTGS'));
+            } else {
+                setRtgsSrNo(''); // Clear RTGS SR No. if not in RTGS mode
+            }
         }
     }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
 

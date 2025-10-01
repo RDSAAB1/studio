@@ -15,6 +15,9 @@ import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { RtgsForm } from './rtgs-form';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
+import { useSupplierData } from '@/hooks/use-supplier-data';
+import { addBank } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
@@ -92,10 +95,12 @@ export const PaymentForm = (props: any) => {
                                 </Popover>
                             </div>
 
+                            {paymentMethod !== 'RTGS' && (
                              <div className="space-y-1 flex-1 min-w-[120px]">
                                 <Label className="text-xs">Payment ID</Label>
                                 <Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
                             </div>
+                            )}
 
                             <div className="space-y-1 flex-1 min-w-[120px]">
                                 <Label className="text-xs">Payment Type</Label>
