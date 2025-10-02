@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useMemo } from 'react';
@@ -63,7 +64,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...calculations });
+            const result = await processPaymentLogic({ ...data, ...form, ...calculations, handleDeletePayment });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -103,12 +104,6 @@ export const useSupplierPayments = () => {
         try {
             setActiveTab('processing');
             await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations, handleDeletePayment });
-
-            if (paymentToEdit.rtgsFor === 'Supplier' && paymentToEdit.paidFor) {
-                const srNosInPayment = paymentToEdit.paidFor.map((pf: any) => pf.srNo);
-                const entriesToSelect = data.suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
-                form.setSelectedEntryIds(new Set(entriesToSelect.map((s: Customer) => s.id)));
-            }
 
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
