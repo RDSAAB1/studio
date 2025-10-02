@@ -8,12 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Printer, Info, Download, Trash2 } from "lucide-react";
+import { Printer, Info, Download, Trash2, Pen } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
-export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete }: any) => {
+export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit }: any) => {
     return (
         <Card>
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
@@ -38,7 +38,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                             <TableBody>
                                 {payments.map((p: any) => (
                                     <TableRow key={p.id}>
-                                        <TableCell className="font-mono text-xs p-2">{p.paymentId}</TableCell>
+                                        <TableCell className="font-mono text-xs p-2">{p.paymentId || p.rtgsSrNo}</TableCell>
                                         <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
                                         <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}>
@@ -56,13 +56,16 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(p)}>
                                                     <Info className="h-4 w-4" />
                                                 </Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
+                                                    <Pen className="h-4 w-4" />
+                                                </Button>
                                                 {onDelete && (
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
                                                             <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                                                         </AlertDialogTrigger>
                                                         <AlertDialogContent>
-                                                            <AlertDialogHeader><AlertDialogTitle>Delete Payment?</AlertDialogTitle><AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore outstanding balances. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                                            <AlertDialogHeader><AlertDialogTitle>Delete Payment?</AlertDialogTitle><AlertDialogDescription>This will permanently delete payment {p.paymentId || p.rtgsSrNo} and restore outstanding balances. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                 <AlertDialogAction onClick={() => onDelete(p.id)}>Delete</AlertDialogAction>

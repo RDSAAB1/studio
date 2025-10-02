@@ -127,6 +127,7 @@ export default function SupplierPaymentsClient() {
                     <PaymentHistory
                         payments={hook.paymentHistory}
                         onShowDetails={hook.setSelectedPaymentForDetails}
+                        onEdit={hook.handleEditPayment}
                         onPrintRtgs={hook.setRtgsReceiptData}
                         onDelete={hook.handleDeletePayment}
                     />
