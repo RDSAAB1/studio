@@ -419,7 +419,6 @@ export default function SupplierProfileClient() {
          acc.totalAmount += s.totalAmount;
          acc.totalOriginalAmount += s.totalOriginalAmount;
          acc.totalPaid += s.totalPaid;
-         acc.totalCdAmount! += s.totalCdAmount!;
          acc.totalGrossWeight! += s.totalGrossWeight!;
          acc.totalTeirWeight! += s.totalTeirWeight!;
          acc.totalFinalWeight! += s.totalFinalWeight!;
@@ -429,6 +428,7 @@ export default function SupplierProfileClient() {
          acc.totalLabouryAmount! += s.totalLabouryAmount!;
          acc.totalKanta! += s.totalKanta!;
          acc.totalOtherCharges! += s.totalOtherCharges!;
+         acc.totalCdAmount! += s.totalCdAmount!;
          return acc;
      }, {
          name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
@@ -509,7 +509,7 @@ export default function SupplierProfileClient() {
                 
                 <div className="w-full sm:w-[300px]">
                     <CustomDropdown
-                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
                         onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
@@ -552,5 +552,3 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
-
-    
