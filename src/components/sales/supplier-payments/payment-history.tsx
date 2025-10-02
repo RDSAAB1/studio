@@ -56,9 +56,11 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(p)}>
                                                     <Info className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-                                                    <Pen className="h-4 w-4" />
-                                                </Button>
+                                                {onEdit && (
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
+                                                        <Pen className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                                 {onDelete && (
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
