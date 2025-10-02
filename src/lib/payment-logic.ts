@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency, generateReadableId } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
@@ -68,7 +67,28 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     let finalPaymentData: Payment | null = null;
     await runTransaction(firestoreDB, async (transaction) => {
         
-        if (editingPayment?.id) {
+        // --- READ PHASE ---
+        const supplierDocsToUpdate: { ref: DocumentReference, data: Customer }[] = [];
+        if (rtgsFor === 'Supplier') {
+            for (const entryData of selectedEntries) {
+                const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
+                const supplierDoc = await transaction.get(supplierRef);
+                if (!supplierDoc.exists()) throw new Error(`Supplier entry ${entryData.srNo} not found.`);
+                supplierDocsToUpdate.push({ ref: supplierRef, data: supplierDoc.data() as Customer });
+            }
+        }
+        
+        // If editing, also read the old payment document upfront
+        let oldPaymentDoc = null;
+        if(editingPayment?.id) {
+            const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
+            oldPaymentDoc = await transaction.get(oldPaymentRef);
+        }
+
+        // --- WRITE PHASE ---
+
+        // First, handle the deletion/reversal logic of the old payment if editing
+        if (editingPayment?.id && oldPaymentDoc?.exists()) {
             await handleDeletePaymentLogic(editingPayment, transaction);
         }
 
@@ -80,12 +100,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             for (const entryData of sortedEntries) {
                 if (amountToDistribute <= 0) break;
                 
-                // Use a fresh read from the transaction for consistency
-                const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
-                const supplierDoc = await transaction.get(supplierRef);
-                if (!supplierDoc.exists()) throw new Error(`Supplier entry ${entryData.srNo} not found.`);
+                const supplierToUpdate = supplierDocsToUpdate.find(s => s.ref.id === entryData.id);
+                if (!supplierToUpdate) continue; // Should not happen if reads were successful
 
-                const currentSupplierData = supplierDoc.data() as Customer;
+                const currentSupplierData = supplierToUpdate.data;
                 const outstanding = Number(currentSupplierData.netAmount);
 
                 const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
@@ -97,7 +115,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         supplierContact: entryData.contact,
                     });
                     const newNetAmount = outstanding - paymentForThisEntry;
-                    transaction.update(supplierRef, { netAmount: newNetAmount });
+                    transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount });
                 }
                 amountToDistribute -= paymentForThisEntry;
             }
@@ -164,7 +182,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers, setPaymentDate, handleDeletePayment
+        suppliers, setPaymentDate, setActiveTab
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
@@ -182,7 +200,12 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');
     setSixRNo(paymentToEdit.sixRNo || '');
-    setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
+    if (paymentToEdit.sixRDate) {
+        const sixRDateObj = new Date(paymentToEdit.sixRDate + "T00:00:00");
+        setSixRDate(sixRDateObj);
+    } else {
+        setSixRDate(undefined);
+    }
     setParchiNo(paymentToEdit.parchiNo || (paymentToEdit.paidFor || []).map(pf => pf.srNo).join(', '));
     setRtgsQuantity(paymentToEdit.quantity || 0);
     setRtgsRate(paymentToEdit.rate || 0);
@@ -218,6 +241,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setSelectedCustomerKey(null);
         setSelectedEntryIds(new Set());
     }
+    setActiveTab('processing');
 };
 
 export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
