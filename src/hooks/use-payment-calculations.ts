@@ -58,9 +58,9 @@ export const usePaymentCalculations = (data: any, form: any) => {
             for (const key of existingKeys) {
                 const [keyNameNorm, keySoNorm] = key.split('|');
                 const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-                const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+                const soDist = levenshteinDistance(supSoNorm, keySoNorm || '');
                 const totalDist = nameDist + soDist;
-
+                
                 if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
                     minDistance = totalDist;
                     bestMatch = key;
