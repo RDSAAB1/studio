@@ -31,7 +31,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
-        selectedEntries, handleDeletePayment
+        selectedEntries, handleDeletePayment, paymentHistory
     } = context;
 
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -69,8 +69,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
-            // Delete the old payment first to revert balances and expense entries
-            await handleDeletePayment(editingPayment.id, true);
+            // Directly call the logic with the full object to avoid race conditions.
+            await handleDeletePaymentLogic(editingPayment.id, paymentHistory, transaction);
         }
 
         let paidForDetails: PaidFor[] = [];
@@ -160,7 +160,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
 export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any) => {
     const {
-        handleDeletePayment, setEditingPayment, setPaymentId, setRtgsSrNo,
+        setEditingPayment, setPaymentId, setRtgsSrNo,
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
         setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
@@ -169,7 +169,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
-    await handleDeletePayment(paymentToEdit.id, true);
+    // No deletion needed here, it's handled in processPaymentLogic
 
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
@@ -222,23 +222,39 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     }
 };
 
-export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymentHistory: Payment[]) => {
+export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymentHistory: Payment[], tx?: any) => {
+    const transaction = tx || runTransaction;
+    
     const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
     if (!paymentToDelete || !paymentToDelete.id) {
-        throw new Error("Payment not found or ID missing.");
+        // If not found in history, try to get from DB directly (edge case)
+        const docRef = doc(firestoreDB, "payments", paymentIdToDelete);
+        const docSnap = await (tx ? tx.get(docRef) : getDoc(docRef));
+        if (!docSnap.exists()) {
+            throw new Error("Payment not found or ID missing.");
+        }
     }
 
-    await runTransaction(firestoreDB, async (transaction) => {
+    const runDelete = async (transaction: any) => {
         const paymentDocRef = doc(firestoreDB, "payments", paymentIdToDelete);
+        const paymentDoc = await transaction.get(paymentDocRef);
+        
+        if (!paymentDoc.exists()) {
+             // It might have been deleted in a race condition, so we can consider this "successful"
+            console.warn(`Payment ${paymentIdToDelete} not found during deletion, it may have already been deleted.`);
+            return;
+        }
 
-        if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-            for (const detail of paymentToDelete.paidFor) {
+        const paymentData = paymentDoc.data() as Payment;
+
+        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
+            for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
                 const supplierDocsSnapshot = await getDocs(q); 
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
+                    const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                     if (db) {
@@ -248,14 +264,21 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
             }
         }
         
-        if (paymentToDelete.expenseTransactionId) {
-            const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
+        if (paymentData.expenseTransactionId) {
+            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
             transaction.delete(expenseDocRef);
         }
 
         transaction.delete(paymentDocRef);
-    });
+    };
+
+    if (tx) {
+        await runDelete(tx);
+    } else {
+        await runTransaction(firestoreDB, runDelete);
+    }
+    
      if (db) {
-        await deletePaymentFromLocalDB(paymentIdToDelete); // WRITE-THROUGH
+        await deletePaymentFromLocalDB(paymentIdToDelete);
     }
 };
