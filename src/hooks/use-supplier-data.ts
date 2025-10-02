@@ -65,20 +65,38 @@ export const useSupplierData = () => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-        
-        // Helper function to create a consistent customer ID
-        const createCustomerId = (s: Customer) => {
-            const name = (s.name || '').trim().toLowerCase();
-            const so = (s.so || '').trim().toLowerCase();
-            const contact = (s.contact || '').trim();
-            return `${name}|${so}|${contact}`;
+        const LEVENSHTEIN_THRESHOLD = 2;
+
+        const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+
+        const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
+            const supNameNorm = normalizeString(supplier.name);
+            const supSoNorm = normalizeString(supplier.so);
+            let bestMatch: string | null = null;
+            let minDistance = Infinity;
+
+            for (const key of existingKeys) {
+                const [keyNameNorm, keySoNorm] = key.split('|');
+                const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+                const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+                const totalDist = nameDist + soDist;
+
+                if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                    minDistance = totalDist;
+                    bestMatch = key;
+                }
+            }
+            return bestMatch;
         };
 
-        // Initialize map with all unique suppliers
         safeSuppliers.forEach(s => {
-            const customerId = createCustomerId(s);
-            if (!summary.has(customerId)) {
-                summary.set(customerId, {
+            if (!s.name || !s.contact) return;
+            const customerId = s.customerId || `${normalizeString(s.name)}|${normalizeString(s.so)}|${s.contact}`;
+            
+            let groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || customerId;
+            
+            if (!summary.has(groupingKey)) {
+                 summary.set(groupingKey, {
                     name: s.name, contact: s.contact, so: s.so, address: s.address,
                     totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                     totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -86,11 +104,10 @@ export const useSupplierData = () => {
                     allTransactions: []
                 } as CustomerSummary);
             }
-            const data = summary.get(customerId)!;
+            const data = summary.get(groupingKey)!;
             data.allTransactions!.push(s);
         });
 
-        // Calculate totals for each group
         summary.forEach(data => {
             let totalNet = 0;
             data.allTransactions!.forEach(s => {
