@@ -62,77 +62,60 @@ export const useSupplierData = () => {
         };
     }, [isClient]);
     
-    const customerSummaryMap = useMemo(() => {
+   const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
-    
+
         const summary = new Map<string, CustomerSummary>();
-    
-        // Group suppliers by a consistent key: name|so
+
         safeSuppliers.forEach(s => {
-            const key = `${toTitleCase(s.name || '')}|${toTitleCase(s.so || '')}`;
-            if (!summary.has(key)) {
-                summary.set(key, {
-                    name: s.name,
-                    so: s.so,
-                    address: s.address,
+            const groupingKey = `${toTitleCase(s.name || '')}|${toTitleCase(s.so || '')}`;
+
+            if (!summary.has(groupingKey)) {
+                // Initialize a new summary object if this is the first time we see this supplier group
+                summary.set(groupingKey, {
+                    name: s.name, so: s.so, address: s.address,
                     contact: '', // Will be aggregated
-                    acNo: s.acNo,
-                    ifscCode: s.ifscCode,
-                    bank: s.bank,
-                    branch: s.branch,
-                    totalAmount: 0,
-                    totalOriginalAmount: 0,
-                    totalPaid: 0,
-                    totalOutstanding: 0,
-                    totalCdAmount: 0,
-                    paymentHistory: [],
-                    outstandingEntryIds: [],
-                    allTransactions: [],
-                    allPayments: [],
-                    transactionsByVariety: {},
-                    totalGrossWeight: 0,
-                    totalTeirWeight: 0,
-                    totalFinalWeight: 0,
-                    totalKartaWeight: 0,
-                    totalNetWeight: 0,
-                    totalKartaAmount: 0,
-                    totalLabouryAmount: 0,
-                    totalKanta: 0,
-                    totalOtherCharges: 0,
-                    totalDeductions: 0,
-                    averageRate: 0,
-                    averageOriginalPrice: 0,
-                    averageKartaPercentage: 0,
-                    averageLabouryRate: 0,
-                    totalTransactions: 0,
-                    totalOutstandingTransactions: 0,
+                    acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
+                    totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0,
+                    totalOutstanding: 0, totalCdAmount: 0,
+                    paymentHistory: [], outstandingEntryIds: [],
+                    allTransactions: [], allPayments: [], transactionsByVariety: {},
+                    totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
+                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+                    totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                    totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
+                    averageKartaPercentage: 0, averageLabouryRate: 0,
+                    totalTransactions: 0, totalOutstandingTransactions: 0,
                 });
             }
-            summary.get(key)!.allTransactions!.push(s);
+
+            const supplierProfile = summary.get(groupingKey)!;
+            // Add the current transaction to this supplier's profile
+            supplierProfile.allTransactions!.push(s);
         });
-    
+
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
         safePaymentHistory.forEach(p => {
             const supplierForPayment = safeSuppliers.find(s => s.customerId === p.customerId);
             if (supplierForPayment) {
-                const key = `${toTitleCase(supplierForPayment.name || '')}|${toTitleCase(supplierForPayment.so || '')}`;
-                if (summary.has(key)) {
-                    summary.get(key)!.allPayments!.push(p);
+                 const groupingKey = `${toTitleCase(supplierForPayment.name || '')}|${toTitleCase(supplierForPayment.so || '')}`;
+                if (summary.has(groupingKey)) {
+                    summary.get(groupingKey)!.allPayments!.push(p);
                 }
             }
         });
-    
-        // Calculate aggregated values for each group
+
+        // Now, iterate through the created summary groups to calculate totals
         summary.forEach((data, key) => {
             const allContacts = new Set(data.allTransactions!.map(t => t.contact));
             data.contact = Array.from(allContacts).join(', ');
-    
+
             let totalRateSum = 0;
             let totalKartaPercentSum = 0;
             let totalLabouryRateSum = 0;
             let rateCount = 0;
-    
+
             data.allTransactions!.forEach(s => {
                 data.totalAmount += s.amount || 0;
                 data.totalOriginalAmount += s.originalNetAmount || 0;
@@ -146,30 +129,30 @@ export const useSupplierData = () => {
                 data.totalKanta! += s.kanta;
                 data.totalOtherCharges! += s.otherCharges || 0;
                 data.totalTransactions! += 1;
-    
+
                 if (s.rate > 0) {
                     totalRateSum += s.rate * s.weight; // Weighted average preparation
                     totalKartaPercentSum += s.kartaPercentage;
                     totalLabouryRateSum += s.labouryRate;
                     rateCount++;
                 }
-    
+
                 const variety = toTitleCase(s.variety) || 'Unknown';
                 data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
             });
-    
+            
             data.allPayments!.forEach(p => {
                 data.totalPaid += p.amount;
                 data.totalCdAmount! += p.cdAmount || 0;
             });
-    
+
             data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
             data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
             data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
             
             data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
             data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
-    
+
             if (rateCount > 0) {
                 data.averageKartaPercentage = totalKartaPercentSum / rateCount;
                 data.averageLabouryRate = totalLabouryRateSum / rateCount;
@@ -177,7 +160,7 @@ export const useSupplierData = () => {
             
             data.paymentHistory = data.allPayments!;
         });
-    
+
         return summary;
     }, [suppliers, paymentHistory]);
 

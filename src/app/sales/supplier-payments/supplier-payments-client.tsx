@@ -30,9 +30,9 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('processing');
-
+    
     const hook = useSupplierPayments();
+    const { activeTab, setActiveTab } = hook;
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey) return [];
@@ -143,7 +143,9 @@ export default function SupplierPaymentsClient() {
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.allTransactions?.[0]?.customerId && parseFloat(String(s.netAmount)) > 0);
+                    const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey || '');
+                    const customerId = summary?.allTransactions?.[0]?.customerId;
+                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === customerId && parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
