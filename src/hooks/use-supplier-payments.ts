@@ -1,10 +1,9 @@
 
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
-import { usePaymentCalculations } from './use-payment-calculations';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
@@ -25,7 +24,6 @@ export const useSupplierPayments = () => {
     };
 
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict);
-    const calculations = usePaymentCalculations(data, form);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
@@ -40,7 +38,7 @@ export const useSupplierPayments = () => {
         form.setSelectedCustomerKey(key);
         form.resetPaymentForm(); 
         if (key) {
-            const customerData = calculations.customerSummaryMap.get(key);
+            const customerData = data.customerSummaryMap.get(key);
             if (customerData) {
                 form.setSupplierDetails({
                     name: customerData.name || '',
@@ -63,7 +61,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...calculations, handleDeletePayment });
+            const result = await processPaymentLogic({ ...data, ...form, handleDeletePayment });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -86,7 +84,7 @@ export const useSupplierPayments = () => {
     
     const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentToDelete);
+            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory);
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }
@@ -101,7 +99,7 @@ export const useSupplierPayments = () => {
     
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
-            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations });
+            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form });
             setActiveTab('processing');
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
@@ -137,7 +135,6 @@ export const useSupplierPayments = () => {
     return {
         ...data,
         ...form,
-        ...calculations,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,

@@ -29,10 +29,8 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('processing');
-
     const hook = useSupplierPayments();
+    const { activeTab, setActiveTab } = hook;
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey || !hook.suppliers) return [];
@@ -46,11 +44,6 @@ export default function SupplierPaymentsClient() {
             p.paidFor?.some(pf => pf.srNo === hook.detailsSupplierEntry.srNo)
         );
     }, [hook.detailsSupplierEntry, hook.paymentHistory]);
-
-    const onEditPayment = (payment: Payment) => {
-        hook.handleEditPayment(payment);
-        setActiveTab('processing');
-    }
 
     if (!hook.isClient || hook.loading) {
         return (
@@ -117,7 +110,7 @@ export default function SupplierPaymentsClient() {
                                 </div>
                             )}
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                                <PaymentForm {...hook} bankBranches={hook.bankBranches} />
+                                <PaymentForm {...hook} />
                             )}
                             {hook.selectedCustomerKey && (
                                 <TransactionTable
@@ -133,7 +126,7 @@ export default function SupplierPaymentsClient() {
                         payments={hook.paymentHistory}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
-                        onEdit={onEditPayment}
+                        onEdit={hook.handleEditPayment}
                         onDelete={hook.handleDeletePayment}
                     />
                 </TabsContent>
