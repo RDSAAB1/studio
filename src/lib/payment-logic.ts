@@ -2,9 +2,9 @@
 
 'use client';
 
-import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
-import { toTitleCase, formatCurrency } from "@/lib/utils";
+import { toTitleCase, formatCurrency, generateReadableId } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
 import { format } from 'date-fns';
 import { updateSupplierInLocalDB, deletePaymentFromLocalDB, db } from './database';
@@ -69,8 +69,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
-            // Directly call the logic with the full object to avoid race conditions.
-            await handleDeletePaymentLogic(editingPayment.id, paymentHistory, transaction);
+            await handleDeletePaymentLogic(editingPayment, transaction);
         }
 
         let paidForDetails: PaidFor[] = [];
@@ -165,12 +164,12 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers, setPaymentDate,
+        suppliers, setPaymentDate, handleDeletePayment
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
-    // No deletion needed here, it's handled in processPaymentLogic
-
+    
+    // Set the form state with the payment to edit
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
     setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
@@ -184,7 +183,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setCheckNo(paymentToEdit.checkNo || '');
     setSixRNo(paymentToEdit.sixRNo || '');
     setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
-    setParchiNo(paymentToEdit.parchiNo || '');
+    setParchiNo(paymentToEdit.parchiNo || (paymentToEdit.paidFor || []).map(pf => pf.srNo).join(', '));
     setRtgsQuantity(paymentToEdit.quantity || 0);
     setRtgsRate(paymentToEdit.rate || 0);
     setRtgsAmount(paymentToEdit.rtgsAmount || 0);
@@ -202,7 +201,6 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         const utcDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
         setPaymentDate(utcDate);
     }
-
 
     if (paymentToEdit.rtgsFor === 'Supplier') {
         setSelectedCustomerKey(paymentToEdit.customerId);
@@ -222,26 +220,14 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     }
 };
 
-export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymentHistory: Payment[], tx?: any) => {
-    const transaction = tx || runTransaction;
+export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
     
-    const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-    if (!paymentToDelete || !paymentToDelete.id) {
-        // If not found in history, try to get from DB directly (edge case)
-        const docRef = doc(firestoreDB, "payments", paymentIdToDelete);
-        const docSnap = await (tx ? tx.get(docRef) : getDoc(docRef));
-        if (!docSnap.exists()) {
-            throw new Error("Payment not found or ID missing.");
-        }
-    }
-
-    const runDelete = async (transaction: any) => {
-        const paymentDocRef = doc(firestoreDB, "payments", paymentIdToDelete);
-        const paymentDoc = await transaction.get(paymentDocRef);
+    const runDelete = async (tx: any) => {
+        const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
+        const paymentDoc = await tx.get(paymentDocRef);
         
         if (!paymentDoc.exists()) {
-             // It might have been deleted in a race condition, so we can consider this "successful"
-            console.warn(`Payment ${paymentIdToDelete} not found during deletion, it may have already been deleted.`);
+             console.warn(`Payment ${paymentToDelete.id} not found during deletion.`);
             return;
         }
 
@@ -256,7 +242,7 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
                     const currentSupplier = customerDoc.data() as Customer;
                     const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    tx.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                     if (db) {
                          await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                     }
@@ -266,19 +252,19 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         
         if (paymentData.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            transaction.delete(expenseDocRef);
+            tx.delete(expenseDocRef);
         }
 
-        transaction.delete(paymentDocRef);
+        tx.delete(paymentDocRef);
     };
 
-    if (tx) {
-        await runDelete(tx);
+    if (transaction) {
+        await runDelete(transaction);
     } else {
         await runTransaction(firestoreDB, runDelete);
     }
     
      if (db) {
-        await deletePaymentFromLocalDB(paymentIdToDelete);
+        await deletePaymentFromLocalDB(paymentToDelete.id);
     }
 };

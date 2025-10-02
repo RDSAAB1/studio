@@ -102,7 +102,7 @@ export const useSupplierPayments = () => {
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
             setActiveTab('processing');
-            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations, handleDeletePayment });
+            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations });
 
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
