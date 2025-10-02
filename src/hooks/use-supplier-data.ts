@@ -65,66 +65,32 @@ export const useSupplierData = () => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-        const LEVENSHTEIN_THRESHOLD = 2;
     
-        const normalizeString = (str: string) => str ? str.replace(/\s+/g, '').toLowerCase() : '';
-    
+        // Group suppliers by customerId
         safeSuppliers.forEach(s => {
-            if (!s.name || !s.contact) return;
+            if (!s.customerId) return;
     
-            const supNameNorm = normalizeString(s.name);
-            const supSoNorm = normalizeString(s.so);
-    
-            let bestMatchKey: string | null = null;
-            let minDistance = Infinity;
-    
-            // Find the best existing match
-            for (const [key, existingSummary] of summary.entries()) {
-                const [keyNameNorm, keySoNorm] = key.split('|');
-                const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-                const soDist = levenshteinDistance(supSoNorm, keySoNorm);
-                const totalDist = nameDist + soDist;
-    
-                if (totalDist < minDistance) {
-                    minDistance = totalDist;
-                    bestMatchKey = key;
-                }
-            }
-    
-            // Decide whether to use the best match or create a new group
-            let groupingKey: string;
-            if (bestMatchKey && minDistance <= LEVENSHTEIN_THRESHOLD) {
-                groupingKey = bestMatchKey;
-            } else {
-                groupingKey = `${supNameNorm}|${supSoNorm}|${s.contact}`;
-            }
-    
-            // Initialize group if it doesn't exist
-            if (!summary.has(groupingKey)) {
-                summary.set(groupingKey, {
+            if (!summary.has(s.customerId)) {
+                summary.set(s.customerId, {
                     name: s.name,
                     contact: s.contact,
                     so: s.so,
                     address: s.address,
                     totalOutstanding: 0,
                     paymentHistory: [],
-                    totalAmount: 0,
-                    totalPaid: 0,
-                    outstandingEntryIds: [],
+                    allTransactions: [],
                     acNo: s.acNo,
                     ifscCode: s.ifscCode,
                     bank: s.bank,
                     branch: s.branch,
-                    allTransactions: []
                 } as CustomerSummary);
             }
     
-            // Add the current supplier entry to the chosen group
-            const data = summary.get(groupingKey)!;
+            const data = summary.get(s.customerId)!;
             data.allTransactions!.push(s);
         });
     
-        // Calculate totals for each group
+        // Calculate totals and assign payments for each group
         summary.forEach(data => {
             let totalNet = 0;
             data.allTransactions!.forEach(s => {
