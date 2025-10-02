@@ -1,7 +1,4 @@
 
-
-'use server';
-
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
