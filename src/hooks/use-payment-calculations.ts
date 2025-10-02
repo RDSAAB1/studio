@@ -4,7 +4,7 @@
 import { useMemo, useEffect } from 'react';
 import { useCashDiscount } from './use-cash-discount';
 import type { Customer, CustomerSummary, Payment, CustomerPayment, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
-import { toTitleCase } from '@/lib/utils';
+import { toTitleCase, levenshteinDistance } from '@/lib/utils';
 
 export const usePaymentCalculations = (data: any, form: any) => {
     const { suppliers, paymentHistory, bankAccounts, fundTransactions, incomes, expenses, customerPayments } = data;
@@ -45,10 +45,35 @@ export const usePaymentCalculations = (data: any, form: any) => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-        
+        const LEVENSHTEIN_THRESHOLD = 2;
+    
+        const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+
+        const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
+            const supNameNorm = normalizeString(supplier.name);
+            const supSoNorm = normalizeString(supplier.so || '');
+            let bestMatch: string | null = null;
+            let minDistance = Infinity;
+
+            for (const key of existingKeys) {
+                const [keyNameNorm, keySoNorm] = key.split('|');
+                const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+                const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+                const totalDist = nameDist + soDist;
+
+                if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                    minDistance = totalDist;
+                    bestMatch = key;
+                }
+            }
+            return bestMatch;
+        };
+
         safeSuppliers.forEach(s => {
-            if (s.customerId && !summary.has(s.customerId)) {
-                summary.set(s.customerId, {
+            const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
+
+            if (!summary.has(groupingKey)) {
+                summary.set(groupingKey, {
                     name: s.name, contact: s.contact, so: s.so, address: s.address,
                     totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                     totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -56,13 +81,9 @@ export const usePaymentCalculations = (data: any, form: any) => {
                     allTransactions: []
                 } as CustomerSummary);
             }
-        });
-        
-        safeSuppliers.forEach(supplier => {
-            if (!supplier.customerId) return;
-            const data = summary.get(supplier.customerId)!;
-            data.allTransactions!.push(supplier);
-            const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
+            const data = summary.get(groupingKey)!;
+            data.allTransactions!.push(s);
+            const netAmount = Math.round(parseFloat(String(s.netAmount)));
             data.totalOutstanding += netAmount;
         });
         
