@@ -29,8 +29,10 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('processing');
+
     const hook = useSupplierPayments();
-    const { activeTab, setActiveTab } = hook;
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey || !hook.suppliers) return [];
@@ -110,7 +112,7 @@ export default function SupplierPaymentsClient() {
                                 </div>
                             )}
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                                <PaymentForm {...hook} />
+                                <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                             )}
                             {hook.selectedCustomerKey && (
                                 <TransactionTable
@@ -127,7 +129,7 @@ export default function SupplierPaymentsClient() {
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
                         onEdit={hook.handleEditPayment}
-                        onDelete={hook.handleDeletePayment}
+                        onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
                     />
                 </TabsContent>
             </Tabs>
@@ -136,12 +138,12 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0)}
+                entries={hook.suppliers.filter((s:any) => s.customerId === hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.allTransactions?.[0]?.customerId && parseFloat(String(s.netAmount)) > 0)}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.allTransactions?.[0]?.customerId && parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
@@ -176,3 +178,5 @@ export default function SupplierPaymentsClient() {
         </div>
     );
 }
+
+    

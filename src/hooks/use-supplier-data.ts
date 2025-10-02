@@ -65,17 +65,18 @@ export const useSupplierData = () => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
-    
+
         const summary = new Map<string, CustomerSummary>();
-    
-        // Initialize map with all unique suppliers based on customerId
+
+        // Step 1: Create a detailed view for each individual supplier entry first.
         safeSuppliers.forEach(s => {
-            if (s.customerId && !summary.has(s.customerId)) {
-                summary.set(s.customerId, {
+            const groupingKey = `${toTitleCase(s.name || '')}|${toTitleCase(s.so || '')}`;
+            if (!summary.has(groupingKey)) {
+                summary.set(groupingKey, {
                     name: s.name,
-                    contact: s.contact,
                     so: s.so,
                     address: s.address,
+                    contact: s.contact, // We will collect all contacts
                     acNo: s.acNo,
                     ifscCode: s.ifscCode,
                     bank: s.bank,
@@ -108,52 +109,58 @@ export const useSupplierData = () => {
                     totalOutstandingTransactions: 0
                 });
             }
-        });
-    
-        let supplierRateSum: { [key: string]: { rate: number; karta: number; laboury: number; count: number } } = {};
-    
-        safeSuppliers.forEach(s => {
-            if (!s.customerId) return;
-            const data = summary.get(s.customerId);
-            if (!data) return;
-    
-            data.totalAmount += s.amount || 0;
-            data.totalOriginalAmount += s.originalNetAmount || 0;
-            data.totalGrossWeight! += s.grossWeight;
-            data.totalTeirWeight! += s.teirWeight;
-            data.totalFinalWeight! += s.weight;
-            data.totalKartaWeight! += s.kartaWeight;
-            data.totalNetWeight! += s.netWeight;
-            data.totalKartaAmount! += s.kartaAmount;
-            data.totalLabouryAmount! += s.labouryAmount;
-            data.totalKanta! += s.kanta;
-            data.totalOtherCharges! += s.otherCharges || 0;
-            data.totalTransactions! += 1;
-    
-            if (!supplierRateSum[s.customerId]) {
-                supplierRateSum[s.customerId] = { rate: 0, karta: 0, laboury: 0, count: 0 };
-            }
-            if (s.rate > 0) {
-                supplierRateSum[s.customerId].rate += s.rate;
-                supplierRateSum[s.customerId].karta += s.kartaPercentage;
-                supplierRateSum[s.customerId].laboury += s.labouryRate;
-                supplierRateSum[s.customerId].count++;
-            }
-    
+
+            const data = summary.get(groupingKey)!;
             data.allTransactions!.push(s);
-    
-            const variety = toTitleCase(s.variety) || 'Unknown';
-            data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
         });
-    
+        
+        let supplierRateSum: { [key: string]: { rate: number; karta: number; laboury: number; count: number } } = {};
+
+        summary.forEach((data, key) => {
+            const allContacts = new Set(data.allTransactions!.map(t => t.contact));
+            data.contact = Array.from(allContacts).join(', '); // Join all unique contacts
+
+            data.allTransactions!.forEach(s => {
+                data.totalAmount += s.amount || 0;
+                data.totalOriginalAmount += s.originalNetAmount || 0;
+                data.totalGrossWeight! += s.grossWeight;
+                data.totalTeirWeight! += s.teirWeight;
+                data.totalFinalWeight! += s.weight;
+                data.totalKartaWeight! += s.kartaWeight;
+                data.totalNetWeight! += s.netWeight;
+                data.totalKartaAmount! += s.kartaAmount;
+                data.totalLabouryAmount! += s.labouryAmount;
+                data.totalKanta! += s.kanta;
+                data.totalOtherCharges! += s.otherCharges || 0;
+                data.totalTransactions! += 1;
+        
+                if (!supplierRateSum[key]) {
+                    supplierRateSum[key] = { rate: 0, karta: 0, laboury: 0, count: 0 };
+                }
+                if (s.rate > 0) {
+                    supplierRateSum[key].rate += s.rate;
+                    supplierRateSum[key].karta += s.kartaPercentage;
+                    supplierRateSum[key].laboury += s.labouryRate;
+                    supplierRateSum[key].count++;
+                }
+        
+                const variety = toTitleCase(s.variety) || 'Unknown';
+                data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+            });
+        });
+
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
         safePaymentHistory.forEach(p => {
-            if (p.customerId && summary.has(p.customerId)) {
-                const data = summary.get(p.customerId)!;
-                data.totalPaid += p.amount;
-                data.totalCdAmount! += p.cdAmount || 0;
-                data.paymentHistory.push(p);
-                data.allPayments!.push(p);
+             const supplierForPayment = safeSuppliers.find(s => s.customerId === p.customerId);
+            if (supplierForPayment) {
+                const groupingKey = `${toTitleCase(supplierForPayment.name || '')}|${toTitleCase(supplierForPayment.so || '')}`;
+                 if (summary.has(groupingKey)) {
+                    const data = summary.get(groupingKey)!;
+                    data.totalPaid += p.amount;
+                    data.totalCdAmount! += p.cdAmount || 0;
+                    data.paymentHistory.push(p);
+                    data.allPayments!.push(p);
+                }
             }
         });
     
@@ -222,3 +229,5 @@ export const useSupplierData = () => {
 };
 
 const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
+
+    
