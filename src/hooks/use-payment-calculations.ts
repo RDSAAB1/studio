@@ -68,7 +68,7 @@ export const usePaymentCalculations = (data: any, form: any) => {
             }
             return bestMatch;
         };
-
+        
         safeSuppliers.forEach(s => {
             const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
 
@@ -86,9 +86,20 @@ export const usePaymentCalculations = (data: any, form: any) => {
             const netAmount = Math.round(parseFloat(String(s.netAmount)));
             data.totalOutstanding += netAmount;
         });
+
+        // This part seems redundant if allTransactions are already grouped.
+        // Keeping it for now but might need refactoring.
+        paymentHistory?.forEach((p: Payment) => {
+            if (p.customerId) {
+                const summaryData = summary.get(p.customerId);
+                if (summaryData) {
+                    summaryData.paymentHistory?.push(p);
+                }
+            }
+        });
         
         return summary;
-    }, [suppliers]);
+    }, [suppliers, paymentHistory]);
     
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
