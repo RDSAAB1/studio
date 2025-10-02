@@ -69,7 +69,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         
         // --- READ PHASE ---
         const supplierDocsToUpdate: { ref: DocumentReference, data: Customer }[] = [];
-        if (rtgsFor === 'Supplier' && selectedEntries.length > 0) {
+        if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
             for (const entryData of selectedEntries) {
                 const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
                 const supplierDoc = await transaction.get(supplierRef);
@@ -119,7 +119,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             transactionType: 'Expense', category: 'Supplier Payments',
             subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
             amount: finalPaymentAmount, payee: supplierDetails.name,
-            description: `Payment for ${rtgsFor === 'Supplier' ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
+            description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
             paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
             status: 'Paid', isRecurring: false,
         };
@@ -133,7 +133,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 transactionType: 'Income', category: 'Cash Discount Received',
                 subCategory: 'Supplier CD', amount: calculatedCdAmount, payee: supplierDetails.name,
-                description: `CD received for ${rtgsFor === 'Supplier' ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
+                description: `CD received for ${rtgsFor === 'Supplier' && selectedEntries ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
                 paymentMethod: 'Other', status: 'Paid', isRecurring: false,
             };
             transaction.set(incomeTransactionRef, incomeData);
@@ -298,3 +298,5 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         await deletePaymentFromLocalDB(paymentToDelete.id);
     }
 };
+
+    

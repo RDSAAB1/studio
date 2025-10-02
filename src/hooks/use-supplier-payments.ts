@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
@@ -32,6 +32,11 @@ export const useSupplierPayments = () => {
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('processing');
+    
+    const selectedEntries = useMemo(() => {
+        if (!form.selectedEntryIds) return [];
+        return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+    }, [data.suppliers, form.selectedEntryIds]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -61,7 +66,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, handleDeletePayment });
+            const result = await processPaymentLogic({ ...data, ...form, selectedEntries, handleDeletePayment });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -84,7 +89,7 @@ export const useSupplierPayments = () => {
     
     const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory);
+            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory);
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }
@@ -155,5 +160,8 @@ export const useSupplierPayments = () => {
         selectPaymentAmount,
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); },
         onConflict: handleConflict,
+        selectedEntries
     };
 };
+
+    
