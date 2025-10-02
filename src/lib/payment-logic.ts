@@ -69,7 +69,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         
         // --- READ PHASE ---
         const supplierDocsToUpdate: { ref: DocumentReference, data: Customer }[] = [];
-        if (rtgsFor === 'Supplier') {
+        if (rtgsFor === 'Supplier' && selectedEntries.length > 0) {
             for (const entryData of selectedEntries) {
                 const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
                 const supplierDoc = await transaction.get(supplierRef);
@@ -78,30 +78,21 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
-        let oldPaymentDoc = null;
-        if(editingPayment?.id) {
-            const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
-            oldPaymentDoc = await transaction.get(oldPaymentRef);
-            if (!oldPaymentDoc.exists()) {
-                throw new Error("The payment you are trying to edit does not exist anymore.");
-            }
-        }
-
         // --- WRITE PHASE ---
-        if (editingPayment?.id && oldPaymentDoc?.exists()) {
-            await handleDeletePaymentLogic(oldPaymentDoc.data() as Payment, transaction);
+        if (editingPayment?.id) {
+            await handleDeletePaymentLogic(editingPayment, transaction);
         }
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier') {
             let amountToDistribute = Math.round(totalPaidAmount);
-            const sortedEntries = selectedEntries.sort((a: Customer, b: Customer) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
 
             for (const entryData of sortedEntries) {
                 if (amountToDistribute <= 0) break;
                 
-                const supplierToUpdate = supplierDocsToUpdate.find(s => s.ref.id === entryData.id);
-                if (!supplierToUpdate) continue; // Should not happen if reads were successful
+                const supplierToUpdate = entryData;
+                if (!supplierToUpdate) continue; // Should not happen
 
                 const currentSupplierData = supplierToUpdate.data;
                 const outstanding = Number(currentSupplierData.netAmount);
@@ -110,9 +101,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
                 if (paymentForThisEntry > 0) {
                     paidForDetails.push({
-                        srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
-                        supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
-                        supplierContact: entryData.contact,
+                        srNo: entryData.data.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
+                        supplierName: toTitleCase(entryData.data.name), supplierSo: toTitleCase(entryData.data.so),
+                        supplierContact: entryData.data.contact,
                     });
                     const newNetAmount = outstanding - paymentForThisEntry;
                     transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount });
@@ -179,7 +170,8 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     const {
         setEditingPayment, setPaymentId, setRtgsSrNo,
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
-        setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
+        setCdEnabled, setCdAt, setCdPercent,
+        setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
         suppliers, setPaymentDate
@@ -194,7 +186,19 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setPaymentType(paymentToEdit.type);
     setPaymentMethod(paymentToEdit.receiptType);
     setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
+    
     setCdEnabled(!!paymentToEdit.cdApplied);
+    if (paymentToEdit.cdApplied && paymentToEdit.cdAmount && paymentToEdit.amount) {
+        // A simple reverse calculation to find a possible percentage
+        const baseForCd = paymentToEdit.type === 'Full' 
+            ? (paymentToEdit.paidFor || []).reduce((sum, pf) => sum + (suppliers.find((s: Customer) => s.srNo === pf.srNo)?.originalNetAmount || 0), 0)
+            : paymentToEdit.amount;
+        if (baseForCd > 0) {
+            setCdPercent(Number(((paymentToEdit.cdAmount / baseForCd) * 100).toFixed(2)));
+        }
+        setCdAt(paymentToEdit.type === 'Full' ? 'on_full_amount' : 'partial_on_paid');
+    }
+
     setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');
@@ -211,7 +215,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setRtgsAmount(paymentToEdit.rtgsAmount || 0);
     setSupplierDetails({
         name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
-        address: paymentToEdit.supplierAddress || '', contact: ''
+        address: paymentToEdit.supplierAddress || '', contact: '' // Contact is not stored in payment
     });
     setBankDetails({
         acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
@@ -244,6 +248,10 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
 
 export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
     
+    if (!paymentToDelete || !paymentToDelete.id) {
+        throw new Error("Payment object or ID is missing for deletion.");
+    }
+
     const runDelete = async (tx: any) => {
         const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
         const paymentDoc = await tx.get(paymentDocRef);

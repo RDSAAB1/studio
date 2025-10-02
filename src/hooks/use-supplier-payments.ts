@@ -33,6 +33,7 @@ export const useSupplierPayments = () => {
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
+    const [activeTab, setActiveTab] = useState('processing');
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -83,13 +84,13 @@ export const useSupplierPayments = () => {
         }
     };
     
-    const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
+    const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentIdToDelete, data.paymentHistory);
+            await handleDeletePaymentLogic(paymentToDelete);
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }
-            if (form.editingPayment?.id === paymentIdToDelete) {
+            if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
             }
         } catch (error: any) {
@@ -101,6 +102,7 @@ export const useSupplierPayments = () => {
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
             await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations });
+            setActiveTab('processing');
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
@@ -147,6 +149,7 @@ export const useSupplierPayments = () => {
         setIsBankSettingsOpen,
         rtgsReceiptData,
         setRtgsReceiptData,
+        activeTab, setActiveTab,
         processPayment,
         handleEditPayment,
         handleDeletePayment,

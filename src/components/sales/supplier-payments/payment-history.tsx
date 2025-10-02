@@ -70,7 +70,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                             <AlertDialogHeader><AlertDialogTitle>Delete Payment?</AlertDialogTitle><AlertDialogDescription>This will permanently delete payment {p.paymentId || p.rtgsSrNo} and restore outstanding balances. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => onDelete(p.id)}>Delete</AlertDialogAction>
+                                                                <AlertDialogAction onClick={() => onDelete(p)}>Delete</AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
                                                     </AlertDialog>
