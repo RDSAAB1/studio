@@ -33,7 +33,6 @@ export const useSupplierPayments = () => {
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState('processing');
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -101,9 +100,7 @@ export const useSupplierPayments = () => {
     
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
-            setActiveTab('processing');
             await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations });
-
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
@@ -150,7 +147,6 @@ export const useSupplierPayments = () => {
         setIsBankSettingsOpen,
         rtgsReceiptData,
         setRtgsReceiptData,
-        activeTab, setActiveTab,
         processPayment,
         handleEditPayment,
         handleDeletePayment,

@@ -47,6 +47,11 @@ export default function SupplierPaymentsClient() {
         );
     }, [hook.detailsSupplierEntry, hook.paymentHistory]);
 
+    const onEditPayment = (payment: Payment) => {
+        hook.handleEditPayment(payment);
+        setActiveTab('processing');
+    }
+
     if (!hook.isClient || hook.loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -128,7 +133,7 @@ export default function SupplierPaymentsClient() {
                         payments={hook.paymentHistory}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
-                        onEdit={hook.handleEditPayment}
+                        onEdit={onEditPayment}
                         onDelete={hook.handleDeletePayment}
                     />
                 </TabsContent>
