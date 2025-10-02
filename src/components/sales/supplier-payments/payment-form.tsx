@@ -55,7 +55,8 @@ export const PaymentForm = (props: any) => {
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
         supplierDetails, setSupplierDetails, isPayeeEditing, setIsPayeeEditing,
-        rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur
+        rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
+        utrNo, setUtrNo, checkNo, setCheckNo
     } = props;
 
     const paymentFromOptions = useMemo(() => {
@@ -100,6 +101,13 @@ export const PaymentForm = (props: any) => {
                                 <div className="space-y-1 flex-1 min-w-[120px]">
                                     <Label className="text-xs">Payment ID</Label>
                                     <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
+                                </div>
+                            )}
+                            
+                            {(paymentMethod === 'Online' || paymentMethod === 'Cash') && (
+                                <div className="space-y-1 flex-1 min-w-[120px]">
+                                    <Label className="text-xs">Check No. / Ref</Label>
+                                    <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/>
                                 </div>
                             )}
 
@@ -252,3 +260,5 @@ export const PaymentForm = (props: any) => {
         </>
     );
 };
+
+    
