@@ -138,14 +138,12 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={hook.suppliers.filter((s:any) => s.customerId === hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.allTransactions?.[0]?.customerId && parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey || '');
-                    const customerId = summary?.allTransactions?.[0]?.customerId;
-                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === customerId && parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
