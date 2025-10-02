@@ -26,6 +26,7 @@ export const RtgsForm = (props: any) => {
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
         handleEditPayment,
+        paymentDate, setPaymentDate,
     } = props;
     
     const { banks, bankBranches } = useSupplierData();
@@ -115,7 +116,7 @@ export const RtgsForm = (props: any) => {
                             <Settings className="h-4 w-4" />
                         </Button>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 p-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                              <div className="space-y-1">
                                 <Label className="text-xs">Bank</Label>

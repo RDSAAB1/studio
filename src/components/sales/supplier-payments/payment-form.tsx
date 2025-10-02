@@ -103,6 +103,13 @@ export const PaymentForm = (props: any) => {
                                 </div>
                             )}
 
+                             {paymentMethod === 'RTGS' && (
+                                <div className="space-y-1 flex-1 min-w-[120px]">
+                                    <Label className="text-xs">RTGS SR No.</Label>
+                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
+                                </div>
+                            )}
+
                             <div className="space-y-1 flex-1 min-w-[120px]">
                                 <Label className="text-xs">Payment Type</Label>
                                 <Select value={paymentType} onValueChange={setPaymentType}>
@@ -202,23 +209,29 @@ export const PaymentForm = (props: any) => {
             </div>
 
             {paymentMethod === 'RTGS' && (
-                 <Card className="mt-3">
-                     <CardHeader>
-                         <CardTitle className="text-base">RTGS Details & Generation</CardTitle>
-                     </CardHeader>
-                     <CardContent className="p-3 space-y-3">
-                         <RtgsForm {...props} />
-                         <PaymentCombinationGenerator
-                             calcTargetAmount={calcTargetAmount}
-                             setCalcTargetAmount={setCalcTargetAmount}
-                             minRate={minRate}
-                             setMinRate={setMinRate}
-                             maxRate={maxRate}
-                             setMaxRate={setMaxRate}
-                             selectPaymentAmount={selectPaymentAmount}
-                         />
-                     </CardContent>
-                 </Card>
+                <div className="space-y-3">
+                     <Card className="mt-3">
+                        <CardContent className="p-3">
+                            <RtgsForm {...props} />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Generate Payment Combinations</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3">
+                             <PaymentCombinationGenerator
+                                calcTargetAmount={calcTargetAmount}
+                                setCalcTargetAmount={setCalcTargetAmount}
+                                minRate={minRate}
+                                setMinRate={setMinRate}
+                                maxRate={maxRate}
+                                setMaxRate={setMaxRate}
+                                selectPaymentAmount={selectPaymentAmount}
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
             )}
              
             <CardFooter className="p-0 pt-3">
