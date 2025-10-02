@@ -78,18 +78,18 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
-        // If editing, also read the old payment document upfront
         let oldPaymentDoc = null;
         if(editingPayment?.id) {
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
             oldPaymentDoc = await transaction.get(oldPaymentRef);
+            if (!oldPaymentDoc.exists()) {
+                throw new Error("The payment you are trying to edit does not exist anymore.");
+            }
         }
 
         // --- WRITE PHASE ---
-
-        // First, handle the deletion/reversal logic of the old payment if editing
         if (editingPayment?.id && oldPaymentDoc?.exists()) {
-            await handleDeletePaymentLogic(editingPayment, transaction);
+            await handleDeletePaymentLogic(oldPaymentDoc.data() as Payment, transaction);
         }
 
         let paidForDetails: PaidFor[] = [];
@@ -182,12 +182,11 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers, setPaymentDate, setActiveTab
+        suppliers, setPaymentDate
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
     
-    // Set the form state with the payment to edit
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
     setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
@@ -195,7 +194,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setPaymentType(paymentToEdit.type);
     setPaymentMethod(paymentToEdit.receiptType);
     setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
-    setCdEnabled(paymentToEdit.cdApplied || false);
+    setCdEnabled(!!paymentToEdit.cdApplied);
     setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');
@@ -241,7 +240,6 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setSelectedCustomerKey(null);
         setSelectedEntryIds(new Set());
     }
-    setActiveTab('processing');
 };
 
 export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
