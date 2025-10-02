@@ -97,9 +97,9 @@ export const PaymentForm = (props: any) => {
                                 </Popover>
                             </div>
                             
-                            {paymentMethod === 'Online' && (
+                            {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
                                 <div className="space-y-1 flex-1 min-w-[120px]">
-                                    <Label className="text-xs">Payment ID</Label>
+                                    <Label className="text-xs">{paymentMethod === 'Cash' ? 'Payment ID (Voucher No.)' : 'Payment ID'}</Label>
                                     <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
                                 </div>
                             )}
@@ -113,7 +113,7 @@ export const PaymentForm = (props: any) => {
 
                              {paymentMethod === 'Online' && (
                                 <div className="space-y-1 flex-1 min-w-[120px]">
-                                    <Label className="text-xs">Ref No.</Label>
+                                    <Label className="text-xs">Check No. / Ref</Label>
                                     <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/>
                                 </div>
                             )}
