@@ -89,7 +89,8 @@ export const useSupplierPayments = () => {
     
     const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory);
+            // No transaction object is passed here, the function will create its own.
+            await handleDeletePaymentLogic(paymentToDelete); 
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }

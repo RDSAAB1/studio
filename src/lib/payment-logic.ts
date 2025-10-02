@@ -1,7 +1,7 @@
 
 'use client';
 
-import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference, WriteBatch } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency, generateReadableId } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
@@ -26,7 +26,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     const {
         rtgsFor, selectedCustomerKey, selectedEntryIds, editingPayment,
         rtgsAmount, paymentAmount, paymentMethod, selectedAccountId,
-        cdEnabled, calculatedCdAmount, totalOutstandingForSelected,
+        cdEnabled, calculatedCdAmount, 
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
@@ -36,7 +36,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
         return { success: false, message: "No supplier selected" };
     }
-    if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
+    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0) && !editingPayment) {
         return { success: false, message: "Please select entries to pay" };
     }
 
@@ -50,8 +50,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
 
     const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
+    
+    const totalOutstandingForSelected = selectedEntries.reduce((sum: number, entry: Customer) => sum + Number(entry.netAmount), 0);
 
-    if (finalPaymentAmount > availableBalance) {
+    if (finalPaymentAmount > availableBalance && !editingPayment) { // Check balance only for new payments
         const accountName = bankAccounts.find((acc: any) => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
         return { success: false, message: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
     }
