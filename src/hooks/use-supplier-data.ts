@@ -68,58 +68,64 @@ export const useSupplierData = () => {
 
         const summary = new Map<string, CustomerSummary>();
 
-        // Step 1: Create a detailed view for each individual supplier entry first.
+        // Step 1: Group all transactions by a primary key (name|so)
+        const groupedTransactions = new Map<string, Customer[]>();
         safeSuppliers.forEach(s => {
             const groupingKey = `${toTitleCase(s.name || '')}|${toTitleCase(s.so || '')}`;
-            if (!summary.has(groupingKey)) {
-                summary.set(groupingKey, {
-                    name: s.name,
-                    so: s.so,
-                    address: s.address,
-                    contact: s.contact, // We will collect all contacts
-                    acNo: s.acNo,
-                    ifscCode: s.ifscCode,
-                    bank: s.bank,
-                    branch: s.branch,
-                    totalAmount: 0,
-                    totalOriginalAmount: 0,
-                    totalPaid: 0,
-                    totalOutstanding: 0,
-                    totalCdAmount: 0,
-                    paymentHistory: [],
-                    outstandingEntryIds: [],
-                    allTransactions: [],
-                    allPayments: [],
-                    transactionsByVariety: {},
-                    totalGrossWeight: 0,
-                    totalTeirWeight: 0,
-                    totalFinalWeight: 0,
-                    totalKartaWeight: 0,
-                    totalNetWeight: 0,
-                    totalKartaAmount: 0,
-                    totalLabouryAmount: 0,
-                    totalKanta: 0,
-                    totalOtherCharges: 0,
-                    totalDeductions: 0,
-                    averageRate: 0,
-                    averageOriginalPrice: 0,
-                    averageKartaPercentage: 0,
-                    averageLabouryRate: 0,
-                    totalTransactions: 0,
-                    totalOutstandingTransactions: 0
-                });
+            if (!groupedTransactions.has(groupingKey)) {
+                groupedTransactions.set(groupingKey, []);
             }
+            groupedTransactions.get(groupingKey)!.push(s);
+        });
+        
+        // Step 2: Create a summary for each group
+        groupedTransactions.forEach((transactions, key) => {
+            const representative = transactions[0]; // Use the first entry as representative
+            const allCustomerIds = new Set(transactions.map(t => t.customerId));
+            const allContacts = new Set(transactions.map(t => t.contact));
 
-            const data = summary.get(groupingKey)!;
-            data.allTransactions!.push(s);
+            const summaryData: CustomerSummary = {
+                name: representative.name,
+                so: representative.so,
+                address: representative.address,
+                contact: Array.from(allContacts).join(', '),
+                acNo: representative.acNo,
+                ifscCode: representative.ifscCode,
+                bank: representative.bank,
+                branch: representative.branch,
+                totalAmount: 0,
+                totalOriginalAmount: 0,
+                totalPaid: 0,
+                totalOutstanding: 0,
+                totalCdAmount: 0,
+                paymentHistory: [],
+                outstandingEntryIds: [],
+                allTransactions: transactions, // All transactions for this group
+                allPayments: [],
+                transactionsByVariety: {},
+                totalGrossWeight: 0,
+                totalTeirWeight: 0,
+                totalFinalWeight: 0,
+                totalKartaWeight: 0,
+                totalNetWeight: 0,
+                totalKartaAmount: 0,
+                totalLabouryAmount: 0,
+                totalKanta: 0,
+                totalOtherCharges: 0,
+                totalDeductions: 0,
+                averageRate: 0,
+                averageOriginalPrice: 0,
+                averageKartaPercentage: 0,
+                averageLabouryRate: 0,
+                totalTransactions: 0,
+                totalOutstandingTransactions: 0
+            };
+            summary.set(key, summaryData);
         });
         
         let supplierRateSum: { [key: string]: { rate: number; karta: number; laboury: number; count: number } } = {};
 
         summary.forEach((data, key) => {
-            const allContacts = new Set(data.allTransactions!.map(t => t.contact));
-            data.contact = Array.from(allContacts).join(', '); // Join all unique contacts
-
             data.allTransactions!.forEach(s => {
                 data.totalAmount += s.amount || 0;
                 data.totalOriginalAmount += s.originalNetAmount || 0;
@@ -229,5 +235,7 @@ export const useSupplierData = () => {
 };
 
 const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
+
+    
 
     
