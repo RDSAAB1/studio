@@ -66,60 +66,77 @@ export const useSupplierData = () => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
         const LEVENSHTEIN_THRESHOLD = 2;
-
-        const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-
-        const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
-            const supNameNorm = normalizeString(supplier.name);
-            const supSoNorm = normalizeString(supplier.so);
-            let bestMatch: string | null = null;
+    
+        const normalizeString = (str: string) => str ? str.replace(/\s+/g, '').toLowerCase() : '';
+    
+        safeSuppliers.forEach(s => {
+            if (!s.name || !s.contact) return;
+    
+            const supNameNorm = normalizeString(s.name);
+            const supSoNorm = normalizeString(s.so);
+    
+            let bestMatchKey: string | null = null;
             let minDistance = Infinity;
-
-            for (const key of existingKeys) {
+    
+            // Find the best existing match
+            for (const [key, existingSummary] of summary.entries()) {
                 const [keyNameNorm, keySoNorm] = key.split('|');
                 const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
                 const soDist = levenshteinDistance(supSoNorm, keySoNorm);
                 const totalDist = nameDist + soDist;
-
-                if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+    
+                if (totalDist < minDistance) {
                     minDistance = totalDist;
-                    bestMatch = key;
+                    bestMatchKey = key;
                 }
             }
-            return bestMatch;
-        };
-
-        safeSuppliers.forEach(s => {
-            if (!s.name || !s.contact) return;
-            const customerId = s.customerId || `${normalizeString(s.name)}|${normalizeString(s.so)}|${s.contact}`;
-            
-            let groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || customerId;
-            
+    
+            // Decide whether to use the best match or create a new group
+            let groupingKey: string;
+            if (bestMatchKey && minDistance <= LEVENSHTEIN_THRESHOLD) {
+                groupingKey = bestMatchKey;
+            } else {
+                groupingKey = `${supNameNorm}|${supSoNorm}|${s.contact}`;
+            }
+    
+            // Initialize group if it doesn't exist
             if (!summary.has(groupingKey)) {
-                 summary.set(groupingKey, {
-                    name: s.name, contact: s.contact, so: s.so, address: s.address,
-                    totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
-                    totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
-                    ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
+                summary.set(groupingKey, {
+                    name: s.name,
+                    contact: s.contact,
+                    so: s.so,
+                    address: s.address,
+                    totalOutstanding: 0,
+                    paymentHistory: [],
+                    totalAmount: 0,
+                    totalPaid: 0,
+                    outstandingEntryIds: [],
+                    acNo: s.acNo,
+                    ifscCode: s.ifscCode,
+                    bank: s.bank,
+                    branch: s.branch,
                     allTransactions: []
                 } as CustomerSummary);
             }
+    
+            // Add the current supplier entry to the chosen group
             const data = summary.get(groupingKey)!;
             data.allTransactions!.push(s);
         });
-
+    
+        // Calculate totals for each group
         summary.forEach(data => {
             let totalNet = 0;
             data.allTransactions!.forEach(s => {
                 totalNet += Number(s.netAmount) || 0;
             });
             data.totalOutstanding = totalNet;
-
+    
             const customerIdsInGroup = new Set(data.allTransactions!.map(t => t.customerId));
             const relevantPayments = (paymentHistory || []).filter((p: Payment) => customerIdsInGroup.has(p.customerId));
             data.paymentHistory = relevantPayments;
         });
-
+    
         return summary;
     }, [suppliers, paymentHistory]);
 
