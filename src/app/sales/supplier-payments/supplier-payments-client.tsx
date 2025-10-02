@@ -98,7 +98,7 @@ export default function SupplierPaymentsClient() {
                                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                                         <div className="flex-1">
                                             <CustomDropdown
-                                                options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                                options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} (${data.contact})` }))}
                                                 value={hook.selectedCustomerKey}
                                                 onChange={hook.handleCustomerSelect}
                                                 placeholder="Search and select supplier..."
