@@ -149,10 +149,10 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     const {
         handleDeletePayment, setEditingPayment, setPaymentId, setRtgsSrNo,
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
-        setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
+        setCdEnabled, setCdAt, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers,
+        suppliers, setPaymentDate,
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
@@ -183,6 +183,12 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
         bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
     });
+    
+    // Set the original payment date
+    if (paymentToEdit.date) {
+        setPaymentDate(new Date(paymentToEdit.date));
+    }
+
 
     if (paymentToEdit.rtgsFor === 'Supplier') {
         setSelectedCustomerKey(paymentToEdit.customerId);
