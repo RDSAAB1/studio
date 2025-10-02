@@ -138,7 +138,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
         if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
-        const newPaymentRef = doc(paymentsCollection);
+        const newPaymentRef = doc(collection(firestoreDB, "payments"));
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
     });
@@ -165,7 +165,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setPaymentType(paymentToEdit.type);
     setPaymentMethod(paymentToEdit.receiptType);
     setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
-    setCdEnabled(paymentToEdit.cdApplied);
+    setCdEnabled(paymentToEdit.cdApplied || false);
     setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');

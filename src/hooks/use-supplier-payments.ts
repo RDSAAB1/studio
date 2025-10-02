@@ -102,7 +102,7 @@ export const useSupplierPayments = () => {
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
             setActiveTab('processing');
-            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, handleDeletePayment });
+            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...calculations, handleDeletePayment });
 
             if (paymentToEdit.rtgsFor === 'Supplier' && paymentToEdit.paidFor) {
                 const srNosInPayment = paymentToEdit.paidFor.map((pf: any) => pf.srNo);

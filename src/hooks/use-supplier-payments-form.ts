@@ -40,6 +40,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
+    const [cdEnabled, setCdEnabled] = useState(false);
+
 
     const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
 
@@ -213,5 +215,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         resetPaymentForm,
         handleFullReset,
         onEdit, setOnEdit,
+        cdEnabled, setCdEnabled,
     };
 };
