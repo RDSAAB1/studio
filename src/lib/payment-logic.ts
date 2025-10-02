@@ -141,7 +141,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
         if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
-        const newPaymentRef = doc(collection(firestoreDB, "payments"));
+        const newPaymentRef = doc(paymentsCollection);
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
     });
@@ -152,10 +152,10 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     const {
         handleDeletePayment, setEditingPayment, setPaymentId, setRtgsSrNo,
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
-        setCdEnabled, setCalculatedCdAmount, setRtgsFor, setUtrNo, setCheckNo,
+        setCdEnabled, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
         setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers, // assuming suppliers are available from context
+        suppliers,
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
@@ -169,8 +169,6 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setPaymentMethod(paymentToEdit.receiptType);
     setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
     setCdEnabled(paymentToEdit.cdApplied);
-    // This needs to be recalculated, so we set the user's inputs
-    // setCalculatedCdAmount(paymentToEdit.cdAmount);
     setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');

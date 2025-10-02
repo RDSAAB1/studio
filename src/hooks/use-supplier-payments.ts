@@ -84,27 +84,6 @@ export const useSupplierPayments = () => {
         }
     };
     
-    const handleEditPayment = async (paymentToEdit: any) => {
-        try {
-            setActiveTab('processing');
-            // This function from payment-logic will undo the payment and set the form state
-            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form });
-
-            // **NEW FIX**: After form state is set, also set the selected entry IDs
-            if (paymentToEdit.rtgsFor === 'Supplier' && paymentToEdit.paidFor) {
-                const srNosInPayment = paymentToEdit.paidFor.map((pf: any) => pf.srNo);
-                const entriesToSelect = data.suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
-                form.setSelectedEntryIds(new Set(entriesToSelect.map((s: Customer) => s.id)));
-            }
-
-            toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save." });
-        } catch (error: any) {
-            toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null);
-        }
-    };
-
-
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
          try {
             await handleDeletePaymentLogic(paymentIdToDelete, data.paymentHistory);
@@ -117,6 +96,24 @@ export const useSupplierPayments = () => {
         } catch (error: any) {
             console.error("Error deleting payment:", error);
             toast({ title: "Failed to delete payment.", description: error.message, variant: "destructive" });
+        }
+    };
+    
+    const handleEditPayment = async (paymentToEdit: any) => {
+        try {
+            setActiveTab('processing');
+            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, handleDeletePayment });
+
+            if (paymentToEdit.rtgsFor === 'Supplier' && paymentToEdit.paidFor) {
+                const srNosInPayment = paymentToEdit.paidFor.map((pf: any) => pf.srNo);
+                const entriesToSelect = data.suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
+                form.setSelectedEntryIds(new Set(entriesToSelect.map((s: Customer) => s.id)));
+            }
+
+            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
+        } catch (error: any) {
+            toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
+            form.setEditingPayment(null);
         }
     };
 

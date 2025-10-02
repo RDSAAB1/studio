@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+    const [paymentId, setPaymentId] = useState('');
     const [rtgsSrNo, setRtgsSrNo] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
     const [paymentAmount, setPaymentAmount] = useState(0);
@@ -140,12 +141,28 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             onEditCallback(existingPayment);
         }
     };
-    
+
+    const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
+        const value = e.target.value.trim().toUpperCase();
+        if (!value) return;
+
+        const existingPayment = paymentHistory.find(p => p.paymentId === value);
+        const existingExpense = expenses.find(ex => ex.transactionId === value);
+
+        if (existingPayment && existingPayment.rtgsFor === 'Outsider') {
+             onEditCallback(existingPayment);
+        } else if (existingExpense) {
+            onConflict(`This ID is used for an expense: ${existingExpense.description}`);
+        }
+    };
+
     useEffect(() => {
         if (!editingPayment) {
-            setRtgsSrNo(getNextPaymentId('RTGS'));
+             setRtgsSrNo(getNextPaymentId('RTGS'));
+             setPaymentId(getNextPaymentId('Cash'));
         }
     }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
+    
 
     const resetPaymentForm = useCallback((isOutsider: boolean = false) => {
         if (!isOutsider) setSelectedEntryIds(new Set());
@@ -154,6 +171,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
+        setPaymentId(getNextPaymentId('Cash'));
         if (isOutsider) {
             setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
             setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -169,6 +187,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     return {
         selectedCustomerKey, setSelectedCustomerKey,
         selectedEntryIds, setSelectedEntryIds,
+        paymentId, setPaymentId, handlePaymentIdBlur,
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
         paymentDate, setPaymentDate,
         paymentAmount, setPaymentAmount,
