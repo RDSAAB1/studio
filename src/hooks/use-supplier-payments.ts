@@ -114,7 +114,8 @@ export const useSupplierPayments = () => {
     
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
-            await originalHandleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...cdHook }, handleCustomerSelect);
+            const contextForEdit = { ...data, ...form, ...cdHook, selectedEntries };
+            await originalHandleEditPaymentLogic(paymentToEdit, contextForEdit, handleCustomerSelect);
             setActiveTab('processing');
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {

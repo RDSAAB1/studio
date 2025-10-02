@@ -36,9 +36,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
         return { success: false, message: "No supplier selected" };
     }
+    // Allow processing for RTGS to outsider even without selected entries
     if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0) && !editingPayment) {
-        return { success: false, message: "Please select entries to pay" };
+        if (paymentMethod !== 'RTGS') {
+            return { success: false, message: "Please select entries to pay" };
+        } else if (rtgsAmount <= 0) {
+             return { success: false, message: "Please enter an amount for RTGS payment" };
+        }
     }
+
 
     const finalPaymentAmount = rtgsAmount || paymentAmount;
     
@@ -121,7 +127,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             transactionType: 'Expense', category: 'Supplier Payments',
             subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
             amount: finalPaymentAmount, payee: supplierDetails.name,
-            description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
+            description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
             paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
             status: 'Paid', isRecurring: false,
         };
@@ -135,7 +141,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 transactionType: 'Income', category: 'Cash Discount Received',
                 subCategory: 'Supplier CD', amount: calculatedCdAmount, payee: supplierDetails.name,
-                description: `CD received for ${rtgsFor === 'Supplier' && selectedEntries ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
+                description: `CD received for ${rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
                 paymentMethod: 'Other', status: 'Paid', isRecurring: false,
             };
             transaction.set(incomeTransactionRef, incomeData);
@@ -160,7 +166,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
         if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
-        const paymentIdToUse = editingPayment ? editingPayment.id : paymentDataBase.paymentId;
+        const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
         const newPaymentRef = doc(firestoreDB, "payments", paymentIdToUse);
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
@@ -216,7 +222,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setRtgsAmount(paymentToEdit.rtgsAmount || 0);
     setSupplierDetails({
         name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
-        address: paymentToEdit.supplierAddress || '', contact: '' // Contact is not stored in payment
+        address: paymentToEdit.supplierAddress || '', contact: '' // Contact will be fetched from supplier entry
     });
     setBankDetails({
         acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
@@ -230,18 +236,35 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     }
 
     if (paymentToEdit.rtgsFor === 'Supplier') {
-        const paymentSupplierName = toTitleCase(paymentToEdit.supplierName || '');
-        const paymentFatherName = toTitleCase(paymentToEdit.supplierFatherName || '');
+        const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
+        if (!firstSrNo) {
+            // Fallback for older data or outsider payments mistakenly marked as supplier
+            const customerProfileKey = Array.from(customerSummaryMap.keys()).find(key => {
+                const summary = customerSummaryMap.get(key);
+                return toTitleCase(summary?.name || '') === toTitleCase(paymentToEdit.supplierName || '') && toTitleCase(summary?.so || '') === toTitleCase(paymentToEdit.supplierFatherName || '');
+            });
+            if (customerProfileKey) onCustomerSelect(customerProfileKey);
+            else console.warn("Could not find matching customer profile for this payment based on name.");
+            return;
+        }
+
+        const originalEntry = suppliers.find((s: Customer) => s.srNo === firstSrNo);
+        if (!originalEntry) {
+            throw new Error(`Original supplier entry for SR# ${firstSrNo} not found.`);
+        }
         
+        const originalEntryName = toTitleCase(originalEntry.name || '');
+        const originalEntrySO = toTitleCase(originalEntry.so || '');
+
         const customerProfileKey = Array.from(customerSummaryMap.keys()).find(key => {
             const summary = customerSummaryMap.get(key);
-            return toTitleCase(summary?.name || '') === paymentSupplierName && toTitleCase(summary?.so || '') === paymentFatherName;
+            return toTitleCase(summary?.name || '') === originalEntryName && toTitleCase(summary?.so || '') === originalEntrySO;
         });
 
         if (customerProfileKey) {
             onCustomerSelect(customerProfileKey);
         } else {
-            console.warn("Could not find matching customer profile for this payment based on name and father's name.");
+            console.warn(`Could not find customer profile for ${originalEntryName} S/O ${originalEntrySO}.`);
         }
         
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
@@ -254,24 +277,29 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         } else {
             setSelectedEntryIds(new Set());
         }
-    } else {
+    } else { // Outsider payment
         onCustomerSelect(null);
         setSelectedEntryIds(new Set());
     }
 };
 
-export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
-    
+export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction: any) => {
     if (!paymentToDelete || !paymentToDelete.id) {
         throw new Error("Payment object or ID is missing for deletion.");
     }
 
     const runDelete = async (tx: any) => {
         const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
-        const paymentDoc = await tx.get(paymentDocRef);
+        
+        let paymentDoc;
+        if(transaction) { // If called from within another transaction
+             paymentDoc = await tx.get(paymentDocRef);
+        } else { // If called directly
+             paymentDoc = await getDoc(paymentDocRef);
+        }
         
         if (!paymentDoc.exists()) {
-             console.warn(`Payment ${paymentToDelete.id} not found during deletion.`);
+            console.warn(`Payment ${paymentToDelete.id} not found during deletion.`);
             return;
         }
 
@@ -280,14 +308,28 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
             for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                // Use the transaction object to get the docs
-                const supplierDocsSnapshot = await getDocs(q); 
+                
+                let supplierDocsSnapshot;
+                 if(transaction) {
+                    // Firestore transactions don't support getDocs. We have to do this read outside.
+                    // This is a limitation. For now, we will perform a non-transactional get.
+                    // This might lead to issues in high-concurrency scenarios.
+                     supplierDocsSnapshot = await getDocs(q);
+                 } else {
+                     supplierDocsSnapshot = await getDocs(q);
+                 }
+                
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
                     const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    tx.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    
+                    if(transaction) {
+                         tx.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    } else {
+                        await updateDoc(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    }
                     if (db) {
                          await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                     }
@@ -297,10 +339,18 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         
         if (paymentData.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            tx.delete(expenseDocRef);
+            if(transaction) {
+                 tx.delete(expenseDocRef);
+            } else {
+                 await deleteDoc(expenseDocRef);
+            }
         }
-
-        tx.delete(paymentDocRef);
+        
+        if(transaction) {
+             tx.delete(paymentDocRef);
+        } else {
+             await deleteDoc(paymentDocRef);
+        }
     };
 
     if (transaction) {
