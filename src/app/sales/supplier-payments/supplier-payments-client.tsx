@@ -128,8 +128,8 @@ export default function SupplierPaymentsClient() {
                         payments={hook.paymentHistory}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
-                        onDelete={hook.handleDeletePayment}
                         onEdit={hook.handleEditPayment}
+                        onDelete={hook.handleDeletePayment}
                     />
                 </TabsContent>
             </Tabs>
