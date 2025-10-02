@@ -65,11 +65,10 @@ export const useSupplierData = () => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-    
-        // Group suppliers by customerId
+
+        // 1. Group all supplier entries by a consistent customerId
         safeSuppliers.forEach(s => {
             if (!s.customerId) return;
-    
             if (!summary.has(s.customerId)) {
                 summary.set(s.customerId, {
                     name: s.name,
@@ -85,24 +84,24 @@ export const useSupplierData = () => {
                     branch: s.branch,
                 } as CustomerSummary);
             }
-    
-            const data = summary.get(s.customerId)!;
-            data.allTransactions!.push(s);
+            summary.get(s.customerId)!.allTransactions!.push(s);
         });
-    
-        // Calculate totals and assign payments for each group
+
+        // 2. Calculate totals for each group
         summary.forEach(data => {
-            let totalNet = 0;
-            data.allTransactions!.forEach(s => {
-                totalNet += Number(s.netAmount) || 0;
-            });
+            const totalNet = data.allTransactions!.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
             data.totalOutstanding = totalNet;
-    
-            const customerIdsInGroup = new Set(data.allTransactions!.map(t => t.customerId));
-            const relevantPayments = (paymentHistory || []).filter((p: Payment) => customerIdsInGroup.has(p.customerId));
-            data.paymentHistory = relevantPayments;
         });
-    
+
+        // 3. Assign payment history to each group
+        if (Array.isArray(paymentHistory)) {
+            paymentHistory.forEach(p => {
+                if (p.customerId && summary.has(p.customerId)) {
+                    summary.get(p.customerId)!.paymentHistory.push(p);
+                }
+            });
+        }
+        
         return summary;
     }, [suppliers, paymentHistory]);
 
