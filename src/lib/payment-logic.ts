@@ -24,13 +24,12 @@ interface ProcessPaymentResult {
 
 export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
     const {
-        rtgsFor, selectedCustomerKey, selectedEntryIds, editingPayment,
+        rtgsFor, selectedCustomerKey, selectedEntries, editingPayment,
         rtgsAmount, paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, 
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
-        selectedEntries
     } = context;
 
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -174,77 +173,32 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     return { success: true, payment: finalPaymentData };
 };
 
-export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any, onCustomerSelect: (key: string) => void) => {
+export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any, onCustomerSelect: (key: string | null) => void) => {
     const {
-        setEditingPayment, setPaymentId, setRtgsSrNo,
-        setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
-        setCdEnabled, setCdAt, setCdPercent,
-        setRtgsFor, setUtrNo, setCheckNo,
-        setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
-        setSupplierDetails, setBankDetails, setSelectedEntryIds,
-        suppliers, setPaymentDate, customerSummaryMap
+        setEditingPayment,
+        customerSummaryMap, suppliers,
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
     
+    // Store the full payment object to be used later
     setEditingPayment(paymentToEdit);
-    setPaymentId(paymentToEdit.paymentId);
-    setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
-    setPaymentAmount(paymentToEdit.amount);
-    setPaymentType(paymentToEdit.type);
-    setPaymentMethod(paymentToEdit.receiptType);
-    setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
     
-    setCdEnabled(!!paymentToEdit.cdApplied);
-    if (paymentToEdit.cdApplied && paymentToEdit.cdAmount && paymentToEdit.amount) {
-        const baseForCd = paymentToEdit.type === 'Full' 
-            ? (paymentToEdit.paidFor || []).reduce((sum, pf) => sum + (suppliers.find((s: Customer) => s.srNo === pf.srNo)?.originalNetAmount || 0), 0)
-            : paymentToEdit.amount;
-        if (baseForCd > 0) {
-            setCdPercent(Number(((paymentToEdit.cdAmount / baseForCd) * 100).toFixed(2)));
-        }
-        setCdAt(paymentToEdit.type === 'Full' ? 'on_full_amount' : 'partial_on_paid');
-    }
-
-    setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
-    setUtrNo(paymentToEdit.utrNo || '');
-    setCheckNo(paymentToEdit.checkNo || '');
-    setSixRNo(paymentToEdit.sixRNo || '');
-    if (paymentToEdit.sixRDate) {
-        const sixRDateObj = new Date(paymentToEdit.sixRDate + "T00:00:00");
-        setSixRDate(sixRDateObj);
-    } else {
-        setSixRDate(undefined);
-    }
-    setParchiNo(paymentToEdit.parchiNo || (paymentToEdit.paidFor || []).map(pf => pf.srNo).join(', '));
-    setRtgsQuantity(paymentToEdit.quantity || 0);
-    setRtgsRate(paymentToEdit.rate || 0);
-    setRtgsAmount(paymentToEdit.rtgsAmount || 0);
-    setSupplierDetails({
-        name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
-        address: paymentToEdit.supplierAddress || '', contact: '' // Contact will be fetched from supplier entry
-    });
-    setBankDetails({
-        acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
-        bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
-    });
-    
-    if (paymentToEdit.date) {
-        const dateParts = paymentToEdit.date.split('-').map(Number);
-        const utcDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
-        setPaymentDate(utcDate);
-    }
-
+    // Logic to find and select the correct supplier
     if (paymentToEdit.rtgsFor === 'Supplier') {
         const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
         if (!firstSrNo) {
-            // Fallback for older data or outsider payments mistakenly marked as supplier
-            const customerProfileKey = Array.from(customerSummaryMap.keys()).find(key => {
+            console.warn("Cannot find original entry for payment. Falling back to name matching.");
+            const customerProfileKey = Array.from(customerSummaryMap.keys()).find((key: string) => {
                 const summary = customerSummaryMap.get(key);
                 return toTitleCase(summary?.name || '') === toTitleCase(paymentToEdit.supplierName || '') && toTitleCase(summary?.so || '') === toTitleCase(paymentToEdit.supplierFatherName || '');
             });
-            if (customerProfileKey) onCustomerSelect(customerProfileKey);
-            else console.warn("Could not find matching customer profile for this payment based on name.");
+
+            if (customerProfileKey) {
+                onCustomerSelect(customerProfileKey);
+            } else {
+                 throw new Error("Could not find matching customer profile for this payment based on name.");
+            }
             return;
         }
 
@@ -256,7 +210,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         const originalEntryName = toTitleCase(originalEntry.name || '');
         const originalEntrySO = toTitleCase(originalEntry.so || '');
 
-        const customerProfileKey = Array.from(customerSummaryMap.keys()).find(key => {
+        const customerProfileKey = Array.from(customerSummaryMap.keys()).find((key: string) => {
             const summary = customerSummaryMap.get(key);
             return toTitleCase(summary?.name || '') === originalEntryName && toTitleCase(summary?.so || '') === originalEntrySO;
         });
@@ -264,26 +218,14 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         if (customerProfileKey) {
             onCustomerSelect(customerProfileKey);
         } else {
-            console.warn(`Could not find customer profile for ${originalEntryName} S/O ${originalEntrySO}.`);
-        }
-        
-        const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-        if (srNosInPayment.length > 0) {
-            const selectedSupplierEntries = suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
-            if (selectedSupplierEntries.length !== srNosInPayment.length) {
-                 throw new Error("One or more original entries for this payment are missing from local data.");
-            }
-            setSelectedEntryIds(new Set(selectedSupplierEntries.map((s: Customer) => s.id)));
-        } else {
-            setSelectedEntryIds(new Set());
+            throw new Error(`Could not find customer profile for ${originalEntryName} S/O ${originalEntrySO}.`);
         }
     } else { // Outsider payment
         onCustomerSelect(null);
-        setSelectedEntryIds(new Set());
     }
 };
 
-export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction: any) => {
+export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
     if (!paymentToDelete || !paymentToDelete.id) {
         throw new Error("Payment object or ID is missing for deletion.");
     }
@@ -291,12 +233,7 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
     const runDelete = async (tx: any) => {
         const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
         
-        let paymentDoc;
-        if(transaction) { // If called from within another transaction
-             paymentDoc = await tx.get(paymentDocRef);
-        } else { // If called directly
-             paymentDoc = await getDoc(paymentDocRef);
-        }
+        const paymentDoc = await tx.get(paymentDocRef);
         
         if (!paymentDoc.exists()) {
             console.warn(`Payment ${paymentToDelete.id} not found during deletion.`);
@@ -308,16 +245,7 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
             for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                
-                let supplierDocsSnapshot;
-                 if(transaction) {
-                    // Firestore transactions don't support getDocs. We have to do this read outside.
-                    // This is a limitation. For now, we will perform a non-transactional get.
-                    // This might lead to issues in high-concurrency scenarios.
-                     supplierDocsSnapshot = await getDocs(q);
-                 } else {
-                     supplierDocsSnapshot = await getDocs(q);
-                 }
+                const supplierDocsSnapshot = await getDocs(q); 
                 
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
@@ -325,13 +253,10 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
                     const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     
-                    if(transaction) {
-                         tx.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                    } else {
-                        await updateDoc(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                    }
+                    tx.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    
                     if (db) {
-                         await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
+                        await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                     }
                 }
             }
@@ -339,18 +264,10 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         
         if (paymentData.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            if(transaction) {
-                 tx.delete(expenseDocRef);
-            } else {
-                 await deleteDoc(expenseDocRef);
-            }
+            tx.delete(expenseDocRef);
         }
         
-        if(transaction) {
-             tx.delete(paymentDocRef);
-        } else {
-             await deleteDoc(paymentDocRef);
-        }
+        tx.delete(paymentDocRef);
     };
 
     if (transaction) {

@@ -68,7 +68,9 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
                 // Open the modal only after a selection is confirmed
-                 setTimeout(() => setIsOutstandingModalOpen(true), 100);
+                 if (!form.editingPayment) {
+                    setTimeout(() => setIsOutstandingModalOpen(true), 100);
+                 }
             }
         }
     };
@@ -125,17 +127,62 @@ export const useSupplierPayments = () => {
     };
 
     const handlePaySelectedOutstanding = () => {
-        if (form.selectedEntryIds.size === 0) {
-            toast({ title: "No Entries Selected.", variant: "destructive" });
-            return;
+        if (form.editingPayment) {
+            const {
+                setPaymentId, setRtgsSrNo, setPaymentAmount, setPaymentType,
+                setPaymentMethod, setSelectedAccountId, setCdEnabled, setCdAt,
+                setCdPercent, setUtrNo, setCheckNo, setSixRNo, setSixRDate,
+                setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
+                setSupplierDetails, setBankDetails, setPaymentDate
+            } = form;
+
+            const paymentToEdit = form.editingPayment;
+            setPaymentId(paymentToEdit.paymentId);
+            setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
+            setPaymentAmount(paymentToEdit.amount);
+            setPaymentType(paymentToEdit.type);
+            setPaymentMethod(paymentToEdit.receiptType);
+            setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
+            
+            setCdEnabled(!!paymentToEdit.cdApplied);
+            if (paymentToEdit.cdApplied && paymentToEdit.cdAmount && paymentToEdit.amount) {
+                const baseForCd = paymentToEdit.type === 'Full' 
+                    ? (paymentToEdit.paidFor || []).reduce((sum, pf) => sum + (data.suppliers.find((s: Customer) => s.srNo === pf.srNo)?.originalNetAmount || 0), 0)
+                    : paymentToEdit.amount;
+                if (baseForCd > 0) {
+                    setCdPercent(Number(((paymentToEdit.cdAmount / baseForCd) * 100).toFixed(2)));
+                }
+                setCdAt(paymentToEdit.type === 'Full' ? 'on_full_amount' : 'partial_on_paid');
+            }
+
+            setUtrNo(paymentToEdit.utrNo || '');
+            setCheckNo(paymentToEdit.checkNo || '');
+            setSixRNo(paymentToEdit.sixRNo || '');
+             if (paymentToEdit.sixRDate) {
+                const sixRDateObj = new Date(paymentToEdit.sixRDate + "T00:00:00");
+                setSixRDate(sixRDateObj);
+            } else {
+                setSixRDate(undefined);
+            }
+            setParchiNo(paymentToEdit.parchiNo || (paymentToEdit.paidFor || []).map(pf => pf.srNo).join(', '));
+            setRtgsQuantity(paymentToEdit.quantity || 0);
+            setRtgsRate(paymentToEdit.rate || 0);
+            setRtgsAmount(paymentToEdit.rtgsAmount || 0);
+            setSupplierDetails({
+                name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
+                address: paymentToEdit.supplierAddress || '', contact: ''
+            });
+            setBankDetails({
+                acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
+                bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
+            });
+            
+            if (paymentToEdit.date) {
+                const dateParts = paymentToEdit.date.split('-').map(Number);
+                const utcDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+                setPaymentDate(utcDate);
+            }
         }
-        
-        const srNos = Array.from(form.selectedEntryIds).map(id => {
-            const entry = data.suppliers.find((s: Customer) => s.id === id);
-            return entry ? entry.srNo : '';
-        }).filter(Boolean);
-        
-        form.setParchiNo(srNos.join(', '));
         
         setIsOutstandingModalOpen(false);
     };
