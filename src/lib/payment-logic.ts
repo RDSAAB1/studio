@@ -56,7 +56,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
     const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
     
-    const totalOutstandingForSelected = selectedEntries.reduce((sum: number, entry: Customer) => sum + Number(entry.netAmount), 0);
+    const totalOutstandingForSelected = selectedEntries?.reduce((sum: number, entry: Customer) => sum + Number(entry.netAmount), 0) || 0;
+
 
     if (finalPaymentAmount > availableBalance && !editingPayment) { // Check balance only for new payments
         const accountName = bankAccounts.find((acc: any) => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
@@ -87,7 +88,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         
         // --- WRITE PHASE ---
         if (editingPayment?.id) {
-            await handleDeletePaymentLogic(editingPayment, transaction);
+            await handleDeletePaymentLogic(editingPayment, true, transaction);
         }
 
         let paidForDetails: PaidFor[] = [];
@@ -173,59 +174,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     return { success: true, payment: finalPaymentData };
 };
 
-export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any, onCustomerSelect: (key: string | null) => void) => {
-    const {
-        setEditingPayment,
-        customerSummaryMap, suppliers,
-    } = context;
 
-    if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
-    
-    // Store the full payment object to be used later
-    setEditingPayment(paymentToEdit);
-    
-    // Logic to find and select the correct supplier
-    if (paymentToEdit.rtgsFor === 'Supplier') {
-        const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-        if (!firstSrNo) {
-            console.warn("Cannot find original entry for payment. Falling back to name matching.");
-            const customerProfileKey = Array.from(customerSummaryMap.keys()).find((key: string) => {
-                const summary = customerSummaryMap.get(key);
-                return toTitleCase(summary?.name || '') === toTitleCase(paymentToEdit.supplierName || '') && toTitleCase(summary?.so || '') === toTitleCase(paymentToEdit.supplierFatherName || '');
-            });
-
-            if (customerProfileKey) {
-                onCustomerSelect(customerProfileKey);
-            } else {
-                 throw new Error("Could not find matching customer profile for this payment based on name.");
-            }
-            return;
-        }
-
-        const originalEntry = suppliers.find((s: Customer) => s.srNo === firstSrNo);
-        if (!originalEntry) {
-            throw new Error(`Original supplier entry for SR# ${firstSrNo} not found.`);
-        }
-        
-        const originalEntryName = toTitleCase(originalEntry.name || '');
-        const originalEntrySO = toTitleCase(originalEntry.so || '');
-
-        const customerProfileKey = Array.from(customerSummaryMap.keys()).find((key: string) => {
-            const summary = customerSummaryMap.get(key);
-            return toTitleCase(summary?.name || '') === originalEntryName && toTitleCase(summary?.so || '') === originalEntrySO;
-        });
-
-        if (customerProfileKey) {
-            onCustomerSelect(customerProfileKey);
-        } else {
-            throw new Error(`Could not find customer profile for ${originalEntryName} S/O ${originalEntrySO}.`);
-        }
-    } else { // Outsider payment
-        onCustomerSelect(null);
-    }
-};
-
-export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transaction?: any) => {
+export const handleDeletePaymentLogic = async (paymentToDelete: Payment, isEditing: boolean = false, transaction?: any) => {
     if (!paymentToDelete || !paymentToDelete.id) {
         throw new Error("Payment object or ID is missing for deletion.");
     }
@@ -276,7 +226,7 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         await runTransaction(firestoreDB, runDelete);
     }
     
-     if (db) {
+     if (db && !isEditing) {
         await deletePaymentFromLocalDB(paymentToDelete.id);
     }
 };

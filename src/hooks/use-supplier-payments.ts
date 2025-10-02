@@ -5,7 +5,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
-import { processPaymentLogic, handleEditPaymentLogic as originalHandleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
+import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
 import { addBank } from '@/lib/firestore';
 import type { Customer, Payment } from '@/lib/definitions';
@@ -51,7 +51,10 @@ export const useSupplierPayments = () => {
 
     const handleCustomerSelect = (key: string | null) => {
         form.setSelectedCustomerKey(key);
-        form.resetPaymentForm(); 
+        // We reset form only if it's not an edit flow in progress
+        if (!form.editingPayment) {
+            form.resetPaymentForm();
+        }
         if (key) {
             const customerData = data.customerSummaryMap.get(key);
             if (customerData) {
@@ -114,15 +117,56 @@ export const useSupplierPayments = () => {
         }
     };
     
-    const handleEditPayment = async (paymentToEdit: any) => {
+    const handleEditPayment = async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) {
+            toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
+            return;
+        }
+
+        form.setEditingPayment(paymentToEdit); // Store the full payment object
+
         try {
-            const contextForEdit = { ...data, ...form, ...cdHook, selectedEntries };
-            await originalHandleEditPaymentLogic(paymentToEdit, contextForEdit, handleCustomerSelect);
+            let customerProfileKey: string | undefined;
+
+            if (paymentToEdit.rtgsFor === 'Supplier') {
+                const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
+                if (!firstSrNo) {
+                    throw new Error("Cannot find original entry reference in the payment.");
+                }
+
+                const originalEntry = data.suppliers.find((s: Customer) => s.srNo === firstSrNo);
+                if (!originalEntry) {
+                    throw new Error(`Original supplier entry for SR# ${firstSrNo} not found.`);
+                }
+                
+                const originalEntryName = toTitleCase(originalEntry.name || '');
+                const originalEntrySO = toTitleCase(originalEntry.so || '');
+
+                customerProfileKey = Array.from(data.customerSummaryMap.keys()).find((key: string) => {
+                    const summary = data.customerSummaryMap.get(key);
+                    return toTitleCase(summary?.name || '') === originalEntryName && toTitleCase(summary?.so || '') === originalEntrySO;
+                });
+
+                if (!customerProfileKey) {
+                    throw new Error(`Could not find a matching supplier profile for ${originalEntryName}.`);
+                }
+            } else { // Outsider
+                customerProfileKey = 'OUTSIDER_PAYMENT_KEY'; // A placeholder or handle as needed
+            }
+
+            if (customerProfileKey) {
+                handleCustomerSelect(customerProfileKey);
+                const paidForSrNos = new Set(paymentToEdit.paidFor?.map(pf => pf.srNo) || []);
+                const paidForIds = data.suppliers.filter(s => paidForSrNos.has(s.srNo)).map(s => s.id);
+                form.setSelectedEntryIds(new Set(paidForIds));
+                setIsOutstandingModalOpen(true);
+            }
+            
             setActiveTab('processing');
-            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
+
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null);
+            form.setEditingPayment(null); // Clear editing state on error
         }
     };
 
@@ -135,15 +179,18 @@ export const useSupplierPayments = () => {
                 setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
                 setSupplierDetails, setBankDetails, setPaymentDate
             } = form;
-
+    
             const paymentToEdit = form.editingPayment;
+    
+            // Set basic details
             setPaymentId(paymentToEdit.paymentId);
             setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
             setPaymentAmount(paymentToEdit.amount);
             setPaymentType(paymentToEdit.type);
-            setPaymentMethod(paymentToEdit.receiptType);
+            setPaymentMethod(paymentToEdit.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
             
+            // Set CD details
             setCdEnabled(!!paymentToEdit.cdApplied);
             if (paymentToEdit.cdApplied && paymentToEdit.cdAmount && paymentToEdit.amount) {
                 const baseForCd = paymentToEdit.type === 'Full' 
@@ -153,35 +200,46 @@ export const useSupplierPayments = () => {
                     setCdPercent(Number(((paymentToEdit.cdAmount / baseForCd) * 100).toFixed(2)));
                 }
                 setCdAt(paymentToEdit.type === 'Full' ? 'on_full_amount' : 'partial_on_paid');
+            } else {
+                 setCdEnabled(false);
+                 setCdPercent(0);
             }
-
+    
+            // Set reference numbers
             setUtrNo(paymentToEdit.utrNo || '');
             setCheckNo(paymentToEdit.checkNo || '');
             setSixRNo(paymentToEdit.sixRNo || '');
-             if (paymentToEdit.sixRDate) {
-                const sixRDateObj = new Date(paymentToEdit.sixRDate + "T00:00:00");
+            if (paymentToEdit.sixRDate) {
+                const sixRDateObj = new Date(paymentToEdit.sixRDate + "T00:00:00"); // Avoid timezone issues
                 setSixRDate(sixRDateObj);
             } else {
                 setSixRDate(undefined);
             }
             setParchiNo(paymentToEdit.parchiNo || (paymentToEdit.paidFor || []).map(pf => pf.srNo).join(', '));
+            
+            // Set RTGS specific details
             setRtgsQuantity(paymentToEdit.quantity || 0);
             setRtgsRate(paymentToEdit.rate || 0);
             setRtgsAmount(paymentToEdit.rtgsAmount || 0);
+            
+            // Set Payee and Bank details
             setSupplierDetails({
                 name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
-                address: paymentToEdit.supplierAddress || '', contact: ''
+                address: paymentToEdit.supplierAddress || '', contact: '' // Contact is not stored in payment
             });
             setBankDetails({
                 acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
                 bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
             });
             
+            // Set Payment Date
             if (paymentToEdit.date) {
                 const dateParts = paymentToEdit.date.split('-').map(Number);
                 const utcDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
                 setPaymentDate(utcDate);
             }
+            
+            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         }
         
         setIsOutstandingModalOpen(false);
