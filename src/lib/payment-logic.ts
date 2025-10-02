@@ -102,7 +102,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             transactionType: 'Expense', category: 'Supplier Payments',
             subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
             amount: finalPaymentAmount, payee: supplierDetails.name,
-            description: `Payment ${paymentId} to ${supplierDetails.name}`,
+            description: `Payment for ${rtgsFor === 'Supplier' ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
             paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
             status: 'Paid', isRecurring: false,
         };
@@ -116,7 +116,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 transactionType: 'Income', category: 'Cash Discount Received',
                 subCategory: 'Supplier CD', amount: calculatedCdAmount, payee: supplierDetails.name,
-                description: `CD received on payment ${paymentId}`,
+                description: `CD received for ${rtgsFor === 'Supplier' ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
                 paymentMethod: 'Other', status: 'Paid', isRecurring: false,
             };
             transaction.set(incomeTransactionRef, incomeData);
@@ -141,7 +141,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
         if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
-        const newPaymentRef = doc(paymentsCollection);
+        const newPaymentRef = doc(collection(firestoreDB, "payments"));
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
     });
