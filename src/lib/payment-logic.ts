@@ -1,5 +1,7 @@
 
 
+'use client';
+
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
@@ -220,35 +222,42 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     }
 };
 
-export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymentHistory: Payment[]) => {
-    const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-    if (!paymentToDelete || !paymentToDelete.id) {
-        throw new Error("Payment not found or ID missing.");
-    }
+export const handleDeletePaymentLogic = async (paymentIdToDelete: string) => {
+    const paymentDocRef = doc(firestoreDB, "payments", paymentIdToDelete);
 
     await runTransaction(firestoreDB, async (transaction) => {
-        const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
-        
-        if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-            for (const detail of paymentToDelete.paidFor) {
+        const paymentDoc = await transaction.get(paymentDocRef);
+        if (!paymentDoc.exists()) {
+            throw new Error("Payment not found or ID missing.");
+        }
+
+        const paymentData = paymentDoc.data() as Payment;
+
+        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
+            for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
                 const supplierDocsSnapshot = await getDocs(q); 
-                 if (!supplierDocsSnapshot.empty) {
+                if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
+                    const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    if (db) {
+                         await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
+                    }
                 }
             }
         }
         
-        if (paymentToDelete.expenseTransactionId) {
-            const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
+        if (paymentData.expenseTransactionId) {
+            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
             transaction.delete(expenseDocRef);
         }
-        
-        // Hard delete the payment document
-        transaction.delete(paymentRef);
+
+        transaction.delete(paymentDocRef);
     });
+     if (db) {
+        await deletePaymentFromLocalDB(paymentIdToDelete); // WRITE-THROUGH
+    }
 };
