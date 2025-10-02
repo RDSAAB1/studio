@@ -5,7 +5,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
-import { processPaymentLogic, handleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
+import { processPaymentLogic, handleEditPaymentLogic as originalHandleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
 import { addBank } from '@/lib/firestore';
 import type { Customer, Payment } from '@/lib/definitions';
@@ -76,7 +76,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...cdHook, selectedEntries, handleDeletePayment });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdHook, selectedEntries });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -99,7 +99,7 @@ export const useSupplierPayments = () => {
     
     const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentToDelete); 
+            await handleDeletePaymentLogic(paymentToDelete, isEditing); 
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }
@@ -114,7 +114,7 @@ export const useSupplierPayments = () => {
     
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
-            await handleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...cdHook });
+            await originalHandleEditPaymentLogic(paymentToEdit, { ...data, ...form, ...cdHook }, handleCustomerSelect);
             setActiveTab('processing');
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {

@@ -30,7 +30,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
-        selectedEntries, handleDeletePayment, paymentHistory
+        selectedEntries
     } = context;
 
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -86,7 +86,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
 
         let paidForDetails: PaidFor[] = [];
-        if (rtgsFor === 'Supplier') {
+        if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
             let amountToDistribute = Math.round(totalPaidAmount);
             const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
 
@@ -168,15 +168,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     return { success: true, payment: finalPaymentData };
 };
 
-export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any) => {
+export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any, onCustomerSelect: (key: string) => void) => {
     const {
         setEditingPayment, setPaymentId, setRtgsSrNo,
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
         setCdEnabled, setCdAt, setCdPercent,
         setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
-        setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
-        suppliers, setPaymentDate
+        setSupplierDetails, setBankDetails, setSelectedEntryIds,
+        suppliers, setPaymentDate, customerSummaryMap
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
@@ -191,7 +191,6 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     
     setCdEnabled(!!paymentToEdit.cdApplied);
     if (paymentToEdit.cdApplied && paymentToEdit.cdAmount && paymentToEdit.amount) {
-        // A simple reverse calculation to find a possible percentage
         const baseForCd = paymentToEdit.type === 'Full' 
             ? (paymentToEdit.paidFor || []).reduce((sum, pf) => sum + (suppliers.find((s: Customer) => s.srNo === pf.srNo)?.originalNetAmount || 0), 0)
             : paymentToEdit.amount;
@@ -231,7 +230,20 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     }
 
     if (paymentToEdit.rtgsFor === 'Supplier') {
-        setSelectedCustomerKey(paymentToEdit.customerId);
+        const paymentSupplierName = toTitleCase(paymentToEdit.supplierName || '');
+        const paymentFatherName = toTitleCase(paymentToEdit.supplierFatherName || '');
+        
+        const customerProfileKey = Array.from(customerSummaryMap.keys()).find(key => {
+            const summary = customerSummaryMap.get(key);
+            return toTitleCase(summary?.name || '') === paymentSupplierName && toTitleCase(summary?.so || '') === paymentFatherName;
+        });
+
+        if (customerProfileKey) {
+            onCustomerSelect(customerProfileKey);
+        } else {
+            console.warn("Could not find matching customer profile for this payment based on name and father's name.");
+        }
+        
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         if (srNosInPayment.length > 0) {
             const selectedSupplierEntries = suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
@@ -243,7 +255,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
             setSelectedEntryIds(new Set());
         }
     } else {
-        setSelectedCustomerKey(null);
+        onCustomerSelect(null);
         setSelectedEntryIds(new Set());
     }
 };
@@ -268,6 +280,7 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
             for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                // Use the transaction object to get the docs
                 const supplierDocsSnapshot = await getDocs(q); 
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
@@ -300,5 +313,3 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, transac
         await deletePaymentFromLocalDB(paymentToDelete.id);
     }
 };
-
-    
