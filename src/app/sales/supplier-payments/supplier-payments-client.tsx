@@ -35,10 +35,10 @@ export default function SupplierPaymentsClient() {
     const hook = useSupplierPayments();
 
     const transactionsForSelectedSupplier = useMemo(() => {
-        if (!hook.selectedCustomerKey || !hook.suppliers) return [];
+        if (!hook.selectedCustomerKey) return [];
         const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
-    }, [hook.selectedCustomerKey, hook.suppliers, hook.customerSummaryMap]);
+    }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
     
     const paymentsForDetailsEntry = useMemo(() => {
         if (!hook.detailsSupplierEntry || !hook.paymentHistory) return [];
@@ -178,5 +178,3 @@ export default function SupplierPaymentsClient() {
         </div>
     );
 }
-
-    
