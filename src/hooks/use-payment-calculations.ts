@@ -4,7 +4,7 @@
 import { useMemo, useEffect } from 'react';
 import { useCashDiscount } from './use-cash-discount';
 import type { Customer, CustomerSummary, Payment, CustomerPayment, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
-import { toTitleCase, levenshteinDistance } from '@/lib/utils';
+import { toTitleCase, levenshteinDistance, formatCurrency } from '@/lib/utils';
 
 export const usePaymentCalculations = (data: any, form: any) => {
     const { suppliers, paymentHistory, bankAccounts, fundTransactions, incomes, expenses, customerPayments } = data;
@@ -45,11 +45,50 @@ export const usePaymentCalculations = (data: any, form: any) => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-    
-        // Step 1: Initialize the summary map for each unique customerId
+        const LEVENSHTEIN_THRESHOLD = 2;
+
+        // Function to create a normalized key from customer data
+        const createKey = (c: Customer) => `${toTitleCase(c.name)}|${toTitleCase(c.so || '')}|${c.contact}`.toLowerCase();
+        
+        // Function to find a similar key using Levenshtein distance
+        const findBestMatchKey = (customer: Customer, existingKeys: string[]): string | null => {
+            const custNameNorm = toTitleCase(customer.name).replace(/\s+/g, '').toLowerCase();
+            const custSoNorm = toTitleCase(customer.so || '').replace(/\s+/g, '').toLowerCase();
+            let bestMatch: string | null = null;
+            let minDistance = Infinity;
+
+            for (const key of existingKeys) {
+                const [keyName, keySo] = key.split('|');
+                const nameDist = levenshteinDistance(custNameNorm, keyName.replace(/\s+/g, '').toLowerCase());
+                const soDist = levenshteinDistance(custSoNorm, (keySo || '').replace(/\s+/g, '').toLowerCase());
+                const totalDist = nameDist + soDist;
+                
+                if (totalDist > 0 && totalDist < LEVENSHTEIN_THRESHOLD) {
+                    if (totalDist < minDistance) {
+                        minDistance = totalDist;
+                        bestMatch = key;
+                    }
+                }
+            }
+            return bestMatch;
+        };
+        
+        // Group suppliers
         safeSuppliers.forEach(s => {
-            if (s.customerId && !summary.has(s.customerId)) {
-                summary.set(s.customerId, {
+            if (!s.customerId) return;
+            
+            // Prefer exact match on customerId first
+            let groupingKey = s.customerId;
+            if (!summary.has(groupingKey)) {
+                // If no exact match, try to find a fuzzy match
+                const bestMatchKey = findBestMatchKey(s, Array.from(summary.keys()));
+                if (bestMatchKey) {
+                    groupingKey = bestMatchKey;
+                }
+            }
+
+            if (!summary.has(groupingKey)) {
+                summary.set(groupingKey, {
                     name: s.name, contact: s.contact, so: s.so, address: s.address,
                     totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                     totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -57,26 +96,23 @@ export const usePaymentCalculations = (data: any, form: any) => {
                     allTransactions: []
                 } as CustomerSummary);
             }
+            const data = summary.get(groupingKey)!;
+            data.allTransactions!.push(s);
         });
-    
-        // Step 2: Aggregate transaction data into the summaries
-        safeSuppliers.forEach(s => {
-            if (s.customerId && summary.has(s.customerId)) {
-                const data = summary.get(s.customerId)!;
-                data.allTransactions!.push(s);
-                const netAmount = Math.round(parseFloat(String(s.netAmount)));
-                data.totalOutstanding += netAmount;
-            }
+
+        // Calculate totals for each group
+        summary.forEach(data => {
+            let totalNet = 0;
+            data.allTransactions!.forEach(s => {
+                totalNet += Number(s.netAmount) || 0;
+            });
+            data.totalOutstanding = totalNet;
+
+            const customerIdsInGroup = new Set(data.allTransactions!.map(t => t.customerId));
+            const relevantPayments = (paymentHistory || []).filter((p: Payment) => customerIdsInGroup.has(p.customerId));
+            data.paymentHistory = relevantPayments;
         });
-    
-        // Step 3: Aggregate payment history
-        paymentHistory?.forEach((p: Payment) => {
-            if (p.customerId && summary.has(p.customerId)) {
-                const summaryData = summary.get(p.customerId)!;
-                summaryData.paymentHistory?.push(p);
-            }
-        });
-        
+
         return summary;
     }, [suppliers, paymentHistory]);
     
