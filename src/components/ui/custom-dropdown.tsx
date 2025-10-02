@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, levenshteinDistance } from '@/lib/utils';
 import { Input } from './input';
 
 export interface CustomDropdownOption {
@@ -51,9 +51,21 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
             return options;
         }
-        return options.filter(item =>
-            item.label.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        
+        const lowercasedSearchTerm = searchTerm.toLowerCase();
+        
+        return options
+            .map(item => ({
+                ...item,
+                // Calculate Levenshtein distance for fuzzy matching
+                distance: levenshteinDistance(lowercasedSearchTerm, item.label.toLowerCase())
+            }))
+            .filter(item => 
+                // Keep items that include the search term OR are very similar (low distance)
+                item.label.toLowerCase().includes(lowercasedSearchTerm) || item.distance <= 2
+            )
+            .sort((a, b) => a.distance - b.distance); // Sort by similarity
+
     }, [searchTerm, options, selectedItem]);
 
     const handleClickOutside = useCallback((event: MouseEvent) => {
