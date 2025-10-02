@@ -104,7 +104,7 @@ export const useSupplierPayments = () => {
     
     const handleDeletePayment = async (paymentToDelete: Payment, isEditing: boolean = false) => {
          try {
-            await handleDeletePaymentLogic(paymentToDelete, isEditing); 
+            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory); 
             if (!isEditing) {
                 toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             }
@@ -123,21 +123,18 @@ export const useSupplierPayments = () => {
             return;
         }
 
-        form.setEditingPayment(paymentToEdit); // Store the full payment object
+        form.setEditingPayment(paymentToEdit);
+        form.setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
 
         try {
             let customerProfileKey: string | undefined;
 
             if (paymentToEdit.rtgsFor === 'Supplier') {
                 const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-                if (!firstSrNo) {
-                    throw new Error("Cannot find original entry reference in the payment.");
-                }
+                if (!firstSrNo) throw new Error("Cannot find original entry reference in the payment.");
 
                 const originalEntry = data.suppliers.find((s: Customer) => s.srNo === firstSrNo);
-                if (!originalEntry) {
-                    throw new Error(`Original supplier entry for SR# ${firstSrNo} not found.`);
-                }
+                if (!originalEntry) throw new Error(`Original supplier entry for SR# ${firstSrNo} not found.`);
                 
                 const originalEntryName = toTitleCase(originalEntry.name || '');
                 const originalEntrySO = toTitleCase(originalEntry.so || '');
@@ -147,22 +144,22 @@ export const useSupplierPayments = () => {
                     return toTitleCase(summary?.name || '') === originalEntryName && toTitleCase(summary?.so || '') === originalEntrySO;
                 });
 
-                if (!customerProfileKey) {
-                    throw new Error(`Could not find a matching supplier profile for ${originalEntryName}.`);
-                }
+                if (!customerProfileKey) throw new Error(`Could not find a matching supplier profile for ${originalEntryName}.`);
             } else { // Outsider
-                customerProfileKey = 'OUTSIDER_PAYMENT_KEY'; // A placeholder or handle as needed
+                customerProfileKey = undefined; // No profile key for outsiders
             }
-
+            
+            setActiveTab('processing');
             if (customerProfileKey) {
                 handleCustomerSelect(customerProfileKey);
                 const paidForSrNos = new Set(paymentToEdit.paidFor?.map(pf => pf.srNo) || []);
                 const paidForIds = data.suppliers.filter(s => paidForSrNos.has(s.srNo)).map(s => s.id);
                 form.setSelectedEntryIds(new Set(paidForIds));
                 setIsOutstandingModalOpen(true);
+            } else if (paymentToEdit.rtgsFor === 'Outsider') {
+                 handlePaySelectedOutstanding(); // Directly fill form for outsiders
             }
-            
-            setActiveTab('processing');
+
 
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
