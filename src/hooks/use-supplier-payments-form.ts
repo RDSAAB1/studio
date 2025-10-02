@@ -38,7 +38,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [minRate, setMinRate] = useState<number>(0);
     const [maxRate, setMaxRate] = useState<number>(0);
     
-    // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
     const [cdEnabled, setCdEnabled] = useState(false);
 
@@ -102,6 +101,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (!paymentHistory || !expenses) return '';
+    
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const lastNum = rtgsPayments.reduce((max, p) => {
@@ -111,20 +111,34 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             }, 0);
             return generateReadableId('RT', lastNum, 5);
         }
-         // For Cash and Online, we don't have a separate ID in the form anymore, but the logic can stay for other uses.
-        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash');
+    
+        if (method === 'Online') {
+            const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online' && p.paymentId.startsWith('P'));
+            const lastNum = onlinePayments.reduce((max, p) => {
+                const numMatch = p.paymentId.match(/^P(\d+)$/);
+                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+                return num > max ? num : max;
+            }, 0);
+            return generateReadableId('P', lastNum, 5);
+        }
+    
+        // For Cash payment
+        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash' && p.paymentId.startsWith('EX'));
         const lastCashNum = cashPayments.reduce((max, p) => {
             const numMatch = p.paymentId.match(/^EX(\d+)$/);
             const num = numMatch ? parseInt(numMatch[1], 10) : 0;
             return num > max ? num : max;
         }, 0);
+        
         const lastExpenseNum = expenses.reduce((max, e) => {
             const numMatch = e.transactionId?.match(/^EX(\d+)$/);
             const num = numMatch ? parseInt(numMatch[1], 10) : 0;
             return num > max ? num : max;
         }, 0);
+    
         const lastNum = Math.max(lastCashNum, lastExpenseNum);
         return generateReadableId('EX', lastNum, 5);
+
     }, [paymentHistory, expenses]);
     
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
@@ -151,7 +165,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const existingPayment = paymentHistory.find(p => p.paymentId === value);
         const existingExpense = expenses.find(ex => ex.transactionId === value);
 
-        if (existingPayment && existingPayment.rtgsFor === 'Outsider') {
+        if (existingPayment) { // This will catch both P and EX from payments
              onEditCallback(existingPayment);
         } else if (existingExpense) {
             onConflict(`This ID is used for an expense: ${existingExpense.description}`);
@@ -161,7 +175,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     useEffect(() => {
         if (!editingPayment) {
              setRtgsSrNo(getNextPaymentId('RTGS'));
-             setPaymentId(getNextPaymentId('Cash'));
+             setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
         }
     }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
     
@@ -173,7 +187,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
-        setPaymentId(getNextPaymentId('Cash'));
+        setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
         if (isOutsider) {
             setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
             setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
