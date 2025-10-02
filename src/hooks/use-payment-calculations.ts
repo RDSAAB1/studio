@@ -45,35 +45,11 @@ export const usePaymentCalculations = (data: any, form: any) => {
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
-        const LEVENSHTEIN_THRESHOLD = 2;
     
-        const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-
-        const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
-            const supNameNorm = normalizeString(supplier.name);
-            const supSoNorm = normalizeString(supplier.so || '');
-            let bestMatch: string | null = null;
-            let minDistance = Infinity;
-
-            for (const key of existingKeys) {
-                const [keyNameNorm, keySoNorm] = key.split('|');
-                const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-                const soDist = levenshteinDistance(supSoNorm, keySoNorm || '');
-                const totalDist = nameDist + soDist;
-                
-                if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
-                    minDistance = totalDist;
-                    bestMatch = key;
-                }
-            }
-            return bestMatch;
-        };
-        
+        // Step 1: Initialize the summary map for each unique customerId
         safeSuppliers.forEach(s => {
-            const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
-
-            if (!summary.has(groupingKey)) {
-                summary.set(groupingKey, {
+            if (s.customerId && !summary.has(s.customerId)) {
+                summary.set(s.customerId, {
                     name: s.name, contact: s.contact, so: s.so, address: s.address,
                     totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                     totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -81,20 +57,23 @@ export const usePaymentCalculations = (data: any, form: any) => {
                     allTransactions: []
                 } as CustomerSummary);
             }
-            const data = summary.get(groupingKey)!;
-            data.allTransactions!.push(s);
-            const netAmount = Math.round(parseFloat(String(s.netAmount)));
-            data.totalOutstanding += netAmount;
         });
-
-        // This part seems redundant if allTransactions are already grouped.
-        // Keeping it for now but might need refactoring.
+    
+        // Step 2: Aggregate transaction data into the summaries
+        safeSuppliers.forEach(s => {
+            if (s.customerId && summary.has(s.customerId)) {
+                const data = summary.get(s.customerId)!;
+                data.allTransactions!.push(s);
+                const netAmount = Math.round(parseFloat(String(s.netAmount)));
+                data.totalOutstanding += netAmount;
+            }
+        });
+    
+        // Step 3: Aggregate payment history
         paymentHistory?.forEach((p: Payment) => {
-            if (p.customerId) {
-                const summaryData = summary.get(p.customerId);
-                if (summaryData) {
-                    summaryData.paymentHistory?.push(p);
-                }
+            if (p.customerId && summary.has(p.customerId)) {
+                const summaryData = summary.get(p.customerId)!;
+                summaryData.paymentHistory?.push(p);
             }
         });
         
