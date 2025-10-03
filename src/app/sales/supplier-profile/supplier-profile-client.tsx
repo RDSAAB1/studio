@@ -318,9 +318,9 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Step 1: Create a detailed view for each individual supplier entry first.
+    // Correctly calculate netAmount for each transaction before grouping
     const detailedEntries = filteredSuppliers.map(entry => {
-        const paymentsForThisEntry = filteredPayments.filter(p => 
+        const paymentsForThisEntry = filteredPayments.filter(p =>
             p.paidFor?.some(pf => pf.srNo === entry.srNo)
         );
         const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
@@ -328,25 +328,18 @@ export default function SupplierProfileClient() {
             return sum + (paidForDetail?.amount || 0);
         }, 0);
         const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-
+        
         return {
             ...entry,
-            totalPaidForEntry,
-            totalCdForEntry,
             netAmount: (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry,
-            paymentHistoryForThisEntry: paymentsForThisEntry,
         };
     });
 
-    // Step 2: Group these detailed entries by customerId to create the profile.
-    detailedEntries.forEach(detailedEntry => {
-        const groupingKey = detailedEntry.customerId;
-        if (!groupingKey) return;
-
-        if (!summary.has(groupingKey)) {
-            summary.set(groupingKey, {
-                name: detailedEntry.name, contact: detailedEntry.contact, so: detailedEntry.so, address: detailedEntry.address,
-                acNo: detailedEntry.acNo, ifscCode: detailedEntry.ifscCode, bank: detailedEntry.bank, branch: detailedEntry.branch,
+    detailedEntries.forEach(s => {
+        if (s.customerId && !summary.has(s.customerId)) {
+            summary.set(s.customerId, {
+                name: s.name, contact: s.contact, so: s.so, address: s.address,
+                acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
                 transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
@@ -356,43 +349,39 @@ export default function SupplierProfileClient() {
                 averageKartaPercentage: 0, averageLabouryRate: 0,
             });
         }
-        
-        const data = summary.get(groupingKey)!;
-        
-        // Aggregate all values from the detailed entry
-        data.allTransactions.push(detailedEntry);
-        detailedEntry.paymentHistoryForThisEntry.forEach(p => {
-             if (!data.allPayments.some(existingP => existingP.id === p.id)) {
-                data.allPayments.push(p);
-            }
-        });
-
-        data.totalOriginalAmount += detailedEntry.originalNetAmount;
-        data.totalAmount += detailedEntry.amount;
-        data.totalPaid += detailedEntry.totalPaidForEntry;
-        data.totalCdAmount! += detailedEntry.totalCdForEntry;
-        
-        data.totalGrossWeight! += detailedEntry.grossWeight;
-        data.totalTeirWeight! += detailedEntry.teirWeight;
-        data.totalFinalWeight! += detailedEntry.weight;
-        data.totalKartaWeight! += detailedEntry.kartaWeight;
-        data.totalNetWeight! += detailedEntry.netWeight;
-        data.totalKartaAmount! += detailedEntry.kartaAmount;
-        data.totalLabouryAmount! += detailedEntry.labouryAmount;
-        data.totalKanta! += detailedEntry.kanta;
-        data.totalOtherCharges! += detailedEntry.otherCharges || 0;
-        data.totalTransactions! += 1;
-
-        if (detailedEntry.netAmount >= 1) {
-            data.outstandingEntryIds.push(detailedEntry.id);
-        }
-
-        const variety = toTitleCase(detailedEntry.variety) || 'Unknown';
-        data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+        const data = summary.get(s.customerId!)!;
+        data.allTransactions!.push(s);
     });
 
-    // Final calculations for each profile
+    filteredPayments.forEach(p => {
+        if (p.customerId && summary.has(p.customerId)) {
+            summary.get(p.customerId)!.allPayments!.push(p);
+        }
+    });
+
     summary.forEach((data, key) => {
+        data.allTransactions!.forEach(s => {
+            data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
+            data.totalAmount += s.amount || 0;
+            data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
+            data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
+            data.totalFinalWeight! += s.weight || 0;
+            data.totalKartaWeight! += s.kartaWeight || 0;
+            data.totalNetWeight! += s.netWeight || 0;
+            data.totalKartaAmount! += s.kartaAmount || 0;
+            data.totalLabouryAmount! += s.labouryAmount || 0;
+            data.totalKanta! += s.kanta || 0;
+            data.totalOtherCharges! += s.otherCharges || 0;
+            data.totalTransactions! += 1;
+            const variety = toTitleCase(s.variety) || 'Unknown';
+            data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+        });
+
+        data.allPayments!.forEach(p => {
+            data.totalPaid += p.amount;
+            data.totalCdAmount! += (p.cdAmount || 0);
+        });
+
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
         data.totalOutstandingTransactions = data.allTransactions.filter(t => t.netAmount >= 1).length;
@@ -434,17 +423,17 @@ export default function SupplierProfileClient() {
          name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
          paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
          totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
+         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: detailedEntries, 
          allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
-    millSummary.totalTransactions = filteredSuppliers.length;
+    millSummary.totalTransactions = detailedEntries.length;
     millSummary.totalOutstandingTransactions = detailedEntries.filter(c => c.netAmount >= 1).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
-    const totalRateData = filteredSuppliers.reduce((acc, s) => {
+    const totalRateData = detailedEntries.reduce((acc, s) => {
          if(s.rate > 0) {
              acc.karta += s.kartaPercentage;
              acc.laboury += s.labouryRate;
@@ -456,7 +445,7 @@ export default function SupplierProfileClient() {
          millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
          millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
-    millSummary.transactionsByVariety = filteredSuppliers.reduce((acc, s) => {
+    millSummary.transactionsByVariety = detailedEntries.reduce((acc, s) => {
          const variety = toTitleCase(s.variety) || 'Unknown';
          acc[variety] = (acc[variety] || 0) + 1;
          return acc;
@@ -509,7 +498,7 @@ export default function SupplierProfileClient() {
                 
                 <div className="w-full sm:w-[300px]">
                     <CustomDropdown
-                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
                         onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
