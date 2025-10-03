@@ -45,7 +45,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                         <TableRow>
                             <TableHead>SR No</TableHead>
                             <TableHead>Supplier</TableHead>
-                            <TableHead className="text-right">Total Due</TableHead>
+                            <TableHead className="text-right">Total Paid Amount</TableHead>
                             <TableHead className="text-right">CD</TableHead>
                             <TableHead className="text-right">Actual Paid</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
@@ -54,15 +54,17 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <TableBody>
                         {payment.paidFor?.map((pf: any, index: number) => {
                             const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
-                            const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                            const totalDueForThisEntry = pf.amount; // This is the amount that was settled for this entry
                             
                             let cdForThisEntry = 0;
-                            if (payment.cdApplied && payment.cdAmount && totalPaidInPayment > 0) {
-                                const proportion = pf.amount / totalPaidInPayment;
-                                cdForThisEntry = payment.cdAmount * proportion;
+                            if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+                                const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                                if (totalAmountInPayment > 0) {
+                                    const proportion = pf.amount / totalAmountInPayment;
+                                    cdForThisEntry = payment.cdAmount * proportion;
+                                }
                             }
                             
-                            const totalDueForThisEntry = pf.amount; // pf.amount is the amount reduced from netAmount
                             const actualPaid = totalDueForThisEntry - cdForThisEntry;
 
 
