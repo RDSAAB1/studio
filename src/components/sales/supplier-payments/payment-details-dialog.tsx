@@ -32,8 +32,8 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               </DialogHeader>
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                <DetailItem icon={<Banknote size={14} />} label="Amount Paid" value={formatCurrency(payment.amount)} />
-                <DetailItem icon={<Percent size={14} />} label="CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
+                <DetailItem icon={<Banknote size={14} />} label="Total Amount Paid" value={formatCurrency(payment.amount)} />
+                <DetailItem icon={<Percent size={14} />} label="Total CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
                 <DetailItem icon={<Hash size={14} />} label="CD Applied" value={payment.cdApplied ? "Yes" : "No"} />
@@ -46,17 +46,26 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             <TableHead>SR No</TableHead>
                             <TableHead>Supplier Name</TableHead>
                             <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead className="text-right">CD</TableHead>
+                            <TableHead className="text-right">Paid After CD</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {payment.paidFor?.map((pf: any, index: number) => {
                             const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
+                            const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                            const proportion = totalPaidInPayment > 0 ? pf.amount / totalPaidInPayment : 0;
+                            const cdForThisEntry = (payment.cdAmount || 0) * proportion;
+                            const paidAfterCd = pf.amount - cdForThisEntry;
+
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(cdForThisEntry)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(paidAfterCd)}</TableCell>
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />
