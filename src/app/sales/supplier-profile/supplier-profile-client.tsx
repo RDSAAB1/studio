@@ -36,7 +36,7 @@ export default function SupplierProfileClient() {
   
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
-  const [detailsCustomer, setDetailsCustomer] = useState<any | null>(null);
+  const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -80,65 +80,78 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Process all entries
     filteredSuppliers.forEach(s => {
-        if (!s.customerId) return;
-        let data = summary.get(s.customerId);
-        if (!data) {
-            data = {
+        if (s.customerId && !summary.has(s.customerId)) {
+            summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
-                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
+                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
-                transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
-                totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0,
-                totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
-                averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
-                averageKartaPercentage: 0, averageLabouryRate: 0,
-            };
-            summary.set(s.customerId, data);
+                transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
+                totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
+                totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
+                averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+            });
         }
+    });
+
+    let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
+
+    filteredSuppliers.forEach(s => {
+        if (!s.customerId) return;
+        const data = summary.get(s.customerId)!;
+
+        const paymentsForThisEntry = filteredPayments.filter(p => p.paidFor?.some(pf => pf.srNo === s.srNo));
+        const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
+            const pf = p.paidFor!.find(pf => pf.srNo === s.srNo)!;
+            return sum + pf.amount;
+        }, 0);
+        const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => {
+            if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
+                if (totalAmountInPayment > 0) {
+                    const proportion = (p.paidFor.find(pf => pf.srNo === s.srNo)?.amount || 0) / totalAmountInPayment;
+                    return sum + (p.cdAmount * proportion);
+                }
+            }
+            return sum;
+        }, 0);
+
+        s.netAmount = (s.originalNetAmount || 0) - totalPaidForEntry;
+
         data.allTransactions!.push(s);
     });
 
-    // Attach payments to the correct group
     filteredPayments.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             summary.get(p.customerId)!.allPayments!.push(p);
+        } else if (p.rtgsFor === 'Outsider') {
+            const outsiderKey = p.customerId || `${toTitleCase(p.supplierName || 'Outsider')}|${toTitleCase(p.supplierFatherName || '')}`;
+            if (!summary.has(outsiderKey)) {
+                summary.set(outsiderKey, {
+                    name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                    contact: '',
+                    acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                    totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+                    paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+                    transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
+                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
+                    totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
+                    averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                    averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+                });
+            }
+            summary.get(outsiderKey)!.allPayments!.push(p);
         }
     });
 
-    // Calculate totals for each group
-    summary.forEach(data => {
-        // First, calculate the correct netAmount for each transaction
-        const updatedTransactions = data.allTransactions!.map(t => {
-            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
-            
-            const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
-                const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
-                return sum + pf.amount;
-            }, 0);
+    summary.forEach((data, key) => {
+        const allContacts = new Set(data.allTransactions!.map(t => t.contact));
+        data.contact = Array.from(allContacts).join(', ');
 
-            const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => {
-                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                    const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
-                    if (totalAmountInPayment > 0) {
-                        const proportion = (p.paidFor.find(pf => pf.srNo === t.srNo)?.amount || 0) / totalAmountInPayment;
-                        return sum + (p.cdAmount * proportion);
-                    }
-                }
-                return sum;
-            }, 0);
-            
-            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
-            return { ...t, netAmount: newNetAmount };
-        });
-
-        data.allTransactions = updatedTransactions;
-
-        // Now calculate all summaries based on the corrected transaction data
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
+        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
         data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
@@ -150,15 +163,13 @@ export default function SupplierProfileClient() {
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
         
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + p.amount, 0);
+        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
+        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
-
         data.totalOutstandingTransactions = data.allTransactions.filter(t => (t.netAmount || 0) >= 1).length;
-        
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         
@@ -184,7 +195,7 @@ export default function SupplierProfileClient() {
         
         data.paymentHistory = data.allPayments!;
     });
-
+    
     const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
          acc.totalAmount += s.totalAmount;
          acc.totalOriginalAmount += s.totalOriginalAmount;
@@ -241,14 +252,6 @@ export default function SupplierProfileClient() {
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
-  if (!isClient) {
-    return (
-        <div className="flex items-center justify-center h-64">
-            <Loader2 className="animate-spin h-8 w-8 text-primary" />
-        </div>
-    );
-  }
-
   const detailsSupplierData = useMemo(() => {
     if (!detailsCustomer) return null;
     const supplierProfile = supplierSummaryMap.get(detailsCustomer.customerId);
@@ -262,7 +265,15 @@ export default function SupplierProfileClient() {
         totalOutstanding: detailsCustomer.netAmount,
         totalOriginalAmount: detailsCustomer.originalNetAmount,
     };
-}, [detailsCustomer, supplierSummaryMap, paymentHistory]);
+  }, [detailsCustomer, supplierSummaryMap, paymentHistory]);
+
+  if (!isClient) {
+    return (
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="animate-spin h-8 w-8 text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -320,7 +331,7 @@ export default function SupplierProfileClient() {
         </DialogContent>
       </Dialog>
       
-       <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
+      <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
                 <StatementPreview data={detailsSupplierData} />
@@ -338,8 +349,3 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
-
-
-    
-
-    

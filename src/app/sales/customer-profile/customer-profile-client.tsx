@@ -191,17 +191,24 @@ export default function CustomerProfileClient() {
 
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
-    const handleShowDetails = (customer: Customer) => {
-        const customerProfile = customerSummaryMap.get(customer.customerId);
-        const fullData = {
-            ...customerProfile,
-            allTransactions: [customer],
-            allPayments: customerPayments.filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
-            totalOutstanding: customer.netAmount,
-            totalOriginalAmount: customer.originalNetAmount,
-        };
-        setDetailsCustomer(fullData);
+  const detailsCustomerData = useMemo(() => {
+    if (!detailsCustomer) return null;
+    const customerProfile = customerSummaryMap.get(detailsCustomer.customerId);
+    if (!customerProfile) return null;
+
+    const paymentsForEntry = customerPayments.filter(p => p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo));
+    return {
+        ...customerProfile,
+        allTransactions: [detailsCustomer],
+        allPayments: paymentsForEntry,
+        totalOutstanding: detailsCustomer.netAmount,
+        totalOriginalAmount: detailsCustomer.originalNetAmount,
     };
+  }, [detailsCustomer, customerSummaryMap, customerPayments]);
+    
+  const handleShowDetails = (customer: Customer) => {
+      setDetailsCustomer(customer);
+  };
 
   if (!isClient) {
     return (
@@ -260,7 +267,7 @@ export default function CustomerProfileClient() {
       <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsCustomer} />
+                <StatementPreview data={detailsCustomerData} />
             </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -275,5 +282,3 @@ export default function CustomerProfileClient() {
     </div>
   );
 }
-
-    
