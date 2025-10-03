@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -11,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes } from "lucide-react";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes, Briefcase } from "lucide-react";
 
 interface DetailsDialogProps {
     isOpen: boolean;
@@ -131,38 +132,55 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                             </CardContent>
                         </Card>
 
-                        {paymentsForDetailsEntry.length > 0 && (
-                             <Card className="mt-4">
+                         <Card className="mt-4">
                                 <CardHeader className="p-4 pb-2">
                                     <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-4 pt-0">
-                                    <Table className="text-sm">
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="p-2 text-xs">Payment ID</TableHead>
-                                                <TableHead className="p-2 text-xs">Date</TableHead>
-                                                <TableHead className="p-2 text-xs">Type</TableHead>
-                                                <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {paymentsForDetailsEntry.map((payment, index) => {
-                                                const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
-                                                return (
-                                                    <TableRow key={payment.id || index}>
-                                                        <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
-                                                        <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                        <TableCell className="p-2">{payment.type}</TableCell>
-                                                        <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
+                                    {paymentsForDetailsEntry.length > 0 ? (
+                                        <Table className="text-sm">
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                                    <TableHead className="p-2 text-xs">Date</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Total Paid (with CD)</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">CD</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paymentsForDetailsEntry.map((payment, index) => {
+                                                    const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
+                                                    if (!paidForThis) return null;
+
+                                                    let cdForThisEntry = 0;
+                                                    if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+                                                        const totalAmountInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + pf.amount, 0);
+                                                        if (totalAmountInPayment > 0) {
+                                                            const proportion = paidForThis.amount / totalAmountInPayment;
+                                                            cdForThisEntry = payment.cdAmount * proportion;
+                                                        }
+                                                    }
+
+                                                    const totalPaidWithCD = paidForThis.amount + cdForThisEntry;
+
+                                                    return (
+                                                        <TableRow key={payment.id || index}>
+                                                            <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
+                                                            <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                                            <TableCell className="p-2 text-right">{formatCurrency(totalPaidWithCD)}</TableCell>
+                                                            <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis.amount)}</TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
+                                    )}
                                 </CardContent>
                             </Card>  
-                        )}
                     </div>
                 </ScrollArea>
             </DialogContent>
