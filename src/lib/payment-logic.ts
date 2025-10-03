@@ -86,10 +86,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
         
         if (editingPayment?.id) {
-            // When editing, the amounts have already been restored by a call to handleDeletePaymentLogic
-            // We just need to delete the old payment record itself.
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
-            transaction.delete(oldPaymentRef);
+            const oldPaymentDoc = await transaction.get(oldPaymentRef);
+            if (oldPaymentDoc.exists()) {
+                transaction.delete(oldPaymentRef);
+            }
         }
 
         let paidForDetails: PaidFor[] = [];
@@ -223,3 +224,4 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
       await deletePaymentFromLocalDB(paymentToDelete.id);
     }
   };
+
