@@ -80,6 +80,7 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
+    // Initialize map with all unique suppliers
     filteredSuppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
@@ -133,26 +134,29 @@ export default function SupplierProfileClient() {
 
         const updatedTransactions = data.allTransactions!.map(t => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            
             let totalPaidForEntry = 0;
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
-                totalPaidForEntry += paidForThisDetail.amount;
+                const totalDueInPayment = paidForThisDetail.amount; // This is Total Due (Actual Paid + CD) for this entry in this payment
+
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-                    if (totalAmountInPayment > 0) {
-                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                    if(totalAmountInPayment > 0) {
+                        const proportion = totalDueInPayment / totalAmountInPayment;
                         totalCdForEntry += p.cdAmount * proportion;
                     }
                 }
+                totalPaidForEntry += (totalDueInPayment - totalCdForEntry);
             });
             const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
             return { ...t, netAmount: newNetAmount };
         });
 
         data.allTransactions = updatedTransactions;
-
+        
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
@@ -170,7 +174,7 @@ export default function SupplierProfileClient() {
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
         
         data.totalOutstandingTransactions = data.allTransactions.filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -336,6 +340,3 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
-
-
-    
