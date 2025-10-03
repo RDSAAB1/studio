@@ -66,9 +66,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         [paymentsForDetailsEntry, customer.srNo]
     );
 
-    const finalOutstanding = useMemo(() => {
-        return (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
-    }, [customer.originalNetAmount, totalPaidForThisEntry, totalCdForThisEntry]);
+    const finalOutstanding = (customer.originalNetAmount || 0) - totalPaidForThisEntry;
     
     const isCustomer = entryType === 'Customer';
 
@@ -175,7 +173,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                         <Table className="text-sm">
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="p-2 text-xs">ID</TableHead>
+                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Total Paid (with CD)</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
@@ -196,16 +194,16 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                         }
                                                     }
                                                     
-                                                    const actualPaid = paidForThis.amount;
-                                                    const totalPaidWithCD = actualPaid + cdForThisEntry;
+                                                    const totalPaidWithCD = paidForThis.amount;
+                                                    const actualPaid = totalPaidWithCD - cdForThisEntry;
 
                                                     return (
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                            <TableCell className="p-2 text-right">{formatCurrency(totalPaidWithCD)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(totalPaidWithCD)}</TableCell>
                                                             <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
-                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(actualPaid)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaid)}</TableCell>
                                                         </TableRow>
                                                     );
                                                 })}
