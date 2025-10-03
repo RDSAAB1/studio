@@ -23,6 +23,8 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowEntryDetails }: any) => {
     if (!payment) return null;
 
+    const totalActualPaid = payment.amount;
+
     return (
         <Dialog open={!!payment} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
@@ -32,7 +34,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               </DialogHeader>
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                <DetailItem icon={<Banknote size={14} />} label="Total Amount Paid (Actual)" value={formatCurrency(payment.amount)} />
+                <DetailItem icon={<Banknote size={14} />} label="Actual Amount Paid" value={formatCurrency(totalActualPaid)} />
                 <DetailItem icon={<Percent size={14} />} label="Total CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
@@ -54,8 +56,8 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <TableBody>
                         {payment.paidFor?.map((pf: any, index: number) => {
                             const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
-                            const totalDueForThisEntry = pf.amount; // This is the amount that was settled for this entry
-                            
+                            const totalPaidAmount = pf.amount; // This is the amount that was settled for this entry (Payment + CD)
+
                             let cdForThisEntry = 0;
                             if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
                                 const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
@@ -65,14 +67,13 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                                 }
                             }
                             
-                            const actualPaid = totalDueForThisEntry - cdForThisEntry;
-
+                            const actualPaid = totalPaidAmount - cdForThisEntry;
 
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatCurrency(totalDueForThisEntry)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(totalPaidAmount)}</TableCell>
                                     <TableCell className="text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
                                     <TableCell className="text-right font-semibold text-green-600">{formatCurrency(actualPaid)}</TableCell>
                                     <TableCell className="text-center">
