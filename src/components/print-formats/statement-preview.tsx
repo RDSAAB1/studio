@@ -17,9 +17,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const { toast } = useToast();
     const statementRef = useRef<HTMLDivElement>(null);
 
-    if (!data) return null;
-
     const transactions = useMemo(() => {
+        if (!data) return [];
         const allTransactions = data.allTransactions || [];
         const allPayments = data.allPayments || [];
         
@@ -34,7 +33,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             date: p.date,
             particulars: `Payment (ID# ${p.paymentId})`,
             debit: 0,
-            credit: p.amount + (p.cdAmount || 0),
+            credit: p.amount,
         }));
 
         const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -45,6 +44,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             return { ...item, balance: runningBalance };
         });
     }, [data]);
+    
+    if (!data) return null;
 
     const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
