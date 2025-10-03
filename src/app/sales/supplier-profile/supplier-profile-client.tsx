@@ -292,10 +292,13 @@ export default function SupplierProfileClient() {
         selectedSupplierData={selectedSupplierData}
         isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
         onShowDetails={(supplier) => {
+            const supplierProfile = supplierSummaryMap.get(supplier.customerId);
             const fullData = {
-                ...supplier,
+                ...supplierProfile,
                 allTransactions: [supplier],
                 allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
+                totalOutstanding: supplier.netAmount,
+                totalOriginalAmount: supplier.originalNetAmount,
             };
             setDetailsCustomer(fullData);
         }}
@@ -324,10 +327,13 @@ export default function SupplierProfileClient() {
         suppliers={suppliers}
         onOpenChange={() => setSelectedPaymentForDetails(null)}
         onShowEntryDetails={(supplier: Supplier) => {
+            const supplierProfile = supplierSummaryMap.get(supplier.customerId);
             const fullData = {
-                ...supplier,
+                ...supplierProfile,
                 allTransactions: [supplier],
                 allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
+                totalOutstanding: supplier.netAmount,
+                totalOriginalAmount: supplier.originalNetAmount,
             };
             setDetailsCustomer(fullData);
         }}

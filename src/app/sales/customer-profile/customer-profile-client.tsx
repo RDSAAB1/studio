@@ -189,10 +189,13 @@ export default function CustomerProfileClient() {
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
     const handleShowDetails = (customer: Customer) => {
+        const customerProfile = customerSummaryMap.get(customer.customerId);
         const fullData = {
-            ...customer,
+            ...customerProfile,
             allTransactions: [customer],
             allPayments: customerPayments.filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
+            totalOutstanding: customer.netAmount,
+            totalOriginalAmount: customer.originalNetAmount,
         };
         setDetailsCustomer(fullData);
     };
