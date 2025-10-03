@@ -189,22 +189,17 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-    
+
         setIsProcessing(true);
         form.setEditingPayment(paymentToEdit);
         setActiveTab('processing');
-    
+
         try {
             await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
-    
-            // Force a re-fetch of suppliers to ensure the state is updated
-            const updatedSuppliers = await new Promise<Customer[]>((resolve, reject) => {
-                const unsub = getSuppliersRealtime((suppliers) => {
-                    resolve(suppliers);
-                    unsub(); // Important: Unsubscribe after the first fetch to avoid loops
-                }, reject);
-            });
-    
+            
+            // This is a workaround to ensure the state has time to update.
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (!firstSrNo) {
                 if (paymentToEdit.rtgsFor === 'Outsider') {
@@ -217,11 +212,11 @@ export const useSupplierPayments = () => {
                 throw new Error("Payment has no associated entries to identify the supplier.");
             }
     
-            const originalEntry = updatedSuppliers.find(s => s.srNo === firstSrNo);
+            const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
             if (!originalEntry) {
                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
             }
-    
+
             const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
                 const summary = data.customerSummaryMap.get(key);
                 return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
@@ -233,7 +228,7 @@ export const useSupplierPayments = () => {
     
             form.setSelectedCustomerKey(profileKey);
     
-            const paidForIds = updatedSuppliers
+            const paidForIds = data.suppliers
                 .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
                 .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
