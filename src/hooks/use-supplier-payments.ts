@@ -7,7 +7,7 @@ import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
-import { addBank } from '@/lib/firestore';
+import { addBank, getSuppliersRealtime } from '@/lib/firestore';
 import type { Customer, Payment } from '@/lib/definitions';
 import { useCashDiscount } from './use-cash-discount';
 
@@ -189,59 +189,59 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-
+    
         setIsProcessing(true);
         form.setEditingPayment(paymentToEdit);
         setActiveTab('processing');
-
+    
         try {
-            // Restore amounts in DB, but don't delete the payment record itself
             await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
-
-            // Give Firestore a moment to propagate changes, then fetch fresh supplier data
-            await new Promise(resolve => setTimeout(resolve, 500));
+    
+            // Force a re-fetch of suppliers to ensure the state is updated
             const updatedSuppliers = await new Promise<Customer[]>((resolve, reject) => {
-                const unsub = getSuppliersRealtime(resolve, reject);
-                // Unsubscribe after first fetch to avoid loops
-                setTimeout(() => unsub(), 2000); 
+                const unsub = getSuppliersRealtime((suppliers) => {
+                    resolve(suppliers);
+                    unsub(); // Important: Unsubscribe after the first fetch to avoid loops
+                }, reject);
             });
-
+    
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (!firstSrNo) {
-                 if (paymentToEdit.rtgsFor === 'Outsider') {
+                if (paymentToEdit.rtgsFor === 'Outsider') {
                     form.setRtgsFor('Outsider');
-                    handlePaySelectedOutstanding(paymentToEdit); // This will prefill outsider details
+                    handlePaySelectedOutstanding(paymentToEdit);
                     setIsProcessing(false);
                     toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
                     return;
                 }
                 throw new Error("Payment has no associated entries to identify the supplier.");
             }
-
+    
             const originalEntry = updatedSuppliers.find(s => s.srNo === firstSrNo);
             if (!originalEntry) {
                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
             }
-
+    
             const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
                 const summary = data.customerSummaryMap.get(key);
                 return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
             });
-
+    
             if (!profileKey) {
                 throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
             }
-            
+    
             form.setSelectedCustomerKey(profileKey);
-
-            const paidForIds = updatedSuppliers.filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo)).map(s => s.id);
+    
+            const paidForIds = updatedSuppliers
+                .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
+                .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
-            
-            // This is the crucial part: pre-fill the form with the payment data
+    
             handlePaySelectedOutstanding(paymentToEdit);
-
+    
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-
+    
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
             form.setEditingPayment(null);
