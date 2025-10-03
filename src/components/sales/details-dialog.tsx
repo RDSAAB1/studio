@@ -185,26 +185,25 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
                                                     if (!paidForThis) return null;
 
-                                                    const totalPaidForThisEntry = paidForThis.amount;
-                                                    
                                                     let cdForThisEntry = 0;
                                                     if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                                                        const totalAmountInPayment = payment.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                                                        const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
                                                         if (totalAmountInPayment > 0) {
-                                                            const proportion = totalPaidForThisEntry / totalAmountInPayment;
+                                                            const proportion = paidForThis.amount / totalAmountInPayment;
                                                             cdForThisEntry = payment.cdAmount * proportion;
                                                         }
                                                     }
-                                                    
-                                                    const actualPaid = totalPaidForThisEntry - cdForThisEntry;
+
+                                                    const totalPaidAmountForEntry = paidForThis.amount;
+                                                    const actualPaidForEntry = totalPaidAmountForEntry - cdForThisEntry;
 
                                                     return (
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(totalPaidForThisEntry)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(totalPaidAmountForEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
-                                                            <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaid)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
                                                         </TableRow>
                                                     );
                                                 })}

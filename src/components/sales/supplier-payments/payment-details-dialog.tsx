@@ -27,7 +27,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
 
     return (
         <Dialog open={!!payment} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Payment Details: {payment.paymentId}</DialogTitle>
                 <DialogDescription>Details of the payment made on {format(new Date(payment.date), "PPP")}.</DialogDescription>
@@ -56,7 +56,6 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <TableBody>
                         {payment.paidFor?.map((pf: any, index: number) => {
                             const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
-                            const totalPaidAmount = pf.amount; // This is the amount that was settled for this entry (Payment + CD)
 
                             let cdForThisEntry = 0;
                             if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
@@ -67,6 +66,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                                 }
                             }
                             
+                            const totalPaidAmount = pf.amount;
                             const actualPaid = totalPaidAmount - cdForThisEntry;
 
                             return (
@@ -75,7 +75,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right font-semibold">{formatCurrency(totalPaidAmount)}</TableCell>
                                     <TableCell className="text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
-                                    <TableCell className="text-right font-semibold text-green-600">{formatCurrency(actualPaid)}</TableCell>
+                                    <TableCell className="text-right font-bold text-green-600">{formatCurrency(actualPaid)}</TableCell>
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />
