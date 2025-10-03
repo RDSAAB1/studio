@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
@@ -35,13 +35,47 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, entryType = 'Supplier' }: DetailsDialogProps) => {
     if (!customer) return null;
 
-    const paymentsForDetailsEntry = (paymentHistory || []).filter(p =>
-      p.paidFor?.some(pf => pf.srNo === customer.srNo)
+    const paymentsForDetailsEntry = useMemo(() => 
+        (paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
+        [paymentHistory, customer.srNo]
     );
+
+    const totalPaidForThisEntry = useMemo(() => 
+        paymentsForDetailsEntry.reduce((sum, p) => {
+            const paidForThis = p.paidFor?.find(pf => pf.srNo === customer.srNo);
+            return sum + (paidForThis?.amount || 0);
+        }, 0),
+        [paymentsForDetailsEntry, customer.srNo]
+    );
+
+    const totalCdForThisEntry = useMemo(() =>
+        paymentsForDetailsEntry.reduce((sum, p) => {
+            if (!p.cdApplied || !p.cdAmount || !p.paidFor || p.paidFor.length === 0) {
+                return sum;
+            }
+            const paidForThisDetail = p.paidFor.find(pf => pf.srNo === customer.srNo);
+            if (!paidForThisDetail) return sum;
+
+            const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
+            if (totalAmountInPayment > 0) {
+                const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                return sum + (p.cdAmount * proportion);
+            }
+            return sum;
+        }, 0),
+        [paymentsForDetailsEntry, customer.srNo]
+    );
+
+    const finalOutstanding = useMemo(() => {
+        return (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
+    }, [customer.originalNetAmount, totalPaidForThisEntry, totalCdForThisEntry]);
     
     const isCustomer = entryType === 'Customer';
 
     const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
+
+    const displayBrokerageAmount = (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0);
+    const displayCdAmount = (Number(customer.amount) || 0) * ((Number(customer.cdRate) || 0) / 100);
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -111,10 +145,10 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kartaAmount) || 0)}</td></tr>}
                                             
-                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.bagAmount) || 0)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({(customer.bags || 0)} @ {formatCurrency(Number(customer.bagRate) || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.bagAmount) || 0)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}
-                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.cd) || 0)}</td></tr>}
-                                            {isCustomer && !customer.isBrokerageIncluded && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.brokerage) || 0)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{Number(customer.cdRate || customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount || 0)}</td></tr>}
+                                            {isCustomer && !customer.isBrokerageIncluded && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(Number(customer.brokerageRate || customer.brokerage) || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Advance/Freight</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.advanceFreight) || 0)}</td></tr>}
                                         </tbody>
                                     </table>
@@ -128,7 +162,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                 <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                 <Separator className="my-2"/>
                                 <p className="text-sm text-destructive font-medium">{isCustomer ? 'Final Receivable' : 'Final Outstanding'} Amount</p>
-                                <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p>
+                                <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstanding)}</p>
                             </CardContent>
                         </Card>
 
@@ -155,7 +189,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
 
                                                     let cdForThisEntry = 0;
                                                     if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                                                        const totalAmountInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + pf.amount, 0);
+                                                        const totalAmountInPayment = payment.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                                                         if (totalAmountInPayment > 0) {
                                                             const proportion = paidForThis.amount / totalAmountInPayment;
                                                             cdForThisEntry = payment.cdAmount * proportion;
@@ -187,3 +221,5 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         </Dialog>
     );
 };
+
+    
