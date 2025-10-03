@@ -32,7 +32,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               </DialogHeader>
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                <DetailItem icon={<Banknote size={14} />} label="Actual Amount Paid" value={formatCurrency(payment.amount)} />
+                <DetailItem icon={<Banknote size={14} />} label="Total Amount Paid (Actual)" value={formatCurrency(payment.amount)} />
                 <DetailItem icon={<Percent size={14} />} label="Total CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
@@ -56,15 +56,15 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
                             const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
                             
-                            const actualPaid = pf.amount;
-                            
                             let cdForThisEntry = 0;
                             if (payment.cdApplied && payment.cdAmount && totalPaidInPayment > 0) {
-                                const proportion = actualPaid / totalPaidInPayment;
+                                const proportion = pf.amount / totalPaidInPayment;
                                 cdForThisEntry = payment.cdAmount * proportion;
                             }
                             
-                            const totalDueForThisEntry = actualPaid + cdForThisEntry;
+                            const totalDueForThisEntry = pf.amount; // pf.amount is the amount reduced from netAmount
+                            const actualPaid = totalDueForThisEntry - cdForThisEntry;
+
 
                             return (
                                 <TableRow key={index}>
