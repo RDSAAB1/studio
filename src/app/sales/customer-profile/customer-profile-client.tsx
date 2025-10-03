@@ -18,9 +18,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
 // Icons
@@ -28,169 +28,12 @@ import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "luc
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
-export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
-    const { toast } = useToast();
-    const statementRef = React.useRef<HTMLDivElement>(null);
-
-    if (!data) return null;
-
-    const transactions = useMemo(() => {
-        const allTransactions = data.allTransactions || [];
-        const allPayments = data.allPayments || [];
-        
-        const mappedTransactions = allTransactions.map(t => ({
-            date: t.date,
-            particulars: `Purchase (SR# ${t.srNo})`,
-            debit: parseFloat(String(t.originalNetAmount)) || 0,
-            credit: 0,
-        }));
-        
-        const mappedPayments = allPayments.map(p => ({
-            date: p.date,
-            particulars: `Payment (ID# ${p.paymentId})`,
-            debit: 0,
-            credit: (p.amount || 0),
-        }));
-
-        const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        let runningBalance = 0;
-        return combined.map(item => {
-            runningBalance += item.debit - item.credit;
-            return { ...item, balance: runningBalance };
-        });
-    }, [data]);
-
-    const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
-    const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
-    const closingBalance = totalDebit - totalCredit;
-
-     const handlePrint = () => {
-        const node = statementRef.current;
-        if (!node) {
-            toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
-            return;
-        }
-
-        const newWindow = window.open('', '', 'height=800,width=1200');
-        if (newWindow) {
-            const document = newWindow.document;
-            document.write(`
-                <html>
-                    <head>
-                        <title>Print Statement for ${data.name}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .no-print { display: none; }
-                             @media print {
-                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .summary-grid-container { display: flex !important; flex-wrap: nowrap !important; gap: 1rem; }
-                                .summary-grid-container > div { flex: 1; }
-                             }
-                        </style>
-                    </head>
-                    <body>
-                    </body>
-                </html>
-            `);
-
-            document.body.innerHTML = node.innerHTML;
-            
-            setTimeout(() => {
-                newWindow.focus();
-                newWindow.print();
-                newWindow.close();
-            }, 500);
-        } else {
-            toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
-        }
-    };
-    
-    return (
-    <>
-        <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
-             <DialogTitle>Account Statement for {data.name}</DialogTitle>
-             <DialogDescription className="sr-only">A detailed summary and transaction history for {data.name}.</DialogDescription>
-        </DialogHeader>
-        <div ref={statementRef} className="printable-area bg-white p-4 sm:p-6 font-sans text-black">
-            {/* Header */}
-            <div className="flex justify-between items-start pb-4 border-b border-gray-300 mb-4">
-                <div>
-                    <h2 className="text-xl font-bold text-black">BizSuite DataFlow</h2>
-                    <p className="text-xs text-gray-600">{toTitleCase(data.name)}</p>
-                    <p className="text-xs text-gray-600">{toTitleCase(data.address || '')}</p>
-                    <p className="text-xs text-gray-600">{data.contact}</p>
-                </div>
-                <div className="text-right">
-                        <h1 className="text-2xl font-bold text-black">Statement of Account</h1>
-                        <div className="mt-2 text-sm">
-                        <div className="flex justify-between"><span className="font-semibold text-black">Statement Date:</span> <span>{format(new Date(), 'dd-MMM-yyyy')}</span></div>
-                        <div className="flex justify-between"><span className="font-semibold text-black">Closing Balance:</span> <span className="font-bold">{formatCurrency(data.totalOutstanding)}</span></div>
-                        </div>
-                </div>
-            </div>
-
-            {/* Transaction Table */}
-            <div>
-                <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-2 text-black">TRANSACTIONS</h2>
-                <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                    <Table className="print-table min-w-full">
-                        <TableHeader>
-                            <TableRow className="bg-gray-100">
-                                <TableHead className="py-2 px-3 text-black">Date</TableHead>
-                                <TableHead className="py-2 px-3 text-black">Particulars</TableHead>
-                                <TableHead className="text-right py-2 px-3 text-black">Debit</TableHead>
-                                <TableHead className="text-right py-2 px-3 text-black">Credit</TableHead>
-                                <TableHead className="text-right py-2 px-3 text-black">Balance</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell colSpan={4} className="font-semibold py-2 px-3 text-black">Opening Balance</TableCell>
-                                <TableCell className="text-right font-semibold font-mono py-2 px-3 text-black">{formatCurrency(0)}</TableCell>
-                            </TableRow>
-                            {transactions.map((item, index) => (
-                                <TableRow key={index} className="[&_td]:py-2 [&_td]:px-3">
-                                    <TableCell className="text-black">{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell className="text-black">{item.particulars}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{formatCurrency(item.balance)}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow className="bg-gray-100 font-bold">
-                                <TableCell colSpan={2} className="py-2 px-3 text-black">Closing Balance</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalDebit)}</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(closingBalance)}</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </div>
-            </div>
-        </div>
-        <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
-            <div className="flex-grow" />
-            <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
-            <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
-        </DialogFooter>
-    </>
-    );
-};
-
-
 export default function CustomerProfileClient() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
-  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [detailsCustomer, setDetailsCustomer] = useState<any | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -265,6 +108,18 @@ export default function CustomerProfileClient() {
 
     // Calculate totals for each group
     summary.forEach(data => {
+        const outstandingEntries = data.allTransactions!.map(t => {
+            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
+                const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
+                return sum + pf.amount;
+            }, 0);
+            t.netAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
+            return t;
+        });
+
+        data.allTransactions = outstandingEntries;
+
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalBrokerage = data.allTransactions!.reduce((sum, t) => sum + (t.brokerage || 0), 0);
@@ -277,20 +132,8 @@ export default function CustomerProfileClient() {
         data.totalTransactions = data.allTransactions!.length;
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + p.amount, 0);
-
-        // Correct outstanding calculation for each entry before summing up
-        const outstandingEntries = data.allTransactions!.map(t => {
-            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
-            const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
-                const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
-                return sum + pf.amount;
-            }, 0);
-            t.netAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
-            return t;
-        });
         
-        data.allTransactions = outstandingEntries;
-        data.totalOutstanding = outstandingEntries.reduce((sum, t) => sum + (t.netAmount as number), 0);
+        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
         
         data.totalOutstandingTransactions = outstandingEntries.filter(t => (t.netAmount || 0) >= 1).length;
         
@@ -345,6 +188,15 @@ export default function CustomerProfileClient() {
 
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
+    const handleShowDetails = (customer: Customer) => {
+        const fullData = {
+            ...customer,
+            allTransactions: [customer],
+            allPayments: customerPayments.filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
+        };
+        setDetailsCustomer(fullData);
+    };
+
   if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
@@ -385,7 +237,7 @@ export default function CustomerProfileClient() {
       <SupplierProfileView
         selectedSupplierData={selectedCustomerData}
         isMillSelected={selectedCustomerKey === MILL_OVERVIEW_KEY}
-        onShowDetails={setDetailsCustomer}
+        onShowDetails={handleShowDetails}
         onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
         isCustomerView={true}
@@ -399,18 +251,19 @@ export default function CustomerProfileClient() {
         </DialogContent>
       </Dialog>
       
-      <CustomerDetailsDialog
-          customer={detailsCustomer}
-          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
-          paymentHistory={customerPayments}
-          onPrint={() => {}} // Pass a dummy function or implement if needed
-      />
+      <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                <StatementPreview data={detailsCustomer} />
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       <PaymentDetailsDialog
         payment={selectedPaymentForDetails}
         suppliers={customers} // It expects suppliers, but customers have a similar structure for display
         onOpenChange={() => setSelectedPaymentForDetails(null)}
-        onShowEntryDetails={setDetailsCustomer}
+        onShowEntryDetails={handleShowDetails}
       />
       
     </div>

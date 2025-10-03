@@ -12,19 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, ScrollArea } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
-import { DetailsDialog } from '@/components/sales/supplier-payments/details-dialog';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
+import { StatementPreview } from '@/components/print-formats/statement-preview';
 
 
 export default function SupplierPaymentsClient() {
@@ -40,12 +39,22 @@ export default function SupplierPaymentsClient() {
         return summary ? summary.allTransactions || [] : [];
     }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
     
-    const paymentsForDetailsEntry = useMemo(() => {
-        if (!hook.detailsSupplierEntry || !hook.paymentHistory) return [];
-        return hook.paymentHistory.filter(p =>
-            p.paidFor?.some(pf => pf.srNo === hook.detailsSupplierEntry.srNo)
+    const detailsEntryData = useMemo(() => {
+        if (!hook.detailsSupplierEntry) return null;
+        const matchingSummary = Array.from(hook.customerSummaryMap.values()).find(summary =>
+            summary.allTransactions.some(t => t.id === hook.detailsSupplierEntry.id)
         );
-    }, [hook.detailsSupplierEntry, hook.paymentHistory]);
+        if (matchingSummary) {
+            return {
+                ...matchingSummary,
+                allTransactions: [hook.detailsSupplierEntry],
+                totalOutstanding: hook.detailsSupplierEntry.netAmount,
+                totalOriginalAmount: hook.detailsSupplierEntry.originalNetAmount,
+            }
+        }
+        return null;
+    }, [hook.detailsSupplierEntry, hook.customerSummaryMap]);
+
 
     if (!hook.isClient || hook.loading) {
         return (
@@ -138,26 +147,27 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
+                entries={hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0)}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
                 onConfirm={hook.handlePaySelectedOutstanding}
                 onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
             />
-
-            <DetailsDialog 
-                isOpen={!!hook.detailsSupplierEntry}
-                onOpenChange={() => hook.setDetailsSupplierEntry(null)}
-                customer={hook.detailsSupplierEntry}
-                paymentHistory={paymentsForDetailsEntry}
-            />
             
+            <Dialog open={!!hook.detailsSupplierEntry} onOpenChange={() => hook.setDetailsSupplierEntry(null)}>
+                <DialogContent className="max-w-5xl p-0 printable-statement-container">
+                    <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                        <StatementPreview data={detailsEntryData} />
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
+
             <PaymentDetailsDialog
                 payment={hook.selectedPaymentForDetails}
                 suppliers={hook.suppliers}
