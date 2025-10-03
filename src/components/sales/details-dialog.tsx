@@ -42,6 +42,16 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
       p.paidFor?.some((pf:any) => pf.srNo === customer?.srNo)
     );
 
+    const totalPaidForThisEntry = paymentsForDetailsEntry.reduce((sum, p) => {
+        const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === customer.srNo);
+        return sum + (paidForDetail?.amount || 0);
+    }, 0);
+
+    const totalCdForThisEntry = paymentsForDetailsEntry.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+
+    const finalOutstandingAmount = (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
+
+
     return (
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
@@ -56,7 +66,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                         <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="max-h-[85vh]">
+                <ScrollArea className="h-auto max-h-[85vh]">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                         {activeLayout === 'classic' && (
                         <div className="space-y-4">
@@ -91,7 +101,13 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 </Card>
                             </div>
                             <Card className="border-primary/50 bg-primary/5 text-center">
-                                <CardContent className="p-3"><p className="text-sm text-primary/80 font-medium">Original Total</p><p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p><Separator className="my-2"/><p className="text-sm text-destructive font-medium">Final Outstanding Amount</p><p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p></CardContent>
+                                <CardContent className="p-3">
+                                    <p className="text-sm text-primary/80 font-medium">Original Total</p>
+                                    <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
+                                    <Separator className="my-2"/>
+                                    <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
+                                    <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstandingAmount)}</p>
+                                </CardContent>
                             </Card>
                             <Card className="mt-4">
                                 <CardHeader className="p-4 pb-2"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle></CardHeader>
