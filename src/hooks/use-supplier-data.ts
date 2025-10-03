@@ -148,7 +148,7 @@ export const useSupplierData = () => {
                     }
                 });
                 
-                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
             });
             
             data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -237,6 +237,4 @@ export const useSupplierData = () => {
 };
 
 const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
-    
-
     

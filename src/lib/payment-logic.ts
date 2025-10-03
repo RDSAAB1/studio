@@ -64,12 +64,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
     }
 
-    const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
-    if (totalPaidAmount <= 0) {
-        return { success: false, message: "Payment amount must be positive" };
+    const totalPaidAmount = finalPaymentAmount; // THIS IS THE ACTUAL AMOUNT PAID
+    const totalReduction = totalPaidAmount + calculatedCdAmount; // Amount to reduce from outstanding
+
+    if (totalPaidAmount <= 0 && calculatedCdAmount <= 0) {
+        return { success: false, message: "Payment and CD amount cannot both be zero." };
     }
-    if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
-        return { success: false, message: "Partial payment cannot exceed outstanding" };
+    if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalReduction > totalOutstandingForSelected) {
+        return { success: false, message: "Partial payment plus CD cannot exceed outstanding amount." };
     }
 
     let finalPaymentData: Payment | null = null;
@@ -85,25 +87,23 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
-        // When updating, we delete the old payment logic which is handled in handleEditPayment via handleDeletePaymentLogic.
-        // The processPaymentLogic now only handles creation.
-        // We just need to make sure we use the correct ID.
         if (editingPayment?.id) {
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
             if (oldPaymentDoc.exists()) {
                 // The actual deletion happens in handleEditPayment, we just check existence here if needed
-                // For a pure 'create' logic, this block might be removed or adjusted.
             }
         }
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
             let amountToDistribute = Math.round(totalPaidAmount);
+            let cdToDistribute = Math.round(calculatedCdAmount);
+
             const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
 
             for (const entryData of sortedEntries) {
-                if (amountToDistribute <= 0) break;
+                if (amountToDistribute <= 0 && cdToDistribute <= 0) break;
                 
                 const supplierToUpdate = entryData;
                 if (!supplierToUpdate) continue; 
@@ -111,18 +111,23 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const currentSupplierData = supplierToUpdate.data;
                 const outstanding = Number(currentSupplierData.netAmount);
 
-                const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+                const reductionForThisEntry = Math.min(outstanding, amountToDistribute + cdToDistribute);
+                
+                // Distribute CD first if available
+                const cdForThisEntry = Math.min(reductionForThisEntry, cdToDistribute);
+                const paymentForThisEntry = reductionForThisEntry - cdForThisEntry;
 
-                if (paymentForThisEntry > 0) {
+                if (paymentForThisEntry > 0 || cdForThisEntry > 0) {
                     paidForDetails.push({
                         srNo: entryData.data.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
                         supplierName: toTitleCase(entryData.data.name), supplierSo: toTitleCase(entryData.data.so),
                         supplierContact: entryData.data.contact,
                     });
-                    const newNetAmount = outstanding - paymentForThisEntry;
+                    const newNetAmount = outstanding - paymentForThisEntry - cdForThisEntry;
                     transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount });
                 }
                 amountToDistribute -= paymentForThisEntry;
+                cdToDistribute -= cdForThisEntry;
             }
         }
 
@@ -205,7 +210,13 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount + (paymentData.cdApplied && paymentData.cdAmount ? paymentData.cdAmount / paymentData.paidFor.length : 0);
+                    
+                    // Restore the amount that was reduced from netAmount, which is payment + CD part
+                    const totalPaidInPayment = paymentData.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                    const proportion = totalPaidInPayment > 0 ? detail.amount / totalPaidInPayment : 0;
+                    const cdForThisEntry = (paymentData.cdAmount || 0) * proportion;
+                    
+                    const amountToRestore = detail.amount + cdForThisEntry;
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
@@ -228,5 +239,3 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
       await deletePaymentFromLocalDB(paymentToDelete.id);
     }
   };
-
-

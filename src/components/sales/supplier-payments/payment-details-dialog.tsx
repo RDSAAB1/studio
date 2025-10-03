@@ -57,13 +57,13 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
                             const proportion = totalPaidInPayment > 0 ? pf.amount / totalPaidInPayment : 0;
                             const cdForThisEntry = (payment.cdAmount || 0) * proportion;
-                            const paidAfterCd = pf.amount - cdForThisEntry;
+                            const paidAfterCd = pf.amount; // The amount in paidFor IS the amount paid after CD for that entry
 
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(pf.amount + cdForThisEntry)}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(cdForThisEntry)}</TableCell>
                                     <TableCell className="text-right font-semibold">{formatCurrency(paidAfterCd)}</TableCell>
                                     <TableCell className="text-center">
