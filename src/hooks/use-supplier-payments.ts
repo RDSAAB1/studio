@@ -103,7 +103,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory); 
+            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -116,64 +116,7 @@ export const useSupplierPayments = () => {
         }
     };
     
-    const handleEditPayment = async (paymentToEdit: Payment) => {
-        if (!paymentToEdit.id) {
-            toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
-            return;
-        }
-    
-        setIsProcessing(true);
-        
-        try {
-            // Temporarily restore amounts for editing
-            await handleDeletePaymentLogic(paymentToEdit, true);
-    
-            form.setEditingPayment(paymentToEdit);
-            setActiveTab('processing');
-            
-            // Auto-select supplier based on the first srNo
-            const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            if (firstSrNo) {
-                const originalEntry = data.suppliers.find((s: Customer) => s.srNo === firstSrNo);
-                if (originalEntry) {
-                    const supplierName = toTitleCase(originalEntry.name || '');
-                    const supplierSO = toTitleCase(originalEntry.so || '');
-                    
-                    const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
-                        const summary = data.customerSummaryMap.get(key);
-                        return toTitleCase(summary?.name || '') === supplierName && toTitleCase(summary?.so || '') === supplierSO;
-                    });
-                    
-                    if (profileKey) {
-                        form.setSelectedCustomerKey(profileKey);
-                        const paidForIds = data.suppliers.filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo)).map(s => s.id);
-                        form.setSelectedEntryIds(new Set(paidForIds));
-                        
-                        // Now, auto-fill the form with the payment details
-                        handlePaySelectedOutstanding(paymentToEdit);
-                    } else {
-                         throw new Error(`Could not find a matching supplier profile for ${supplierName}.`);
-                    }
-                } else {
-                    throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
-                }
-            } else if (paymentToEdit.rtgsFor === 'Outsider') {
-                form.setRtgsFor('Outsider');
-                handlePaySelectedOutstanding(paymentToEdit);
-            }
-    
-            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-    
-        } catch (error: any) {
-            toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null); // Clear editing state on error
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-
-    const handlePaySelectedOutstanding = (paymentToEdit?: Payment) => {
+    const handlePaySelectedOutstanding = useCallback((paymentToEdit?: Payment) => {
         const paymentData = paymentToEdit || form.editingPayment;
         if (paymentData) {
             const {
@@ -239,7 +182,74 @@ export const useSupplierPayments = () => {
         }
         
         setIsOutstandingModalOpen(false);
-    };
+    }, [form, data.suppliers]);
+
+    const handleEditPayment = useCallback(async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) {
+            toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
+            return;
+        }
+
+        setIsProcessing(true);
+        form.setEditingPayment(paymentToEdit);
+        setActiveTab('processing');
+
+        try {
+            // Restore amounts in DB, but don't delete the payment record itself
+            await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
+
+            // Give Firestore a moment to propagate changes, then fetch fresh supplier data
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const updatedSuppliers = await new Promise<Customer[]>((resolve, reject) => {
+                const unsub = getSuppliersRealtime(resolve, reject);
+                // Unsubscribe after first fetch to avoid loops
+                setTimeout(() => unsub(), 2000); 
+            });
+
+            const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
+            if (!firstSrNo) {
+                 if (paymentToEdit.rtgsFor === 'Outsider') {
+                    form.setRtgsFor('Outsider');
+                    handlePaySelectedOutstanding(paymentToEdit); // This will prefill outsider details
+                    setIsProcessing(false);
+                    toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
+                    return;
+                }
+                throw new Error("Payment has no associated entries to identify the supplier.");
+            }
+
+            const originalEntry = updatedSuppliers.find(s => s.srNo === firstSrNo);
+            if (!originalEntry) {
+                throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
+            }
+
+            const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
+                const summary = data.customerSummaryMap.get(key);
+                return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
+            });
+
+            if (!profileKey) {
+                throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
+            }
+            
+            form.setSelectedCustomerKey(profileKey);
+
+            const paidForIds = updatedSuppliers.filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo)).map(s => s.id);
+            form.setSelectedEntryIds(new Set(paidForIds));
+            
+            // This is the crucial part: pre-fill the form with the payment data
+            handlePaySelectedOutstanding(paymentToEdit);
+
+            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
+
+        } catch (error: any) {
+            toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
+            form.setEditingPayment(null);
+        } finally {
+            setIsProcessing(false);
+        }
+    }, [data.paymentHistory, data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
+
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
         form.setRtgsQuantity(option.quantity);
@@ -253,7 +263,6 @@ export const useSupplierPayments = () => {
         ...data,
         ...form,
         ...cdHook,
-        setCdPercent: cdHook.setCdPercent,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
