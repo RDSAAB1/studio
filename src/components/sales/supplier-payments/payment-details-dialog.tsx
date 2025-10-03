@@ -32,7 +32,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               </DialogHeader>
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                <DetailItem icon={<Banknote size={14} />} label="Total Amount Paid" value={formatCurrency(payment.amount)} />
+                <DetailItem icon={<Banknote size={14} />} label="Actual Amount Paid" value={formatCurrency(payment.amount)} />
                 <DetailItem icon={<Percent size={14} />} label="Total CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
@@ -46,8 +46,8 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             <TableHead>SR No</TableHead>
                             <TableHead>Supplier</TableHead>
                             <TableHead className="text-right">Total Due</TableHead>
-                            <TableHead className="text-right">Paid Amount (Actual)</TableHead>
                             <TableHead className="text-right">CD</TableHead>
+                            <TableHead className="text-right">Actual Paid</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -65,8 +65,8 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(totalDueForThisEntry)}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatCurrency(actualPaid)}</TableCell>
                                     <TableCell className="text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(actualPaid)}</TableCell>
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />
