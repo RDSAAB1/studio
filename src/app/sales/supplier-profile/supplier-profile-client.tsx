@@ -29,6 +29,7 @@ import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "luc
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
+
 export default function SupplierProfileClient() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Supplier[]>([]);
@@ -170,8 +171,8 @@ export default function SupplierProfileClient() {
         }, { karta: 0, laboury: 0, count: 0 });
 
         if(rateData.count > 0) {
-             data.averageKartaPercentage = rates.karta / rates.count;
-             data.averageLabouryRate = rates.laboury / rates.count;
+             data.averageKartaPercentage = rateData.karta / rateData.count;
+             data.averageLabouryRate = rateData.laboury / rateData.count;
         }
 
         data.transactionsByVariety = data.allTransactions!.reduce((acc, s) => {
@@ -322,7 +323,7 @@ export default function SupplierProfileClient() {
         payment={selectedPaymentForDetails}
         suppliers={suppliers}
         onOpenChange={() => setSelectedPaymentForDetails(null)}
-        onShowEntryDetails={(supplier) => {
+        onShowEntryDetails={(supplier: Supplier) => {
             const fullData = {
                 ...supplier,
                 allTransactions: [supplier],

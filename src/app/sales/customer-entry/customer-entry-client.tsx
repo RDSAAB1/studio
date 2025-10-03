@@ -67,7 +67,7 @@ export type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dateStr = format(today, 'yyyy-MM-dd');
+  const dateStr = today.toISOString().split('T')[0];
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
@@ -261,15 +261,13 @@ export default function CustomerEntryClient() {
   const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    let formDate: Date;
+    let formDate;
     try {
         formDate = customerState.date ? new Date(customerState.date) : today;
         if (isNaN(formDate.getTime())) formDate = today;
     } catch {
         formDate = today;
     }
-    
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
@@ -303,15 +301,15 @@ export default function CustomerEntryClient() {
     setIsEditing(false);
     let nextSrNum = 1;
     if (safeCustomers.length > 0) {
-        const highestSrNo = safeCustomers.reduce((max, s) => s.srNo > max ? s.srNo : max, 'C00000');
-        nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
+        const lastSrNo = safeCustomers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'C00000';
+        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
-    newState.date = format(today, 'yyyy-MM-dd');
-    newState.dueDate = format(today, 'yyyy-MM-dd');
+    newState.date = today.toISOString().split('T')[0];
+    newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
@@ -389,9 +387,9 @@ export default function CustomerEntryClient() {
     const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
         srNo: formValues.srNo,
-        date: format(formValues.date, 'yyyy-MM-dd'),
+        date: formValues.date.toISOString().split('T')[0],
         term: '0', 
-        dueDate: format(formValues.date, 'yyyy-MM-dd'),
+        dueDate: formValues.date.toISOString().split('T')[0],
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
@@ -592,7 +590,7 @@ export default function CustomerEntryClient() {
                 for (const item of json) {
                     const customerData: Partial<Customer> = {
                         srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
-                        date: item.date ? format(new Date(item.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         name: toTitleCase(item.name),
                         companyName: toTitleCase(item.companyName || ''),
                         address: toTitleCase(item.address || ''),
@@ -678,8 +676,8 @@ export default function CustomerEntryClient() {
                 handleContactBlur={handleContactBlur}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={setLastVariety}
-                setLastPaymentType={setLastPaymentType}
+                setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -762,5 +760,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    

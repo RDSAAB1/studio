@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, ScrollArea } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 

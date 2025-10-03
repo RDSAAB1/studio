@@ -27,7 +27,8 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { Dialog, DialogContent, ScrollArea } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
@@ -797,14 +798,6 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
-
       <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
