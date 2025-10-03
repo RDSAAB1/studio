@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, levenshteinDistance } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
@@ -317,27 +317,35 @@ export default function SupplierProfileClient() {
   const supplierSummaryMap = useMemo(() => {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
+    const LEVENSHTEIN_THRESHOLD = 2;
 
-    // Correctly calculate netAmount for each transaction before grouping
-    const detailedEntries = filteredSuppliers.map(entry => {
-        const paymentsForThisEntry = filteredPayments.filter(p =>
-            p.paidFor?.some(pf => pf.srNo === entry.srNo)
-        );
-        const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-            return sum + (paidForDetail?.amount || 0);
-        }, 0);
-        const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        
-        return {
-            ...entry,
-            netAmount: (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry,
-        };
-    });
+    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
-    detailedEntries.forEach(s => {
-        if (s.customerId && !summary.has(s.customerId)) {
-            summary.set(s.customerId, {
+    const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
+        const supNameNorm = normalizeString(supplier.name);
+        const supSoNorm = normalizeString(supplier.so || '');
+        let bestMatch: string | null = null;
+        let minDistance = Infinity;
+
+        for (const key of existingKeys) {
+            const [keyNameNorm, keySoNorm] = key.split('|');
+            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+            const totalDist = nameDist + soDist;
+
+            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                minDistance = totalDist;
+                bestMatch = key;
+            }
+        }
+        return bestMatch;
+    };
+    
+    // Group transactions by a composite key
+    filteredSuppliers.forEach(s => {
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
+        if (!summary.has(groupingKey)) {
+            summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
@@ -349,17 +357,23 @@ export default function SupplierProfileClient() {
                 averageKartaPercentage: 0, averageLabouryRate: 0,
             });
         }
-        const data = summary.get(s.customerId!)!;
+        const data = summary.get(groupingKey)!;
         data.allTransactions!.push(s);
     });
 
+    // Attach payments to the correct group
     filteredPayments.forEach(p => {
-        if (p.customerId && summary.has(p.customerId)) {
-            summary.get(p.customerId)!.allPayments!.push(p);
+        const supplierForPayment = filteredSuppliers.find(s => s.customerId === p.customerId);
+        if (supplierForPayment) {
+             const groupingKey = findBestMatchKey(supplierForPayment, Array.from(summary.keys())) || `${normalizeString(supplierForPayment.name)}|${normalizeString(supplierForPayment.so || '')}`;
+            if (summary.has(groupingKey)) {
+                summary.get(groupingKey)!.allPayments!.push(p);
+            }
         }
     });
 
-    summary.forEach((data, key) => {
+    // Calculate totals for each group
+    summary.forEach(data => {
         data.allTransactions!.forEach(s => {
             data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
             data.totalAmount += s.amount || 0;
@@ -384,7 +398,8 @@ export default function SupplierProfileClient() {
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
-        data.totalOutstandingTransactions = data.allTransactions.filter(t => t.netAmount >= 1).length;
+        data.outstandingEntryIds = data.allTransactions!.filter(t => (t.netAmount || 0) >= 1).map(t => t.id);
+        data.totalOutstandingTransactions = data.outstandingEntryIds.length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         
@@ -423,17 +438,17 @@ export default function SupplierProfileClient() {
          name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
          paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
          totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: detailedEntries, 
+         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
          allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
-    millSummary.totalTransactions = detailedEntries.length;
-    millSummary.totalOutstandingTransactions = detailedEntries.filter(c => c.netAmount >= 1).length;
+    millSummary.totalTransactions = filteredSuppliers.length;
+    millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
-    const totalRateData = detailedEntries.reduce((acc, s) => {
+    const totalRateData = filteredSuppliers.reduce((acc, s) => {
          if(s.rate > 0) {
              acc.karta += s.kartaPercentage;
              acc.laboury += s.labouryRate;
@@ -445,7 +460,7 @@ export default function SupplierProfileClient() {
          millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
          millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
-    millSummary.transactionsByVariety = detailedEntries.reduce((acc, s) => {
+    millSummary.transactionsByVariety = filteredSuppliers.reduce((acc, s) => {
          const variety = toTitleCase(s.variety) || 'Unknown';
          acc[variety] = (acc[variety] || 0) + 1;
          return acc;

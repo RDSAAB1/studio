@@ -257,19 +257,20 @@ export default function CustomerProfileClient() {
         return bestMatch;
     };
     
+    // Group transactions by a composite key
     filteredCustomers.forEach(s => {
         const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.companyName || '')}`;
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address, companyName: s.companyName,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
-                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
                 transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
                 totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
-                totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
-                averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
-                averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+                totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
+                averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0,
                 totalBrokerage: 0, totalCd: 0,
             });
         }
@@ -277,6 +278,18 @@ export default function CustomerProfileClient() {
         data.allTransactions!.push(s);
     });
 
+    // Attach payments to the correct group
+    filteredCustomerPayments.forEach(p => {
+        const customerForPayment = filteredCustomers.find(s => s.customerId === p.customerId);
+        if (customerForPayment) {
+             const groupingKey = findBestMatchKey(customerForPayment, Array.from(summary.keys())) || `${normalizeString(customerForPayment.name)}|${normalizeString(customerForPayment.companyName || '')}`;
+            if (summary.has(groupingKey)) {
+                summary.get(groupingKey)!.allPayments!.push(p);
+            }
+        }
+    });
+
+    // Calculate totals for each group
     summary.forEach(data => {
         data.allTransactions!.forEach(s => {
             data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
@@ -293,19 +306,15 @@ export default function CustomerProfileClient() {
             data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
         });
 
-        const customerIds = new Set(data.allTransactions!.map(t => t.customerId));
-        const relevantPayments = filteredCustomerPayments.filter(p => customerIds.has(p.customerId));
-        
-        relevantPayments.forEach(p => {
+        data.allPayments!.forEach(p => {
             data.totalPaid += p.amount;
-            data.paymentHistory.push(p);
-            data.allPayments!.push(p);
         });
 
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.outstandingEntryIds = data.allTransactions!.filter(t => (t.netAmount || 0) > 0).map(t => t.id);
         data.totalOutstandingTransactions = data.outstandingEntryIds.length;
+        data.paymentHistory = data.allPayments;
     });
 
     const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
