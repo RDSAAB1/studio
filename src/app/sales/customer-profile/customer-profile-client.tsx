@@ -108,17 +108,20 @@ export default function CustomerProfileClient() {
 
     // Calculate totals for each group
     summary.forEach(data => {
-        const outstandingEntries = data.allTransactions!.map(t => {
+        // First, calculate the correct netAmount for each transaction
+        const updatedTransactions = data.allTransactions!.map(t => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            
             const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
                 const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
                 return sum + pf.amount;
             }, 0);
-            t.netAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
-            return t;
+            
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
+            return { ...t, netAmount: newNetAmount };
         });
 
-        data.allTransactions = outstandingEntries;
+        data.allTransactions = updatedTransactions;
 
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -135,7 +138,7 @@ export default function CustomerProfileClient() {
         
         data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
         
-        data.totalOutstandingTransactions = outstandingEntries.filter(t => (t.netAmount || 0) >= 1).length;
+        data.totalOutstandingTransactions = updatedTransactions.filter(t => (t.netAmount || 0) >= 1).length;
         
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         

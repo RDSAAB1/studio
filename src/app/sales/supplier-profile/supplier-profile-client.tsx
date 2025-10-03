@@ -6,7 +6,7 @@ import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } 
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { getSuppliersRealtime, getPaymentsRealtime, getCustomersRealtime } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 
 // UI Components
@@ -21,7 +21,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
-import { StatementPreview } from '@/components/print-formats/statement-preview';
+import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
 // Icons
@@ -32,7 +32,6 @@ const MILL_OVERVIEW_KEY = 'mill-overview';
 
 export default function SupplierProfileClient() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [customers, setCustomers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
@@ -48,17 +47,15 @@ export default function SupplierProfileClient() {
   useEffect(() => {
     setIsClient(true);
     const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
     const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
     return () => {
         unsubSuppliers();
-        unsubCustomers();
         unsubPayments();
     };
   }, []);
 
   const filteredData = useMemo(() => {
-    let allEntries = [...suppliers, ...customers];
+    let filteredSuppliers = suppliers;
     let filteredPayments = paymentHistory;
 
     if (startDate || endDate) {
@@ -72,19 +69,19 @@ export default function SupplierProfileClient() {
             return true;
         };
     
-        allEntries = allEntries.filter(s => filterByDate(new Date(s.date)));
+        filteredSuppliers = suppliers.filter(s => filterByDate(new Date(s.date)));
         filteredPayments = paymentHistory.filter(p => filterByDate(new Date(p.date)));
     }
 
-    return { allEntries, filteredPayments };
-  }, [suppliers, customers, paymentHistory, startDate, endDate]);
+    return { filteredSuppliers, filteredPayments };
+  }, [suppliers, paymentHistory, startDate, endDate]);
 
   const supplierSummaryMap = useMemo(() => {
-    const { allEntries, filteredPayments } = filteredData;
+    const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
     // Process all entries (suppliers and customers)
-    allEntries.forEach(s => {
+    filteredSuppliers.forEach(s => {
         if (!s.customerId) return;
 
         let data = summary.get(s.customerId);
@@ -114,6 +111,33 @@ export default function SupplierProfileClient() {
 
     // Calculate totals for each group
     summary.forEach(data => {
+        // First, calculate the correct netAmount for each transaction
+        const updatedTransactions = data.allTransactions!.map(t => {
+            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            
+            const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
+                const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
+                return sum + pf.amount;
+            }, 0);
+
+            const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => {
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
+                    if (totalAmountInPayment > 0) {
+                        const proportion = (p.paidFor.find(pf => pf.srNo === t.srNo)?.amount || 0) / totalAmountInPayment;
+                        return sum + (p.cdAmount * proportion);
+                    }
+                }
+                return sum;
+            }, 0);
+            
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return { ...t, netAmount: newNetAmount };
+        });
+
+        data.allTransactions = updatedTransactions;
+
+        // Now calculate all summaries based on the corrected transaction data
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
@@ -132,31 +156,9 @@ export default function SupplierProfileClient() {
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
         
-        // Correct outstanding calculation for each entry before summing up
-        const outstandingEntries = data.allTransactions!.map(t => {
-            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
-            const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
-                const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
-                return sum + pf.amount;
-            }, 0);
-             const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => {
-                if (p.cdApplied) {
-                    const totalPaidInPayment = p.paidFor!.reduce((s, i) => s + i.amount, 0);
-                    if (totalPaidInPayment > 0) {
-                        const proportion = (p.paidFor!.find(pf => pf.srNo === t.srNo)!.amount) / totalPaidInPayment;
-                        return sum + (p.cdAmount || 0) * proportion;
-                    }
-                }
-                return sum;
-            }, 0);
-            t.netAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-            return t;
-        });
+        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
 
-        data.allTransactions = outstandingEntries;
-        data.totalOutstanding = outstandingEntries.reduce((sum, t) => sum + (t.netAmount as number), 0);
-
-        data.totalOutstandingTransactions = outstandingEntries.filter(t => (t.netAmount || 0) >= 1).length;
+        data.totalOutstandingTransactions = data.allTransactions.filter(t => (t.netAmount || 0) >= 1).length;
         
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
@@ -203,17 +205,17 @@ export default function SupplierProfileClient() {
          name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
          paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
          totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: allEntries, 
+         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
          allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
-    millSummary.totalTransactions = allEntries.length;
-    millSummary.totalOutstandingTransactions = allEntries.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+    millSummary.totalTransactions = filteredSuppliers.length;
+    millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
-    const totalRateData = allEntries.reduce((acc, s) => {
+    const totalRateData = filteredSuppliers.reduce((acc, s) => {
          if(s.rate > 0) {
              acc.karta += s.kartaPercentage;
              acc.laboury += s.labouryRate;
@@ -225,7 +227,7 @@ export default function SupplierProfileClient() {
          millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
          millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
-    millSummary.transactionsByVariety = allEntries.reduce((acc, s) => {
+    millSummary.transactionsByVariety = filteredSuppliers.reduce((acc, s) => {
          const variety = toTitleCase(s.variety) || 'Unknown';
          acc[variety] = (acc[variety] || 0) + 1;
          return acc;
