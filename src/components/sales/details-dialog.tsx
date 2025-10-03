@@ -44,36 +44,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
 
     const totalPaidForThisEntry = paymentsForDetailsEntry.reduce((sum, p) => {
         const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === customer.srNo);
+        // This now correctly includes the CD amount as part of the total reduction
         return sum + (paidForDetail?.amount || 0);
     }, 0);
-
-    const totalCdForThisEntry = paymentsForDetailsEntry.reduce((sum, p) => {
-        const paymentHasMultipleEntries = (p.paidFor?.length || 0) > 1;
-        const paidForThisDetail = p.paidFor?.find((pf: any) => pf.srNo === customer.srNo);
-        
-        if (paymentHasMultipleEntries) {
-            const totalOriginalAmountInPayment = p.paidFor.reduce((total: number, pf: any) => {
-                // This part is tricky without all supplier data. We assume originalNetAmount is on the entry.
-                // A better approach would be to have originalNetAmount accessible here.
-                // For now, we'll approximate distribution based on amount paid.
-                const totalPaidInPayment = p.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                if (totalPaidInPayment > 0) {
-                    return total + pf.amount; // Approximate based on paid proportion
-                }
-                return total;
-            }, 0);
-
-            if (totalOriginalAmountInPayment > 0) {
-                 const proportion = (paidForThisDetail?.amount || 0) / totalOriginalAmountInPayment;
-                 return sum + ((p.cdAmount || 0) * proportion);
-            }
-        }
-        // If only one entry, the full CD amount applies to it
-        return sum + (p.cdAmount || 0);
-    }, 0);
-
-
-    const finalOutstandingAmount = (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
+    
+    const finalOutstandingAmount = (customer.originalNetAmount || 0) - totalPaidForThisEntry;
 
 
     return (
@@ -125,59 +100,30 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 </Card>
                             </div>
                             <Card className="border-primary/50 bg-primary/5 text-center">
-                                <CardContent className="p-3">
-                                    <p className="text-sm text-primary/80 font-medium">Original Total</p>
-                                    <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
-                                    <Separator className="my-2"/>
-                                    <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
-                                    <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstandingAmount)}</p>
-                                </CardContent>
+                                <CardContent className="p-3"><p className="text-sm text-primary/80 font-medium">Original Total</p><p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p><Separator className="my-2"/><p className="text-sm text-destructive font-medium">Final Outstanding Amount</p><p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstandingAmount)}</p></CardContent>
                             </Card>
                             <Card className="mt-4">
                                 <CardHeader className="p-4 pb-2"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0">
-                                    {paymentsForDetailsEntry.length > 0 ? (
-                                        <Table className="text-sm">
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
-                                                    <TableHead className="p-2 text-xs">Date</TableHead>
-                                                    <TableHead className="p-2 text-xs">Type</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {paymentsForDetailsEntry.map((payment: any, index: number) => {
-                                                     const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
-                                                     let cdForThisEntry = 0;
-                                                     if (payment.cdApplied) {
-                                                         const paymentHasMultipleEntries = (payment.paidFor?.length || 0) > 1;
-                                                         if (paymentHasMultipleEntries) {
-                                                             const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                                                             if (totalPaidInPayment > 0) {
-                                                                const proportion = (paidForThis?.amount || 0) / totalPaidInPayment;
-                                                                cdForThisEntry = (payment.cdAmount || 0) * proportion;
-                                                             }
-                                                         } else {
-                                                             cdForThisEntry = payment.cdAmount || 0;
-                                                         }
+                                    {paymentsForDetailsEntry.length > 0 ? (<Table className="text-sm"><TableHeader><TableRow><TableHead className="p-2 text-xs">Payment ID</TableHead><TableHead className="p-2 text-xs">Date</TableHead><TableHead className="p-2 text-xs">Type</TableHead><TableHead className="p-2 text-xs text-right">Amount Paid</TableHead><TableHead className="p-2 text-xs text-right">CD Amount</TableHead></TableRow></TableHeader><TableBody>
+                                        {paymentsForDetailsEntry.map((payment: any, index: number) => {
+                                             const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
+                                             let cdForThisEntry = 0;
+                                             if (payment.cdApplied) {
+                                                 const paymentHasMultipleEntries = (payment.paidFor?.length || 0) > 1;
+                                                 if (paymentHasMultipleEntries) {
+                                                     const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                                                     if (totalPaidInPayment > 0) {
+                                                        const proportion = (paidForThis?.amount || 0) / totalPaidInPayment;
+                                                        cdForThisEntry = (payment.cdAmount || 0) * proportion;
                                                      }
-                                                     return (
-                                                         <TableRow key={payment.id || index}>
-                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
-                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                             <TableCell className="p-2">{payment.type}</TableCell>
-                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
-                                                             <TableCell className="p-2 text-right">{formatCurrency(cdForThisEntry)}</TableCell>
-                                                         </TableRow>
-                                                     );
-                                                })}
-                                            </TableBody>
-                                        </Table>
-                                    ) : (
-                                        <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
-                                    )}
+                                                 } else {
+                                                     cdForThisEntry = payment.cdAmount || 0;
+                                                 }
+                                             }
+                                             return (<TableRow key={payment.id || index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="p-2">{payment.type}</TableCell><TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount - cdForThisEntry || 0)}</TableCell><TableCell className="p-2 text-right">{formatCurrency(cdForThisEntry)}</TableCell></TableRow>);
+                                        })}
+                                    </TableBody></Table>) : (<p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>)}
                                 </CardContent>
                             </Card>  
                         </div>
