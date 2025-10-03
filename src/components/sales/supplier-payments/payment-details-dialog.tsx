@@ -44,10 +44,10 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <TableHeader>
                         <TableRow>
                             <TableHead>SR No</TableHead>
-                            <TableHead>Supplier Name</TableHead>
-                            <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead>Supplier</TableHead>
+                            <TableHead className="text-right">Total Due</TableHead>
+                            <TableHead className="text-right">Paid Amount (Actual)</TableHead>
                             <TableHead className="text-right">CD</TableHead>
-                            <TableHead className="text-right">Paid After CD</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -57,15 +57,16 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
                             const proportion = totalPaidInPayment > 0 ? pf.amount / totalPaidInPayment : 0;
                             const cdForThisEntry = (payment.cdAmount || 0) * proportion;
-                            const paidAfterCd = pf.amount; // The amount in paidFor IS the amount paid after CD for that entry
+                            const actualPaid = pf.amount;
+                            const totalDueForThisEntry = actualPaid + cdForThisEntry;
 
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(pf.amount + cdForThisEntry)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(cdForThisEntry)}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatCurrency(paidAfterCd)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(totalDueForThisEntry)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(actualPaid)}</TableCell>
+                                    <TableCell className="text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />
