@@ -175,11 +175,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                         <Table className="text-sm">
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                                    <TableHead className="p-2 text-xs">ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Total Paid (with CD)</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Actual Paid</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -195,8 +195,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                             cdForThisEntry = payment.cdAmount * proportion;
                                                         }
                                                     }
-
-                                                    const totalPaidWithCD = paidForThis.amount + cdForThisEntry;
+                                                    
+                                                    const actualPaid = paidForThis.amount;
+                                                    const totalPaidWithCD = actualPaid + cdForThisEntry;
 
                                                     return (
                                                         <TableRow key={payment.id || index}>
@@ -204,7 +205,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                             <TableCell className="p-2 text-right">{formatCurrency(totalPaidWithCD)}</TableCell>
                                                             <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
-                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis.amount)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(actualPaid)}</TableCell>
                                                         </TableRow>
                                                     );
                                                 })}
@@ -221,5 +222,3 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         </Dialog>
     );
 };
-
-    
