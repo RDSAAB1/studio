@@ -7,7 +7,7 @@ import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
-import { addBank, getSuppliersRealtime } from '@/lib/firestore';
+import { addBank } from '@/lib/firestore';
 import type { Customer, Payment } from '@/lib/definitions';
 import { useCashDiscount } from './use-cash-discount';
 
@@ -189,17 +189,17 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-
+    
         setIsProcessing(true);
         form.setEditingPayment(paymentToEdit);
         setActiveTab('processing');
-
+    
         try {
             await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
-            
-            // This is a workaround to ensure the state has time to update.
+    
+            // Wait for state to potentially update after deletion logic.
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+    
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (!firstSrNo) {
                 if (paymentToEdit.rtgsFor === 'Outsider') {
@@ -253,11 +253,16 @@ export const useSupplierPayments = () => {
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
     
-
     return {
         ...data,
         ...form,
-        ...cdHook,
+        cdEnabled: cdHook.cdEnabled,
+        setCdEnabled: cdHook.setCdEnabled,
+        cdPercent: cdHook.cdPercent,
+        setCdPercent: cdHook.setCdPercent,
+        cdAt: cdHook.cdAt,
+        setCdAt: cdHook.setCdAt,
+        calculatedCdAmount: cdHook.calculatedCdAmount,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
