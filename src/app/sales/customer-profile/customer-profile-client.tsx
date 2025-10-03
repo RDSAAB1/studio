@@ -134,7 +134,7 @@ export default function CustomerProfileClient() {
         data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + t.netWeight, 0);
         data.totalTransactions = data.allTransactions!.length;
         
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + p.amount, 0);
+        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         
         data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
         
@@ -169,7 +169,7 @@ export default function CustomerProfileClient() {
     }, {
         name: 'Mill (Total Customers)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
-        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredCustomers, 
         allPayments: filteredCustomerPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0,
         totalBrokerage: 0, totalCd: 0,
@@ -275,3 +275,5 @@ export default function CustomerProfileClient() {
     </div>
   );
 }
+
+    

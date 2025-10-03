@@ -80,10 +80,9 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Process all entries (suppliers and customers)
+    // Process all entries
     filteredSuppliers.forEach(s => {
         if (!s.customerId) return;
-
         let data = summary.get(s.customerId);
         if (!data) {
             data = {
@@ -131,7 +130,7 @@ export default function SupplierProfileClient() {
                 return sum;
             }, 0);
             
-            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
             return { ...t, netAmount: newNetAmount };
         });
 
@@ -250,6 +249,21 @@ export default function SupplierProfileClient() {
     );
   }
 
+  const detailsSupplierData = useMemo(() => {
+    if (!detailsCustomer) return null;
+    const supplierProfile = supplierSummaryMap.get(detailsCustomer.customerId);
+    if (!supplierProfile) return null;
+
+    const paymentsForEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo));
+    return {
+        ...supplierProfile,
+        allTransactions: [detailsCustomer],
+        allPayments: paymentsForEntry,
+        totalOutstanding: detailsCustomer.netAmount,
+        totalOriginalAmount: detailsCustomer.originalNetAmount,
+    };
+}, [detailsCustomer, supplierSummaryMap, paymentHistory]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -293,17 +307,7 @@ export default function SupplierProfileClient() {
       <SupplierProfileView 
         selectedSupplierData={selectedSupplierData}
         isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
-        onShowDetails={(supplier) => {
-            const supplierProfile = supplierSummaryMap.get(supplier.customerId);
-            const fullData = {
-                ...supplierProfile,
-                allTransactions: [supplier],
-                allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
-                totalOutstanding: supplier.netAmount,
-                totalOriginalAmount: supplier.originalNetAmount,
-            };
-            setDetailsCustomer(fullData);
-        }}
+        onShowDetails={setDetailsCustomer}
         onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
       />
@@ -316,10 +320,10 @@ export default function SupplierProfileClient() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
+       <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsCustomer} />
+                <StatementPreview data={detailsSupplierData} />
             </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -328,19 +332,14 @@ export default function SupplierProfileClient() {
         payment={selectedPaymentForDetails}
         suppliers={suppliers}
         onOpenChange={() => setSelectedPaymentForDetails(null)}
-        onShowEntryDetails={(supplier: Supplier) => {
-            const supplierProfile = supplierSummaryMap.get(supplier.customerId);
-            const fullData = {
-                ...supplierProfile,
-                allTransactions: [supplier],
-                allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
-                totalOutstanding: supplier.netAmount,
-                totalOriginalAmount: supplier.originalNetAmount,
-            };
-            setDetailsCustomer(fullData);
-        }}
+        onShowEntryDetails={setDetailsCustomer}
       />
       
     </div>
   );
 }
+
+
+    
+
+    

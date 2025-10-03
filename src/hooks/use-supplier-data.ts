@@ -93,11 +93,34 @@ export const useSupplierData = () => {
 
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
         safePaymentHistory.forEach(p => {
-            const supplierForPayment = safeSuppliers.find(s => s.customerId === p.customerId);
-            if (supplierForPayment) {
-                 const groupingKey = `${toTitleCase(supplierForPayment.name || '')}|${toTitleCase(supplierForPayment.so || '')}`;
-                if (summary.has(groupingKey)) {
-                    summary.get(groupingKey)!.allPayments!.push(p);
+            if(p.rtgsFor === 'Outsider') {
+                const outsiderKey = `${toTitleCase(p.supplierName || 'Outsider')}|${toTitleCase(p.supplierFatherName || '')}`;
+                 if (!summary.has(outsiderKey)) {
+                    summary.set(outsiderKey, {
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                        contact: '', 
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0,
+                        totalOutstanding: 0, totalCdAmount: 0,
+                        paymentHistory: [], outstandingEntryIds: [],
+                        allTransactions: [], allPayments: [], transactionsByVariety: {},
+                        totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
+                        totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+                        totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                        totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
+                        averageKartaPercentage: 0, averageLabouryRate: 0,
+                        totalTransactions: 0, totalOutstandingTransactions: 0,
+                    });
+                }
+                summary.get(outsiderKey)!.allPayments!.push(p);
+
+            } else {
+                const supplierForPayment = safeSuppliers.find(s => s.customerId === p.customerId);
+                if (supplierForPayment) {
+                     const groupingKey = `${toTitleCase(supplierForPayment.name || '')}|${toTitleCase(supplierForPayment.so || '')}`;
+                    if (summary.has(groupingKey)) {
+                        summary.get(groupingKey)!.allPayments!.push(p);
+                    }
                 }
             }
         });
@@ -141,7 +164,7 @@ export const useSupplierData = () => {
             data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
             data.totalTransactions = data.allTransactions!.length;
             
-            data.totalPaid = data.allPayments!.reduce((sum, p) => sum + p.amount, 0);
+            data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
             data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
             data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
             
@@ -214,4 +237,6 @@ export const useSupplierData = () => {
 };
 
 const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
+    
+
     
