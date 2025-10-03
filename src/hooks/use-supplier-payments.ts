@@ -121,11 +121,13 @@ export const useSupplierPayments = () => {
         if (paymentData) {
             const {
                 setPaymentId, setRtgsSrNo, setPaymentAmount, setPaymentType,
-                setPaymentMethod, setSelectedAccountId, setCdEnabled, setCdAt,
-                setCdPercent, setUtrNo, setCheckNo, setSixRNo, setSixRDate,
+                setPaymentMethod, setSelectedAccountId,
+                setUtrNo, setCheckNo, setSixRNo, setSixRDate,
                 setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
                 setSupplierDetails, setBankDetails, setPaymentDate
             } = form;
+
+            const { setCdEnabled, setCdPercent, setCdAt } = cdHook;
     
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
@@ -182,7 +184,7 @@ export const useSupplierPayments = () => {
         }
         
         setIsOutstandingModalOpen(false);
-    }, [form, data.suppliers]);
+    }, [form, data.suppliers, cdHook]);
 
     const handleEditPayment = useCallback(async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) {
@@ -195,10 +197,8 @@ export const useSupplierPayments = () => {
         setActiveTab('processing');
 
         try {
-            // Restore outstanding amounts for the entries this payment was for
-            await handleDeletePaymentLogic(paymentToEdit.id, data.paymentHistory, true); // true to indicate it's an edit
+            await handleDeletePaymentLogic(paymentToEdit.id, data.paymentHistory, true);
 
-            // Wait a bit to ensure state updates from Firestore can propagate
             await new Promise(resolve => setTimeout(resolve, 500));
             
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
@@ -222,13 +222,11 @@ export const useSupplierPayments = () => {
             
             form.setSelectedCustomerKey(profileKey);
 
-            // Select the entries that were part of this payment
             const paidForIds = data.suppliers
                 .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
                 .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
             
-            // Refill form
             handlePaySelectedOutstanding(paymentToEdit);
 
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
@@ -236,7 +234,7 @@ export const useSupplierPayments = () => {
         } catch (error: any) {
             console.error("Edit setup failed:", error);
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null); // Clear editing state on error
+            form.setEditingPayment(null);
             form.resetPaymentForm();
         } finally {
             setIsProcessing(false);
