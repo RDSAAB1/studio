@@ -12,40 +12,49 @@ import { Button } from "@/components/ui/button";
 import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, ScrollArea } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
-import { DetailsDialog } from '@/components/sales/supplier-payments/details-dialog';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
+import { StatementPreview } from '@/components/print-formats/statement-preview';
 
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('processing');
-
+    
     const hook = useSupplierPayments();
+    const { activeTab, setActiveTab } = hook;
 
     const transactionsForSelectedSupplier = useMemo(() => {
-        if (!hook.selectedCustomerKey || !hook.suppliers) return [];
+        if (!hook.selectedCustomerKey) return [];
         const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
-    }, [hook.selectedCustomerKey, hook.suppliers, hook.customerSummaryMap]);
+    }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
     
-    const paymentsForDetailsEntry = useMemo(() => {
-        if (!hook.detailsSupplierEntry || !hook.paymentHistory) return [];
-        return hook.paymentHistory.filter(p =>
-            p.paidFor?.some(pf => pf.srNo === hook.detailsSupplierEntry.srNo)
+    const detailsEntryData = useMemo(() => {
+        if (!hook.detailsSupplierEntry) return null;
+        const matchingSummary = Array.from(hook.customerSummaryMap.values()).find(summary =>
+            summary.allTransactions.some(t => t.id === hook.detailsSupplierEntry.id)
         );
-    }, [hook.detailsSupplierEntry, hook.paymentHistory]);
+        if (matchingSummary) {
+            return {
+                ...matchingSummary,
+                allTransactions: [hook.detailsSupplierEntry],
+                totalOutstanding: hook.detailsSupplierEntry.netAmount,
+                totalOriginalAmount: hook.detailsSupplierEntry.originalNetAmount,
+            }
+        }
+        return null;
+    }, [hook.detailsSupplierEntry, hook.customerSummaryMap]);
+
 
     if (!hook.isClient || hook.loading) {
         return (
@@ -85,10 +94,6 @@ export default function SupplierPaymentsClient() {
                                         </button>
                                     </div>
                                 )}
-                                <Button variant="outline" size="icon" onClick={() => setIsHistoryOpen(true)}>
-                                    <History className="h-4 w-4" />
-                                    <span className="sr-only">View History</span>
-                                </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="p-3">
@@ -97,7 +102,7 @@ export default function SupplierPaymentsClient() {
                                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                                         <div className="flex-1">
                                             <CustomDropdown
-                                                options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                                options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} (${data.contact})` }))}
                                                 value={hook.selectedCustomerKey}
                                                 onChange={hook.handleCustomerSelect}
                                                 placeholder="Search and select supplier..."
@@ -132,25 +137,11 @@ export default function SupplierPaymentsClient() {
                         payments={hook.paymentHistory}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
+                        onEdit={hook.handleEditPayment}
+                        onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
                     />
                 </TabsContent>
             </Tabs>
-
-            <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Full Payment History</DialogTitle>
-                        <DialogDescription>A complete log of all payments recorded.</DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-grow min-h-0">
-                        <PaymentHistory
-                            payments={hook.paymentHistory}
-                            onShowDetails={hook.setSelectedPaymentForDetails}
-                            onPrintRtgs={hook.setRtgsReceiptData}
-                        />
-                    </div>
-                </DialogContent>
-            </Dialog>
           
             <OutstandingEntriesDialog
                 isOpen={hook.isOutstandingModalOpen}
@@ -168,14 +159,15 @@ export default function SupplierPaymentsClient() {
                 onConfirm={hook.handlePaySelectedOutstanding}
                 onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
             />
-
-            <DetailsDialog 
-                isOpen={!!hook.detailsSupplierEntry}
-                onOpenChange={() => hook.setDetailsSupplierEntry(null)}
-                customer={hook.detailsSupplierEntry}
-                paymentHistory={paymentsForDetailsEntry}
-            />
             
+            <Dialog open={!!hook.detailsSupplierEntry} onOpenChange={() => hook.setDetailsSupplierEntry(null)}>
+                <DialogContent className="max-w-5xl p-0 printable-statement-container">
+                    <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                        <StatementPreview data={detailsEntryData} />
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
+
             <PaymentDetailsDialog
                 payment={hook.selectedPaymentForDetails}
                 suppliers={hook.suppliers}
