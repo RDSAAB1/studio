@@ -85,11 +85,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
+        // When updating, we delete the old payment logic which is handled in handleEditPayment via handleDeletePaymentLogic.
+        // The processPaymentLogic now only handles creation.
+        // We just need to make sure we use the correct ID.
         if (editingPayment?.id) {
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
             if (oldPaymentDoc.exists()) {
-                transaction.delete(oldPaymentRef);
+                // The actual deletion happens in handleEditPayment, we just check existence here if needed
+                // For a pure 'create' logic, this block might be removed or adjusted.
             }
         }
 
@@ -224,4 +228,5 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
       await deletePaymentFromLocalDB(paymentToDelete.id);
     }
   };
+
 

@@ -103,7 +103,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory); 
+            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -187,28 +187,26 @@ export const useSupplierPayments = () => {
     }, [form, data.suppliers, cdHook]);
 
     const handleEditPayment = useCallback(async (paymentToEdit: Payment) => {
-        if (!paymentToEdit.id) {
+        if (!paymentToEdit || !paymentToEdit.id) {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
 
         setIsProcessing(true);
-        form.setEditingPayment(paymentToEdit);
         setActiveTab('processing');
+        form.setEditingPayment(paymentToEdit);
 
         try {
-            await handleDeletePaymentLogic(paymentToEdit.id, data.paymentHistory, true);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
             
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (!firstSrNo) {
-                 throw new Error("Payment has no associated entries to identify the supplier.");
+                throw new Error("Payment has no associated entries to identify the supplier.");
             }
             
             const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
             if (!originalEntry) {
-                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
+                throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
             }
 
             const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
@@ -227,6 +225,7 @@ export const useSupplierPayments = () => {
                 .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
             
+            // This is the crucial part that fills the form
             handlePaySelectedOutstanding(paymentToEdit);
 
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
@@ -252,13 +251,7 @@ export const useSupplierPayments = () => {
     return {
         ...data,
         ...form,
-        cdEnabled: cdHook.cdEnabled,
-        setCdEnabled: cdHook.setCdEnabled,
-        cdPercent: cdHook.cdPercent,
-        setCdPercent: cdHook.setCdPercent,
-        cdAt: cdHook.cdAt,
-        setCdAt: cdHook.setCdAt,
-        calculatedCdAmount: cdHook.calculatedCdAmount,
+        ...cdHook,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
