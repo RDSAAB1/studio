@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -19,7 +18,7 @@ import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
-import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
+import { DetailsDialog } from "@/components/sales/details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
@@ -718,11 +717,12 @@ export default function CustomerEntryClient() {
         </div>
        )}
 
-      <CustomerDetailsDialog
-        customer={detailsCustomer}
+      <DetailsDialog
+        isOpen={!!detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
-        onPrint={handleOpenPrintPreview}
+        customer={detailsCustomer}
         paymentHistory={paymentHistory}
+        entryType="Customer"
       />
         
       <DocumentPreviewDialog

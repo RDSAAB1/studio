@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -19,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { StatementPreview } from "@/components/print-formats/statement-preview";
@@ -28,7 +28,6 @@ import { StatementPreview } from "@/components/print-formats/statement-preview";
 import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
-
 
 export default function SupplierProfileClient() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -101,25 +100,6 @@ export default function SupplierProfileClient() {
     filteredSuppliers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
-
-        const paymentsForThisEntry = filteredPayments.filter(p => p.paidFor?.some(pf => pf.srNo === s.srNo));
-        const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
-            const pf = p.paidFor!.find(pf => pf.srNo === s.srNo)!;
-            return sum + pf.amount;
-        }, 0);
-        const totalCdForEntry = paymentsForThisEntry.reduce((sum, p) => {
-            if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
-                if (totalAmountInPayment > 0) {
-                    const proportion = (p.paidFor.find(pf => pf.srNo === s.srNo)?.amount || 0) / totalAmountInPayment;
-                    return sum + (p.cdAmount * proportion);
-                }
-            }
-            return sum;
-        }, 0);
-
-        s.netAmount = (s.originalNetAmount || 0) - totalPaidForEntry;
-
         data.allTransactions!.push(s);
     });
 
@@ -149,6 +129,28 @@ export default function SupplierProfileClient() {
     summary.forEach((data, key) => {
         const allContacts = new Set(data.allTransactions!.map(t => t.contact));
         data.contact = Array.from(allContacts).join(', ');
+
+        const updatedTransactions = data.allTransactions!.map(t => {
+            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            let totalPaidForEntry = 0;
+            let totalCdForEntry = 0;
+
+            paymentsForThisEntry.forEach(p => {
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                    if (totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        totalCdForEntry += p.cdAmount * proportion;
+                    }
+                }
+            });
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return { ...t, netAmount: newNetAmount };
+        });
+
+        data.allTransactions = updatedTransactions;
 
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
@@ -252,21 +254,6 @@ export default function SupplierProfileClient() {
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
-  const detailsSupplierData = useMemo(() => {
-    if (!detailsCustomer) return null;
-    const supplierProfile = supplierSummaryMap.get(detailsCustomer.customerId);
-    if (!supplierProfile) return null;
-
-    const paymentsForEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo));
-    return {
-        ...supplierProfile,
-        allTransactions: [detailsCustomer],
-        allPayments: paymentsForEntry,
-        totalOutstanding: detailsCustomer.netAmount,
-        totalOriginalAmount: detailsCustomer.originalNetAmount,
-    };
-  }, [detailsCustomer, supplierSummaryMap, paymentHistory]);
-
   if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
@@ -331,13 +318,12 @@ export default function SupplierProfileClient() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsSupplierData} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <DetailsDialog 
+          isOpen={!!detailsCustomer}
+          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+          customer={detailsCustomer}
+          paymentHistory={paymentHistory}
+      />
       
       <PaymentDetailsDialog
         payment={selectedPaymentForDetails}

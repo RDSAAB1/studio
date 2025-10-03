@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -24,7 +23,7 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
-import { StatementPreview } from '@/components/print-formats/statement-preview';
+import { DetailsDialog } from "@/components/sales/details-dialog";
 
 
 export default function SupplierPaymentsClient() {
@@ -39,22 +38,6 @@ export default function SupplierPaymentsClient() {
         const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
     }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
-    
-    const detailsEntryData = useMemo(() => {
-        if (!hook.detailsSupplierEntry) return null;
-        const matchingSummary = Array.from(hook.customerSummaryMap.values()).find(summary =>
-            summary.allTransactions.some(t => t.id === hook.detailsSupplierEntry.id)
-        );
-        if (matchingSummary) {
-            return {
-                ...matchingSummary,
-                allTransactions: [hook.detailsSupplierEntry],
-                totalOutstanding: hook.detailsSupplierEntry.netAmount,
-                totalOriginalAmount: hook.detailsSupplierEntry.originalNetAmount,
-            }
-        }
-        return null;
-    }, [hook.detailsSupplierEntry, hook.customerSummaryMap]);
 
 
     if (!hook.isClient || hook.loading) {
@@ -161,13 +144,13 @@ export default function SupplierPaymentsClient() {
                 onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
             />
             
-            <Dialog open={!!hook.detailsSupplierEntry} onOpenChange={() => hook.setDetailsSupplierEntry(null)}>
-                <DialogContent className="max-w-5xl p-0 printable-statement-container">
-                    <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                        <StatementPreview data={detailsEntryData} />
-                    </ScrollArea>
-                </DialogContent>
-            </Dialog>
+            <DetailsDialog
+                isOpen={!!hook.detailsSupplierEntry}
+                onOpenChange={() => hook.setDetailsSupplierEntry(null)}
+                customer={hook.detailsSupplierEntry}
+                paymentHistory={hook.paymentHistory}
+                entryType="Supplier"
+            />
 
             <PaymentDetailsDialog
                 payment={hook.selectedPaymentForDetails}

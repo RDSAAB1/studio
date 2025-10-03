@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -21,6 +20,7 @@ import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { StatementPreview } from "@/components/print-formats/statement-preview";
+import { DetailsDialog } from '@/components/sales/details-dialog';
 
 
 // Icons
@@ -80,9 +80,8 @@ export default function CustomerProfileClient() {
     // Process all entries
     filteredCustomers.forEach(s => {
         if (!s.customerId) return;
-        let data = summary.get(s.customerId);
-        if (!data) {
-            data = {
+        if (!summary.has(s.customerId)) {
+            summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address, companyName: s.companyName,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
@@ -93,10 +92,9 @@ export default function CustomerProfileClient() {
                 averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
                 averageKartaPercentage: 0, averageLabouryRate: 0,
                 totalBrokerage: 0, totalCd: 0,
-            };
-            summary.set(s.customerId, data);
+            });
         }
-        data.allTransactions!.push(s);
+        summary.get(s.customerId)!.allTransactions!.push(s);
     });
 
     // Attach payments to the correct group
@@ -108,35 +106,32 @@ export default function CustomerProfileClient() {
 
     // Calculate totals for each group
     summary.forEach(data => {
-        // First, calculate the correct netAmount for each transaction
-        const updatedTransactions = data.allTransactions!.map(t => {
-            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
-            
+        const updatedTransactions = (data.allTransactions || []).map(t => {
+            const paymentsForThisEntry = (data.allPayments || []).filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
             const totalPaidForEntry = paymentsForThisEntry.reduce((sum, p) => {
                 const pf = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
                 return sum + pf.amount;
             }, 0);
-            
             const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
             return { ...t, netAmount: newNetAmount };
         });
 
         data.allTransactions = updatedTransactions;
 
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
-        data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
-        data.totalBrokerage = data.allTransactions!.reduce((sum, t) => sum + (t.brokerage || 0), 0);
-        data.totalCd = data.allTransactions!.reduce((sum, t) => sum + (t.cd || 0), 0);
-        data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.advanceFreight || 0), 0);
-        data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
-        data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
-        data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
-        data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + t.netWeight, 0);
-        data.totalTransactions = data.allTransactions!.length;
+        data.totalOriginalAmount = data.allTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+        data.totalAmount = data.allTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+        data.totalBrokerage = data.allTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0);
+        data.totalCd = data.allTransactions.reduce((sum, t) => sum + (t.cd || 0), 0);
+        data.totalOtherCharges = data.allTransactions.reduce((sum, t) => sum + (t.advanceFreight || 0), 0);
+        data.totalGrossWeight = data.allTransactions.reduce((sum, t) => sum + t.grossWeight, 0);
+        data.totalTeirWeight = data.allTransactions.reduce((sum, t) => sum + t.teirWeight, 0);
+        data.totalFinalWeight = data.allTransactions.reduce((sum, t) => sum + t.weight, 0);
+        data.totalNetWeight = data.allTransactions.reduce((sum, t) => sum + t.netWeight, 0);
+        data.totalTransactions = data.allTransactions.length;
         
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
+        data.totalPaid = data.allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + (t.netAmount as number), 0);
+        data.totalOutstanding = data.allTransactions.reduce((sum, t) => sum + (t.netAmount as number), 0);
         
         data.totalOutstandingTransactions = updatedTransactions.filter(t => (t.netAmount || 0) >= 1).length;
         
@@ -144,7 +139,7 @@ export default function CustomerProfileClient() {
         
         data.paymentHistory = data.allPayments!;
         
-        data.transactionsByVariety = data.allTransactions!.reduce((acc, s) => {
+        data.transactionsByVariety = data.allTransactions.reduce((acc, s) => {
             const variety = toTitleCase(s.variety) || 'Unknown';
             acc[variety] = (acc[variety] || 0) + 1;
             return acc;
@@ -172,7 +167,7 @@ export default function CustomerProfileClient() {
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredCustomers, 
         allPayments: filteredCustomerPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0,
-        totalBrokerage: 0, totalCd: 0,
+        totalBrokerage: 0, totalCd: 0, totalCdAmount: 0
     });
     
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
@@ -191,25 +186,6 @@ export default function CustomerProfileClient() {
 
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
-  const detailsCustomerData = useMemo(() => {
-    if (!detailsCustomer) return null;
-    const customerProfile = customerSummaryMap.get(detailsCustomer.customerId);
-    if (!customerProfile) return null;
-
-    const paymentsForEntry = customerPayments.filter(p => p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo));
-    return {
-        ...customerProfile,
-        allTransactions: [detailsCustomer],
-        allPayments: paymentsForEntry,
-        totalOutstanding: detailsCustomer.netAmount,
-        totalOriginalAmount: detailsCustomer.originalNetAmount,
-    };
-  }, [detailsCustomer, customerSummaryMap, customerPayments]);
-    
-  const handleShowDetails = (customer: Customer) => {
-      setDetailsCustomer(customer);
-  };
-
   if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
@@ -250,7 +226,7 @@ export default function CustomerProfileClient() {
       <SupplierProfileView
         selectedSupplierData={selectedCustomerData}
         isMillSelected={selectedCustomerKey === MILL_OVERVIEW_KEY}
-        onShowDetails={handleShowDetails}
+        onShowDetails={setDetailsCustomer}
         onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
         isCustomerView={true}
@@ -264,19 +240,19 @@ export default function CustomerProfileClient() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!detailsCustomer} onOpenChange={() => setDetailsCustomer(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsCustomerData} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <DetailsDialog 
+          isOpen={!!detailsCustomer}
+          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+          customer={detailsCustomer}
+          paymentHistory={customerPayments}
+          entryType="Customer"
+      />
       
       <PaymentDetailsDialog
         payment={selectedPaymentForDetails}
         suppliers={customers} // It expects suppliers, but customers have a similar structure for display
         onOpenChange={() => setSelectedPaymentForDetails(null)}
-        onShowEntryDetails={handleShowDetails}
+        onShowEntryDetails={setDetailsCustomer}
       />
       
     </div>

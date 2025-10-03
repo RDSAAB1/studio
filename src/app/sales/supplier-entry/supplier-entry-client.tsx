@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -20,6 +19,7 @@ import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
+import { DetailsDialog } from "@/components/sales/details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
@@ -27,9 +27,6 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
 const formSchema = z.object({
@@ -79,7 +76,7 @@ export default function SupplierEntryClient() {
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [detailsSupplier, setDetailsSupplier] = useState<any | null>(null);
+  const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<string>>(new Set());
@@ -489,13 +486,8 @@ const handleDelete = async (id: string) => {
   };
   
   const handleShowDetails = (supplier: Customer) => {
-    const fullData = {
-        ...supplier,
-        allTransactions: [supplier],
-        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
-    };
-    setDetailsSupplier(fullData);
-  };
+    setDetailsSupplier(supplier);
+  }
   
   const handleSinglePrint = (entry: Customer) => {
     setReceiptsToPrint([entry]);
@@ -605,9 +597,9 @@ const handleDelete = async (id: string) => {
                      const supplierData: Customer = {
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         name: toTitleCase(item['NAME']),
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
@@ -649,6 +641,8 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
+            setSuppliers([]);
+            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
@@ -798,13 +792,12 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
-      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsSupplier} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+       <DetailsDialog
+        isOpen={!!detailsSupplier}
+        onOpenChange={() => setDetailsSupplier(null)}
+        customer={detailsSupplier}
+        paymentHistory={paymentHistory}
+      />
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}
