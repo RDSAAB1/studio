@@ -1,9 +1,11 @@
 
 "use client";
 
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState } from "react";
+import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
+import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -44,7 +46,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
 
     const totalPaidForThisEntry = paymentsForDetailsEntry.reduce((sum, p) => {
         const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === customer.srNo);
-        // This now correctly includes the CD amount as part of the total reduction
         return sum + (paidForDetail?.amount || 0);
     }, 0);
     
@@ -109,16 +110,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                         {paymentsForDetailsEntry.map((payment: any, index: number) => {
                                              const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
                                              let cdForThisEntry = 0;
-                                             if (payment.cdApplied) {
-                                                 const paymentHasMultipleEntries = (payment.paidFor?.length || 0) > 1;
-                                                 if (paymentHasMultipleEntries) {
-                                                     const totalPaidInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                                                     if (totalPaidInPayment > 0) {
-                                                        const proportion = (paidForThis?.amount || 0) / totalPaidInPayment;
-                                                        cdForThisEntry = (payment.cdAmount || 0) * proportion;
-                                                     }
-                                                 } else {
-                                                     cdForThisEntry = payment.cdAmount || 0;
+                                             if (payment.cdApplied && payment.paidFor && payment.paidFor.length > 0) {
+                                                 const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                                                 if (totalAmountInPayment > 0) {
+                                                    const proportion = (paidForThis?.amount || 0) / totalAmountInPayment;
+                                                    cdForThisEntry = (payment.cdAmount || 0) * proportion;
                                                  }
                                              }
                                              return (<TableRow key={payment.id || index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="p-2">{payment.type}</TableCell><TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount - cdForThisEntry || 0)}</TableCell><TableCell className="p-2 text-right">{formatCurrency(cdForThisEntry)}</TableCell></TableRow>);
