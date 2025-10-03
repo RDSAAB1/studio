@@ -79,6 +79,8 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
+            // The processPaymentLogic now internally handles editing vs new payment.
+            // We've removed the explicit check for editingPayment here to avoid the confirmation dialog on every update.
             const result = await processPaymentLogic({ ...data, ...form, ...cdHook, selectedEntries });
 
             if (!result.success) {
@@ -103,7 +105,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory); 
+            await handleDeletePaymentLogic(paymentToDelete.id, data.paymentHistory); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -167,7 +169,7 @@ export const useSupplierPayments = () => {
             
             setSupplierDetails({
                 name: paymentData.supplierName || '', fatherName: paymentData.supplierFatherName || '',
-                address: paymentData.supplierAddress || '', contact: ''
+                address: paymentData.supplierAddress || '', contact: '' // contact not stored in payment
             });
             setBankDetails({
                 acNo: paymentData.bankAcNo || '', ifscCode: paymentData.bankIfsc || '',
@@ -195,51 +197,51 @@ export const useSupplierPayments = () => {
         setActiveTab('processing');
     
         try {
-            await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
+            await handleDeletePaymentLogic(paymentToEdit.id, data.paymentHistory, true);
     
-            // Wait for state to potentially update after deletion logic.
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
     
-            const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            if (!firstSrNo) {
-                if (paymentToEdit.rtgsFor === 'Outsider') {
-                    form.setRtgsFor('Outsider');
-                    handlePaySelectedOutstanding(paymentToEdit);
-                    setIsProcessing(false);
-                    toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-                    return;
+            let profileKey: string | undefined;
+    
+            if (paymentToEdit.rtgsFor === 'Outsider') {
+                form.setRtgsFor('Outsider');
+            } else {
+                form.setRtgsFor('Supplier');
+                const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
+                if (!firstSrNo) {
+                    throw new Error("Payment has no associated entries to identify the supplier.");
                 }
-                throw new Error("Payment has no associated entries to identify the supplier.");
+    
+                const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
+                if (!originalEntry) {
+                    throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
+                }
+    
+                profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
+                    const summary = data.customerSummaryMap.get(key);
+                    return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
+                });
+    
+                if (!profileKey) {
+                    throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
+                }
+    
+                form.setSelectedCustomerKey(profileKey);
+    
+                const paidForIds = data.suppliers
+                    .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
+                    .map(s => s.id);
+                form.setSelectedEntryIds(new Set(paidForIds));
             }
-    
-            const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
-            if (!originalEntry) {
-                throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
-            }
-
-            const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
-                const summary = data.customerSummaryMap.get(key);
-                return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
-            });
-    
-            if (!profileKey) {
-                throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
-            }
-    
-            form.setSelectedCustomerKey(profileKey);
-    
-            const paidForIds = data.suppliers
-                .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
-                .map(s => s.id);
-            form.setSelectedEntryIds(new Set(paidForIds));
     
             handlePaySelectedOutstanding(paymentToEdit);
     
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
     
         } catch (error: any) {
+            console.error("Edit setup failed:", error);
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null);
+            form.setEditingPayment(null); // Clear editing state on error
         } finally {
             setIsProcessing(false);
         }
