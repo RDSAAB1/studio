@@ -80,7 +80,7 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Initialize map with all unique suppliers
+    // Initialize map with all unique suppliers from their entries
     filteredSuppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
@@ -96,57 +96,15 @@ export default function SupplierProfileClient() {
                 averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
             });
         }
-    });
-
-    let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
-
-    filteredSuppliers.forEach(s => {
-        if (!s.customerId) return;
-        const data = summary.get(s.customerId)!;
-        data.allTransactions!.push(s);
-    });
-
-    filteredPayments.forEach(p => {
-        let targetKey: string | undefined;
-
-        if (p.customerId && summary.has(p.customerId)) {
-            targetKey = p.customerId;
-        } else {
-            // Find matching supplier for Outsider or unlinked payments
-            const pName = toTitleCase(p.supplierName || '');
-            const pSo = toTitleCase(p.supplierFatherName || '');
-
-            const foundKey = Array.from(summary.keys()).find(key => {
-                const s = summary.get(key)!;
-                const sName = toTitleCase(s.name);
-                const sSo = toTitleCase(s.so || '');
-                const sContact = s.allTransactions![0]?.contact; // Get contact from first transaction
-                return (sName === pName && sSo === pSo) || (sContact && sContact === p.supplierContact);
-            });
-
-            if (foundKey) {
-                targetKey = foundKey;
-            } else if (p.rtgsFor === 'Outsider') {
-                const outsiderKey = `${pName}|${pSo}|${p.bankAcNo}`; // Make key more unique
-                if (!summary.has(outsiderKey)) {
-                    summary.set(outsiderKey, {
-                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '', contact: p.supplierContact || '',
-                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                        totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-                        totalCashPaid: 0, totalRtgsPaid: 0, paymentHistory: [], outstandingEntryIds: [],
-                        allTransactions: [], allPayments: [], transactionsByVariety: {}, totalGrossWeight: 0,
-                        totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
-                        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
-                        totalCdAmount: 0, averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0,
-                        totalOutstandingTransactions: 0, averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
-                    });
-                }
-                targetKey = outsiderKey;
-            }
+        if (s.customerId) {
+            summary.get(s.customerId)!.allTransactions!.push(s);
         }
-        
-        if (targetKey && summary.has(targetKey)) {
-            summary.get(targetKey)!.allPayments!.push(p);
+    });
+
+    // Distribute payments to the correct supplier summary
+    filteredPayments.forEach(p => {
+        if (p.customerId && summary.has(p.customerId)) {
+            summary.get(p.customerId)!.allPayments!.push(p);
         }
     });
 
@@ -173,7 +131,7 @@ export default function SupplierProfileClient() {
                 }
             });
             
-            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
             return { ...t, netAmount: newNetAmount };
         });
 
@@ -216,7 +174,7 @@ export default function SupplierProfileClient() {
 
         if(rateData.count > 0) {
              data.averageKartaPercentage = rateData.karta / rateData.count;
-             data.averageLabouryRate = rates.laboury / rates.count;
+             data.averageLabouryRate = rateData.laboury / rateData.count;
         }
 
         data.transactionsByVariety = data.allTransactions!.reduce((acc, s) => {
