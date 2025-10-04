@@ -40,6 +40,24 @@ export default function SupplierPaymentsClient() {
         return summary ? summary.allTransactions || [] : [];
     }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
 
+    useEffect(() => {
+        if (hook.selectedEntryIds.size > 0) {
+            const selectedEntries = hook.suppliers.filter((s: Customer) => hook.selectedEntryIds.has(s.id));
+            const srNos = selectedEntries.map(e => e.srNo).join(', ');
+            const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
+            
+            hook.setParchiNo(srNos);
+            hook.setPaymentAmount(totalAmount);
+            hook.setPaymentType('Full'); // Default to full payment when entries are selected
+        } else {
+            // Optionally reset when selection is cleared
+            hook.setParchiNo('');
+            if (!hook.editingPayment) { // Don't reset amount if we are editing a payment
+                hook.setPaymentAmount(0);
+            }
+        }
+    }, [hook.selectedEntryIds, hook.suppliers]);
+
 
     if (!hook.isClient || hook.loading) {
         return (
@@ -102,18 +120,18 @@ export default function SupplierPaymentsClient() {
                                             </div>
                                         )}
                                     </div>
+                                     {hook.selectedCustomerKey && (
+                                        <TransactionTable
+                                            suppliers={transactionsForSelectedSupplier}
+                                            onShowDetails={hook.setDetailsSupplierEntry}
+                                            selectedIds={hook.selectedEntryIds}
+                                            onSelectionChange={hook.setSelectedEntryIds}
+                                        />
+                                    )}
                                 </div>
                             )}
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
                                 <PaymentForm {...hook} bankBranches={hook.bankBranches} />
-                            )}
-                            {hook.selectedCustomerKey && (
-                                <TransactionTable
-                                    suppliers={transactionsForSelectedSupplier}
-                                    onShowDetails={hook.setDetailsSupplierEntry}
-                                    selectedIds={hook.selectedEntryIds}
-                                    onSelectionChange={hook.setSelectedEntryIds}
-                                />
                             )}
                         </CardContent>
                     </Card>
@@ -174,5 +192,3 @@ export default function SupplierPaymentsClient() {
         </div>
     );
 }
-
-    
