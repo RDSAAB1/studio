@@ -52,12 +52,8 @@ export const useSupplierPayments = () => {
         const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
 
         if (form.selectedEntryIds.size > 0 && form.paymentType === 'Full') {
-            const finalAmount = totalAmount - cdHook.calculatedCdAmount;
+             const finalAmount = totalAmount - cdHook.calculatedCdAmount;
             form.setPaymentAmount(finalAmount);
-        } else if (form.selectedEntryIds.size > 0 && form.paymentType !== 'Full' && form.paymentAmount > totalAmount) {
-             form.setPaymentAmount(totalAmount);
-        } else if (form.selectedEntryIds.size === 0) {
-            form.setPaymentAmount(0);
         }
 
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
