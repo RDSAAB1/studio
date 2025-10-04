@@ -430,7 +430,9 @@ const handleDelete = async (id: string) => {
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name)}|${toTitleCase(values.so)}`,
+        customerId: isForcedUnique 
+            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
+            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
         forceUnique: isForcedUnique,
     };
 
@@ -484,9 +486,9 @@ const handleDelete = async (id: string) => {
     }
   };
   
-  const handleShowDetails = (customer: Customer) => {
-    setDetailsSupplier(customer);
-  }
+  const handleShowDetails = (supplier: Customer) => {
+    setDetailsSupplier(supplier);
+  };
   
   const handleSinglePrint = (entry: Customer) => {
     setReceiptsToPrint([entry]);
@@ -788,14 +790,6 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
-
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -832,3 +826,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
