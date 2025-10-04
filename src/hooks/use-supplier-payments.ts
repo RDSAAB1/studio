@@ -46,7 +46,7 @@ export const useSupplierPayments = () => {
     }, [selectedEntries]);
 
     const cdHook = useCashDiscount({
-        paymentAmount: form.paymentAmount,
+        paymentAmount: form.paymentType === 'Full' ? totalOutstandingForSelected : form.paymentAmount,
         totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
         selectedEntries: selectedEntries,
@@ -60,8 +60,7 @@ export const useSupplierPayments = () => {
         if (form.paymentType === 'Full') {
             form.setPaymentAmount(totalOutstandingForSelected);
         }
-    
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected]);
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.setPaymentAmount, form.setParchiNo]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -85,6 +84,7 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
+             setIsOutstandingModalOpen(true);
         }
     };
 
@@ -277,8 +277,11 @@ export const useSupplierPayments = () => {
     }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
 
     const finalAmountToSettle = useMemo(() => {
+        if (form.paymentType === 'Full') {
+            return form.paymentAmount;
+        }
         return form.paymentAmount + cdHook.calculatedCdAmount;
-    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
