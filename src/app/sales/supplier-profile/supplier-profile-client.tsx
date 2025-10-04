@@ -107,26 +107,46 @@ export default function SupplierProfileClient() {
     });
 
     filteredPayments.forEach(p => {
+        let targetKey: string | undefined;
+
         if (p.customerId && summary.has(p.customerId)) {
-            summary.get(p.customerId)!.allPayments!.push(p);
-        } else if (p.rtgsFor === 'Outsider') {
-            const outsiderKey = p.customerId || `${toTitleCase(p.supplierName || 'Outsider')}|${toTitleCase(p.supplierFatherName || '')}`;
-            if (!summary.has(outsiderKey)) {
-                summary.set(outsiderKey, {
-                    name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
-                    contact: '',
-                    acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                    totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-                    totalCashPaid: 0, totalRtgsPaid: 0,
-                    paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
-                    transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
-                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
-                    totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
-                    averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
-                    averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
-                });
+            targetKey = p.customerId;
+        } else {
+            // Find matching supplier for Outsider or unlinked payments
+            const pName = toTitleCase(p.supplierName || '');
+            const pSo = toTitleCase(p.supplierFatherName || '');
+
+            const foundKey = Array.from(summary.keys()).find(key => {
+                const s = summary.get(key)!;
+                const sName = toTitleCase(s.name);
+                const sSo = toTitleCase(s.so || '');
+                const sContact = s.allTransactions![0]?.contact; // Get contact from first transaction
+                return (sName === pName && sSo === pSo) || (sContact && sContact === p.supplierContact);
+            });
+
+            if (foundKey) {
+                targetKey = foundKey;
+            } else if (p.rtgsFor === 'Outsider') {
+                const outsiderKey = `${pName}|${pSo}|${p.bankAcNo}`; // Make key more unique
+                if (!summary.has(outsiderKey)) {
+                    summary.set(outsiderKey, {
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '', contact: p.supplierContact || '',
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                        totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+                        totalCashPaid: 0, totalRtgsPaid: 0, paymentHistory: [], outstandingEntryIds: [],
+                        allTransactions: [], allPayments: [], transactionsByVariety: {}, totalGrossWeight: 0,
+                        totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+                        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                        totalCdAmount: 0, averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0,
+                        totalOutstandingTransactions: 0, averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+                    });
+                }
+                targetKey = outsiderKey;
             }
-            summary.get(outsiderKey)!.allPayments!.push(p);
+        }
+        
+        if (targetKey && summary.has(targetKey)) {
+            summary.get(targetKey)!.allPayments!.push(p);
         }
     });
 
@@ -196,7 +216,7 @@ export default function SupplierProfileClient() {
 
         if(rateData.count > 0) {
              data.averageKartaPercentage = rateData.karta / rateData.count;
-             data.averageLabouryRate = rateData.laboury / rateData.count;
+             data.averageLabouryRate = rates.laboury / rates.count;
         }
 
         data.transactionsByVariety = data.allTransactions!.reduce((acc, s) => {
