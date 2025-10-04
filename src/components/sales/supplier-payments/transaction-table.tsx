@@ -42,7 +42,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                 <TableRow>
                                     <TableHead className="p-2 text-xs w-10">
                                         <Checkbox
-                                            checked={selectedIds.size > 0 && selectedIds.size === outstandingSuppliers.length}
+                                            checked={(selectedIds?.size ?? 0) > 0 && selectedIds.size === outstandingSuppliers.length}
                                             onCheckedChange={handleSelectAll}
                                         />
                                     </TableHead>
@@ -55,10 +55,10 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                             </TableHeader>
                             <TableBody>
                                 {suppliers.map((entry: any) => (
-                                    <TableRow key={entry.id} data-state={selectedIds.has(entry.id) ? 'selected' : ''}>
+                                    <TableRow key={entry.id} data-state={selectedIds?.has(entry.id) ? 'selected' : ''}>
                                         <TableCell className="p-2">
                                             <Checkbox 
-                                                checked={selectedIds.has(entry.id)} 
+                                                checked={selectedIds?.has(entry.id)} 
                                                 onCheckedChange={() => handleRowSelect(entry.id)}
                                                 disabled={Number(entry.netAmount) < 1}
                                             />
@@ -87,5 +87,3 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
         </Card>
     );
 };
-
-    
