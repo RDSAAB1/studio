@@ -5,18 +5,18 @@ import { useState, useEffect, useMemo } from 'react';
 
 interface UseCashDiscountProps {
     paymentAmount: number;
+    totalOutstanding: number;
     paymentType: string;
     selectedEntries: any[];
-    paymentHistory: any[];
-    paymentDate: Date | undefined; // Added paymentDate
+    paymentDate: Date | undefined;
 }
 
 export const useCashDiscount = ({
     paymentAmount,
+    totalOutstanding,
     paymentType,
-    selectedEntries = [], // Fallback to an empty array
-    paymentHistory,
-    paymentDate, // Receive paymentDate
+    selectedEntries = [],
+    paymentDate,
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
@@ -27,6 +27,7 @@ export const useCashDiscount = ({
         effectivePaymentDate.setHours(0, 0, 0, 0);
 
         return selectedEntries.some(e => {
+            if (!e.dueDate) return false;
             const dueDate = new Date(e.dueDate);
             dueDate.setHours(0, 0, 0, 0);
             return effectivePaymentDate <= dueDate;
@@ -38,36 +39,33 @@ export const useCashDiscount = ({
     }, [eligibleForCd]);
 
     const calculatedCdAmount = useMemo(() => {
-        if (!cdEnabled) {
+        if (!cdEnabled || !eligibleForCd) {
             return 0;
         }
 
-        const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
-        effectivePaymentDate.setHours(0, 0, 0, 0);
-
-        const eligibleEntriesForCd = selectedEntries.filter(e => {
-            const dueDate = new Date(e.dueDate);
-            dueDate.setHours(0, 0, 0, 0);
-            return effectivePaymentDate <= dueDate;
-        });
-        
         let baseAmountForCd = 0;
         
-        if (cdAt === 'partial_on_paid') {
-            if (eligibleEntriesForCd.length > 0) {
+        switch (cdAt) {
+            case 'on_full_amount':
+                 baseAmountForCd = selectedEntries.reduce((sum, entry) => {
+                    const dueDate = new Date(entry.dueDate);
+                    const effectiveDate = paymentDate ? new Date(paymentDate) : new Date();
+                    return effectiveDate <= dueDate ? sum + (entry.originalNetAmount || 0) : sum;
+                }, 0);
+                break;
+            case 'on_unpaid_amount':
+                baseAmountForCd = totalOutstanding;
+                break;
+            case 'partial_on_paid':
                 baseAmountForCd = paymentAmount;
-            }
-        } else {
-            if (cdAt === 'on_unpaid_amount') {
-                baseAmountForCd = eligibleEntriesForCd.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-            } else if (cdAt === 'on_full_amount') {
-                baseAmountForCd = eligibleEntriesForCd.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
-            }
+                break;
+            default:
+                baseAmountForCd = 0;
         }
         
         return Math.round((baseAmountForCd * cdPercent) / 100);
 
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentDate]);
+    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentDate, eligibleForCd, totalOutstanding]);
     
     useEffect(() => {
         if (paymentType === 'Full') {

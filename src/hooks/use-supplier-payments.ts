@@ -40,26 +40,28 @@ export const useSupplierPayments = () => {
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
+    const totalOutstandingForSelected = useMemo(() => {
+        return selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
+    }, [selectedEntries]);
+
     const cdHook = useCashDiscount({
         paymentAmount: form.paymentAmount,
+        totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
         selectedEntries: selectedEntries,
-        paymentHistory: data.paymentHistory,
         paymentDate: form.paymentDate,
     });
     
-    useEffect(() => {
-        const totalOutstanding = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
-
-        if (form.paymentType === 'Full') {
-            const finalAmount = totalOutstanding - cdHook.calculatedCdAmount;
-            form.setPaymentAmount(finalAmount);
-        }
-
+     useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
 
-    }, [form.selectedEntryIds, selectedEntries, form.paymentType, cdHook.calculatedCdAmount]);
+        if (form.paymentType === 'Full') {
+            const finalAmount = totalOutstandingForSelected - cdHook.calculatedCdAmount;
+            form.setPaymentAmount(finalAmount);
+        }
+
+    }, [form.selectedEntryIds, selectedEntries, form.paymentType, totalOutstandingForSelected, cdHook.calculatedCdAmount, form.setParchiNo, form.setPaymentAmount]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -282,8 +284,7 @@ export const useSupplierPayments = () => {
         selectPaymentAmount,
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); },
         onConflict: handleConflict,
-        selectedEntries
+        selectedEntries,
+        totalOutstandingForSelected
     };
 };
-
-    
