@@ -44,8 +44,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
     }
 
-
-    const finalPaymentAmount = rtgsFor === 'Outsider' ? rtgsAmount : paymentAmount;
+    const finalAmountToPay = rtgsFor === 'Outsider' ? rtgsAmount : paymentAmount;
     
     const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
@@ -58,19 +57,20 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     
     const totalOutstandingForSelected = selectedEntries?.reduce((sum: number, entry: Customer) => sum + Number(entry.netAmount), 0) || 0;
 
-
-    if (finalPaymentAmount > availableBalance && !editingPayment) { // Check balance only for new payments
+    // For new payments, check if the amount exceeds the available balance.
+    // For edited payments, this check is tricky because the balance might temporarily be inflated due to rollback.
+    // We will rely on Firestore transaction to ensure atomicity.
+    if (finalAmountToPay > availableBalance && !editingPayment) {
         const accountName = bankAccounts.find((acc: any) => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
-        return { success: false, message: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
+        return { success: false, message: `Payment of ${formatCurrency(finalAmountToPay)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
     }
 
-    const totalActualPaid = paymentType === 'Full' ? totalOutstandingForSelected - calculatedCdAmount : finalPaymentAmount;
-    const totalReduction = totalActualPaid + calculatedCdAmount;
+    const totalToSettle = finalAmountToPay + calculatedCdAmount;
 
-    if (totalActualPaid <= 0 && calculatedCdAmount <= 0) {
+    if (finalAmountToPay <= 0 && calculatedCdAmount <= 0) {
         return { success: false, message: "Payment and CD amount cannot both be zero." };
     }
-     if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalReduction > totalOutstandingForSelected) {
+     if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalToSettle > totalOutstandingForSelected) {
         return { success: false, message: "Partial payment plus CD cannot exceed outstanding amount." };
     }
 
@@ -90,14 +90,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         if (editingPayment?.id) {
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
-            if (oldPaymentDoc.exists()) {
-                // The actual deletion happens in handleEditPayment, we just check existence here if needed
+            if (!oldPaymentDoc.exists()) {
+                throw new Error("The payment you are trying to edit was not found. It might have been deleted.")
             }
         }
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
-            let amountToDistribute = Math.round(totalActualPaid);
+            let amountToDistribute = Math.round(finalAmountToPay);
             let cdToDistribute = Math.round(calculatedCdAmount);
 
             const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
@@ -105,44 +105,64 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             for (const entryData of sortedEntries) {
                 if (amountToDistribute <= 0 && cdToDistribute <= 0) break;
                 
-                const supplierToUpdate = entryData;
-                if (!supplierToUpdate) continue; 
-
-                const currentSupplierData = supplierToUpdate.data;
+                const currentSupplierData = entryData.data;
                 const outstanding = Number(currentSupplierData.netAmount);
 
-                const maxPossibleReduction = Math.min(outstanding, amountToDistribute + cdToDistribute);
+                const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+                const remainingOutstandingAfterPayment = outstanding - paymentForThisEntry;
+                const cdForThisEntry = Math.min(remainingOutstandingAfterPayment, cdToDistribute);
                 
-                const cdForThisEntry = Math.min(maxPossibleReduction, cdToDistribute);
-                const paymentForThisEntry = maxPossibleReduction - cdForThisEntry;
-
                 if (paymentForThisEntry > 0 || cdForThisEntry > 0) {
                     paidForDetails.push({
-                        srNo: entryData.data.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
-                        supplierName: toTitleCase(entryData.data.name), supplierSo: toTitleCase(entryData.data.so),
+                        srNo: entryData.data.srNo, 
+                        amount: paymentForThisEntry,
+                        cdApplied: cdEnabled,
+                        supplierName: toTitleCase(entryData.data.name), 
+                        supplierSo: toTitleCase(entryData.data.so),
                         supplierContact: entryData.data.contact,
                     });
                     const newNetAmount = outstanding - paymentForThisEntry - cdForThisEntry;
-                    transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount < 0 ? 0 : newNetAmount });
+                    
+                    if (newNetAmount < -0.01) { // Allow for small floating point inaccuracies
+                         throw new Error(`Overpayment detected on SR# ${entryData.data.srNo}. Outstanding is ${formatCurrency(outstanding)}, but trying to settle ${formatCurrency(paymentForThisEntry + cdForThisEntry)}.`);
+                    }
+
+                    transaction.update(entryData.ref, { netAmount: newNetAmount < 0 ? 0 : newNetAmount });
                 }
                 amountToDistribute -= paymentForThisEntry;
                 cdToDistribute -= cdForThisEntry;
             }
         }
 
-        const expenseTransactionRef = doc(expensesCollection);
-        const expenseData: Partial<Expense> = {
-            id: expenseTransactionRef.id, 
-            date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-            transactionType: 'Expense', category: 'Supplier Payments',
-            subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-            amount: totalActualPaid, payee: supplierDetails.name,
-            description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
-            paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
-            status: 'Paid', isRecurring: false,
-        };
-        if (paymentMethod !== 'Cash') expenseData.bankAccountId = accountIdForPayment;
-        transaction.set(expenseTransactionRef, expenseData);
+        // Only create an expense record if actual money is being transferred
+        let expenseTransactionId = editingPayment?.expenseTransactionId || undefined;
+        if (totalActualPaid > 0) {
+             const expenseData: Partial<Expense> = {
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                transactionType: 'Expense', category: 'Supplier Payments',
+                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+                amount: totalActualPaid, payee: supplierDetails.name,
+                description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
+                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+                status: 'Paid', isRecurring: false,
+            };
+            if (paymentMethod !== 'Cash') expenseData.bankAccountId = accountIdForPayment;
+            
+            if (expenseTransactionId) {
+                const expenseDocRef = doc(expensesCollection, expenseTransactionId);
+                transaction.update(expenseDocRef, expenseData);
+            } else {
+                const newExpenseRef = doc(collection(firestoreDB, "expenses"));
+                transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id, transactionId: newExpenseRef.id });
+                expenseTransactionId = newExpenseRef.id;
+            }
+        } else if (expenseTransactionId) {
+            // If the new payment is 0 but there was an old one, delete it.
+            const expenseDocRef = doc(expensesCollection, expenseTransactionId);
+            transaction.delete(expenseDocRef);
+            expenseTransactionId = undefined;
+        }
+        
 
         if (cdEnabled && calculatedCdAmount > 0) {
             const incomeTransactionRef = doc(incomesCollection);
@@ -170,7 +190,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierFatherName: toTitleCase(supplierDetails.fatherName),
             supplierAddress: toTitleCase(supplierDetails.address),
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-            rtgsFor, expenseTransactionId: expenseTransactionRef.id,
+            rtgsFor, expenseTransactionId: expenseTransactionId,
         };
         if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
@@ -195,8 +215,8 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
         const paymentDoc = await transaction.get(paymentDocRef);
         
         if (!paymentDoc.exists()) {
-             console.warn(`Payment ${paymentToDelete.id} not found during deletion.`);
-             return;
+             console.warn(`Payment ${paymentToDelete.id} not found during deletion attempt.`);
+             return; // Exit if the payment has already been deleted.
         }
 
         const paymentData = paymentDoc.data() as Payment;
@@ -210,14 +230,15 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
                     
-                    const totalAmountInPayment = paymentData.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                    let cdForThisEntry = 0;
-                    if (paymentData.cdApplied && paymentData.cdAmount && totalAmountInPayment > 0) {
-                        const proportion = detail.amount / totalAmountInPayment;
-                        cdForThisEntry = paymentData.cdAmount * proportion;
+                    let amountToRestore = detail.amount;
+                    if (paymentData.cdApplied && paymentData.cdAmount) {
+                         const totalPaidInTx = paymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                         if (totalPaidInTx > 0) {
+                            const proportion = detail.amount / totalPaidInTx;
+                            amountToRestore += paymentData.cdAmount * proportion;
+                         }
                     }
-                    
-                    const amountToRestore = detail.amount + cdForThisEntry;
+
                     let newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     
                     // Safety check: netAmount should not exceed originalNetAmount
@@ -234,9 +255,14 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
         
         if (paymentData.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            transaction.delete(expenseDocRef);
+            const expenseDoc = await transaction.get(expenseDocRef);
+            if (expenseDoc.exists()) {
+                 transaction.delete(expenseDocRef);
+            }
         }
       
+      // If we are editing, we don't delete the payment doc itself, just its effects.
+      // The calling function will then set a new doc with the same ID.
       if (!isEditing) {
         transaction.delete(paymentDocRef);
       }
@@ -245,4 +271,4 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
     if (db && !isEditing) {
       await deletePaymentFromLocalDB(paymentToDelete.id);
     }
-  };
+};

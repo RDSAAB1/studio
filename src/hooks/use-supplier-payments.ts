@@ -219,7 +219,10 @@ export const useSupplierPayments = () => {
             
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (!firstSrNo) {
-                throw new Error("Payment has no associated entries to identify the supplier.");
+                // This might be an Outsider RTGS payment, which is okay.
+                handlePaySelectedOutstanding(paymentToEdit);
+                setIsProcessing(false);
+                return;
             }
             
             const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
@@ -243,7 +246,6 @@ export const useSupplierPayments = () => {
                 .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
             
-            // This is the crucial part that fills the form
             handlePaySelectedOutstanding(paymentToEdit);
 
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
