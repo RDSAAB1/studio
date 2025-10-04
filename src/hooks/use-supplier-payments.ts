@@ -49,10 +49,10 @@ export const useSupplierPayments = () => {
     });
     
     useEffect(() => {
-        const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
+        const totalOutstanding = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
 
-        if (form.selectedEntryIds.size > 0 && form.paymentType === 'Full') {
-             const finalAmount = totalAmount - cdHook.calculatedCdAmount;
+        if (form.paymentType === 'Full') {
+            const finalAmount = totalOutstanding - cdHook.calculatedCdAmount;
             form.setPaymentAmount(finalAmount);
         }
 
@@ -285,3 +285,5 @@ export const useSupplierPayments = () => {
         selectedEntries
     };
 };
+
+    
