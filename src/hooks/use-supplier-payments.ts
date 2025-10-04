@@ -50,14 +50,20 @@ export const useSupplierPayments = () => {
     
     useEffect(() => {
         const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
+
         if (form.selectedEntryIds.size > 0 && form.paymentType === 'Full') {
-            form.setPaymentAmount(totalAmount);
+            const finalAmount = totalAmount - cdHook.calculatedCdAmount;
+            form.setPaymentAmount(finalAmount);
+        } else if (form.selectedEntryIds.size > 0 && form.paymentType !== 'Full' && form.paymentAmount > totalAmount) {
+             form.setPaymentAmount(totalAmount);
+        } else if (form.selectedEntryIds.size === 0) {
+            form.setPaymentAmount(0);
         }
-        
+
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
 
-    }, [form.selectedEntryIds, selectedEntries, form.paymentType, form.setPaymentAmount, form.setParchiNo]);
+    }, [form.selectedEntryIds, selectedEntries, form.paymentType, cdHook.calculatedCdAmount]);
 
 
     const handleCustomerSelect = (key: string | null) => {
