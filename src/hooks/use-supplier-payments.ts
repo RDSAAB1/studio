@@ -57,11 +57,10 @@ export const useSupplierPayments = () => {
         form.setParchiNo(srNos);
 
         if (form.paymentType === 'Full') {
-            const finalAmount = totalOutstandingForSelected - cdHook.calculatedCdAmount;
-            form.setPaymentAmount(finalAmount);
+            form.setPaymentAmount(totalOutstandingForSelected);
         }
 
-    }, [form.selectedEntryIds, selectedEntries, form.paymentType, totalOutstandingForSelected, cdHook.calculatedCdAmount, form.setParchiNo, form.setPaymentAmount]);
+    }, [form.selectedEntryIds, selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -91,7 +90,14 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...cdHook, selectedEntries });
+            const paymentData = {
+                ...form,
+                paymentAmount: form.paymentAmount - cdHook.calculatedCdAmount,
+                cdAmount: cdHook.calculatedCdAmount,
+                cdApplied: cdHook.cdEnabled
+            };
+            
+            const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -143,15 +149,15 @@ export const useSupplierPayments = () => {
     
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
-            setPaymentAmount(paymentData.amount);
+            setPaymentAmount(paymentData.amount + (paymentData.cdAmount || 0)); // Restore pre-CD amount
             setPaymentType(paymentData.type);
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
             
             setCdEnabled(!!paymentData.cdApplied);
             if (paymentData.cdApplied && paymentData.cdAmount && paymentData.amount) {
-                const baseForCd = paymentData.type === 'Full' 
-                    ? (paymentData.paidFor || []).reduce((sum, pf) => sum + (data.suppliers.find((s: Customer) => s.srNo === pf.srNo)?.originalNetAmount || 0), 0)
+                 const baseForCd = paymentData.type === 'Full' 
+                    ? paymentData.amount + paymentData.cdAmount
                     : paymentData.amount;
                 if (baseForCd > 0) {
                     setCdPercent(Number(((paymentData.cdAmount / baseForCd) * 100).toFixed(2)));
