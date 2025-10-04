@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, ScrollArea } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -147,12 +148,12 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
