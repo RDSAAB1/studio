@@ -57,7 +57,7 @@ export const useSupplierPayments = () => {
         form.setParchiNo(srNos);
 
         if (form.paymentType === 'Full') {
-            form.setPaymentAmount(totalOutstandingForSelected);
+             form.setPaymentAmount(totalOutstandingForSelected);
         }
 
     }, [form.selectedEntryIds, selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount]);
@@ -92,7 +92,7 @@ export const useSupplierPayments = () => {
         try {
             const paymentData = {
                 ...form,
-                paymentAmount: form.paymentAmount - cdHook.calculatedCdAmount,
+                paymentAmount: form.paymentAmount,
                 cdAmount: cdHook.calculatedCdAmount,
                 cdApplied: cdHook.cdEnabled
             };
