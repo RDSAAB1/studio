@@ -103,8 +103,17 @@ export default function SupplierProfileClient() {
 
     // Distribute payments to the correct supplier summary
     filteredPayments.forEach(p => {
-        if (p.customerId && summary.has(p.customerId)) {
-            summary.get(p.customerId)!.allPayments!.push(p);
+        // Find supplier by customerId first
+        let supplierForPayment = filteredSuppliers.find(s => s.customerId === p.customerId);
+        
+        // If not found, try to find by matching SR No in paidFor
+        if (!supplierForPayment && p.paidFor && p.paidFor.length > 0) {
+            const srNo = p.paidFor[0].srNo;
+            supplierForPayment = filteredSuppliers.find(s => s.srNo === srNo);
+        }
+
+        if (supplierForPayment && summary.has(supplierForPayment.customerId)) {
+            summary.get(supplierForPayment.customerId)!.allPayments!.push(p);
         }
     });
 
@@ -157,7 +166,8 @@ export default function SupplierProfileClient() {
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
-        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
+        
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount;
         
         data.totalOutstandingTransactions = data.allTransactions.filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -278,7 +288,7 @@ export default function SupplierProfileClient() {
                             {endDate ? format(endDate, "PPP") : <span>End Date</span>}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} /></PopoverContent>
                 </Popover>
                 
                 <div className="w-full sm:w-[300px]">
