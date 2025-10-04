@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -55,12 +56,12 @@ export const useSupplierPayments = () => {
      useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
-
+    
         if (form.paymentType === 'Full') {
-             form.setPaymentAmount(totalOutstandingForSelected);
+            form.setPaymentAmount(totalOutstandingForSelected);
         }
-
-    }, [form.selectedEntryIds, selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount]);
+    
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -121,7 +122,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete, data.paymentHistory); 
+            await handleDeletePaymentLogic(paymentToDelete); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -149,18 +150,19 @@ export const useSupplierPayments = () => {
     
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
-            setPaymentAmount(paymentData.amount + (paymentData.cdAmount || 0)); // Restore pre-CD amount
+            
+            // Set the amount to the total settled amount (actual paid + CD)
+            const totalSettledInPayment = paymentData.amount + (paymentData.cdAmount || 0);
+            setPaymentAmount(totalSettledInPayment);
+            
             setPaymentType(paymentData.type);
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
             
             setCdEnabled(!!paymentData.cdApplied);
-            if (paymentData.cdApplied && paymentData.cdAmount && paymentData.amount) {
-                 const baseForCd = paymentData.type === 'Full' 
-                    ? paymentData.amount + paymentData.cdAmount
-                    : paymentData.amount;
-                if (baseForCd > 0) {
-                    setCdPercent(Number(((paymentData.cdAmount / baseForCd) * 100).toFixed(2)));
+            if (paymentData.cdApplied && paymentData.cdAmount) {
+                if(totalSettledInPayment > 0) {
+                     setCdPercent(Number(((paymentData.cdAmount / totalSettledInPayment) * 100).toFixed(2)));
                 } else {
                     setCdPercent(0);
                 }
@@ -187,7 +189,7 @@ export const useSupplierPayments = () => {
             
             setSupplierDetails({
                 name: paymentData.supplierName || '', fatherName: paymentData.supplierFatherName || '',
-                address: paymentData.supplierAddress || '', contact: '' // contact not stored in payment
+                address: paymentData.supplierAddress || '', contact: ''
             });
             setBankDetails({
                 acNo: paymentData.bankAcNo || '', ifscCode: paymentData.bankIfsc || '',
@@ -209,25 +211,21 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-    
+        
         setIsProcessing(true);
         setActiveTab('processing');
         form.setEditingPayment(paymentToEdit);
     
         try {
-            // This is the key change: we DO NOT revert the payment in the database here.
-            // We just load its data into the form. The revert+apply happens atomically in `processPaymentLogic`.
-    
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
     
-            if (!firstSrNo && form.rtgsFor === 'Supplier') {
+            if (form.rtgsFor === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
                  setIsProcessing(false);
                  return;
             }
             
-            // If it's an Outsider payment, there's no original entry to find.
             if (form.rtgsFor === 'Outsider') {
                 handlePaySelectedOutstanding(paymentToEdit);
                 toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
@@ -272,7 +270,14 @@ export const useSupplierPayments = () => {
     
 
     const finalAmountToBePaid = useMemo(() => {
-        return form.paymentAmount - cdHook.calculatedCdAmount;
+        if (form.paymentType === 'Full') {
+             return form.paymentAmount - cdHook.calculatedCdAmount;
+        }
+        return form.paymentAmount;
+    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
+
+    const finalAmountToSettle = useMemo(() => {
+        return form.paymentAmount + cdHook.calculatedCdAmount;
     }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
 
@@ -288,6 +293,7 @@ export const useSupplierPayments = () => {
         ...form,
         ...cdHook,
         finalAmountToBePaid,
+        finalAmountToSettle,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
