@@ -35,7 +35,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
         <Card className="mt-3">
             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Outstanding Entries</CardTitle></CardHeader>
             <CardContent className="p-0">
-                <ScrollArea className="h-64">
+                <ScrollArea className="h-40">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
@@ -48,8 +48,8 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                     </TableHead>
                                     <TableHead className="p-2 text-xs">SR No</TableHead>
                                     <TableHead className="p-2 text-xs">Date</TableHead>
-                                    <TableHead className="p-2 text-xs">Original Amt</TableHead>
-                                    <TableHead className="p-2 text-xs">Outstanding</TableHead>
+                                    <TableHead className="p-2 text-xs text-right">Original Amt</TableHead>
+                                    <TableHead className="p-2 text-xs text-right">Outstanding</TableHead>
                                     <TableHead className="p-2 text-xs text-center">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -66,7 +66,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                         <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
                                         <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(Number(entry.netAmount))}</TableCell>
+                                        <TableCell className="text-right p-2 text-xs font-semibold">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                         <TableCell className="text-center p-0">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                                 <Info className="h-4 w-4" />

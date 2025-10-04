@@ -231,6 +231,44 @@ export const useSupplierData = () => {
         finalSummaryMap.set(uniqueKey, data);
     });
 
+    // Add Mill Overview
+    const millSummary = Array.from(finalSummaryMap.values()).reduce((acc, s) => {
+        acc.totalAmount += s.totalAmount;
+        acc.totalOriginalAmount += s.totalOriginalAmount;
+        acc.totalPaid += s.totalPaid;
+        acc.totalCashPaid += s.totalCashPaid;
+        acc.totalRtgsPaid += s.totalRtgsPaid;
+        acc.totalOutstanding += s.totalOutstanding;
+        acc.totalCdAmount += s.totalCdAmount!;
+        acc.totalGrossWeight! += s.totalGrossWeight!;
+        acc.totalTeirWeight! += s.totalTeirWeight!;
+        acc.totalFinalWeight! += s.totalFinalWeight!;
+        acc.totalKartaWeight! += s.totalKartaWeight!;
+        acc.totalNetWeight! += s.totalNetWeight!;
+        acc.totalKartaAmount! += s.totalKartaAmount!;
+        acc.totalLabouryAmount! += s.totalLabouryAmount!;
+        acc.totalKanta! += s.totalKanta!;
+        acc.totalOtherCharges! += s.totalOtherCharges!;
+        acc.totalTransactions! += s.totalTransactions!;
+        acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
+        Object.entries(s.transactionsByVariety!).forEach(([variety, count]) => {
+            acc.transactionsByVariety![variety] = (acc.transactionsByVariety![variety] || 0) + count;
+        });
+        return acc;
+    }, {
+        name: 'Mill (Total Overview)', contact: '', so: '', address: '',
+        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+        totalOutstanding: 0, totalCdAmount: 0,
+        paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+        totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+        totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
+        totalTransactions: 0, totalOutstandingTransactions: 0,
+        transactionsByVariety: {}, totalBrokerage: 0, totalCd: 0,
+    });
+    finalSummaryMap.set('mill-overview', millSummary);
+
+
     return finalSummaryMap;
 }, [suppliers, paymentHistory]);
 
@@ -282,3 +320,4 @@ export const useSupplierData = () => {
 
 const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
     
+
