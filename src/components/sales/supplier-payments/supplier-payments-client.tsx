@@ -99,7 +99,6 @@ export default function SupplierPaymentsClient() {
                                                     <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
                                                     <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
                                                 </div>
-                                                <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
                                             </div>
                                         )}
                                     </div>
@@ -112,6 +111,8 @@ export default function SupplierPaymentsClient() {
                                 <TransactionTable
                                     suppliers={transactionsForSelectedSupplier}
                                     onShowDetails={hook.setDetailsSupplierEntry}
+                                    selectedIds={hook.selectedEntryIds}
+                                    onSelectionChange={hook.setSelectedEntryIds}
                                 />
                             )}
                         </CardContent>
@@ -173,3 +174,5 @@ export default function SupplierPaymentsClient() {
         </div>
     );
 }
+
+    

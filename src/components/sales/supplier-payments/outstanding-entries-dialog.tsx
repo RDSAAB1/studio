@@ -56,3 +56,5 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
         </Dialog>
     );
 };
+
+    

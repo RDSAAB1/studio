@@ -69,9 +69,6 @@ export const useSupplierPayments = () => {
                     bank: customerData.bank || '',
                     branch: customerData.branch || '',
                 });
-                 if (!form.editingPayment) {
-                    setIsOutstandingModalOpen(true);
-                 }
             }
         }
     };
@@ -275,3 +272,5 @@ export const useSupplierPayments = () => {
         selectedEntries
     };
 };
+
+    
