@@ -430,9 +430,7 @@ const handleDelete = async (id: string) => {
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: isForcedUnique 
-            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
-            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        customerId: `${toTitleCase(values.name)}|${toTitleCase(values.so)}`,
         forceUnique: isForcedUnique,
     };
 
@@ -486,8 +484,8 @@ const handleDelete = async (id: string) => {
     }
   };
   
-  const handleShowDetails = (supplier: Customer) => {
-    setDetailsSupplier(supplier);
+  const handleShowDetails = (customer: Customer) => {
+    setDetailsSupplier(customer);
   }
   
   const handleSinglePrint = (entry: Customer) => {
@@ -642,7 +640,6 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
             console.error("Error deleting all entries:", error);
@@ -764,12 +761,12 @@ const handleDelete = async (id: string) => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                     A supplier with a very similar name already exists. Is this the same person?
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+                    </div>
                 </AlertDialogDescription>
-                <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                    <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-                    <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-                    <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-                </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
@@ -791,7 +788,15 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
-       <DetailsDialog
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
+      <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
         customer={detailsSupplier}
