@@ -258,6 +258,13 @@ export const useSupplierPayments = () => {
         }
     }, [data.paymentHistory, data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
 
+    const finalAmountToBePaid = useMemo(() => {
+        if (form.paymentType === 'Full') {
+            return form.paymentAmount - cdHook.calculatedCdAmount;
+        }
+        return form.paymentAmount; // For partial, pay amount is what user enters
+    }, [form.paymentType, form.paymentAmount, cdHook.calculatedCdAmount]);
+
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
         form.setRtgsQuantity(option.quantity);
@@ -270,6 +277,7 @@ export const useSupplierPayments = () => {
         ...data,
         ...form,
         ...cdHook,
+        finalAmountToBePaid,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,

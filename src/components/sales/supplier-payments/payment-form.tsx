@@ -50,6 +50,7 @@ export const PaymentForm = (props: any) => {
         processPayment, isProcessing, resetPaymentForm, editingPayment,
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
+        finalAmountToBePaid,
         calcTargetAmount, setCalcTargetAmount,
         minRate, setMinRate, maxRate, setMaxRate,
         selectPaymentAmount,
@@ -74,8 +75,7 @@ export const PaymentForm = (props: any) => {
         return bankOptions;
     }, [paymentMethod, financialState.balances, bankAccounts]);
 
-    const finalAmountToBePaid = paymentAmount - calculatedCdAmount;
-    const finalAmountToSettle = paymentAmount;
+    const finalAmountToSettle = paymentAmount + calculatedCdAmount;
 
 
     return (
@@ -142,7 +142,7 @@ export const PaymentForm = (props: any) => {
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label htmlFor="payment-amount" className="text-xs">Payable Amount</Label>
-                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !cdEnabled} className="h-8 text-xs" />
+                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
                             </div>
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
