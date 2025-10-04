@@ -65,29 +65,44 @@ export const useSupplierData = () => {
     
    const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
+    const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
     const safeCustomerPayments = Array.isArray(customerPayments) ? customerPayments : [];
 
     const summary = new Map<string, CustomerSummary>();
 
-    [...safeSuppliers, ...safeCustomerPayments].forEach(item => {
-        const isSupplier = 'srNo' in item;
-        const customerId = isSupplier ? item.customerId : item.customerId;
-        const name = isSupplier ? item.name : (item as CustomerPayment).customerName || 'Unknown';
-        const companyName = isSupplier ? item.companyName : '';
+    // Combine suppliers and payments for grouping
+    const allItems = [...safeSuppliers, ...safePaymentHistory, ...safeCustomerPayments];
 
+    allItems.forEach(item => {
+        let customerId, name, so, companyName, isOutsider = false;
+
+        if ('srNo' in item) { // It's a Customer
+            customerId = item.customerId;
+            name = item.name;
+            so = item.so;
+            companyName = item.companyName;
+        } else { // It's a Payment or CustomerPayment
+            customerId = item.customerId;
+            name = ('supplierName' in item) ? item.supplierName : ('customerName' in item) ? item.customerName : 'Unknown';
+            so = ('supplierFatherName' in item) ? item.supplierFatherName : '';
+            isOutsider = ('rtgsFor' in item) && item.rtgsFor === 'Outsider';
+        }
+
+        if (!customerId && isOutsider) {
+            customerId = `${normalizeString(name)}|${normalizeString(so)}`;
+        }
+        
         if (!customerId) return;
 
         if (!summary.has(customerId)) {
             summary.set(customerId, {
-                name: name,
-                companyName: companyName,
-                contact: isSupplier ? item.contact : '',
-                so: isSupplier ? item.so : '',
-                address: isSupplier ? item.address : '',
-                acNo: isSupplier ? item.acNo : '',
-                ifscCode: isSupplier ? item.ifscCode : '',
-                bank: isSupplier ? item.bank : '',
-                branch: isSupplier ? item.branch : '',
+                name: name, so: so, companyName: companyName,
+                address: 'address' in item ? item.address : '',
+                contact: 'contact' in item ? item.contact : '',
+                acNo: 'acNo' in item ? item.acNo : '',
+                ifscCode: 'ifscCode' in item ? item.ifscCode : '',
+                bank: 'bank' in item ? item.bank : '',
+                branch: 'branch' in item ? item.branch : '',
                 totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                 totalOutstanding: 0, totalCdAmount: 0, totalDeductions: 0,
                 paymentHistory: [], outstandingEntryIds: [],
@@ -103,14 +118,15 @@ export const useSupplierData = () => {
         }
         
         const data = summary.get(customerId)!;
-        if(isSupplier) {
+        if('srNo' in item) { // Is a Customer entry
             data.allTransactions!.push(item);
-        } else {
+        } else { // Is a Payment entry
             data.allPayments!.push(item);
         }
     });
 
     summary.forEach((data) => {
+        // First, link payments to transactions
         data.allTransactions!.forEach(t => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
             let totalPaidForEntry = 0;
@@ -130,6 +146,7 @@ export const useSupplierData = () => {
             t.netAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
         });
 
+        // Now calculate all summaries
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + p.amount, 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
@@ -169,6 +186,7 @@ export const useSupplierData = () => {
              data.averageLabouryRate = rateData.laboury / rateData.count;
         }
 
+        data.paymentHistory = data.allPayments!;
         data.transactionsByVariety = data.allTransactions!.reduce((acc, s) => {
             const variety = toTitleCase(s.variety) || 'Unknown';
             acc[variety] = (acc[variety] || 0) + 1;
@@ -224,8 +242,8 @@ export const useSupplierData = () => {
     }
     
     millSummary.allTransactions = safeSuppliers;
-    millSummary.allPayments = paymentHistory;
-    millSummary.paymentHistory = paymentHistory;
+    millSummary.allPayments = [...safePaymentHistory, ...safeCustomerPayments];
+    millSummary.paymentHistory = [...safePaymentHistory, ...safeCustomerPayments];
 
     millSummary.transactionsByVariety = safeSuppliers.reduce((acc, s) => {
          const variety = toTitleCase(s.variety) || 'Unknown';

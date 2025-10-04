@@ -66,7 +66,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         [paymentsForDetailsEntry, customer.srNo]
     );
     
-    const finalOutstanding = (customer.originalNetAmount || 0) - totalPaidForThisEntry;
+    const finalOutstanding = (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
     
     const isCustomer = entryType === 'Customer';
 
