@@ -35,7 +35,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
         <Card className="mt-3">
             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Outstanding Entries</CardTitle></CardHeader>
             <CardContent className="p-0">
-                <ScrollArea className="h-96">
+                <ScrollArea className="h-64">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>

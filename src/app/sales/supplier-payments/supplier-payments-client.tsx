@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -98,20 +99,23 @@ export default function SupplierPaymentsClient() {
                                                     <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
                                                     <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
                                                 </div>
-                                                <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             )}
-                            {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                                <PaymentForm {...hook} bankBranches={hook.bankBranches} />
-                            )}
-                            {hook.selectedCustomerKey && (
+
+                             {hook.selectedCustomerKey && (
                                 <TransactionTable
                                     suppliers={transactionsForSelectedSupplier}
                                     onShowDetails={hook.setDetailsSupplierEntry}
+                                    selectedIds={hook.selectedEntryIds}
+                                    onSelectionChange={hook.setSelectedEntryIds}
                                 />
+                            )}
+
+                            {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
+                                <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                             )}
                         </CardContent>
                     </Card>
@@ -131,12 +135,12 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = hook.suppliers.filter((s:any) => s.customerId === hook.selectedCustomerKey && parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
