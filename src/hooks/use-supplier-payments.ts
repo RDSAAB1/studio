@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -46,7 +45,7 @@ export const useSupplierPayments = () => {
     }, [selectedEntries]);
 
     const cdHook = useCashDiscount({
-        paymentAmount: form.paymentType === 'Full' ? totalOutstandingForSelected : form.paymentAmount,
+        paymentAmount: totalOutstandingForSelected,
         totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
         selectedEntries: selectedEntries,
@@ -60,7 +59,7 @@ export const useSupplierPayments = () => {
         if (form.paymentType === 'Full') {
             form.setPaymentAmount(totalOutstandingForSelected);
         }
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.setPaymentAmount, form.setParchiNo]);
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -151,7 +150,6 @@ export const useSupplierPayments = () => {
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            // Set the amount to the total settled amount (actual paid + CD)
             const totalSettledInPayment = paymentData.amount + (paymentData.cdAmount || 0);
             setPaymentAmount(totalSettledInPayment);
             
@@ -211,14 +209,15 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-        
-        setIsProcessing(true);
-        setActiveTab('processing');
+
         form.setEditingPayment(paymentToEdit);
-    
+        setActiveTab('processing');
+        setIsProcessing(true);
+        
         try {
+            await handleDeletePaymentLogic(paymentToEdit, true); // Revert the values virtually
+            
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-    
             if (form.rtgsFor === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
@@ -257,7 +256,6 @@ export const useSupplierPayments = () => {
             handlePaySelectedOutstanding(paymentToEdit);
     
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-    
         } catch (error: any) {
             console.error("Edit setup failed:", error);
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
@@ -277,11 +275,8 @@ export const useSupplierPayments = () => {
     }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
 
     const finalAmountToSettle = useMemo(() => {
-        if (form.paymentType === 'Full') {
-            return form.paymentAmount;
-        }
         return form.paymentAmount + cdHook.calculatedCdAmount;
-    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
