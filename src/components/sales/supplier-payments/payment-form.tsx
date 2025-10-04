@@ -137,10 +137,15 @@ export const PaymentForm = (props: any) => {
                                     </SelectContent>
                                 </Select>
                             </div>
-
+                            
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label htmlFor="payment-amount" className="text-xs">Payable Amount</Label>
                                 <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                            </div>
+
+                             <div className="space-y-1 flex-1 min-w-[150px]">
+                                <Label className="text-xs font-bold text-green-600">To Be Paid</Label>
+                                <Input value={formatCurrency(finalAmountToBePaid)} readOnly className="h-8 text-xs font-bold text-green-600 border-green-500 bg-green-500/10" />
                             </div>
                             
                             <div className="space-y-1 flex-grow min-w-[200px]">
@@ -252,32 +257,13 @@ export const PaymentForm = (props: any) => {
             )}
              
             <CardFooter className="p-0 pt-3">
-                <Card className="bg-muted/30 w-full p-2">
-                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Payable:</Label>
-                            <span className="text-sm font-semibold">{formatCurrency(props.rtgsAmount || paymentAmount)}</span>
-                        </div>
-                        {cdEnabled && (
-                            <div className="flex items-center gap-2">
-                                <Label className="text-xs font-medium text-muted-foreground">CD:</Label>
-                                <span className="text-sm font-semibold text-destructive">-{formatCurrency(calculatedCdAmount)}</span>
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2 border-l-2 border-primary pl-3 ml-3">
-                            <Label className="text-sm font-medium text-primary">To Be Paid:</Label>
-                            <span className="text-base font-bold text-primary border-2 border-green-500 rounded-md px-2 py-0.5 bg-background">
-                                {formatCurrency(finalAmountToBePaid)}
-                            </span>
-                        </div>
-                        <div className="flex-grow"></div>
-                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                        <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
-                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                            {editingPayment ? 'Update Payment' : 'Finalize Payment'}
-                        </Button>
-                    </CardContent>
-                </Card>
+                <div className="w-full flex flex-wrap items-center justify-end gap-2">
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
+                    <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                        {editingPayment ? 'Update Payment' : 'Finalize Payment'}
+                    </Button>
+                </div>
             </CardFooter>
         </>
     );
