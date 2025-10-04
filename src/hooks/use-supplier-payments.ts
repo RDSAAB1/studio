@@ -209,18 +209,28 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: "Payment is missing a valid ID.", variant: "destructive" });
             return;
         }
-
+    
         setIsProcessing(true);
         setActiveTab('processing');
         form.setEditingPayment(paymentToEdit);
-
+    
         try {
-            await handleDeletePaymentLogic(paymentToEdit, data.paymentHistory, true);
-            
+            // This is the key change: we DO NOT revert the payment in the database here.
+            // We just load its data into the form. The revert+apply happens atomically in `processPaymentLogic`.
+    
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            if (!firstSrNo) {
-                // This might be an Outsider RTGS payment, which is okay.
+    
+            if (!firstSrNo && form.rtgsFor === 'Supplier') {
+                 toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
+                 form.resetPaymentForm();
+                 setIsProcessing(false);
+                 return;
+            }
+            
+            // If it's an Outsider payment, there's no original entry to find.
+            if (form.rtgsFor === 'Outsider') {
                 handlePaySelectedOutstanding(paymentToEdit);
+                toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
                 setIsProcessing(false);
                 return;
             }
@@ -229,27 +239,27 @@ export const useSupplierPayments = () => {
             if (!originalEntry) {
                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
             }
-
+    
             const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
                 const summary = data.customerSummaryMap.get(key);
                 return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
             });
-
+    
             if (!profileKey) {
                 throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
             }
             
             form.setSelectedCustomerKey(profileKey);
-
+    
             const paidForIds = data.suppliers
                 .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
                 .map(s => s.id);
             form.setSelectedEntryIds(new Set(paidForIds));
             
             handlePaySelectedOutstanding(paymentToEdit);
-
+    
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-
+    
         } catch (error: any) {
             console.error("Edit setup failed:", error);
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
@@ -258,14 +268,12 @@ export const useSupplierPayments = () => {
         } finally {
             setIsProcessing(false);
         }
-    }, [data.paymentHistory, data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
+    }, [data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
+    
 
     const finalAmountToBePaid = useMemo(() => {
-        if (form.paymentType === 'Full') {
-            return form.paymentAmount - cdHook.calculatedCdAmount;
-        }
-        return form.paymentAmount; // For partial, pay amount is what user enters
-    }, [form.paymentType, form.paymentAmount, cdHook.calculatedCdAmount]);
+        return form.paymentAmount - cdHook.calculatedCdAmount;
+    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {

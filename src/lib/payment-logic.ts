@@ -57,14 +57,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     
     const totalOutstandingForSelected = selectedEntries?.reduce((sum: number, entry: Customer) => sum + Number(entry.netAmount), 0) || 0;
 
-    // For new payments, check if the amount exceeds the available balance.
-    // For edited payments, this check is tricky because the balance might temporarily be inflated due to rollback.
-    // We will rely on Firestore transaction to ensure atomicity.
-    if (finalAmountToPay > availableBalance && !editingPayment) {
-        const accountName = bankAccounts.find((acc: any) => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
-        return { success: false, message: `Payment of ${formatCurrency(finalAmountToPay)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
-    }
-
     const totalToSettle = finalAmountToPay + calculatedCdAmount;
 
     if (finalAmountToPay <= 0 && calculatedCdAmount <= 0) {
@@ -77,6 +69,43 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     let finalPaymentData: Payment | null = null;
     await runTransaction(firestoreDB, async (transaction) => {
         
+        // --- Step 1: Revert old payment if editing ---
+        if (editingPayment?.id) {
+            const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
+            const oldPaymentDoc = await transaction.get(oldPaymentRef);
+            if (oldPaymentDoc.exists()) {
+                const oldPaymentData = oldPaymentDoc.data() as Payment;
+                // Revert supplier balances
+                if (oldPaymentData.paidFor) {
+                    for (const detail of oldPaymentData.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                        const supplierSnapshot = await getDocs(q); // Use getDocs within transaction
+                        if (!supplierSnapshot.empty) {
+                            const supplierDoc = supplierSnapshot.docs[0];
+                            const currentSupplier = supplierDoc.data() as Customer;
+                            let amountToRestore = detail.amount;
+                             if (oldPaymentData.cdApplied && oldPaymentData.cdAmount && oldPaymentData.paidFor && oldPaymentData.paidFor.length > 0) {
+                                const totalPaidInTx = oldPaymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                                if(totalPaidInTx > 0) {
+                                    const proportion = detail.amount / totalPaidInTx;
+                                    amountToRestore += oldPaymentData.cdAmount * proportion;
+                                }
+                            }
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(supplierDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
+                    }
+                }
+                // Delete old expense record
+                if (oldPaymentData.expenseTransactionId) {
+                    const expenseRef = doc(firestoreDB, "expenses", oldPaymentData.expenseTransactionId);
+                    transaction.delete(expenseRef);
+                }
+            }
+        }
+
+
+        // --- Step 2: Apply new payment logic ---
         const supplierDocsToUpdate: { ref: DocumentReference, data: Customer }[] = [];
         if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
             for (const entryData of selectedEntries) {
@@ -87,14 +116,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
-        if (editingPayment?.id) {
-            const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
-            const oldPaymentDoc = await transaction.get(oldPaymentRef);
-            if (!oldPaymentDoc.exists()) {
-                throw new Error("The payment you are trying to edit was not found. It might have been deleted.")
-            }
-        }
-
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
             let amountToDistribute = Math.round(finalAmountToPay);
@@ -136,6 +157,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         // Only create an expense record if actual money is being transferred
         let expenseTransactionId = editingPayment?.expenseTransactionId || undefined;
+        const totalActualPaid = finalAmountToPay;
         if (totalActualPaid > 0) {
              const expenseData: Partial<Expense> = {
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
@@ -148,19 +170,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             };
             if (paymentMethod !== 'Cash') expenseData.bankAccountId = accountIdForPayment;
             
-            if (expenseTransactionId) {
-                const expenseDocRef = doc(expensesCollection, expenseTransactionId);
-                transaction.update(expenseDocRef, expenseData);
-            } else {
-                const newExpenseRef = doc(collection(firestoreDB, "expenses"));
-                transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id, transactionId: newExpenseRef.id });
-                expenseTransactionId = newExpenseRef.id;
-            }
+            const newExpenseRef = doc(collection(firestoreDB, "expenses"));
+            transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id, transactionId: newExpenseRef.id });
+            expenseTransactionId = newExpenseRef.id;
+
         } else if (expenseTransactionId) {
-            // If the new payment is 0 but there was an old one, delete it.
-            const expenseDocRef = doc(expensesCollection, expenseTransactionId);
-            transaction.delete(expenseDocRef);
-            expenseTransactionId = undefined;
+            // This logic is now covered by the revert step if editing
         }
         
 
@@ -231,17 +246,16 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
                     const currentSupplier = customerDoc.data() as Customer;
                     
                     let amountToRestore = detail.amount;
-                    if (paymentData.cdApplied && paymentData.cdAmount) {
-                         const totalPaidInTx = paymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                         if (totalPaidInTx > 0) {
+                     if (paymentData.cdApplied && paymentData.cdAmount && paymentData.paidFor && paymentData.paidFor.length > 0) {
+                        const totalPaidInTx = paymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                        if(totalPaidInTx > 0) {
                             const proportion = detail.amount / totalPaidInTx;
                             amountToRestore += paymentData.cdAmount * proportion;
-                         }
+                        }
                     }
 
                     let newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     
-                    // Safety check: netAmount should not exceed originalNetAmount
                     if (newNetAmount > currentSupplier.originalNetAmount) {
                         console.warn(`Restored net amount for ${currentSupplier.srNo} exceeded original. Capping it.`);
                         newNetAmount = currentSupplier.originalNetAmount;
