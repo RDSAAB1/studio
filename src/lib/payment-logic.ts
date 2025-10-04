@@ -36,7 +36,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: "No supplier selected" };
     }
     
-    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0) && !editingPayment) {
+    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0)) {
         if (paymentMethod !== 'RTGS') {
             return { success: false, message: "Please select entries to pay" };
         } else if (rtgsAmount <= 0) {
@@ -60,15 +60,48 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
     let finalPaymentData: Payment | null = null;
     await runTransaction(firestoreDB, async (transaction) => {
-        let oldPaymentData: Payment | null = null;
+        
+        // --- Step 1 (inside transaction): Revert old payment if editing ---
         if (editingPayment?.id) {
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
             if (oldPaymentDoc.exists()) {
-                oldPaymentData = oldPaymentDoc.data() as Payment;
+                const oldPaymentData = oldPaymentDoc.data() as Payment;
+                if (oldPaymentData.paidFor) {
+                    for (const detail of oldPaymentData.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                        const supplierDocsSnapshot = await getDocs(q); // Use getDocs for queries
+                        if (!supplierDocsSnapshot.empty) {
+                            const customerDoc = supplierDocsSnapshot.docs[0];
+                            const currentSupplier = customerDoc.data() as Customer;
+                            let amountToRestore = detail.amount;
+                            if (oldPaymentData.cdApplied && oldPaymentData.cdAmount && oldPaymentData.paidFor.length > 0) {
+                                const totalPaidInTx = oldPaymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                                if(totalPaidInTx > 0) {
+                                    const proportion = detail.amount / totalPaidInTx;
+                                    amountToRestore += oldPaymentData.cdAmount * proportion;
+                                }
+                            }
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
+                    }
+                }
+                if (oldPaymentData.expenseTransactionId) {
+                    const expenseRef = doc(firestoreDB, "expenses", oldPaymentData.expenseTransactionId);
+                    transaction.delete(expenseRef);
+                }
+                 if (oldPaymentData.cdApplied && oldPaymentData.cdAmount) {
+                    const incomeQuery = query(incomesCollection, where('description', '==', `CD received for ${oldPaymentData.rtgsFor === 'Supplier' && oldPaymentData.paidFor ? 'SR# ' + oldPaymentData.paidFor.map(e => e.srNo).join(', ') : 'RTGS ' + oldPaymentData.rtgsSrNo}`), limit(1));
+                    const incomeDocs = await getDocs(incomeQuery);
+                    if (!incomeDocs.empty) {
+                        transaction.delete(incomeDocs.docs[0].ref);
+                    }
+                }
             }
         }
-        
+
+        // --- Step 2 (inside transaction): Fetch current state for validation ---
         let totalOutstandingForSelected = 0;
         const supplierDocsToUpdate: { ref: DocumentReference, data: Customer }[] = [];
 
@@ -78,27 +111,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const supplierDoc = await transaction.get(supplierRef);
                 if (!supplierDoc.exists()) throw new Error(`Supplier entry ${entryData.srNo} not found.`);
                 const supplierData = supplierDoc.data() as Customer;
-                
-                let currentOutstanding = Number(supplierData.netAmount);
-
-                // If editing, temporarily add back the old paid amount for this specific entry
-                if (oldPaymentData && oldPaymentData.paidFor) {
-                    const oldPaidDetail = oldPaymentData.paidFor.find(pf => pf.srNo === supplierData.srNo);
-                    if (oldPaidDetail) {
-                        let amountToRestore = oldPaidDetail.amount;
-                        if (oldPaymentData.cdApplied && oldPaymentData.cdAmount && oldPaymentData.paidFor.length > 0) {
-                            const totalPaidInTx = oldPaymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                            if (totalPaidInTx > 0) {
-                                const proportion = oldPaidDetail.amount / totalPaidInTx;
-                                amountToRestore += oldPaymentData.cdAmount * proportion;
-                            }
-                        }
-                        currentOutstanding += amountToRestore;
-                    }
-                }
-                
-                totalOutstandingForSelected += currentOutstanding;
-                supplierDocsToUpdate.push({ ref: supplierRef, data: { ...supplierData, netAmount: currentOutstanding } });
+                totalOutstandingForSelected += Number(supplierData.netAmount);
+                supplierDocsToUpdate.push({ ref: supplierRef, data: supplierData });
             }
         }
         
@@ -106,36 +120,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             throw new Error(`Partial payment plus CD (${formatCurrency(totalToSettle)}) cannot exceed the adjusted outstanding amount (${formatCurrency(totalOutstandingForSelected)}).`);
         }
 
-        // --- Step 1 (inside transaction): Revert old payment if editing ---
-        if (oldPaymentData) {
-            // Revert supplier balances
-            if (oldPaymentData.paidFor) {
-                for (const detail of oldPaymentData.paidFor) {
-                    const supplierToUpdate = supplierDocsToUpdate.find(s => s.data.srNo === detail.srNo);
-                    if (supplierToUpdate) {
-                         let amountToRestore = detail.amount;
-                         if (oldPaymentData.cdApplied && oldPaymentData.cdAmount && oldPaymentData.paidFor.length > 0) {
-                            const totalPaidInTx = oldPaymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                            if(totalPaidInTx > 0) {
-                                const proportion = detail.amount / totalPaidInTx;
-                                amountToRestore += oldPaymentData.cdAmount * proportion;
-                            }
-                        }
-                        const newNetAmount = Number(supplierToUpdate.data.netAmount) + amountToRestore;
-                        transaction.update(supplierToUpdate.ref, { netAmount: Math.round(newNetAmount) });
-                        // Update the local copy for subsequent calculations
-                        supplierToUpdate.data.netAmount = Math.round(newNetAmount); 
-                    }
-                }
-            }
-            // Delete old expense record
-            if (oldPaymentData.expenseTransactionId) {
-                const expenseRef = doc(firestoreDB, "expenses", oldPaymentData.expenseTransactionId);
-                transaction.delete(expenseRef);
-            }
-        }
-
-        // --- Step 2 (inside transaction): Apply new payment logic ---
+        // --- Step 3 (inside transaction): Apply new payment logic ---
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
             let amountToDistribute = Math.round(finalAmountToPay);
@@ -233,11 +218,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 };
 
 
-export const handleDeletePaymentLogic = async (paymentToDelete: Payment, isEditing: boolean = false) => {
+export const handleDeletePaymentLogic = async (paymentToDelete: Payment, isEditing: boolean = false, suppliers: Customer[] = []) => {
     if (!paymentToDelete || !paymentToDelete.id) {
         throw new Error("Payment ID is missing for deletion.");
     }
-
     await runTransaction(firestoreDB, async (transaction) => {
         const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
         const paymentDoc = await transaction.get(paymentDocRef);

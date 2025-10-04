@@ -29,7 +29,6 @@ export const useSupplierPayments = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
     const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any | null>(null);
-    const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('processing');
@@ -59,7 +58,7 @@ export const useSupplierPayments = () => {
              const payable = (totalOutstandingForSelected || 0);
             form.setPaymentAmount(payable);
         }
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount]);
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -83,7 +82,6 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
-             setIsOutstandingModalOpen(true);
         }
     };
 
@@ -121,7 +119,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete, false, data.suppliers); 
+            await handleDeletePaymentLogic(paymentToDelete, false); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -201,7 +199,6 @@ export const useSupplierPayments = () => {
             }
         }
         
-        setIsOutstandingModalOpen(false);
     }, [form, data.suppliers, cdHook]);
 
     const handleEditPayment = useCallback(async (paymentToEdit: Payment) => {
@@ -215,9 +212,6 @@ export const useSupplierPayments = () => {
         setIsProcessing(true);
         
         try {
-            // Revert virtually
-            await handleDeletePaymentLogic(paymentToEdit, true, data.suppliers);
-            
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (form.rtgsFor === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
@@ -298,8 +292,6 @@ export const useSupplierPayments = () => {
         setDetailsSupplierEntry,
         selectedPaymentForDetails,
         setSelectedPaymentForDetails,
-        isOutstandingModalOpen,
-        setIsOutstandingModalOpen,
         isBankSettingsOpen,
         setIsBankSettingsOpen,
         rtgsReceiptData,

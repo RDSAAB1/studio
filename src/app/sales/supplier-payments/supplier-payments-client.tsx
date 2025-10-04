@@ -21,7 +21,6 @@ import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
-import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
@@ -102,18 +101,16 @@ export default function SupplierPaymentsClient() {
                                             </div>
                                         )}
                                     </div>
+                                     {hook.selectedCustomerKey && (
+                                        <TransactionTable
+                                            suppliers={transactionsForSelectedSupplier}
+                                            onShowDetails={hook.setDetailsSupplierEntry}
+                                            selectedIds={hook.selectedEntryIds}
+                                            onSelectionChange={hook.setSelectedEntryIds}
+                                        />
+                                    )}
                                 </div>
                             )}
-
-                             {hook.selectedCustomerKey && (
-                                <TransactionTable
-                                    suppliers={transactionsForSelectedSupplier}
-                                    onShowDetails={hook.setDetailsSupplierEntry}
-                                    selectedIds={hook.selectedEntryIds}
-                                    onSelectionChange={hook.setSelectedEntryIds}
-                                />
-                            )}
-
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
                                 <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                             )}
@@ -131,23 +128,6 @@ export default function SupplierPaymentsClient() {
                 </TabsContent>
             </Tabs>
           
-            <OutstandingEntriesDialog
-                isOpen={hook.isOutstandingModalOpen}
-                onOpenChange={hook.setIsOutstandingModalOpen}
-                customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
-                selectedIds={hook.selectedEntryIds}
-                onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
-                onSelectAll={(checked: boolean) => {
-                    const newSet = new Set<string>();
-                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
-                    if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
-                    hook.setSelectedEntryIds(newSet);
-                }}
-                onConfirm={hook.handlePaySelectedOutstanding}
-                onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
-            />
-            
             <DetailsDialog
                 isOpen={!!hook.detailsSupplierEntry}
                 onOpenChange={() => hook.setDetailsSupplierEntry(null)}
