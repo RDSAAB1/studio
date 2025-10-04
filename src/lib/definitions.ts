@@ -218,6 +218,8 @@ export type CustomerSummary = {
     totalAmount: number;
     totalOriginalAmount: number;
     totalPaid: number;
+    totalCashPaid: number;
+    totalRtgsPaid: number;
     totalOutstanding: number;
     totalDeductions: number;
     paymentHistory: (SupplierPayment | CustomerPayment)[];
@@ -454,6 +456,4 @@ export type Holiday = {
     date: string;
     name: string;
 }
-    
-
     

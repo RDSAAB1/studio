@@ -87,6 +87,7 @@ export default function SupplierProfileClient() {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+                totalCashPaid: 0, totalRtgsPaid: 0,
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
                 transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
                 totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
@@ -116,6 +117,7 @@ export default function SupplierProfileClient() {
                     contact: '',
                     acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
                     totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+                    totalCashPaid: 0, totalRtgsPaid: 0,
                     paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
                     transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
                     totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
@@ -140,18 +142,18 @@ export default function SupplierProfileClient() {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
-                const totalDueInPayment = paidForThisDetail.amount; // This is Total Due (Actual Paid + CD) for this entry in this payment
+                totalPaidForEntry += paidForThisDetail.amount;
 
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
-                        const proportion = totalDueInPayment / totalAmountInPayment;
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
                         totalCdForEntry += p.cdAmount * proportion;
                     }
                 }
-                totalPaidForEntry += (totalDueInPayment - totalCdForEntry);
             });
-            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            
+            const newNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
             return { ...t, netAmount: newNetAmount };
         });
 
@@ -171,6 +173,9 @@ export default function SupplierProfileClient() {
         data.totalTransactions = data.allTransactions!.length;
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
+        data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
+        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType === 'RTGS' || p.receiptType === 'Online').reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
+
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
 
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
@@ -207,6 +212,8 @@ export default function SupplierProfileClient() {
          acc.totalAmount += s.totalAmount;
          acc.totalOriginalAmount += s.totalOriginalAmount;
          acc.totalPaid += s.totalPaid;
+         acc.totalCashPaid! += s.totalCashPaid!;
+         acc.totalRtgsPaid! += s.totalRtgsPaid!;
          acc.totalGrossWeight! += s.totalGrossWeight!;
          acc.totalTeirWeight! += s.totalTeirWeight!;
          acc.totalFinalWeight! += s.totalFinalWeight!;
@@ -220,6 +227,7 @@ export default function SupplierProfileClient() {
          return acc;
      }, {
          name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+         totalCashPaid: 0, totalRtgsPaid: 0,
          paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
          totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
          averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 

@@ -13,6 +13,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Scale, Weight, Calculator, Percent, Server, Milestone, FileText, Users, Download, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 
@@ -166,7 +167,8 @@ export const SupplierProfileView = ({
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">{isCustomerView ? 'Total Receivable' : 'Total Net Payable'} <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/Qtl)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">RTGS/Online Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
