@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -597,9 +598,9 @@ const handleDelete = async (id: string) => {
                      const supplierData: Customer = {
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         name: toTitleCase(item['NAME']),
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
@@ -641,8 +642,6 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            setSuppliers([]);
-            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
@@ -765,12 +764,12 @@ const handleDelete = async (id: string) => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                     A supplier with a very similar name already exists. Is this the same person?
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-                    </div>
                 </AlertDialogDescription>
+                <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                    <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                    <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                    <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+                </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
