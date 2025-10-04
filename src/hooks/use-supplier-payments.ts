@@ -70,7 +70,7 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
                  if (!form.editingPayment) {
-                    setTimeout(() => setIsOutstandingModalOpen(true), 100);
+                    setIsOutstandingModalOpen(true);
                  }
             }
         }
