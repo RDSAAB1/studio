@@ -63,6 +63,11 @@ export const useCashDiscount = ({
                 baseAmountForCd = 0;
         }
         
+        // Safety check to prevent NaN
+        if (isNaN(baseAmountForCd)) {
+            return 0;
+        }
+
         return Math.round((baseAmountForCd * cdPercent) / 100);
 
     }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentDate, eligibleForCd, totalOutstanding]);
