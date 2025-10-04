@@ -45,7 +45,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     }
 
 
-    const finalPaymentAmount = rtgsAmount || paymentAmount;
+    const finalPaymentAmount = rtgsFor === 'Outsider' ? rtgsAmount : paymentAmount;
     
     const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
@@ -64,13 +64,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
     }
 
-    const totalPaidAmount = finalPaymentAmount; // THIS IS THE ACTUAL AMOUNT PAID
-    const totalReduction = totalPaidAmount + calculatedCdAmount; // Amount to reduce from outstanding
+    const totalActualPaid = paymentType === 'Full' ? totalOutstandingForSelected - calculatedCdAmount : finalPaymentAmount;
+    const totalReduction = totalActualPaid + calculatedCdAmount;
 
-    if (totalPaidAmount <= 0 && calculatedCdAmount <= 0) {
+    if (totalActualPaid <= 0 && calculatedCdAmount <= 0) {
         return { success: false, message: "Payment and CD amount cannot both be zero." };
     }
-    if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalReduction > totalOutstandingForSelected) {
+     if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalReduction > totalOutstandingForSelected) {
         return { success: false, message: "Partial payment plus CD cannot exceed outstanding amount." };
     }
 
@@ -97,7 +97,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && supplierDocsToUpdate.length > 0) {
-            let amountToDistribute = Math.round(totalPaidAmount);
+            let amountToDistribute = Math.round(totalActualPaid);
             let cdToDistribute = Math.round(calculatedCdAmount);
 
             const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
@@ -111,11 +111,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const currentSupplierData = supplierToUpdate.data;
                 const outstanding = Number(currentSupplierData.netAmount);
 
-                const reductionForThisEntry = Math.min(outstanding, amountToDistribute + cdToDistribute);
+                const maxPossibleReduction = Math.min(outstanding, amountToDistribute + cdToDistribute);
                 
-                // Distribute CD first if available
-                const cdForThisEntry = Math.min(reductionForThisEntry, cdToDistribute);
-                const paymentForThisEntry = reductionForThisEntry - cdForThisEntry;
+                const cdForThisEntry = Math.min(maxPossibleReduction, cdToDistribute);
+                const paymentForThisEntry = maxPossibleReduction - cdForThisEntry;
 
                 if (paymentForThisEntry > 0 || cdForThisEntry > 0) {
                     paidForDetails.push({
@@ -124,7 +123,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         supplierContact: entryData.data.contact,
                     });
                     const newNetAmount = outstanding - paymentForThisEntry - cdForThisEntry;
-                    transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount });
+                    transaction.update(supplierToUpdate.ref, { netAmount: newNetAmount < 0 ? 0 : newNetAmount });
                 }
                 amountToDistribute -= paymentForThisEntry;
                 cdToDistribute -= cdForThisEntry;
@@ -137,7 +136,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             transactionType: 'Expense', category: 'Supplier Payments',
             subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-            amount: finalPaymentAmount, payee: supplierDetails.name,
+            amount: totalActualPaid, payee: supplierDetails.name,
             description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
             paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
             status: 'Paid', isRecurring: false,
@@ -161,7 +160,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         const paymentDataBase: Omit<Payment, 'id'> = {
             paymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-            amount: Math.round(finalPaymentAmount), cdAmount: Math.round(calculatedCdAmount),
+            amount: Math.round(totalActualPaid), cdAmount: Math.round(calculatedCdAmount),
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
             paidFor: rtgsFor === 'Supplier' ? paidForDetails : [], sixRNo,
@@ -211,14 +210,22 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, payment
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
                     
-                    // Restore the amount that was reduced from netAmount, which is payment + CD part
-                    const totalPaidInPayment = paymentData.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                    const proportion = totalPaidInPayment > 0 ? detail.amount / totalPaidInPayment : 0;
-                    const cdForThisEntry = (paymentData.cdAmount || 0) * proportion;
+                    const totalAmountInPayment = paymentData.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
+                    let cdForThisEntry = 0;
+                    if (paymentData.cdApplied && paymentData.cdAmount && totalAmountInPayment > 0) {
+                        const proportion = detail.amount / totalAmountInPayment;
+                        cdForThisEntry = paymentData.cdAmount * proportion;
+                    }
                     
                     const amountToRestore = detail.amount + cdForThisEntry;
-                    const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                    let newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     
+                    // Safety check: netAmount should not exceed originalNetAmount
+                    if (newNetAmount > currentSupplier.originalNetAmount) {
+                        console.warn(`Restored net amount for ${currentSupplier.srNo} exceeded original. Capping it.`);
+                        newNetAmount = currentSupplier.originalNetAmount;
+                    }
+
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                     if (db) await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
