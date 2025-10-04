@@ -4,7 +4,6 @@
 import { useState, useEffect, useMemo } from 'react';
 
 interface UseCashDiscountProps {
-    paymentAmount: number;
     totalOutstanding: number;
     paymentType: string;
     selectedEntries: any[];
@@ -12,7 +11,6 @@ interface UseCashDiscountProps {
 }
 
 export const useCashDiscount = ({
-    paymentAmount,
     totalOutstanding,
     paymentType,
     selectedEntries = [],
@@ -47,17 +45,19 @@ export const useCashDiscount = ({
         
         switch (cdAt) {
             case 'on_full_amount':
-                 baseAmountForCd = selectedEntries.reduce((sum, entry) => {
-                    const dueDate = new Date(entry.dueDate);
-                    const effectiveDate = paymentDate ? new Date(paymentDate) : new Date();
-                    return effectiveDate <= dueDate ? sum + (entry.originalNetAmount || 0) : sum;
-                }, 0);
+                 baseAmountForCd = totalOutstanding;
                 break;
             case 'on_unpaid_amount':
                 baseAmountForCd = totalOutstanding;
                 break;
             case 'partial_on_paid':
-                baseAmountForCd = paymentAmount;
+                // For partial, CD is on the amount being paid from the eligible entries
+                const eligibleOutstanding = selectedEntries.reduce((sum, entry) => {
+                    const dueDate = new Date(entry.dueDate);
+                    const effectiveDate = paymentDate ? new Date(paymentDate) : new Date();
+                    return effectiveDate <= dueDate ? sum + (entry.netAmount || 0) : sum;
+                }, 0);
+                baseAmountForCd = Math.min(totalOutstanding, eligibleOutstanding);
                 break;
             default:
                 baseAmountForCd = 0;
@@ -70,13 +70,13 @@ export const useCashDiscount = ({
 
         return Math.round((baseAmountForCd * cdPercent) / 100);
 
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentDate, eligibleForCd, totalOutstanding]);
+    }, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentDate, eligibleForCd, totalOutstanding]);
     
     useEffect(() => {
         if (paymentType === 'Full') {
             setCdAt('on_full_amount');
         } else if (paymentType === 'Partial') {
-            setCdAt('partial_on_paid');
+            setCdAt('on_unpaid_amount');
         }
     }, [paymentType]);
 

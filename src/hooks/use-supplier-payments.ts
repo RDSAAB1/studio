@@ -45,7 +45,6 @@ export const useSupplierPayments = () => {
     }, [selectedEntries]);
 
     const cdHook = useCashDiscount({
-        paymentAmount: totalOutstandingForSelected,
         totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
         selectedEntries: selectedEntries,
@@ -57,9 +56,10 @@ export const useSupplierPayments = () => {
         form.setParchiNo(srNos);
     
         if (form.paymentType === 'Full') {
-            form.setPaymentAmount(totalOutstandingForSelected);
+             const payable = (totalOutstandingForSelected || 0);
+            form.setPaymentAmount(payable);
         }
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form]);
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -121,7 +121,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete); 
+            await handleDeletePaymentLogic(paymentToDelete, false, data.suppliers); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -215,7 +215,8 @@ export const useSupplierPayments = () => {
         setIsProcessing(true);
         
         try {
-            await handleDeletePaymentLogic(paymentToEdit, true); // Revert the values virtually
+            // Revert virtually
+            await handleDeletePaymentLogic(paymentToEdit, true, data.suppliers);
             
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
             if (form.rtgsFor === 'Supplier' && !firstSrNo) {
@@ -269,13 +270,13 @@ export const useSupplierPayments = () => {
 
     const finalAmountToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-             return form.paymentAmount - cdHook.calculatedCdAmount;
+             return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
         }
-        return form.paymentAmount;
+        return form.paymentAmount || 0;
     }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
 
     const finalAmountToSettle = useMemo(() => {
-        return form.paymentAmount + cdHook.calculatedCdAmount;
+        return (form.paymentAmount || 0) + (cdHook.calculatedCdAmount || 0);
     }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
 
