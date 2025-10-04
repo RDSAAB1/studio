@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Bot, ArrowUpDown, Replace } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { usePaymentCombination } from '@/hooks/use-payment-combination';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PaymentCombinationGeneratorProps {
     calcTargetAmount: number;
