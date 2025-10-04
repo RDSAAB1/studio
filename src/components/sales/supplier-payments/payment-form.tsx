@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User, Hash } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User, Hash, CircleDollarSign } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { RtgsForm } from './rtgs-form';
@@ -18,6 +18,7 @@ import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { addBank } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
@@ -74,6 +75,7 @@ export const PaymentForm = (props: any) => {
     }, [paymentMethod, financialState.balances, bankAccounts]);
 
     const finalAmountToBePaid = paymentAmount - calculatedCdAmount;
+    const finalAmountToSettle = paymentAmount;
 
 
     return (
@@ -140,7 +142,7 @@ export const PaymentForm = (props: any) => {
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label htmlFor="payment-amount" className="text-xs">Payable Amount</Label>
-                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !cdEnabled} className="h-8 text-xs" />
                             </div>
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
@@ -257,12 +259,23 @@ export const PaymentForm = (props: any) => {
             )}
              
             <CardFooter className="p-0 pt-3">
-                <div className="w-full flex flex-wrap items-center justify-end gap-2">
-                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                    <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
-                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                        {editingPayment ? 'Update Payment' : 'Finalize Payment'}
-                    </Button>
+                <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
+                     <div className="w-full sm:w-auto p-3 rounded-lg bg-muted/50 flex items-center justify-between sm:justify-start gap-4">
+                        <div className="flex items-center gap-2">
+                           <CircleDollarSign className="h-5 w-5 text-primary"/>
+                           <div>
+                            <p className="text-xs text-muted-foreground">Final Amount to Settle</p>
+                            <p className="text-lg font-bold text-primary">{formatCurrency(finalAmountToSettle)}</p>
+                           </div>
+                        </div>
+                     </div>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
+                        <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            {editingPayment ? 'Update Payment' : 'Finalize Payment'}
+                        </Button>
+                    </div>
                 </div>
             </CardFooter>
         </>
