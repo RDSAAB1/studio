@@ -40,23 +40,6 @@ export const useSupplierPayments = () => {
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
-    useEffect(() => {
-        if (form.selectedEntryIds.size > 0) {
-            const srNos = selectedEntries.map(e => e.srNo).join(', ');
-            const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
-            
-            form.setParchiNo(srNos);
-            form.setPaymentAmount(totalAmount);
-            form.setPaymentType('Full'); // Default to full payment when entries are selected
-        } else {
-            // Optionally reset when selection is cleared, but only if not editing
-            if (!form.editingPayment) {
-              form.setParchiNo('');
-              form.setPaymentAmount(0);
-            }
-        }
-    }, [form.selectedEntryIds, selectedEntries, form.setParchiNo, form.setPaymentAmount, form.setPaymentType, form.editingPayment]);
-
     const cdHook = useCashDiscount({
         paymentAmount: form.paymentAmount,
         paymentType: form.paymentType,
@@ -64,6 +47,17 @@ export const useSupplierPayments = () => {
         paymentHistory: data.paymentHistory,
         paymentDate: form.paymentDate,
     });
+    
+    useEffect(() => {
+        const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
+        if (form.selectedEntryIds.size > 0 && form.paymentType === 'Full') {
+            form.setPaymentAmount(totalAmount);
+        }
+        
+        const srNos = selectedEntries.map(e => e.srNo).join(', ');
+        form.setParchiNo(srNos);
+
+    }, [form.selectedEntryIds, selectedEntries, form.paymentType, form.setPaymentAmount, form.setParchiNo]);
 
 
     const handleCustomerSelect = (key: string | null) => {
