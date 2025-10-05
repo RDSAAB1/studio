@@ -1,15 +1,18 @@
 
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useToast } from "@/hooks/use-toast";
-import { useSupplierData } from './use-supplier-data';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { generateReadableId } from '@/lib/utils';
+import type { Payment, Expense, BankAccount } from '@/lib/definitions';
+import { format } from 'date-fns';
+import { useCashDiscount } from './use-cash-discount';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
+import { useToast } from "@/hooks/use-toast";
+import { useSupplierData } from './use-supplier-data';
 import { toTitleCase } from "@/lib/utils";
 import { addBank } from '@/lib/firestore';
-import type { Customer, Payment } from "@/lib/definitions";
-import { useCashDiscount } from './use-cash-discount';
+import type { Customer } from "@/lib/definitions";
 
 
 export const useSupplierPayments = () => {
@@ -52,7 +55,7 @@ export const useSupplierPayments = () => {
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
         toBePaidAmount: toBePaidAmount,
-        selectedEntries: selectedEntries
+        selectedEntries: selectedEntries,
     });
     
     const handleSettleAmountChange = (value: number) => {
@@ -66,14 +69,15 @@ export const useSupplierPayments = () => {
     
     useEffect(() => {
         if (form.paymentType === 'Full') {
-            handleSettleAmountChange(totalOutstandingForSelected);
-            const newToBePaid = totalOutstandingForSelected - calculatedCdAmount;
+            const newSettleAmount = totalOutstandingForSelected;
+            handleSettleAmountChange(newSettleAmount);
+            const newToBePaid = newSettleAmount - calculatedCdAmount;
             handleToBePaidChange(newToBePaid > 0 ? newToBePaid : 0);
         } else { // Partial
             const newSettleAmount = toBePaidAmount + calculatedCdAmount;
             handleSettleAmountChange(newSettleAmount);
         }
-    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount, selectedEntries]);
+    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount]);
 
 
     // Auto-fill logic for parchi number
@@ -134,9 +138,9 @@ export const useSupplierPayments = () => {
             const isCdApplied = !!paymentData.cdApplied;
             cdProps.setCdEnabled(isCdApplied);
             if (isCdApplied && paymentData.cdAmount) {
-                const settledAmt = paymentData.amount + paymentData.cdAmount;
-                if(settledAmt > 0) {
-                     cdProps.setCdPercent(Number(((paymentData.cdAmount / settledAmt) * 100).toFixed(2)));
+                const totalPaidAmount = paymentData.amount + paymentData.cdAmount;
+                if(totalPaidAmount > 0) {
+                     cdProps.setCdPercent(Number(((paymentData.cdAmount / totalPaidAmount) * 100).toFixed(2)));
                 } else {
                     cdProps.setCdPercent(0);
                 }
