@@ -75,8 +75,6 @@ export const PaymentForm = (props: any) => {
         return bankOptions;
     }, [paymentMethod, financialState.balances, bankAccounts]);
 
-    const finalAmountToSettle = paymentAmount + calculatedCdAmount;
-
 
     return (
         <>
@@ -141,7 +139,7 @@ export const PaymentForm = (props: any) => {
                             </div>
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
-                                <Label htmlFor="payment-amount" className="text-xs">Payable Amount</Label>
+                                <Label htmlFor="payment-amount" className="text-xs">Settle Amount</Label>
                                 <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
                             </div>
 
@@ -178,19 +176,6 @@ export const PaymentForm = (props: any) => {
                                 <div className="flex items-center gap-2 flex-1 min-w-[150px]">
                                     <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
                                     <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-                                </div>
-                                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                                    <Label className="text-xs">At</Label>
-                                    <Select value={cdAt} onValueChange={setCdAt}>
-                                        <SelectTrigger className="h-8 text-xs">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {cdOptions.map(opt => (
-                                                <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
                                 </div>
                                 <div className="flex items-center gap-2 flex-1 min-w-[150px]">
                                     <Label className="text-xs">Amt</Label>
@@ -264,8 +249,8 @@ export const PaymentForm = (props: any) => {
                         <div className="flex items-center gap-2">
                            <CircleDollarSign className="h-5 w-5 text-primary"/>
                            <div>
-                            <p className="text-xs text-muted-foreground">Final Amount to Settle</p>
-                            <p className="text-lg font-bold text-primary">{formatCurrency(finalAmountToSettle)}</p>
+                            <p className="text-xs text-muted-foreground">To Be Paid</p>
+                            <p className="text-lg font-bold text-primary">{formatCurrency(finalAmountToBePaid)}</p>
                            </div>
                         </div>
                      </div>
@@ -281,3 +266,5 @@ export const PaymentForm = (props: any) => {
         </>
     );
 };
+
+    
