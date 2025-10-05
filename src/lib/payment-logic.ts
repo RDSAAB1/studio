@@ -85,10 +85,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                      paidForDetails.push({
                         srNo: entry.srNo, 
                         amount: paymentForThisEntry,
-                        cdApplied: cdEnabled,
-                        supplierName: toTitleCase(entry.name), 
-                        supplierSo: toTitleCase(entry.so),
-                        supplierContact: entry.contact,
                     });
                 }
                 amountToDistribute -= paymentForThisEntry;
@@ -132,7 +128,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-            paidFor: rtgsFor === 'Supplier' ? paidForDetails : [], sixRNo,
+            paidFor: paidForDetails, sixRNo,
             sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
             parchiNo: parchiNo || '',
             utrNo, checkNo,

@@ -144,14 +144,6 @@ export type FundTransaction = {
 export type PaidFor = {
     srNo: string;
     amount: number;
-    cdApplied?: boolean;
-    supplierName?: string;
-    supplierSo?: string;
-    supplierContact?: string;
-    bankName?: string;
-    bankBranch?: string;
-    bankAcNo?: string;
-    bankIfsc?: string;
 }
 
 export type SupplierPayment = {
