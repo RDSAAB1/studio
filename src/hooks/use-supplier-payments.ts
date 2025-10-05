@@ -40,20 +40,34 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, form.selectedEntryIds]);
     
     const totalOutstandingForSelected = useMemo(() => {
-        const editingPaymentAmount = form.editingPayment?.paidFor
-            ?.filter(pf => form.selectedEntryIds.has(pf.srNo))
-            .reduce((sum, pf) => sum + pf.amount, 0) || 0;
-
-        const editingPaymentCd = form.editingPayment?.cdAmount || 0;
-
+        // Calculate the base outstanding amount from the selected entries.
         const currentOutstanding = selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
 
-        if (form.isBeingEdited) {
-            return currentOutstanding + editingPaymentAmount + editingPaymentCd;
+        // If we are editing a payment, we need to temporarily "add back" the amount
+        // of that payment to the outstanding balance to allow for correct validation.
+        if (form.isBeingEdited && form.editingPayment) {
+            const paymentBeingEdited = form.editingPayment;
+            
+            // Find the portions of the payment that apply to the currently selected entries.
+            const relevantPaidFor = paymentBeingEdited.paidFor?.filter(pf => form.selectedEntryIds.has(pf.srNo)) || [];
+            
+            // Sum up the amount paid and the CD applied for these portions.
+            const amountToRestore = relevantPaidFor.reduce((sum, pf) => sum + pf.amount, 0);
+            
+            let cdToRestore = 0;
+            if (paymentBeingEdited.cdApplied && paymentBeingEdited.cdAmount && paymentBeingEdited.paidFor && paymentBeingEdited.paidFor.length > 0) {
+                 const totalAmountInPayment = paymentBeingEdited.paidFor.reduce((s, i) => s + i.amount, 0);
+                 if(totalAmountInPayment > 0) {
+                    const proportionOfSelected = amountToRestore / totalAmountInPayment;
+                    cdToRestore = paymentBeingEdited.cdAmount * proportionOfSelected;
+                 }
+            }
+            
+            return currentOutstanding + amountToRestore + cdToRestore;
         }
 
         return currentOutstanding;
-    }, [selectedEntries, form.isBeingEdited, form.editingPayment]);
+    }, [selectedEntries, form.editingPayment, form.isBeingEdited, form.selectedEntryIds]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -79,19 +93,12 @@ export const useSupplierPayments = () => {
     };
     
     useEffect(() => {
-        // This effect ensures the `settleAmount` and `toBePaidAmount` are correctly linked
-        // based on the payment type and CD, preventing infinite loops.
         if (form.paymentType === 'Full') {
-            // When Full payment, settle amount is the total outstanding. `toBePaid` is derived.
-            setSettleAmount(totalOutstandingForSelected);
+            handleSettleAmountChange(totalOutstandingForSelected);
             const newToBePaid = totalOutstandingForSelected - calculatedCdAmount;
-            setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
-        } else { // Partial payment
-            // When Partial, `toBePaid` is the source of truth entered by user. `settleAmount` is derived.
-            const newSettleAmount = toBePaidAmount + calculatedCdAmount;
-            setSettleAmount(newSettleAmount);
+            handleToBePaidChange(newToBePaid > 0 ? newToBePaid : 0);
         }
-    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited, toBePaidAmount, calculatedCdAmount]);
+    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, form.isBeingEdited]);
 
 
     // Auto-fill logic for parchi number
@@ -149,14 +156,6 @@ export const useSupplierPayments = () => {
             
             setPaymentType(paymentData.type);
             
-            // This is the key part:
-            // Set the `toBePaidAmount` from the record, which will then trigger
-            // the useEffect to calculate the correct `settleAmount`.
-            handleToBePaidChange(paymentData.amount);
-            
-            setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
-            setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
-            
             const isCdApplied = !!paymentData.cdApplied;
             cdProps.setCdEnabled(isCdApplied);
             if (isCdApplied && paymentData.cdAmount) {
@@ -170,7 +169,12 @@ export const useSupplierPayments = () => {
                  cdProps.setCdEnabled(false);
                  cdProps.setCdPercent(0);
             }
+
+            handleToBePaidChange(paymentData.amount);
     
+            setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
+            setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
+            
             setUtrNo(paymentData.utrNo || '');
             setCheckNo(paymentData.checkNo || '');
             setSixRNo(paymentData.sixRNo || '');
