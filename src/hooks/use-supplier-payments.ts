@@ -51,15 +51,17 @@ export const useSupplierPayments = () => {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
-                totalPaidForEntry += paidForThisDetail.amount;
-
+                let cdForThisPortion = 0;
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
                     if (totalAmountInPayment > 0) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        totalCdForEntry += p.cdAmount * proportion;
+                        cdForThisPortion = p.cdAmount * proportion;
                     }
                 }
+                
+                totalCdForEntry += cdForThisPortion;
+                totalPaidForEntry += (paidForThisDetail.amount - cdForThisPortion);
             });
 
             const currentOutstanding = (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
