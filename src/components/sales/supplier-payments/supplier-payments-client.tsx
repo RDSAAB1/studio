@@ -25,7 +25,6 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
-import { OutstandingEntriesDialog } from "./outstanding-entries-dialog";
 
 
 export default function SupplierPaymentsClient() {
@@ -40,16 +39,6 @@ export default function SupplierPaymentsClient() {
         const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
     }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
-    
-    const selectedEntries = useMemo(() => {
-        if (!hook.selectedEntryIds) return [];
-        const safeSuppliers = Array.isArray(hook.suppliers) ? hook.suppliers : [];
-        return safeSuppliers.filter((s: Customer) => hook.selectedEntryIds.has(s.id));
-    }, [hook.suppliers, hook.selectedEntryIds]);
-
-    const totalOutstandingForSelected = useMemo(() => {
-        return selectedEntries.reduce((sum, entry) => sum + (parseFloat(String(entry.netAmount)) || 0), 0);
-    }, [selectedEntries]);
 
 
     if (!hook.isClient || hook.loading) {
@@ -127,7 +116,7 @@ export default function SupplierPaymentsClient() {
                                 <PaymentForm 
                                     {...hook} 
                                     bankBranches={hook.bankBranches}
-                                    totalOutstandingForSelected={totalOutstandingForSelected}
+                                    totalOutstandingForSelected={hook.totalOutstandingForSelected}
                                 />
                             )}
                         </CardContent>
@@ -144,18 +133,6 @@ export default function SupplierPaymentsClient() {
                 </TabsContent>
             </Tabs>
           
-            <OutstandingEntriesDialog
-                isOpen={hook.isOutstandingModalOpen}
-                onOpenChange={hook.setIsOutstandingModalOpen}
-                customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => s.netAmount > 0)}
-                selectedIds={hook.selectedEntryIds}
-                onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
-                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.filter((s:any) => s.netAmount > 0).map((c: any) => c.id) : []))}
-                onConfirm={() => hook.setIsOutstandingModalOpen(false)}
-                onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
-            />
-            
             <DetailsDialog
                 isOpen={!!hook.detailsSupplierEntry}
                 onOpenChange={() => hook.setDetailsSupplierEntry(null)}
