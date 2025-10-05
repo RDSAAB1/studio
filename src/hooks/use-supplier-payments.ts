@@ -40,11 +40,13 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, form.selectedEntryIds]);
     
     const totalOutstandingForSelected = useMemo(() => {
+        if (!selectedEntries) return 0;
+        
         // Calculate the base outstanding amount from the selected entries.
         const currentOutstanding = selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
-
-        // If we are editing a payment, we need to temporarily "add back" the amount
-        // of that payment to the outstanding balance to allow for correct validation.
+    
+        // If we are editing a payment, we need to temporarily "add back" the amount of that payment
+        // to the outstanding balance to allow for correct validation and calculation.
         if (form.isBeingEdited && form.editingPayment) {
             const paymentBeingEdited = form.editingPayment;
             
@@ -65,23 +67,19 @@ export const useSupplierPayments = () => {
             
             return currentOutstanding + amountToRestore + cdToRestore;
         }
-
+    
         return currentOutstanding;
-    }, [selectedEntries, form.editingPayment, form.isBeingEdited, form.selectedEntryIds]);
+    }, [selectedEntries, form.editingPayment, form.isBeingEdited]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
 
-    const cdHook = useCashDiscount({
+    const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
-        paymentDate: form.paymentDate,
-        selectedEntries: selectedEntries,
         toBePaidAmount: toBePaidAmount,
     });
-
-    const { calculatedCdAmount, ...cdProps } = cdHook;
     
     const handleSettleAmountChange = (value: number) => {
         setSettleAmount(value);
@@ -97,8 +95,11 @@ export const useSupplierPayments = () => {
             handleSettleAmountChange(totalOutstandingForSelected);
             const newToBePaid = totalOutstandingForSelected - calculatedCdAmount;
             handleToBePaidChange(newToBePaid > 0 ? newToBePaid : 0);
+        } else { // Partial
+            const newSettleAmount = toBePaidAmount + calculatedCdAmount;
+            handleSettleAmountChange(newSettleAmount);
         }
-    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, form.isBeingEdited]);
+    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount]);
 
 
     // Auto-fill logic for parchi number
