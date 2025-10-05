@@ -61,15 +61,16 @@ export const useSupplierPayments = () => {
         if (paymentType === 'Full' && !isBeingEdited) {
             setPaymentAmount(totalOutstandingForSelected || 0);
         }
-    }, [selectedEntries, form]);
+    }, [form, selectedEntries, totalOutstandingForSelected]);
 
     // Smart auto-correction logic for partial payments
     useEffect(() => {
         const { paymentType, paymentAmount, setPaymentAmount } = form;
 
+        // For partial payments, ensure the settlement amount doesn't exceed the outstanding amount.
         if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
-            const finalSettleAmount = paymentAmount; // In partial, the payable amount is the settlement amount from supplier's POV.
-            
+            const finalSettleAmount = paymentAmount; // The payable amount is the total settlement from the outstanding balance
+
             if (finalSettleAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
                 const newPaymentAmount = totalOutstandingForSelected;
                 
@@ -77,7 +78,7 @@ export const useSupplierPayments = () => {
                      setPaymentAmount(Math.max(0, newPaymentAmount));
                      toast({
                         title: "Payment Adjusted",
-                        description: "Payable amount was adjusted to match the outstanding balance.",
+                        description: "Payable amount was adjusted to match the outstanding balance with CD.",
                         variant: "default"
                      });
                 }
@@ -174,7 +175,7 @@ export const useSupplierPayments = () => {
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            setPaymentAmount(paymentData.amount || 0); // Set the actual payment amount being edited
+            setPaymentAmount(paymentData.amount + (paymentData.cdAmount || 0)); // Set payable amount to total settled amount
             
             setPaymentType(paymentData.type);
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
