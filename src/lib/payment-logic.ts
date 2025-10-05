@@ -73,7 +73,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
-            let amountToDistribute = Math.round(finalAmountToPay);
+            let amountToDistribute = Math.round(totalToSettle); // Distribute based on total settlement amount
 
             for (const entry of selectedEntries) {
                 if (amountToDistribute <= 0) break;

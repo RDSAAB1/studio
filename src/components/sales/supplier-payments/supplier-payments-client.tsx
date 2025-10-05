@@ -55,12 +55,14 @@ export default function SupplierPaymentsClient() {
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
-                totalPaidForEntry += paidForThisDetail.amount;
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo);
+                if (paidForThisDetail) {
+                    totalPaidForEntry += paidForThisDetail.amount;
+                }
 
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                    if (totalAmountInPayment > 0) {
+                    if (totalAmountInPayment > 0 && paidForThisDetail) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
                         totalCdForEntry += p.cdAmount * proportion;
                     }
