@@ -39,7 +39,7 @@ export const useSupplierPayments = () => {
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
-     const totalOutstandingForSelected = useMemo(() => {
+    const totalOutstandingForSelected = useMemo(() => {
         // When editing, exclude the payment being edited from the calculation
         const paymentHistoryToConsider = form.editingPayment
             ? data.paymentHistory.filter((p: Payment) => p.id !== form.editingPayment.id)
@@ -66,6 +66,7 @@ export const useSupplierPayments = () => {
                 }
                 
                 totalCdForEntry += cdForThisPortion;
+                // Accumulate only the actual amount paid, excluding CD
                 totalPaidForEntry += (paidForThisDetail.amount - cdForThisPortion);
             });
 
@@ -98,24 +99,12 @@ export const useSupplierPayments = () => {
     };
 
     useEffect(() => {
-        if (form.paymentType === 'Full') {
-            const newSettleAmount = totalOutstandingForSelected;
-            handleSettleAmountChange(newSettleAmount);
-        } else { // Partial
-             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0 && !form.isBeingEdited) {
-                handleSettleAmountChange(totalOutstandingForSelected);
-                handleToBePaidChange(totalOutstandingForSelected);
-             }
-        }
-    }, [totalOutstandingForSelected, form.paymentType, toBePaidAmount, form.isBeingEdited]);
-
-
-    useEffect(() => {
         if (form.paymentType === 'Full' && !form.isBeingEdited) {
             const newToBePaid = settleAmount - calculatedCdAmount;
             handleToBePaidChange(newToBePaid);
         }
     }, [settleAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+
 
     useEffect(() => {
         if (form.paymentType === 'Partial' && !form.isBeingEdited) {
@@ -123,6 +112,13 @@ export const useSupplierPayments = () => {
             handleSettleAmountChange(newSettle);
         }
     }, [toBePaidAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+
+    useEffect(() => {
+        if (form.paymentType === 'Full' && totalOutstandingForSelected > 0 && !form.isBeingEdited) {
+            handleSettleAmountChange(totalOutstandingForSelected);
+        }
+    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited]);
+
 
     
     // Auto-fill logic for parchi number
@@ -188,11 +184,9 @@ export const useSupplierPayments = () => {
             const isCdApplied = !!paymentData.cdApplied;
             cdProps.setCdEnabled(isCdApplied);
             if (isCdApplied && paymentData.cdAmount) {
-                const baseAmountForCd = paymentData.type === 'Full' 
-                    ? paymentData.amount + paymentData.cdAmount 
-                    : paymentData.amount;
-                if(baseAmountForCd > 0) {
-                     cdProps.setCdPercent(Number(((paymentData.cdAmount / baseAmountForCd) * 100).toFixed(2)));
+                const settledAmt = paymentData.amount + paymentData.cdAmount;
+                if(settledAmt > 0) {
+                     cdProps.setCdPercent(Number(((paymentData.cdAmount / settledAmt) * 100).toFixed(2)));
                 } else {
                     cdProps.setCdPercent(0);
                 }
@@ -311,7 +305,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
