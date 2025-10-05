@@ -85,6 +85,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                      paidForDetails.push({
                         srNo: entry.srNo, 
                         amount: paymentForThisEntry,
+                        supplierName: toTitleCase(entry.name),
+                        supplierSo: toTitleCase(entry.so),
+                        supplierContact: entry.contact,
+                        cdApplied: cdEnabled,
                     });
                 }
                 amountToDistribute -= paymentForThisEntry;

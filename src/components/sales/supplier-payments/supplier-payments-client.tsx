@@ -24,6 +24,7 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
+import { OutstandingEntriesDialog } from "./outstanding-entries-dialog";
 
 
 export default function SupplierPaymentsClient() {
@@ -31,7 +32,7 @@ export default function SupplierPaymentsClient() {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     
     const hook = useSupplierPayments();
-    const { activeTab, setActiveTab } = hook;
+    const { activeTab, setActiveTab, isOutstandingModalOpen, setIsOutstandingModalOpen } = hook;
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey) return [];
@@ -101,14 +102,6 @@ export default function SupplierPaymentsClient() {
                                             </div>
                                         )}
                                     </div>
-                                     {hook.selectedCustomerKey && (
-                                        <TransactionTable
-                                            suppliers={transactionsForSelectedSupplier}
-                                            onShowDetails={hook.setDetailsSupplierEntry}
-                                            selectedIds={hook.selectedEntryIds}
-                                            onSelectionChange={hook.setSelectedEntryIds}
-                                        />
-                                    )}
                                 </div>
                             )}
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
@@ -157,6 +150,18 @@ export default function SupplierPaymentsClient() {
             isOpen={hook.isBankSettingsOpen}
             onOpenChange={hook.setIsBankSettingsOpen}
           />
+          
+           <OutstandingEntriesDialog
+                isOpen={isOutstandingModalOpen}
+                onOpenChange={setIsOutstandingModalOpen}
+                customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
+                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
+                selectedIds={hook.selectedEntryIds}
+                onSelect={(id: string) => hook.setSelectedEntryIds((prev: Set<string>) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
+                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0).map((c: any) => c.id) : []))}
+                onConfirm={() => setIsOutstandingModalOpen(false)}
+                onCancel={() => { setIsOutstandingModalOpen(false); hook.setSelectedCustomerKey(null); hook.setSelectedEntryIds(new Set()); }}
+            />
         </div>
     );
 }
