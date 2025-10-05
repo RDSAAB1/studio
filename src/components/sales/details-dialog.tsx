@@ -43,7 +43,20 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     const totalPaidForThisEntry = useMemo(() => 
         paymentsForDetailsEntry.reduce((sum, p) => {
             const paidForThis = p.paidFor?.find(pf => pf.srNo === customer.srNo);
-            return sum + (paidForThis?.amount || 0);
+            
+            if (!paidForThis) return sum;
+
+            let cdForThisEntryPortion = 0;
+            if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
+                if (totalAmountInPayment > 0) {
+                    const proportion = paidForThis.amount / totalAmountInPayment;
+                    cdForThisEntryPortion = p.cdAmount * proportion;
+                }
+            }
+            
+            const actualPaid = paidForThis.amount - cdForThisEntryPortion;
+            return sum + actualPaid;
         }, 0),
         [paymentsForDetailsEntry, customer.srNo]
     );
@@ -175,7 +188,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                 <TableRow>
                                                     <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Total Paid Amount</TableHead>
+                                                    <TableHead className="p-2 text-xs">Type</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Settled Amt</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Actual Paid</TableHead>
                                                 </TableRow>
@@ -201,6 +215,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                                            <TableCell className="p-2">{payment.type}</TableCell>
                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(totalPaidAmountForEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
