@@ -45,15 +45,15 @@ export const useSupplierPayments = () => {
     }, [form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
     const totalOutstandingForSelected = useMemo(() => {
-        if (form.editingPayment && selectedEntries.length > 0) {
-            // EDIT MODE: The "outstanding" is the max amount this payment can be.
+        if (form.editingPayment) {
+            // EDIT MODE: Calculate the maximum amount this payment can be.
             // It's the original amount of all selected entries minus OTHER payments.
             return selectedEntries.reduce((sum, entry) => {
                 const originalAmount = Number(entry.originalNetAmount) || 0;
                 
                 // Find all payments for this entry *except* the one being edited
                 const otherPaymentsForThisEntry = (data.paymentHistory || [])
-                    .filter(p => p.id !== form.editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
+                    .filter(p => p.id !== form.editingPayment!.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
 
                 const otherPaymentsTotal = otherPaymentsForThisEntry.reduce((paymentSum, p) => {
                     const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;

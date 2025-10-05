@@ -64,7 +64,8 @@ export const useSupplierData = () => {
     
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
-        const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
+        if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
+    
         const profiles: CustomerSummary[] = [];
     
         const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
@@ -119,6 +120,7 @@ export const useSupplierData = () => {
         });
     
         // 3. Assign payments to profiles
+        const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
         safePaymentHistory.forEach(p => {
             const pNameNorm = normalize(p.supplierName || 'Outsider');
             const pSoNorm = normalize(p.supplierFatherName || '');
@@ -176,6 +178,7 @@ export const useSupplierData = () => {
                     totalPaidForEntry += paidForThisDetail.amount;
                 });
                 
+                // DYNAMIC CALCULATION OF NET AMOUNT
                 const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
                 return { 
                     ...transaction, 
