@@ -9,7 +9,7 @@ interface UseCashDiscountProps {
     totalOutstanding: number;
     paymentDate: Date | undefined;
     selectedEntries: any[];
-    toBePaidAmount: number; // New prop for "To Be Paid" amount
+    toBePaidAmount: number;
 }
 
 export const useCashDiscount = ({
@@ -22,9 +22,7 @@ export const useCashDiscount = ({
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
-    
-    // "cdAt" is no longer needed as the logic is now directly tied to paymentType
-    // const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
 
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
@@ -50,23 +48,21 @@ export const useCashDiscount = ({
         let baseAmountForCd = 0;
         
         if (paymentType === 'Full') {
-            // In Full payment, CD is always on the settle amount (which is the total outstanding)
-            baseAmountForCd = settleAmount;
+             // In Full payment, CD is based on the Settle Amount.
+             baseAmountForCd = settleAmount;
         } else { // Partial payment
-            // As per the new request, CD for partial payments is on the "To Be Paid" amount.
-            baseAmountForCd = toBePaidAmount;
+             // In Partial payment, CD is based on the "To Be Paid" amount.
+             baseAmountForCd = toBePaidAmount;
         }
-        
+
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
             return 0;
         }
-        
+
         const calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
-        // Final sanity check: CD cannot be more than the amount being paid/settled.
-        const maxCdAllowed = paymentType === 'Full' ? settleAmount : toBePaidAmount;
-        
-        return Math.min(calculatedCd, maxCdAllowed);
+        // Final sanity check: CD cannot be more than the amount it's based on.
+        return Math.min(calculatedCd, baseAmountForCd);
 
     }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount]);
     
@@ -75,6 +71,8 @@ export const useCashDiscount = ({
         setCdEnabled,
         cdPercent,
         setCdPercent,
+        cdAt, 
+        setCdAt,
         calculatedCdAmount,
     };
 };

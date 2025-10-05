@@ -255,7 +255,7 @@ export const PaymentForm = (props: any) => {
              
             <CardFooter className="p-0 pt-3">
                 <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
-                     <div className="w-full sm:w-auto p-3 rounded-lg bg-muted/50 flex items-center justify-between sm:justify-start gap-4">
+                    <div className="w-full sm:w-auto p-3 rounded-lg bg-muted/50 flex items-center justify-between sm:justify-start gap-4">
                         <div className="flex items-center gap-2">
                            <CircleDollarSign className="h-5 w-5 text-primary"/>
                            <div>
@@ -263,7 +263,7 @@ export const PaymentForm = (props: any) => {
                             <p className="text-lg font-bold text-primary">{formatCurrency(finalAmountToBePaid)}</p>
                            </div>
                         </div>
-                     </div>
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
                         <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
