@@ -53,7 +53,9 @@ export const useSupplierPayments = () => {
     const cdHook = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
-        settleAmount: settleAmount, // Pass settleAmount to the CD hook
+        settleAmount: settleAmount,
+        paymentDate: form.paymentDate,
+        selectedEntries: selectedEntries
     });
 
     const { calculatedCdAmount, cdEnabled, setCdEnabled, cdPercent, setCdPercent, cdAt, setCdAt } = cdHook;
@@ -65,76 +67,57 @@ export const useSupplierPayments = () => {
 
     // Main calculation useEffect
     useEffect(() => {
-        // Auto-fill Settle Amount for 'Full' payment type
-        if (form.paymentType === 'Full' && !form.isBeingEdited && calculationDriver === 'settle') {
+        if (form.paymentType === 'Full') {
             const newSettleAmount = totalOutstandingForSelected || 0;
             if (settleAmount !== newSettleAmount) {
                 setSettleAmount(newSettleAmount);
             }
         }
-
-        // Auto-correction logic for partial payments
-        if (form.paymentType === 'Partial' && calculationDriver === 'settle') {
-            if (settleAmount > totalOutstandingForSelected) {
+    }, [form.paymentType, totalOutstandingForSelected, form.editingPayment]);
+    
+    const handleSettleAmountChange = (value: number) => {
+        if (form.paymentType === 'Full') {
+            setCalculationDriver('settle');
+            if (value > totalOutstandingForSelected) {
+                setSettleAmount(totalOutstandingForSelected);
                 toast({
                     title: "Adjustment",
-                    description: "Settle amount adjusted to match outstanding balance.",
+                    description: "Full payment settle amount cannot exceed total outstanding.",
                     variant: 'default'
                 });
-                setSettleAmount(totalOutstandingForSelected);
+            } else {
+                setSettleAmount(value);
             }
+        } else {
+            // In partial, user drives "To Be Paid", so we don't set settle directly
+            // unless they are forcing it. For now, this is a one-way street in partial.
+            setCalculationDriver('settle');
+            setSettleAmount(value);
         }
-    }, [
-        form.paymentType, 
-        form.isBeingEdited,
-        totalOutstandingForSelected, 
-        settleAmount,
-        calculationDriver, // Important dependency
-        toast
-    ]);
-
-
-    const handleSettleAmountChange = (value: number) => {
-        setCalculationDriver('settle');
-        setSettleAmount(value);
     };
 
     const handleToBePaidChange = (toBePaidValue: number) => {
-        setCalculationDriver('toBePaid');
-        
-        let newSettleAmount = toBePaidValue; // Default case with no CD
+        if (form.paymentType === 'Partial') {
+            let newSettleAmount = toBePaidValue; // Default case
+            if (cdEnabled && cdPercent > 0 && 1 - cdPercent / 100 !== 0) {
+                 newSettleAmount = toBePaidValue / (1 - cdPercent / 100);
+            }
+            
+            const finalSettleAmount = Math.round(newSettleAmount);
 
-        if (cdEnabled && cdPercent > 0) {
-            if (cdAt === 'partial_on_paid') {
-                 // Settle = ToBePaid / (1 - CD%)
-                 if (1 - (cdPercent / 100) !== 0) {
-                    newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
-                 }
-            } else if (cdAt === 'on_full_amount') {
-                // Settle = ToBePaid + (TotalOutstanding * CD%)
-                newSettleAmount = toBePaidValue + (totalOutstandingForSelected * (cdPercent / 100));
-            } else if (cdAt === 'on_unpaid_amount') {
-                // This is complex. For now, let's assume Settle Amount is what the user wants to adjust.
-                // Reverting to simple logic for this case to avoid complexity.
-                // Settle = ToBePaid + ( (TotalOutstanding - Settle) * CD%)
-                // This requires solving for Settle, which can be tricky. Let's simplify.
-                newSettleAmount = toBePaidValue; // Fallback for simplicity
+            if (finalSettleAmount > totalOutstandingForSelected) {
+                toast({
+                    title: "Adjustment",
+                    description: `Payment capped to max outstanding.`,
+                    variant: 'default'
+                });
+                setSettleAmount(totalOutstandingForSelected);
+            } else {
+                setSettleAmount(finalSettleAmount);
             }
         }
-
-        const finalSettleAmount = Math.round(newSettleAmount);
-
-        if (finalSettleAmount > totalOutstandingForSelected) {
-             toast({
-                title: "Adjustment",
-                description: `To Be Paid amount is too high with CD. Capped to max outstanding.`,
-                variant: 'default'
-            });
-            setSettleAmount(totalOutstandingForSelected);
-        } else {
-            setSettleAmount(finalSettleAmount);
-        }
     };
+
 
     // Auto-fill logic for parchi number
     useEffect(() => {
@@ -147,6 +130,7 @@ export const useSupplierPayments = () => {
         form.setSelectedCustomerKey(key);
         if (!form.editingPayment) {
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
+            setSettleAmount(0);
         }
         if (key) {
             const customerData = data.customerSummaryMap.get(key);
@@ -234,7 +218,6 @@ export const useSupplierPayments = () => {
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            // Here, paymentAmount from DB is the amount settled.
             setSettleAmount(paymentData.amount + (paymentData.cdAmount || 0));
             
             setPaymentType(paymentData.type);

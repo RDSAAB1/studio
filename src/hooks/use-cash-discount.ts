@@ -6,7 +6,6 @@ import { useState, useEffect, useMemo } from 'react';
 interface UseCashDiscountProps {
     paymentType: string;
     settleAmount: number; // The amount being settled from outstanding
-    toBePaidAmount: number; // The actual cash/bank payment being made
     totalOutstanding: number;
     paymentDate: Date | undefined;
     selectedEntries: any[];
@@ -15,7 +14,6 @@ interface UseCashDiscountProps {
 export const useCashDiscount = ({
     paymentType,
     settleAmount,
-    toBePaidAmount,
     totalOutstanding,
     paymentDate,
     selectedEntries = [],
@@ -48,13 +46,11 @@ export const useCashDiscount = ({
         let baseAmountForCd = 0;
         
         if (paymentType === 'Full') {
-            baseAmountForCd = totalOutstanding;
+            baseAmountForCd = settleAmount; // In full payment, settle amount is the outstanding.
         } else { // Partial
-            if (cdAt === 'partial_on_paid') {
-                 // In partial, the CD is on the amount being settled (which is to be paid + cd itself)
-                 // This creates a circular dependency if not handled carefully.
-                 // Let's assume CD is on the "To Be Paid" amount for simplicity in this case.
-                 baseAmountForCd = toBePaidAmount;
+             if (cdAt === 'partial_on_paid') {
+                 // CD is on the amount being settled.
+                 baseAmountForCd = settleAmount;
             } else if (cdAt === 'on_unpaid_amount') {
                 baseAmountForCd = Math.max(0, totalOutstanding - settleAmount);
             } else if (cdAt === 'on_full_amount') {
@@ -70,7 +66,7 @@ export const useCashDiscount = ({
         // The actual CD cannot be more than the amount being settled
         return Math.min(calculatedCd, settleAmount);
 
-    }, [cdEnabled, eligibleForCd, settleAmount, toBePaidAmount, cdPercent, cdAt, totalOutstanding, paymentType]);
+    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, cdAt, totalOutstanding, paymentType]);
     
     return {
         cdEnabled,
