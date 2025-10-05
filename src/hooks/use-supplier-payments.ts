@@ -40,9 +40,32 @@ export const useSupplierPayments = () => {
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
-    const totalOutstandingForSelected = useMemo(() => {
-        return selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
-    }, [selectedEntries]);
+     const totalOutstandingForSelected = useMemo(() => {
+        return selectedEntries.reduce((sum, entry) => {
+            const paymentsForThisEntry = data.paymentHistory.filter((p: Payment) =>
+                p.paidFor?.some(pf => pf.srNo === entry.srNo)
+            );
+            
+            let totalPaidForEntry = 0;
+            let totalCdForEntry = 0;
+
+            paymentsForThisEntry.forEach(p => {
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
+
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                    if (totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        totalCdForEntry += p.cdAmount * proportion;
+                    }
+                }
+            });
+
+            const currentOutstanding = (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return sum + (currentOutstanding > 0 ? currentOutstanding : 0);
+        }, 0);
+    }, [selectedEntries, data.paymentHistory]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -62,20 +85,11 @@ export const useSupplierPayments = () => {
         if (form.paymentType === 'Full') {
             const newSettleAmount = totalOutstandingForSelected;
             setSettleAmount(newSettleAmount);
-            const newToBePaidAmount = newSettleAmount - calculatedCdAmount;
-            setToBePaidAmount(newToBePaidAmount);
-            form.setCalcTargetAmount(Math.round(newToBePaidAmount));
-        } else { // Partial: When switching to partial, reset amounts to allow fresh input, unless entries are selected
-            if (totalOutstandingForSelected > 0) {
-                 const newSettleAmount = totalOutstandingForSelected;
-                 setSettleAmount(newSettleAmount);
-                 setToBePaidAmount(newSettleAmount);
-                 form.setCalcTargetAmount(Math.round(newSettleAmount));
-            } else {
-                setSettleAmount(0);
-                setToBePaidAmount(0);
-                form.setCalcTargetAmount(0);
-            }
+        } else { // Partial
+             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0) {
+                setSettleAmount(totalOutstandingForSelected);
+                setToBePaidAmount(totalOutstandingForSelected);
+             }
         }
     }, [form.paymentType, totalOutstandingForSelected]);
 
@@ -93,6 +107,16 @@ export const useSupplierPayments = () => {
             setSettleAmount(newSettle);
         }
     }, [toBePaidAmount, calculatedCdAmount, form.paymentType]);
+
+    useEffect(() => {
+        if (selectedEntries.length > 0) {
+            handleToBePaidChange(totalOutstandingForSelected);
+            handleSettleAmountChange(totalOutstandingForSelected);
+        } else {
+             handleToBePaidChange(0);
+             handleSettleAmountChange(0);
+        }
+    }, [selectedEntries, totalOutstandingForSelected]);
 
     const handleSettleAmountChange = (value: number) => {
         setSettleAmount(value);

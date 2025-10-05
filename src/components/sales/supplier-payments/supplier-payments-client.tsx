@@ -21,7 +21,6 @@ import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
-import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
@@ -39,6 +38,39 @@ export default function SupplierPaymentsClient() {
         const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
     }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
+    
+    const selectedEntries = useMemo(() => {
+        if (!hook.selectedEntryIds) return [];
+        const safeSuppliers = Array.isArray(hook.suppliers) ? hook.suppliers : [];
+        return safeSuppliers.filter((s: Customer) => hook.selectedEntryIds.has(s.id));
+    }, [hook.suppliers, hook.selectedEntryIds]);
+
+    const totalOutstandingForSelected = useMemo(() => {
+        return selectedEntries.reduce((sum, entry) => {
+            const paymentsForThisEntry = hook.paymentHistory.filter((p: Payment) =>
+                p.paidFor?.some(pf => pf.srNo === entry.srNo)
+            );
+            
+            let totalPaidForEntry = 0;
+            let totalCdForEntry = 0;
+
+            paymentsForThisEntry.forEach(p => {
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
+
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                    if (totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        totalCdForEntry += p.cdAmount * proportion;
+                    }
+                }
+            });
+
+            const currentOutstanding = (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return sum + (currentOutstanding > 0 ? currentOutstanding : 0);
+        }, 0);
+    }, [selectedEntries, hook.paymentHistory]);
 
 
     if (!hook.isClient || hook.loading) {
@@ -105,6 +137,7 @@ export default function SupplierPaymentsClient() {
                                      {hook.selectedCustomerKey && (
                                         <TransactionTable
                                             suppliers={transactionsForSelectedSupplier}
+                                            paymentHistory={hook.paymentHistory}
                                             onShowDetails={hook.setDetailsSupplierEntry}
                                             selectedIds={hook.selectedEntryIds}
                                             onSelectionChange={hook.setSelectedEntryIds}
@@ -113,7 +146,11 @@ export default function SupplierPaymentsClient() {
                                 </div>
                             )}
                             {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                                <PaymentForm {...hook} bankBranches={hook.bankBranches} />
+                                <PaymentForm 
+                                    {...hook} 
+                                    bankBranches={hook.bankBranches}
+                                    totalOutstandingForSelected={totalOutstandingForSelected}
+                                />
                             )}
                         </CardContent>
                     </Card>
@@ -133,16 +170,24 @@ export default function SupplierPaymentsClient() {
                 isOpen={hook.isOutstandingModalOpen}
                 onOpenChange={hook.setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier}
+                paymentHistory={hook.paymentHistory}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: any) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
                 onSelectAll={(checked: boolean) => {
                     const newSet = new Set<string>();
-                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
+                    const outstandingEntries = transactionsForSelectedSupplier.filter((s:any) => {
+                         const paymentsForThis = hook.paymentHistory.filter((p: any) => p.paidFor?.some((pf: any) => pf.srNo === s.srNo));
+                         const totalPaid = paymentsForThis.reduce((sum: number, p: any) => {
+                            const pf = p.paidFor.find((pf: any) => pf.srNo === s.srNo);
+                            return sum + (pf?.amount || 0);
+                         }, 0);
+                         return (s.originalNetAmount - totalPaid) >= 1;
+                    });
                     if(checked) outstandingEntries.forEach((e:any) => newSet.add(e.id));
                     hook.setSelectedEntryIds(newSet);
                 }}
-                onConfirm={hook.handlePaySelectedOutstanding}
+                onConfirm={() => hook.setIsOutstandingModalOpen(false)}
                 onCancel={() => { hook.setIsOutstandingModalOpen(false); hook.handleFullReset(); }}
             />
             
