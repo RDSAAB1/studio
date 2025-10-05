@@ -68,14 +68,13 @@ export const useSupplierPayments = () => {
         if (form.paymentType === 'Full' && !form.isBeingEdited) {
             form.setPaymentAmount(totalOutstandingForSelected || 0);
         }
-    }, [form.paymentType, form.isBeingEdited, totalOutstandingForSelected, selectedEntries]);
+    }, [form.paymentType, form.isBeingEdited, totalOutstandingForSelected, selectedEntries, form.setParchiNo, form.setPaymentAmount]);
 
     // Smart auto-correction logic for partial payments
     useEffect(() => {
         const { paymentAmount, setPaymentAmount } = form;
-        const settleAmount = paymentAmount; // Settle amount is the payable amount before CD
 
-        if (settleAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
+        if (paymentAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
              const adjustedPaymentAmount = totalOutstandingForSelected;
              if (Math.abs(paymentAmount - adjustedPaymentAmount) > 0.01) {
                  setPaymentAmount(adjustedPaymentAmount);
@@ -86,7 +85,7 @@ export const useSupplierPayments = () => {
                  });
              }
         }
-    }, [form.paymentAmount, totalOutstandingForSelected, form.setPaymentAmount, toast]);
+    }, [form, totalOutstandingForSelected, toast]);
 
     const handleToBePaidChange = useCallback((toBePaidValue: number) => {
         const { cdEnabled, cdPercent, cdAt } = cdHook;
@@ -94,14 +93,15 @@ export const useSupplierPayments = () => {
 
         if (cdEnabled && cdPercent > 0) {
             let newSettleAmount = toBePaidValue;
-            // Reverse calculate the settleAmount based on the to-be-paid value
-            if (cdAt === 'partial_on_paid' || cdAt === 'on_full_amount') {
-                newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
+            if (cdAt === 'partial_on_paid') {
+                 if (cdPercent < 100) {
+                    newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
+                 }
             } else if (cdAt === 'on_unpaid_amount') {
-                 // This case is complex and might not be perfectly reversible.
-                 // Let's stick to the most common case for now.
-                 // For S = P - (O-S)*R  => S(1+R) = P + O*R => S = (P + O*R) / (1+R)
-                newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdPercent / 100)) / (1 + (cdPercent / 100));
+                 newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdPercent / 100)) / (1 + (cdPercent / 100));
+            } else if (cdAt === 'on_full_amount') {
+                 const fullCd = totalOutstandingForSelected * (cdPercent / 100);
+                 newSettleAmount = toBePaidValue + fullCd;
             }
             setPaymentAmount(Math.round(newSettleAmount));
         } else {
