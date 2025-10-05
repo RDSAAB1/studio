@@ -56,6 +56,9 @@ export const useSupplierPayments = () => {
         return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
     }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
+    const finalAmountToSettle = useMemo(() => {
+        return form.paymentAmount;
+    }, [form.paymentAmount]);
 
     // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
@@ -65,16 +68,17 @@ export const useSupplierPayments = () => {
         if (form.paymentType === 'Full' && !form.isBeingEdited) {
             form.setPaymentAmount(totalOutstandingForSelected || 0);
         }
-    }, [form, selectedEntries, totalOutstandingForSelected]);
+    }, [form.paymentType, form.isBeingEdited, totalOutstandingForSelected, selectedEntries]);
 
     // Smart auto-correction logic for partial payments
     useEffect(() => {
-        const finalAmountToSettle = form.paymentAmount;
+        const { paymentAmount, setPaymentAmount } = form;
+        const settleAmount = paymentAmount; // Settle amount is the payable amount before CD
 
-        if (finalAmountToSettle > totalOutstandingForSelected + 0.01) { // Add tolerance
+        if (settleAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
              const adjustedPaymentAmount = totalOutstandingForSelected;
-             if (Math.abs(form.paymentAmount - adjustedPaymentAmount) > 0.01) {
-                 form.setPaymentAmount(adjustedPaymentAmount);
+             if (Math.abs(paymentAmount - adjustedPaymentAmount) > 0.01) {
+                 setPaymentAmount(adjustedPaymentAmount);
                  toast({
                     title: "Payment Adjusted",
                     description: "Settle Amount cannot exceed Outstanding. It has been adjusted.",
@@ -82,23 +86,28 @@ export const useSupplierPayments = () => {
                  });
              }
         }
-    }, [form, totalOutstandingForSelected, toast]);
+    }, [form.paymentAmount, totalOutstandingForSelected, form.setPaymentAmount, toast]);
 
     const handleToBePaidChange = useCallback((toBePaidValue: number) => {
-        if (cdHook.cdEnabled && cdHook.cdPercent > 0) {
+        const { cdEnabled, cdPercent, cdAt } = cdHook;
+        const { setPaymentAmount } = form;
+
+        if (cdEnabled && cdPercent > 0) {
             let newSettleAmount = toBePaidValue;
-            if (cdHook.cdAt === 'partial_on_paid' || cdHook.cdAt === 'on_full_amount') {
-                // S = P / (1 - R)
-                newSettleAmount = toBePaidValue / (1 - (cdHook.cdPercent / 100));
-            } else if (cdHook.cdAt === 'on_unpaid_amount') {
-                // S = (P + O*R) / (1 + R)
-                newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdHook.cdPercent / 100)) / (1 + (cdHook.cdPercent / 100));
+            // Reverse calculate the settleAmount based on the to-be-paid value
+            if (cdAt === 'partial_on_paid' || cdAt === 'on_full_amount') {
+                newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
+            } else if (cdAt === 'on_unpaid_amount') {
+                 // This case is complex and might not be perfectly reversible.
+                 // Let's stick to the most common case for now.
+                 // For S = P - (O-S)*R  => S(1+R) = P + O*R => S = (P + O*R) / (1+R)
+                newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdPercent / 100)) / (1 + (cdPercent / 100));
             }
-            form.setPaymentAmount(Math.round(newSettleAmount));
+            setPaymentAmount(Math.round(newSettleAmount));
         } else {
-            form.setPaymentAmount(toBePaidValue);
+            setPaymentAmount(toBePaidValue);
         }
-    }, [cdHook.cdEnabled, cdHook.cdPercent, cdHook.cdAt, totalOutstandingForSelected, form.setPaymentAmount]);
+    }, [cdHook, form, totalOutstandingForSelected]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -121,6 +130,9 @@ export const useSupplierPayments = () => {
                     bank: customerData.bank || '',
                     branch: customerData.branch || '',
                 });
+            }
+             if (form.rtgsFor === 'Supplier') {
+                 setIsOutstandingModalOpen(true);
             }
         }
     };
@@ -316,6 +328,7 @@ export const useSupplierPayments = () => {
         ...cdHook,
         finalAmountToBePaid,
         handleToBePaidChange,
+        finalAmountToSettle,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
