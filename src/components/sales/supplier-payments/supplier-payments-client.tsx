@@ -24,6 +24,7 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
+import { OutstandingEntriesDialog } from "./outstanding-entries-dialog";
 
 
 export default function SupplierPaymentsClient() {
@@ -55,14 +56,12 @@ export default function SupplierPaymentsClient() {
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo);
-                if (paidForThisDetail) {
-                    totalPaidForEntry += paidForThisDetail.amount;
-                }
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
 
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                    if (totalAmountInPayment > 0 && paidForThisDetail) {
+                    if (totalAmountInPayment > 0) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
                         totalCdForEntry += p.cdAmount * proportion;
                     }
