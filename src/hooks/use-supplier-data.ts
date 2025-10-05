@@ -159,6 +159,7 @@ export const useSupplierData = () => {
 
         data.allTransactions!.forEach(transaction => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
+            
             let totalPaidForEntry = 0;
             let totalCdForEntry = 0;
 
@@ -174,6 +175,8 @@ export const useSupplierData = () => {
                     }
                 }
             });
+            
+            // DYNAMIC CALCULATION OF NET AMOUNT
             transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
         });
         
@@ -317,7 +320,3 @@ export const useSupplierData = () => {
         financialState,
     };
 };
-
-const normalizeString = (str: string | undefined) => (str || '').replace(/\s+/g, '').toLowerCase();
-    
-
