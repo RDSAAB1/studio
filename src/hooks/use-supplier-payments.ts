@@ -44,33 +44,29 @@ export const useSupplierPayments = () => {
         return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
-    
     const totalOutstandingForSelected = useMemo(() => {
-        if (!selectedEntries || selectedEntries.length === 0) return 0;
+        if (form.editingPayment && selectedEntries.length > 0) {
+            // EDIT MODE: The "outstanding" is the max amount this payment can be.
+            // It's the original amount of all selected entries minus OTHER payments.
+            return selectedEntries.reduce((sum, entry) => {
+                const originalAmount = Number(entry.originalNetAmount) || 0;
+                
+                // Find all payments for this entry *except* the one being edited
+                const otherPaymentsForThisEntry = (data.paymentHistory || [])
+                    .filter(p => p.id !== form.editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
 
-        return selectedEntries.reduce((sum, entry) => {
-            let outstandingForEntry = Number(entry.originalNetAmount) || 0;
+                const otherPaymentsTotal = otherPaymentsForThisEntry.reduce((paymentSum, p) => {
+                    const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
+                    return paymentSum + paidForThisDetail.amount + (p.cdAmount || 0);
+                }, 0);
 
-            const allPaymentsForThisEntry = (data.paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo));
-            
-            allPaymentsForThisEntry.forEach(p => {
-                // If we are editing this payment, don't count it towards the paid amount
-                // to correctly calculate the "total possible" amount for this edit session.
-                if (form.editingPayment && p.id === form.editingPayment.id) {
-                    return;
-                }
+                return sum + (originalAmount - otherPaymentsTotal);
+            }, 0);
+        }
+        
+        // NEW PAYMENT MODE: Sum of the current net amounts of selected entries.
+        return selectedEntries.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
 
-                const paidForThisDetail = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                if (paidForThisDetail) {
-                    const cdAmountForThisPortion = (p.cdApplied && p.cdAmount && (p.paidFor?.length || 0) > 0)
-                        ? (p.cdAmount / p.paidFor!.reduce((total, pf) => total + pf.amount, 0)) * paidForThisDetail.amount
-                        : 0;
-                    outstandingForEntry -= (paidForThisDetail.amount + cdAmountForThisPortion);
-                }
-            });
-
-            return sum + outstandingForEntry;
-        }, 0);
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
 
