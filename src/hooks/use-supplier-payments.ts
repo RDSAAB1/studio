@@ -46,7 +46,6 @@ export const useSupplierPayments = () => {
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
-    const [calculationDriver, setCalculationDriver] = useState<'settle' | 'toBePaid'>('settle');
 
 
     const cdHook = useCashDiscount({
@@ -62,55 +61,46 @@ export const useSupplierPayments = () => {
 
     useEffect(() => {
         if (form.paymentType === 'Full') {
-            setCalculationDriver('settle');
-            setSettleAmount(totalOutstandingForSelected);
+            const newSettleAmount = totalOutstandingForSelected;
+            const newToBePaidAmount = newSettleAmount - calculatedCdAmount;
+            setSettleAmount(newSettleAmount);
+            setToBePaidAmount(newToBePaidAmount);
+            form.setCalcTargetAmount(newToBePaidAmount); // Update target amount
         } else {
-            setCalculationDriver('toBePaid');
             setSettleAmount(0);
             setToBePaidAmount(0);
+            form.setCalcTargetAmount(0); // Reset target amount
         }
-    }, [form.paymentType, totalOutstandingForSelected]);
-
-    useEffect(() => {
-        if (form.paymentType === 'Full') {
-            const newToBePaid = settleAmount - calculatedCdAmount;
-            setToBePaidAmount(newToBePaid);
-        } else { // Partial
-            const newSettleAmount = toBePaidAmount + calculatedCdAmount;
-            setSettleAmount(newSettleAmount);
-        }
-        
-        // Always update the target amount when to-be-paid changes
-        if (calculationDriver === 'toBePaid') {
-            form.setCalcTargetAmount(toBePaidAmount);
-        }
-
-    }, [settleAmount, toBePaidAmount, calculatedCdAmount, form.paymentType, calculationDriver, form.setCalcTargetAmount]);
-
+    }, [form.paymentType, totalOutstandingForSelected, calculatedCdAmount]);
 
     const handleSettleAmountChange = (value: number) => {
-        setCalculationDriver('settle');
         if (form.paymentType === 'Full') {
+            let newSettleAmount = value;
             if (value > totalOutstandingForSelected) {
-                setSettleAmount(totalOutstandingForSelected);
+                newSettleAmount = totalOutstandingForSelected;
                 toast({
                     title: "Adjustment",
                     description: "Settle amount cannot exceed total outstanding.",
                     variant: 'default'
                 });
-            } else {
-                setSettleAmount(value);
             }
+            const newToBePaid = newSettleAmount - calculatedCdAmount;
+            setSettleAmount(newSettleAmount);
+            setToBePaidAmount(newToBePaid);
+            form.setCalcTargetAmount(newToBePaid);
         }
     };
 
     const handleToBePaidChange = (value: number) => {
-        setCalculationDriver('toBePaid');
         if (form.paymentType === 'Partial') {
-            setToBePaidAmount(value);
-            form.setCalcTargetAmount(value); // Sync with target amount
+            const newToBePaid = value;
+            const newSettle = newToBePaid + calculatedCdAmount;
+            setToBePaidAmount(newToBePaid);
+            setSettleAmount(newSettle);
+            form.setCalcTargetAmount(newToBePaid);
         }
     };
+    
     
     // Auto-fill logic for parchi number
     useEffect(() => {
