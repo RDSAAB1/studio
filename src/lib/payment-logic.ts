@@ -26,7 +26,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     const {
         rtgsFor, selectedCustomerKey, selectedEntries, editingPayment,
         paymentAmount, paymentMethod, selectedAccountId,
-        cdEnabled, calculatedCdAmount, 
+        cdEnabled, calculatedCdAmount, settleAmount, totalOutstandingForSelected,
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, rtgsAmount, supplierDetails, bankDetails,
@@ -51,6 +51,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     if (paymentMethod === 'RTGS' && !accountIdForPayment) {
         return { success: false, message: "Please select an account to pay from for RTGS." };
     }
+    
+    // VALIDATION: Check if settlement amount exceeds total outstanding
+    if (settleAmount > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
+        return { success: false, message: `Settlement amount (${formatCurrency(settleAmount)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
+    }
+
 
     const totalToSettle = finalAmountToPay + calculatedCdAmount;
 
@@ -62,12 +68,16 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
-            // Delete the old payment record. The balance will auto-recalculate on the client.
             const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
-            transaction.delete(oldPaymentRef);
-            if (editingPayment.expenseTransactionId) {
-                const oldExpenseRef = doc(firestoreDB, "expenses", editingPayment.expenseTransactionId);
-                transaction.delete(oldExpenseRef);
+            const oldPaymentDoc = await transaction.get(oldPaymentRef);
+
+            if(oldPaymentDoc.exists()) {
+                const oldPaymentData = oldPaymentDoc.data() as Payment;
+                if (oldPaymentData.expenseTransactionId) {
+                    const oldExpenseRef = doc(firestoreDB, "expenses", oldPaymentData.expenseTransactionId);
+                    transaction.delete(oldExpenseRef);
+                }
+                transaction.delete(oldPaymentRef);
             }
         }
 
@@ -78,7 +88,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             for (const entry of selectedEntries) {
                 if (amountToDistribute <= 0) break;
                 
-                const outstanding = Number(entry.netAmount);
+                const outstanding = Number(entry.netAmount) + (editingPayment?.paidFor?.find((pf:any) => pf.srNo === entry.srNo)?.amount || 0);
                 const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
                 if (paymentForThisEntry > 0) {
@@ -195,4 +205,3 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
         await db.payments.delete(paymentToDelete.id);
     }
 };
-
