@@ -57,19 +57,25 @@ export const useSupplierPayments = () => {
     });
 
     const { calculatedCdAmount, ...cdProps } = cdHook;
-
+    
     useEffect(() => {
         if (form.paymentType === 'Full') {
             const newSettleAmount = totalOutstandingForSelected;
-            const newToBePaidAmount = newSettleAmount - calculatedCdAmount;
             setSettleAmount(newSettleAmount);
+            const newToBePaidAmount = newSettleAmount - calculatedCdAmount;
             setToBePaidAmount(newToBePaidAmount);
-            form.setCalcTargetAmount(Math.round(newToBePaidAmount)); // Update target amount as a round figure
-        } else { // Partial
-            // On switching to partial, reset amounts to allow fresh input
-            setSettleAmount(0);
-            setToBePaidAmount(0);
-            form.setCalcTargetAmount(0);
+            form.setCalcTargetAmount(Math.round(newToBePaidAmount));
+        } else { // Partial: When switching to partial, reset amounts to allow fresh input, unless entries are selected
+            if (totalOutstandingForSelected > 0) {
+                 const newSettleAmount = totalOutstandingForSelected;
+                 setSettleAmount(newSettleAmount);
+                 setToBePaidAmount(newSettleAmount);
+                 form.setCalcTargetAmount(Math.round(newSettleAmount));
+            } else {
+                setSettleAmount(0);
+                setToBePaidAmount(0);
+                form.setCalcTargetAmount(0);
+            }
         }
     }, [form.paymentType, totalOutstandingForSelected]);
 
@@ -87,7 +93,6 @@ export const useSupplierPayments = () => {
             setSettleAmount(newSettle);
         }
     }, [toBePaidAmount, calculatedCdAmount, form.paymentType]);
-
 
     const handleSettleAmountChange = (value: number) => {
         setSettleAmount(value);
@@ -132,58 +137,6 @@ export const useSupplierPayments = () => {
              if (form.rtgsFor === 'Supplier') {
                  setIsOutstandingModalOpen(true);
             }
-        }
-    };
-
-    const processPayment = async () => {
-        setIsProcessing(true);
-        try {
-            const paymentData = {
-                ...form,
-                paymentAmount: toBePaidAmount, // The actual amount paid
-                settleAmount: settleAmount, // The amount settled from outstanding
-                cdAmount: calculatedCdAmount,
-                cdApplied: cdHook.cdEnabled,
-            };
-            
-            const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
-
-            if (!result.success) {
-                toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
-                setIsProcessing(false);
-                return;
-            }
-
-            toast({ title: `Payment processed successfully.`, variant: 'success' });
-            if (form.paymentMethod === 'RTGS' && result.payment) {
-                setRtgsReceiptData(result.payment);
-            }
-            form.resetPaymentForm(form.rtgsFor === 'Outsider');
-            setSettleAmount(0); 
-            setToBePaidAmount(0);
-        } catch (error: any) {
-            console.error("Error processing payment:", error);
-            toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-    
-    const handleDeletePayment = async (paymentToDelete: Payment) => {
-        setIsProcessing(true);
-         try {
-            await handleDeletePaymentLogic(paymentToDelete, data.suppliers); 
-            toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
-            if (form.editingPayment?.id === paymentToDelete.id) {
-              form.resetPaymentForm();
-              setSettleAmount(0);
-              setToBePaidAmount(0);
-            }
-        } catch (error: any) {
-            console.error("Error deleting payment:", error);
-            toast({ title: "Failed to delete payment.", description: error.message, variant: "destructive" });
-        } finally {
-            setIsProcessing(false);
         }
     };
     
@@ -328,6 +281,58 @@ export const useSupplierPayments = () => {
         form.setRtgsRate(option.rate);
         form.setRtgsAmount(option.calculatedAmount);
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
+    };
+
+    const processPayment = async () => {
+        setIsProcessing(true);
+        try {
+            const paymentData = {
+                ...form,
+                paymentAmount: toBePaidAmount, // The actual amount paid
+                settleAmount: settleAmount, // The amount settled from outstanding
+                cdAmount: calculatedCdAmount,
+                cdApplied: cdHook.cdEnabled,
+            };
+            
+            const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
+
+            if (!result.success) {
+                toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
+                setIsProcessing(false);
+                return;
+            }
+
+            toast({ title: `Payment processed successfully.`, variant: 'success' });
+            if (form.paymentMethod === 'RTGS' && result.payment) {
+                setRtgsReceiptData(result.payment);
+            }
+            form.resetPaymentForm(form.rtgsFor === 'Outsider');
+            setSettleAmount(0); 
+            setToBePaidAmount(0);
+        } catch (error: any) {
+            console.error("Error processing payment:", error);
+            toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+    
+    const handleDeletePayment = async (paymentToDelete: Payment) => {
+        setIsProcessing(true);
+         try {
+            await handleDeletePaymentLogic(paymentToDelete, data.suppliers); 
+            toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
+            if (form.editingPayment?.id === paymentToDelete.id) {
+              form.resetPaymentForm();
+              setSettleAmount(0);
+              setToBePaidAmount(0);
+            }
+        } catch (error: any) {
+            console.error("Error deleting payment:", error);
+            toast({ title: "Failed to delete payment.", description: error.message, variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
     };
     
     return {
