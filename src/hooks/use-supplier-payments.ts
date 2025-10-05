@@ -79,15 +79,19 @@ export const useSupplierPayments = () => {
     };
     
     useEffect(() => {
-        if (form.paymentType === 'Full' && totalOutstandingForSelected > 0 && !form.isBeingEdited) {
+        // This effect ensures the `settleAmount` and `toBePaidAmount` are correctly linked
+        // based on the payment type and CD, preventing infinite loops.
+        if (form.paymentType === 'Full') {
+            // When Full payment, settle amount is the total outstanding. `toBePaid` is derived.
             setSettleAmount(totalOutstandingForSelected);
+            const newToBePaid = totalOutstandingForSelected - calculatedCdAmount;
+            setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
+        } else { // Partial payment
+            // When Partial, `toBePaid` is the source of truth entered by user. `settleAmount` is derived.
+            const newSettleAmount = toBePaidAmount + calculatedCdAmount;
+            setSettleAmount(newSettleAmount);
         }
-    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited]);
-    
-    useEffect(() => {
-        const newToBePaid = settleAmount - calculatedCdAmount;
-        setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
-    }, [settleAmount, calculatedCdAmount]);
+    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited, toBePaidAmount, calculatedCdAmount]);
 
 
     // Auto-fill logic for parchi number
@@ -145,7 +149,9 @@ export const useSupplierPayments = () => {
             
             setPaymentType(paymentData.type);
             
-            handleSettleAmountChange(paymentData.amount + (paymentData.cdAmount || 0));
+            // This is the key part:
+            // Set the `toBePaidAmount` from the record, which will then trigger
+            // the useEffect to calculate the correct `settleAmount`.
             handleToBePaidChange(paymentData.amount);
             
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
