@@ -39,45 +39,10 @@ export const useSupplierPayments = () => {
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
-    const totalOutstandingForSelected = useMemo(() => {
-        if (!selectedEntries) return 0;
-    
-        // If editing, the calculation is more complex to avoid double-counting.
-        if (form.isBeingEdited && form.editingPayment) {
-            return selectedEntries.reduce((total, entry) => {
-                // Start with the entry's original payable amount.
-                let entryOutstanding = Number(entry.originalNetAmount) || 0;
-
-                // Find all payments for this entry *except* the one being edited.
-                const otherPayments = data.paymentHistory.filter(p =>
-                    p.id !== form.editingPayment!.id &&
-                    p.paidFor?.some(pf => pf.srNo === entry.srNo)
-                );
-
-                // Subtract the amounts from other payments.
-                otherPayments.forEach(p => {
-                    const paidForThisEntry = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                    if (paidForThisEntry) {
-                        let cdForThisPortion = 0;
-                        if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                            const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-                            if(totalAmountInPayment > 0) {
-                                const proportion = paidForThisEntry.amount / totalAmountInPayment;
-                                cdForThisPortion = p.cdAmount * proportion;
-                            }
-                        }
-                        entryOutstanding -= (paidForThisEntry.amount + cdForThisPortion);
-                    }
-                });
-                
-                return total + entryOutstanding;
-            }, 0);
-        }
-
-        // Default calculation for new payments.
+     const totalOutstandingForSelected = useMemo(() => {
+        if (!selectedEntries || selectedEntries.length === 0) return 0;
         return selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
-
-    }, [selectedEntries, form.isBeingEdited, form.editingPayment, data.paymentHistory]);
+    }, [selectedEntries]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -87,6 +52,7 @@ export const useSupplierPayments = () => {
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
         toBePaidAmount: toBePaidAmount,
+        selectedEntries: selectedEntries
     });
     
     const handleSettleAmountChange = (value: number) => {
@@ -107,7 +73,7 @@ export const useSupplierPayments = () => {
             const newSettleAmount = toBePaidAmount + calculatedCdAmount;
             handleSettleAmountChange(newSettleAmount);
         }
-    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount]);
+    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount, selectedEntries]);
 
 
     // Auto-fill logic for parchi number
