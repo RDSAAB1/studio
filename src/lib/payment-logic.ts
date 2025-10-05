@@ -150,6 +150,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierName: toTitleCase(supplierDetails.name),
             supplierFatherName: toTitleCase(supplierDetails.fatherName),
             supplierAddress: toTitleCase(supplierDetails.address),
+            supplierContact: supplierDetails.contact,
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
             rtgsFor, expenseTransactionId: expenseTransactionId,
         };

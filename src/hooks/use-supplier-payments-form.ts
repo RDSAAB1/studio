@@ -55,17 +55,19 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     }, []);
 
-    useEffect(() => {
+    const handleSetMinRate = (value: number) => {
+        setMinRate(value);
         if (typeof window !== 'undefined') {
-            localStorage.setItem('paymentMinRate', String(minRate));
+            localStorage.setItem('paymentMinRate', String(value));
         }
-    }, [minRate]);
+    };
 
-    useEffect(() => {
+    const handleSetMaxRate = (value: number) => {
+        setMaxRate(value);
         if (typeof window !== 'undefined') {
-            localStorage.setItem('paymentMaxRate', String(maxRate));
+            localStorage.setItem('paymentMaxRate', String(value));
         }
-    }, [maxRate]);
+    };
 
     const handleSetSelectedAccountId = (accountId: string | null) => {
         if (accountId) {
@@ -228,8 +230,10 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         editingPayment, setEditingPayment,
         isBeingEdited, setIsBeingEdited,
         calcTargetAmount, setCalcTargetAmount,
-        minRate, setMinRate,
-        maxRate, setMaxRate,
+        minRate,
+        setMinRate: handleSetMinRate,
+        maxRate,
+        setMaxRate: handleSetMaxRate,
         resetPaymentForm,
         handleFullReset,
         onEdit, setOnEdit,
