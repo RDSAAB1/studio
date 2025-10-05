@@ -41,35 +41,43 @@ export const useSupplierPayments = () => {
     
     const totalOutstandingForSelected = useMemo(() => {
         if (!selectedEntries) return 0;
-        
-        // Calculate the base outstanding amount from the selected entries.
-        const currentOutstanding = selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
     
-        // If we are editing a payment, we need to temporarily "add back" the amount of that payment
-        // to the outstanding balance to allow for correct validation and calculation.
+        // If editing, the calculation is more complex to avoid double-counting.
         if (form.isBeingEdited && form.editingPayment) {
-            const paymentBeingEdited = form.editingPayment;
-            
-            // Find the portions of the payment that apply to the currently selected entries.
-            const relevantPaidFor = paymentBeingEdited.paidFor?.filter(pf => form.selectedEntryIds.has(pf.srNo)) || [];
-            
-            // Sum up the amount paid and the CD applied for these portions.
-            const amountToRestore = relevantPaidFor.reduce((sum, pf) => sum + pf.amount, 0);
-            
-            let cdToRestore = 0;
-            if (paymentBeingEdited.cdApplied && paymentBeingEdited.cdAmount && paymentBeingEdited.paidFor && paymentBeingEdited.paidFor.length > 0) {
-                 const totalAmountInPayment = paymentBeingEdited.paidFor.reduce((s, i) => s + i.amount, 0);
-                 if(totalAmountInPayment > 0) {
-                    const proportionOfSelected = amountToRestore / totalAmountInPayment;
-                    cdToRestore = paymentBeingEdited.cdAmount * proportionOfSelected;
-                 }
-            }
-            
-            return currentOutstanding + amountToRestore + cdToRestore;
+            return selectedEntries.reduce((total, entry) => {
+                // Start with the entry's original payable amount.
+                let entryOutstanding = Number(entry.originalNetAmount) || 0;
+
+                // Find all payments for this entry *except* the one being edited.
+                const otherPayments = data.paymentHistory.filter(p =>
+                    p.id !== form.editingPayment!.id &&
+                    p.paidFor?.some(pf => pf.srNo === entry.srNo)
+                );
+
+                // Subtract the amounts from other payments.
+                otherPayments.forEach(p => {
+                    const paidForThisEntry = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                    if (paidForThisEntry) {
+                        let cdForThisPortion = 0;
+                        if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                            const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                            if(totalAmountInPayment > 0) {
+                                const proportion = paidForThisEntry.amount / totalAmountInPayment;
+                                cdForThisPortion = p.cdAmount * proportion;
+                            }
+                        }
+                        entryOutstanding -= (paidForThisEntry.amount + cdForThisPortion);
+                    }
+                });
+                
+                return total + entryOutstanding;
+            }, 0);
         }
-    
-        return currentOutstanding;
-    }, [selectedEntries, form.editingPayment, form.isBeingEdited]);
+
+        // Default calculation for new payments.
+        return selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
+
+    }, [selectedEntries, form.isBeingEdited, form.editingPayment, data.paymentHistory]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
