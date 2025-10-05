@@ -41,18 +41,17 @@ export const useCashDiscount = ({
     }, [eligibleForCd]);
 
     const calculatedCdAmount = useMemo(() => {
-        if (!cdEnabled || !eligibleForCd || cdPercent <= 0) {
+        if (!cdEnabled || cdPercent <= 0) {
             return 0;
         }
 
         let baseAmountForCd = 0;
         
         if (paymentType === 'Full') {
-             // In Full payment, CD is based on the Settle Amount.
              baseAmountForCd = settleAmount;
         } else { // Partial payment
-             // In Partial payment, CD is based on the "To Be Paid" amount.
-             baseAmountForCd = toBePaidAmount;
+            // When partial, CD is calculated on the amount being paid
+            baseAmountForCd = toBePaidAmount;
         }
 
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
@@ -61,10 +60,9 @@ export const useCashDiscount = ({
 
         const calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
-        // Final sanity check: CD cannot be more than the amount it's based on.
         return Math.min(calculatedCd, baseAmountForCd);
 
-    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount]);
+    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount, cdAt, totalOutstanding]);
     
     return {
         cdEnabled,

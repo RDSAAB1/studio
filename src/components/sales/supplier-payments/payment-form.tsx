@@ -141,7 +141,7 @@ export const PaymentForm = (props: any) => {
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label htmlFor="settle-amount" className="text-xs">Settle Amount</Label>
-                                <Input id="settle-amount" type="number" value={settleAmount} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-xs", paymentType === 'Partial' && 'bg-muted/50')} />
+                                <Input id="settle-amount" type="number" value={Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-xs", paymentType === 'Partial' && 'bg-muted/50')} />
                             </div>
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
