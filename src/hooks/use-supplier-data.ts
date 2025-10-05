@@ -164,16 +164,14 @@ export const useSupplierData = () => {
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
-                if (paidForThisDetail) {
-                    totalPaidForEntry += paidForThisDetail.amount;
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
 
-                    if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                        const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-                        if(totalAmountInPayment > 0) {
-                            const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                            totalCdForEntry += p.cdAmount * proportion;
-                        }
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                    if(totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        totalCdForEntry += p.cdAmount * proportion;
                     }
                 }
             });
@@ -325,3 +323,5 @@ export const useSupplierData = () => {
         financialState,
     };
 };
+
+    
