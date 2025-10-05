@@ -160,24 +160,27 @@ export const useSupplierData = () => {
         const updatedTransactions = data.allTransactions!.map(transaction => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
-            let totalPaidForEntry = 0;
+            let totalActualPaidForEntry = 0;
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                totalPaidForEntry += paidForThisDetail.amount;
-
+                
+                let cdForThisPortion = 0;
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        totalCdForEntry += p.cdAmount * proportion;
+                        cdForThisPortion = p.cdAmount * proportion;
                     }
                 }
+                
+                totalCdForEntry += cdForThisPortion;
+                totalActualPaidForEntry += (paidForThisDetail.amount - cdForThisPortion);
             });
             
             // DYNAMIC CALCULATION OF NET AMOUNT
-            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalActualPaidForEntry - totalCdForEntry;
             return { ...transaction, netAmount: calculatedNetAmount };
         });
 
@@ -324,4 +327,5 @@ export const useSupplierData = () => {
     };
 };
 
+    
     
