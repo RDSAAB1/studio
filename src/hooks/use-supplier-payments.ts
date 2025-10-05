@@ -40,40 +40,22 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, form.selectedEntryIds]);
     
     const totalOutstandingForSelected = useMemo(() => {
-        // When editing, exclude the payment being edited from the calculation
-        const paymentHistoryToConsider = form.editingPayment
-            ? data.paymentHistory.filter((p: Payment) => p.id !== form.editingPayment.id)
-            : data.paymentHistory;
+        // When editing, temporarily add back the payment amount to the outstanding balance
+        // to allow for modification without "exceeding" errors.
+        const editingPaymentAmount = form.editingPayment?.paidFor
+            ?.filter(pf => form.selectedEntryIds.has(pf.srNo))
+            .reduce((sum, pf) => sum + pf.amount, 0) || 0;
 
-        return selectedEntries.reduce((sum, entry) => {
-            const paymentsForThisEntry = paymentHistoryToConsider.filter((p: Payment) =>
-                p.paidFor?.some(pf => pf.srNo === entry.srNo)
-            );
-            
-            let totalPaidForEntry = 0;
-            let totalCdForEntry = 0;
+        const editingPaymentCd = form.editingPayment?.cdAmount || 0;
 
-            paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
-                
-                let cdForThisPortion = 0;
-                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                    const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
-                    if (totalAmountInPayment > 0) {
-                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        cdForThisPortion = p.cdAmount * proportion;
-                    }
-                }
-                
-                totalCdForEntry += cdForThisPortion;
-                // Accumulate only the actual amount paid, excluding CD
-                totalPaidForEntry += (paidForThisDetail.amount - cdForThisPortion);
-            });
+        const currentOutstanding = selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
 
-            const currentOutstanding = (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-            return sum + (currentOutstanding > 0 ? currentOutstanding : 0);
-        }, 0);
-    }, [selectedEntries, data.paymentHistory, form.editingPayment]);
+        if (form.isBeingEdited) {
+            return currentOutstanding + editingPaymentAmount + editingPaymentCd;
+        }
+
+        return currentOutstanding;
+    }, [selectedEntries, form.isBeingEdited, form.editingPayment]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -97,30 +79,22 @@ export const useSupplierPayments = () => {
         setToBePaidAmount(value);
         form.setCalcTargetAmount(Math.round(value)); // Update target amount
     };
-
-    useEffect(() => {
-        if (form.paymentType === 'Full' && !form.isBeingEdited) {
-            const newToBePaid = settleAmount - calculatedCdAmount;
-            handleToBePaidChange(newToBePaid);
-        }
-    }, [settleAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
-
-
-    useEffect(() => {
-        if (form.paymentType === 'Partial' && !form.isBeingEdited) {
-            const newSettle = toBePaidAmount + calculatedCdAmount;
-            handleSettleAmountChange(newSettle);
-        }
-    }, [toBePaidAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
-
-    useEffect(() => {
-        if (form.paymentType === 'Full' && totalOutstandingForSelected > 0 && !form.isBeingEdited) {
-            handleSettleAmountChange(totalOutstandingForSelected);
-        }
-    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited]);
-
-
     
+    // This combined useEffect replaces the two conflicting ones.
+    useEffect(() => {
+        // This part sets the settle amount when entries are selected/changed
+        if (form.paymentType === 'Full' && totalOutstandingForSelected > 0 && !form.isBeingEdited) {
+            setSettleAmount(totalOutstandingForSelected);
+        }
+
+        // This part calculates the final amount to be paid based on settlement and CD
+        if (form.paymentType === 'Full' || form.isBeingEdited) {
+            const newToBePaid = settleAmount - calculatedCdAmount;
+            setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
+        }
+    }, [totalOutstandingForSelected, settleAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+
+
     // Auto-fill logic for parchi number
     useEffect(() => {
         if (!form.isBeingEdited) {
@@ -170,13 +144,14 @@ export const useSupplierPayments = () => {
                 setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
     
-            setIsBeingEdited(true); // Signal that we are in edit mode
+            setIsBeingEdited(true);
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
             setPaymentType(paymentData.type);
-            handleToBePaidChange(paymentData.amount);
+            
             handleSettleAmountChange(paymentData.amount + (paymentData.cdAmount || 0));
+            handleToBePaidChange(paymentData.amount);
             
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
