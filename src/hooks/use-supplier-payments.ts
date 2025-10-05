@@ -88,43 +88,6 @@ export const useSupplierPayments = () => {
 
     const { calculatedCdAmount, ...cdProps } = cdHook;
     
-    useEffect(() => {
-        if (form.paymentType === 'Full') {
-            const newSettleAmount = totalOutstandingForSelected;
-            setSettleAmount(newSettleAmount);
-        } else { // Partial
-             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0 && !form.isBeingEdited) {
-                setSettleAmount(totalOutstandingForSelected);
-                setToBePaidAmount(totalOutstandingForSelected);
-             }
-        }
-    }, [form.paymentType, totalOutstandingForSelected, toBePaidAmount, form.isBeingEdited]);
-
-    useEffect(() => {
-        if (form.paymentType === 'Full' && !form.isBeingEdited) {
-            const newToBePaid = settleAmount - calculatedCdAmount;
-            setToBePaidAmount(newToBePaid);
-            form.setCalcTargetAmount(Math.round(newToBePaid));
-        }
-    }, [settleAmount, calculatedCdAmount, form.paymentType, form.setCalcTargetAmount, form.isBeingEdited]);
-
-    useEffect(() => {
-        if (form.paymentType === 'Partial' && !form.isBeingEdited) {
-            const newSettle = toBePaidAmount + calculatedCdAmount;
-            setSettleAmount(newSettle);
-        }
-    }, [toBePaidAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
-
-    useEffect(() => {
-        if (selectedEntries.length > 0 && !form.isBeingEdited) {
-            handleToBePaidChange(totalOutstandingForSelected);
-            handleSettleAmountChange(totalOutstandingForSelected);
-        } else if (!form.isBeingEdited) {
-             handleToBePaidChange(0);
-             handleSettleAmountChange(0);
-        }
-    }, [selectedEntries, totalOutstandingForSelected, form.isBeingEdited]);
-
     const handleSettleAmountChange = (value: number) => {
         setSettleAmount(value);
     };
@@ -133,7 +96,34 @@ export const useSupplierPayments = () => {
         setToBePaidAmount(value);
         form.setCalcTargetAmount(Math.round(value)); // Update target amount
     };
-    
+
+    useEffect(() => {
+        if (form.paymentType === 'Full') {
+            const newSettleAmount = totalOutstandingForSelected;
+            handleSettleAmountChange(newSettleAmount);
+        } else { // Partial
+             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0 && !form.isBeingEdited) {
+                handleSettleAmountChange(totalOutstandingForSelected);
+                handleToBePaidChange(totalOutstandingForSelected);
+             }
+        }
+    }, [totalOutstandingForSelected, form.paymentType, toBePaidAmount, form.isBeingEdited]);
+
+
+    useEffect(() => {
+        if (form.paymentType === 'Full' && !form.isBeingEdited) {
+            const newToBePaid = settleAmount - calculatedCdAmount;
+            handleToBePaidChange(newToBePaid);
+        }
+    }, [settleAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+
+    useEffect(() => {
+        if (form.paymentType === 'Partial' && !form.isBeingEdited) {
+            const newSettle = toBePaidAmount + calculatedCdAmount;
+            handleSettleAmountChange(newSettle);
+        }
+    }, [toBePaidAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+
     
     // Auto-fill logic for parchi number
     useEffect(() => {
@@ -148,8 +138,8 @@ export const useSupplierPayments = () => {
         form.setSelectedCustomerKey(key);
         if (!form.editingPayment) {
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
-            setSettleAmount(0);
-            setToBePaidAmount(0);
+            handleSettleAmountChange(0);
+            handleToBePaidChange(0);
         }
         if (key) {
             const customerData = data.customerSummaryMap.get(key);
@@ -189,8 +179,8 @@ export const useSupplierPayments = () => {
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
             setPaymentType(paymentData.type);
-            setToBePaidAmount(paymentData.amount);
-            setSettleAmount(paymentData.amount + (paymentData.cdAmount || 0));
+            handleToBePaidChange(paymentData.amount);
+            handleSettleAmountChange(paymentData.amount + (paymentData.cdAmount || 0));
             
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
@@ -259,8 +249,8 @@ export const useSupplierPayments = () => {
             if (form.rtgsFor === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
-                 setSettleAmount(0);
-                 setToBePaidAmount(0);
+                 handleSettleAmountChange(0);
+                 handleToBePaidChange(0);
                  setIsProcessing(false);
                  return;
             }
@@ -301,8 +291,8 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
             form.setEditingPayment(null);
             form.resetPaymentForm();
-            setSettleAmount(0);
-            setToBePaidAmount(0);
+            handleSettleAmountChange(0);
+            handleToBePaidChange(0);
         } finally {
             setIsProcessing(false);
         }
@@ -334,8 +324,8 @@ export const useSupplierPayments = () => {
                 setRtgsReceiptData(result.payment);
             }
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
-            setSettleAmount(0); 
-            setToBePaidAmount(0);
+            handleSettleAmountChange(0); 
+            handleToBePaidChange(0);
         } catch (error: any) {
             console.error("Error processing payment:", error);
             toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
@@ -351,8 +341,8 @@ export const useSupplierPayments = () => {
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
-              setSettleAmount(0);
-              setToBePaidAmount(0);
+              handleSettleAmountChange(0);
+              handleToBePaidChange(0);
             }
         } catch (error: any) {
             console.error("Error deleting payment:", error);
