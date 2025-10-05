@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 interface UseCashDiscountProps {
     totalOutstanding: number;
     paymentType: string;
-    paymentAmount: number; // The amount being entered by the user to pay
+    settleAmount: number; // The amount being settled from outstanding
     selectedEntries: any[];
     paymentDate: Date | undefined;
 }
@@ -14,7 +14,7 @@ interface UseCashDiscountProps {
 export const useCashDiscount = ({
     totalOutstanding,
     paymentType,
-    paymentAmount, // This is now treated as the "Settle Amount"
+    settleAmount,
     selectedEntries = [],
     paymentDate,
 }: UseCashDiscountProps) => {
@@ -44,7 +44,6 @@ export const useCashDiscount = ({
         }
 
         let baseAmountForCd = 0;
-        const settleAmount = paymentAmount || 0;
         const outstandingAmount = totalOutstanding || 0;
 
         switch (cdAt) {
@@ -66,9 +65,10 @@ export const useCashDiscount = ({
         }
         
         const calculatedCd = Math.round((baseAmountForCd * cdPercent) / 100);
+        // The actual CD cannot be more than the amount being settled
         return Math.min(calculatedCd, settleAmount);
 
-    }, [cdEnabled, eligibleForCd, paymentAmount, cdPercent, cdAt, totalOutstanding]);
+    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, cdAt, totalOutstanding]);
     
     return {
         cdEnabled,

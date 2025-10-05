@@ -50,7 +50,7 @@ export const PaymentForm = (props: any) => {
         processPayment, isProcessing, resetPaymentForm, editingPayment,
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
-        finalAmountToBePaid,
+        finalAmountToBePaid, handleToBePaidChange,
         calcTargetAmount, setCalcTargetAmount,
         minRate, setMinRate, maxRate, setMaxRate,
         selectPaymentAmount,
@@ -145,7 +145,7 @@ export const PaymentForm = (props: any) => {
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label className="text-xs font-bold text-green-600">To Be Paid</Label>
-                                <Input value={formatCurrency(finalAmountToBePaid)} readOnly className="h-8 text-xs font-bold text-green-600 border-green-500 bg-green-500/10" />
+                                <Input value={finalAmountToBePaid} onChange={(e) => handleToBePaidChange(parseFloat(e.target.value) || 0)} className="h-8 text-xs font-bold text-green-600 border-green-500 bg-green-500/10" />
                             </div>
                             
                             <div className="space-y-1 flex-grow min-w-[200px]">

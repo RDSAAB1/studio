@@ -47,7 +47,7 @@ export const useSupplierPayments = () => {
     const cdHook = useCashDiscount({
         totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
-        paymentAmount: form.paymentAmount,
+        settleAmount: form.paymentAmount,
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
     });
@@ -59,31 +59,46 @@ export const useSupplierPayments = () => {
 
     // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
-        const { setParchiNo, paymentType, setPaymentAmount, isBeingEdited } = form;
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
-        setParchiNo(srNos);
+        form.setParchiNo(srNos);
 
-        if (paymentType === 'Full' && !isBeingEdited) {
-            setPaymentAmount(totalOutstandingForSelected || 0);
+        if (form.paymentType === 'Full' && !form.isBeingEdited) {
+            form.setPaymentAmount(totalOutstandingForSelected || 0);
         }
     }, [form, selectedEntries, totalOutstandingForSelected]);
 
     // Smart auto-correction logic for partial payments
     useEffect(() => {
-        const { paymentType, paymentAmount, setPaymentAmount } = form;
+        const finalAmountToSettle = form.paymentAmount;
 
-        // If the intended settlement amount exceeds the outstanding, adjust it.
-        if (paymentAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
-            if (Math.abs(totalOutstandingForSelected - paymentAmount) > 0.01) {
-                 setPaymentAmount(Math.max(0, totalOutstandingForSelected));
+        if (finalAmountToSettle > totalOutstandingForSelected + 0.01) { // Add tolerance
+             const adjustedPaymentAmount = totalOutstandingForSelected;
+             if (Math.abs(form.paymentAmount - adjustedPaymentAmount) > 0.01) {
+                 form.setPaymentAmount(adjustedPaymentAmount);
                  toast({
                     title: "Payment Adjusted",
                     description: "Settle Amount cannot exceed Outstanding. It has been adjusted.",
                     variant: "default"
                  });
-            }
+             }
         }
     }, [form, totalOutstandingForSelected, toast]);
+
+    const handleToBePaidChange = useCallback((toBePaidValue: number) => {
+        if (cdHook.cdEnabled && cdHook.cdPercent > 0) {
+            let newSettleAmount = toBePaidValue;
+            if (cdHook.cdAt === 'partial_on_paid' || cdHook.cdAt === 'on_full_amount') {
+                // S = P / (1 - R)
+                newSettleAmount = toBePaidValue / (1 - (cdHook.cdPercent / 100));
+            } else if (cdHook.cdAt === 'on_unpaid_amount') {
+                // S = (P + O*R) / (1 + R)
+                newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdHook.cdPercent / 100)) / (1 + (cdHook.cdPercent / 100));
+            }
+            form.setPaymentAmount(Math.round(newSettleAmount));
+        } else {
+            form.setPaymentAmount(toBePaidValue);
+        }
+    }, [cdHook.cdEnabled, cdHook.cdPercent, cdHook.cdAt, totalOutstandingForSelected, form.setPaymentAmount]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -168,7 +183,7 @@ export const useSupplierPayments = () => {
                 setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
 
-            const { setCdEnabled, setCdPercent } = cdHook;
+            const { setCdEnabled, setCdPercent, setCdAt } = cdHook;
     
             setIsBeingEdited(true); // Signal that we are in edit mode
             setPaymentId(paymentData.paymentId);
@@ -300,6 +315,7 @@ export const useSupplierPayments = () => {
         ...form,
         ...cdHook,
         finalAmountToBePaid,
+        handleToBePaidChange,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
