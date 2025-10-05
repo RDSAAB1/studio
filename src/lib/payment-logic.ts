@@ -28,7 +28,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         rtgsAmount, paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, 
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
-        paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
+        paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo, // <<< parchiNo IS here
         rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
     } = context;
 
@@ -133,7 +133,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
             paidFor: rtgsFor === 'Supplier' ? paidForDetails : [], sixRNo,
-            sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '', parchiNo, utrNo, checkNo,
+            sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '', parchiNo: parchiNo || '', utrNo, checkNo,
             quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
             supplierName: toTitleCase(supplierDetails.name),
             supplierFatherName: toTitleCase(supplierDetails.fatherName),
