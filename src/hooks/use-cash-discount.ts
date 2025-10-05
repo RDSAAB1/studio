@@ -5,10 +5,11 @@ import { useState, useEffect, useMemo } from 'react';
 
 interface UseCashDiscountProps {
     paymentType: string;
-    settleAmount: number; // The amount being settled from outstanding
+    settleAmount: number;
     totalOutstanding: number;
     paymentDate: Date | undefined;
     selectedEntries: any[];
+    toBePaidAmount: number; // New prop for "To Be Paid" amount
 }
 
 export const useCashDiscount = ({
@@ -17,10 +18,13 @@ export const useCashDiscount = ({
     totalOutstanding,
     paymentDate,
     selectedEntries = [],
+    toBePaidAmount,
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
+    
+    // "cdAt" is no longer needed as the logic is now directly tied to paymentType
+    // const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
 
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
@@ -39,23 +43,18 @@ export const useCashDiscount = ({
     }, [eligibleForCd]);
 
     const calculatedCdAmount = useMemo(() => {
-        if (!cdEnabled || !eligibleForCd) {
+        if (!cdEnabled || !eligibleForCd || cdPercent <= 0) {
             return 0;
         }
 
         let baseAmountForCd = 0;
         
         if (paymentType === 'Full') {
-            baseAmountForCd = settleAmount; // In full payment, settle amount is the outstanding.
-        } else { // Partial
-             if (cdAt === 'partial_on_paid') {
-                 // CD is on the amount being settled.
-                 baseAmountForCd = settleAmount;
-            } else if (cdAt === 'on_unpaid_amount') {
-                baseAmountForCd = Math.max(0, totalOutstanding - settleAmount);
-            } else if (cdAt === 'on_full_amount') {
-                baseAmountForCd = totalOutstanding;
-            }
+            // In Full payment, CD is always on the settle amount (which is the total outstanding)
+            baseAmountForCd = settleAmount;
+        } else { // Partial payment
+            // As per the new request, CD for partial payments is on the "To Be Paid" amount.
+            baseAmountForCd = toBePaidAmount;
         }
         
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
@@ -63,18 +62,19 @@ export const useCashDiscount = ({
         }
         
         const calculatedCd = (baseAmountForCd * cdPercent) / 100;
-        // The actual CD cannot be more than the amount being settled
-        return Math.min(calculatedCd, settleAmount);
+        
+        // Final sanity check: CD cannot be more than the amount being paid/settled.
+        const maxCdAllowed = paymentType === 'Full' ? settleAmount : toBePaidAmount;
+        
+        return Math.min(calculatedCd, maxCdAllowed);
 
-    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, cdAt, totalOutstanding, paymentType]);
+    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount]);
     
     return {
         cdEnabled,
         setCdEnabled,
         cdPercent,
         setCdPercent,
-        cdAt,
-        setCdAt,
         calculatedCdAmount,
     };
 };
