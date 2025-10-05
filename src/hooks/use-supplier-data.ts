@@ -330,6 +330,3 @@ export const useSupplierData = () => {
         financialState,
     };
 };
-
-    
-    
