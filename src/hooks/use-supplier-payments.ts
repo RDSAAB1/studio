@@ -35,14 +35,18 @@ export const useSupplierPayments = () => {
     const [activeTab, setActiveTab] = useState('processing');
     
     const selectedEntries = useMemo(() => {
-        if (!form.selectedEntryIds) return [];
         const safeSuppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
         return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
     }, [data.suppliers, form.selectedEntryIds]);
     
      const totalOutstandingForSelected = useMemo(() => {
+        // When editing, exclude the payment being edited from the calculation
+        const paymentHistoryToConsider = form.editingPayment
+            ? data.paymentHistory.filter((p: Payment) => p.id !== form.editingPayment.id)
+            : data.paymentHistory;
+
         return selectedEntries.reduce((sum, entry) => {
-            const paymentsForThisEntry = data.paymentHistory.filter((p: Payment) =>
+            const paymentsForThisEntry = paymentHistoryToConsider.filter((p: Payment) =>
                 p.paidFor?.some(pf => pf.srNo === entry.srNo)
             );
             
@@ -68,7 +72,7 @@ export const useSupplierPayments = () => {
             const currentOutstanding = (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
             return sum + (currentOutstanding > 0 ? currentOutstanding : 0);
         }, 0);
-    }, [selectedEntries, data.paymentHistory]);
+    }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -89,37 +93,37 @@ export const useSupplierPayments = () => {
             const newSettleAmount = totalOutstandingForSelected;
             setSettleAmount(newSettleAmount);
         } else { // Partial
-             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0) {
+             if (totalOutstandingForSelected > 0 && toBePaidAmount === 0 && !form.isBeingEdited) {
                 setSettleAmount(totalOutstandingForSelected);
                 setToBePaidAmount(totalOutstandingForSelected);
              }
         }
-    }, [form.paymentType, totalOutstandingForSelected]);
+    }, [form.paymentType, totalOutstandingForSelected, toBePaidAmount, form.isBeingEdited]);
 
     useEffect(() => {
-        if (form.paymentType === 'Full') {
+        if (form.paymentType === 'Full' && !form.isBeingEdited) {
             const newToBePaid = settleAmount - calculatedCdAmount;
             setToBePaidAmount(newToBePaid);
             form.setCalcTargetAmount(Math.round(newToBePaid));
         }
-    }, [settleAmount, calculatedCdAmount, form.paymentType, form.setCalcTargetAmount]);
+    }, [settleAmount, calculatedCdAmount, form.paymentType, form.setCalcTargetAmount, form.isBeingEdited]);
 
     useEffect(() => {
-        if (form.paymentType === 'Partial') {
+        if (form.paymentType === 'Partial' && !form.isBeingEdited) {
             const newSettle = toBePaidAmount + calculatedCdAmount;
             setSettleAmount(newSettle);
         }
-    }, [toBePaidAmount, calculatedCdAmount, form.paymentType]);
+    }, [toBePaidAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
 
     useEffect(() => {
-        if (selectedEntries.length > 0) {
+        if (selectedEntries.length > 0 && !form.isBeingEdited) {
             handleToBePaidChange(totalOutstandingForSelected);
             handleSettleAmountChange(totalOutstandingForSelected);
-        } else {
+        } else if (!form.isBeingEdited) {
              handleToBePaidChange(0);
              handleSettleAmountChange(0);
         }
-    }, [selectedEntries, totalOutstandingForSelected]);
+    }, [selectedEntries, totalOutstandingForSelected, form.isBeingEdited]);
 
     const handleSettleAmountChange = (value: number) => {
         setSettleAmount(value);
@@ -133,9 +137,11 @@ export const useSupplierPayments = () => {
     
     // Auto-fill logic for parchi number
     useEffect(() => {
-        const srNos = selectedEntries.map(e => e.srNo).join(', ');
-        form.setParchiNo(srNos);
-    }, [selectedEntries, form.setParchiNo]);
+        if (!form.isBeingEdited) {
+            const srNos = selectedEntries.map(e => e.srNo).join(', ');
+            form.setParchiNo(srNos);
+        }
+    }, [selectedEntries, form.setParchiNo, form.isBeingEdited]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -182,10 +188,10 @@ export const useSupplierPayments = () => {
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            setSettleAmount(paymentData.amount + (paymentData.cdAmount || 0));
-            setToBePaidAmount(paymentData.amount);
-            
             setPaymentType(paymentData.type);
+            setToBePaidAmount(paymentData.amount);
+            setSettleAmount(paymentData.amount + (paymentData.cdAmount || 0));
+            
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
             
