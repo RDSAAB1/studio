@@ -40,8 +40,6 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, form.selectedEntryIds]);
     
     const totalOutstandingForSelected = useMemo(() => {
-        // When editing, temporarily add back the payment amount to the outstanding balance
-        // to allow for modification without "exceeding" errors.
         const editingPaymentAmount = form.editingPayment?.paidFor
             ?.filter(pf => form.selectedEntryIds.has(pf.srNo))
             .reduce((sum, pf) => sum + pf.amount, 0) || 0;
@@ -80,19 +78,16 @@ export const useSupplierPayments = () => {
         form.setCalcTargetAmount(Math.round(value)); // Update target amount
     };
     
-    // This combined useEffect replaces the two conflicting ones.
     useEffect(() => {
-        // This part sets the settle amount when entries are selected/changed
         if (form.paymentType === 'Full' && totalOutstandingForSelected > 0 && !form.isBeingEdited) {
             setSettleAmount(totalOutstandingForSelected);
         }
-
-        // This part calculates the final amount to be paid based on settlement and CD
-        if (form.paymentType === 'Full' || form.isBeingEdited) {
-            const newToBePaid = settleAmount - calculatedCdAmount;
-            setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
-        }
-    }, [totalOutstandingForSelected, settleAmount, calculatedCdAmount, form.paymentType, form.isBeingEdited]);
+    }, [totalOutstandingForSelected, form.paymentType, form.isBeingEdited]);
+    
+    useEffect(() => {
+        const newToBePaid = settleAmount - calculatedCdAmount;
+        setToBePaidAmount(newToBePaid > 0 ? newToBePaid : 0);
+    }, [settleAmount, calculatedCdAmount]);
 
 
     // Auto-fill logic for parchi number
