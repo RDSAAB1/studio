@@ -32,6 +32,7 @@ export const useSupplierPayments = () => {
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('processing');
+    const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     
     const selectedEntries = useMemo(() => {
         if (!form.selectedEntryIds) return [];
@@ -82,6 +83,8 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
+             // Automatically open the outstanding entries modal when a supplier is selected
+            setIsOutstandingModalOpen(true);
         }
     };
 
@@ -119,7 +122,7 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete, false); 
+            await handleDeletePaymentLogic(paymentToDelete, data.suppliers); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
@@ -264,14 +267,17 @@ export const useSupplierPayments = () => {
 
     const finalAmountToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-             return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
+             return (totalOutstandingForSelected || 0) - (cdHook.calculatedCdAmount || 0);
         }
         return form.paymentAmount || 0;
-    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType]);
+    }, [form.paymentAmount, totalOutstandingForSelected, cdHook.calculatedCdAmount, form.paymentType]);
 
     const finalAmountToSettle = useMemo(() => {
+        if (form.paymentType === 'Full') {
+            return totalOutstandingForSelected || 0;
+        }
         return (form.paymentAmount || 0) + (cdHook.calculatedCdAmount || 0);
-    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
@@ -294,6 +300,8 @@ export const useSupplierPayments = () => {
         setSelectedPaymentForDetails,
         isBankSettingsOpen,
         setIsBankSettingsOpen,
+        isOutstandingModalOpen,
+        setIsOutstandingModalOpen,
         rtgsReceiptData,
         setRtgsReceiptData,
         activeTab, setActiveTab,
