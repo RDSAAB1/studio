@@ -48,18 +48,17 @@ export const useSupplierPayments = () => {
         totalOutstanding: totalOutstandingForSelected,
         paymentType: form.paymentType,
         settleAmount: form.paymentAmount,
+        toBePaidAmount: form.finalAmountToBePaid, // Pass this for partial calculations
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
     });
     
+    // "To Be Paid" is what's actually paid out.
     const finalAmountToBePaid = useMemo(() => {
         return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
     }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
-    const finalAmountToSettle = useMemo(() => {
-        return form.paymentAmount;
-    }, [form.paymentAmount]);
-
+    
     // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
@@ -70,44 +69,20 @@ export const useSupplierPayments = () => {
         }
     }, [form.paymentType, form.isBeingEdited, totalOutstandingForSelected, selectedEntries, form.setParchiNo, form.setPaymentAmount]);
 
-    // Smart auto-correction logic for partial payments
-    useEffect(() => {
-        const { paymentAmount, setPaymentAmount } = form;
-
-        if (paymentAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
-             const adjustedPaymentAmount = totalOutstandingForSelected;
-             if (Math.abs(paymentAmount - adjustedPaymentAmount) > 0.01) {
-                 setPaymentAmount(adjustedPaymentAmount);
-                 toast({
-                    title: "Payment Adjusted",
-                    description: "Settle Amount cannot exceed Outstanding. It has been adjusted.",
-                    variant: "default"
-                 });
-             }
-        }
-    }, [form, totalOutstandingForSelected, toast]);
 
     const handleToBePaidChange = useCallback((toBePaidValue: number) => {
-        const { cdEnabled, cdPercent, cdAt } = cdHook;
+        const { cdEnabled, cdPercent } = cdHook;
         const { setPaymentAmount } = form;
 
-        if (cdEnabled && cdPercent > 0) {
-            let newSettleAmount = toBePaidValue;
-            if (cdAt === 'partial_on_paid') {
-                 if (cdPercent < 100) {
-                    newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
-                 }
-            } else if (cdAt === 'on_unpaid_amount') {
-                 newSettleAmount = (toBePaidValue + totalOutstandingForSelected * (cdPercent / 100)) / (1 + (cdPercent / 100));
-            } else if (cdAt === 'on_full_amount') {
-                 const fullCd = totalOutstandingForSelected * (cdPercent / 100);
-                 newSettleAmount = toBePaidValue + fullCd;
-            }
+        if (cdEnabled && cdPercent > 0 && toBePaidValue > 0) {
+            // Reverse calculate the settle amount based on the amount to be paid
+            const newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
             setPaymentAmount(Math.round(newSettleAmount));
         } else {
+            // If no CD, then settle amount is the same as to be paid amount
             setPaymentAmount(toBePaidValue);
         }
-    }, [cdHook, form, totalOutstandingForSelected]);
+    }, [cdHook, form]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -328,7 +303,6 @@ export const useSupplierPayments = () => {
         ...cdHook,
         finalAmountToBePaid,
         handleToBePaidChange,
-        finalAmountToSettle,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,

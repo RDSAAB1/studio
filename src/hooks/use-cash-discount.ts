@@ -4,19 +4,21 @@
 import { useState, useEffect, useMemo } from 'react';
 
 interface UseCashDiscountProps {
-    totalOutstanding: number;
     paymentType: string;
     settleAmount: number; // The amount being settled from outstanding
-    selectedEntries: any[];
+    toBePaidAmount: number; // The actual cash/bank payment being made
+    totalOutstanding: number;
     paymentDate: Date | undefined;
+    selectedEntries: any[];
 }
 
 export const useCashDiscount = ({
-    totalOutstanding,
     paymentType,
     settleAmount,
-    selectedEntries = [],
+    toBePaidAmount,
+    totalOutstanding,
     paymentDate,
+    selectedEntries = [],
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
@@ -44,31 +46,31 @@ export const useCashDiscount = ({
         }
 
         let baseAmountForCd = 0;
-        const outstandingAmount = totalOutstanding || 0;
-
-        switch (cdAt) {
-            case 'partial_on_paid':
-                baseAmountForCd = settleAmount;
-                break;
-            case 'on_unpaid_amount':
-                baseAmountForCd = Math.max(0, outstandingAmount - settleAmount);
-                break;
-            case 'on_full_amount':
-                baseAmountForCd = outstandingAmount;
-                break;
-            default:
-                baseAmountForCd = 0;
+        
+        if (paymentType === 'Full') {
+            baseAmountForCd = totalOutstanding;
+        } else { // Partial
+            if (cdAt === 'partial_on_paid') {
+                 // In partial, the CD is on the amount being settled (which is to be paid + cd itself)
+                 // This creates a circular dependency if not handled carefully.
+                 // Let's assume CD is on the "To Be Paid" amount for simplicity in this case.
+                 baseAmountForCd = toBePaidAmount;
+            } else if (cdAt === 'on_unpaid_amount') {
+                baseAmountForCd = Math.max(0, totalOutstanding - settleAmount);
+            } else if (cdAt === 'on_full_amount') {
+                baseAmountForCd = totalOutstanding;
+            }
         }
         
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
             return 0;
         }
         
-        const calculatedCd = Math.round((baseAmountForCd * cdPercent) / 100);
+        const calculatedCd = (baseAmountForCd * cdPercent) / 100;
         // The actual CD cannot be more than the amount being settled
         return Math.min(calculatedCd, settleAmount);
 
-    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, cdAt, totalOutstanding]);
+    }, [cdEnabled, eligibleForCd, settleAmount, toBePaidAmount, cdPercent, cdAt, totalOutstanding, paymentType]);
     
     return {
         cdEnabled,
