@@ -52,11 +52,11 @@ export const useSupplierPayments = () => {
         paymentDate: form.paymentDate,
     });
 
+    // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
 
-        // Auto-fill logic
         if (form.paymentType === 'Full' && !form.isBeingEdited) {
             form.setPaymentAmount(totalOutstandingForSelected || 0);
         }
@@ -67,11 +67,16 @@ export const useSupplierPayments = () => {
         const { paymentType, paymentAmount, setPaymentAmount } = form;
         const { calculatedCdAmount } = cdHook;
 
+        // This check is crucial for partial payments to prevent over-settlement
         if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
             const settleAmount = (paymentAmount || 0) + (calculatedCdAmount || 0);
+            
             if (settleAmount > totalOutstandingForSelected) {
+                // Adjust the payment amount so that payment + CD equals the outstanding amount
                 const newPaymentAmount = totalOutstandingForSelected - (calculatedCdAmount || 0);
-                if (newPaymentAmount !== paymentAmount) {
+                
+                // Only update if the change is significant, to avoid loops
+                if (Math.abs(newPaymentAmount - (paymentAmount || 0)) > 0.01) {
                      setPaymentAmount(Math.max(0, newPaymentAmount));
                      toast({
                         title: "Payment Adjusted",
@@ -81,7 +86,7 @@ export const useSupplierPayments = () => {
                 }
             }
         }
-    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected, form.setPaymentAmount, toast]);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected, form, toast]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -293,11 +298,8 @@ export const useSupplierPayments = () => {
 
 
     const finalAmountToSettle = useMemo(() => {
-        if (form.paymentType === 'Full') {
-            return totalOutstandingForSelected || 0;
-        }
-        return (form.paymentAmount || 0) + (cdHook.calculatedCdAmount || 0);
-    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected]);
+       return (form.paymentAmount || 0) + (cdHook.calculatedCdAmount || 0);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
