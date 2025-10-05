@@ -54,27 +54,25 @@ export const useSupplierPayments = () => {
 
     // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
+        const { setParchiNo, paymentType, setPaymentAmount, isBeingEdited } = form;
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
-        form.setParchiNo(srNos);
+        setParchiNo(srNos);
 
-        if (form.paymentType === 'Full' && !form.isBeingEdited) {
-            form.setPaymentAmount(totalOutstandingForSelected || 0);
+        if (paymentType === 'Full' && !isBeingEdited) {
+            setPaymentAmount(totalOutstandingForSelected || 0);
         }
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.isBeingEdited, form.setParchiNo, form.setPaymentAmount]);
+    }, [selectedEntries, form]);
 
     // Smart auto-correction logic for partial payments
     useEffect(() => {
         const { paymentType, paymentAmount, setPaymentAmount } = form;
 
-        // For partial payments, ensure the settlement amount doesn't exceed the outstanding amount.
         if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
-            const currentSettlement = (paymentAmount || 0);
+            const finalSettleAmount = paymentAmount; // In partial, the payable amount is the settlement amount from supplier's POV.
             
-            if (currentSettlement > totalOutstandingForSelected) {
-                // Adjust payment amount so that the total settlement equals the outstanding.
+            if (finalSettleAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
                 const newPaymentAmount = totalOutstandingForSelected;
                 
-                // Only update if the change is significant, to avoid loops
                 if (Math.abs(newPaymentAmount - (paymentAmount || 0)) > 0.01) {
                      setPaymentAmount(Math.max(0, newPaymentAmount));
                      toast({
@@ -85,7 +83,7 @@ export const useSupplierPayments = () => {
                 }
             }
         }
-    }, [form.paymentAmount, form.paymentType, totalOutstandingForSelected, form, toast]);
+    }, [form, totalOutstandingForSelected, toast]);
 
 
     const handleCustomerSelect = (key: string | null) => {
