@@ -92,10 +92,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             let cdToDistribute = Math.round(calculatedCdAmount);
             const sortedEntries = supplierDocsToUpdate.sort((a, b) => new Date(a.data.date).getTime() - new Date(b.data.date).getTime());
 
-            for (const entryData of sortedEntries) {
+            for (const entry of sortedEntries) {
                 if (amountToDistribute <= 0 && cdToDistribute <= 0) break;
                 
-                const currentSupplierData = entryData.data;
+                // CRITICAL FIX: Fetch the most current state of the document WITHIN the transaction
+                const supplierDoc = await transaction.get(entry.ref);
+                if (!supplierDoc.exists()) continue; // Should not happen, but a safeguard
+                const currentSupplierData = supplierDoc.data() as Customer;
                 const outstanding = Number(currentSupplierData.netAmount);
 
                 const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
@@ -104,20 +107,20 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 
                 if (paymentForThisEntry > 0 || cdForThisEntry > 0) {
                     paidForDetails.push({
-                        srNo: entryData.data.srNo, 
+                        srNo: currentSupplierData.srNo, 
                         amount: paymentForThisEntry,
                         cdApplied: cdEnabled,
-                        supplierName: toTitleCase(entryData.data.name), 
-                        supplierSo: toTitleCase(entryData.data.so),
-                        supplierContact: entryData.data.contact,
+                        supplierName: toTitleCase(currentSupplierData.name), 
+                        supplierSo: toTitleCase(currentSupplierData.so),
+                        supplierContact: currentSupplierData.contact,
                     });
                     const newNetAmount = outstanding - paymentForThisEntry - cdForThisEntry;
                     
                     if (newNetAmount < -0.01) { // Small tolerance for floating point issues
-                         throw new Error(`Overpayment on SR# ${entryData.data.srNo}. Outstanding: ${formatCurrency(outstanding)}, Settlement: ${formatCurrency(paymentForThisEntry + cdForThisEntry)}.`);
+                         throw new Error(`Overpayment on SR# ${currentSupplierData.srNo}. Outstanding: ${formatCurrency(outstanding)}, Settlement: ${formatCurrency(paymentForThisEntry + cdForThisEntry)}.`);
                     }
 
-                    transaction.update(entryData.ref, { netAmount: newNetAmount < 0 ? 0 : newNetAmount });
+                    transaction.update(entry.ref, { netAmount: newNetAmount < 0 ? 0 : newNetAmount });
                 }
                 amountToDistribute -= paymentForThisEntry;
                 cdToDistribute -= cdForThisEntry;
@@ -211,7 +214,7 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
                         const currentSupplier = supplierDoc.data() as Customer;
                         let amountToRestore = detail.amount;
                         if (paymentData.cdApplied && paymentData.cdAmount && paymentData.paidFor.length > 0) {
-                            const totalPaidInTx = paymentData.paidFor.reduce((s, pf) => s + pf.amount, 0);
+                            const totalPaidInTx = paymentData.paidFor.reduce((s: number, pf: any) => s + pf.amount, 0);
                             if (totalPaidInTx > 0) {
                                 const proportion = detail.amount / totalPaidInTx;
                                 amountToRestore += paymentData.cdAmount * proportion;
