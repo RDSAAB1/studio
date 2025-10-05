@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
@@ -20,7 +20,9 @@ import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
+import { DetailsDialog } from "@/components/sales/details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
+import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -89,7 +91,9 @@ export default function SupplierEntryClient() {
   const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-  
+  const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
+  const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -384,51 +388,74 @@ export default function SupplierEntryClient() {
         toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
         return;
     }
+
     try {
+        const entryToDelete = safeSuppliers.find(s => s.id === id);
+        if (!entryToDelete) {
+            toast({ title: "Entry not found.", variant: "destructive" });
+            return;
+        }
+
+        const associatedPayments = safePaymentHistory.filter(p =>
+            p.paidFor?.some(pf => pf.srNo === entryToDelete.srNo)
+        );
+
+        for (const payment of associatedPayments) {
+            await handleDeletePaymentLogic(payment, safeSuppliers);
+        }
+
         await deleteSupplier(id);
-        toast({ title: "Entry deleted.", variant: "success" });
+
+        toast({ title: "Entry and associated payments deleted.", variant: "success" });
         if (currentSupplier.id === id) {
             handleNew();
         }
     } catch (error) {
-        console.error("Error deleting supplier entry: ", error);
+        console.error("Error deleting supplier and payments: ", error);
         toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
   };
 
 
-  const executeSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+  const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     
     const isForcedUnique = values.forceUnique || false;
 
-    const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(values, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
-    
     const completeEntry: Customer = {
-        ...calculatedState,
-        id: values.srNo,
+        ...currentSupplier,
+        ...values,
+        id: values.srNo, // Use srNo as ID
         date: format(values.date, 'yyyy-MM-dd'),
+        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: isForcedUnique
-            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}`
+        customerId: isForcedUnique 
+            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
             : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
         forceUnique: isForcedUnique,
-        // Ensure netAmount is always originalNetAmount on save
-        netAmount: calculatedState.originalNetAmount,
     };
-    
+
+
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
           await deleteSupplier(currentSupplier.id);
         }
-        
-        const savedEntry = await addSupplier(completeEntry);
+
+        if (deletePayments) {
+            await deletePaymentsForSrNo(completeEntry.srNo);
+            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+            await addSupplier(updatedEntry);
+            if (callback) callback(updatedEntry); else handleNew();
+        } else {
+            await addSupplier(completeEntry);
+            if (callback) callback(completeEntry); else handleNew();
+        }
+
         toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-        if (callback) callback(savedEntry); else handleNew();
 
     } catch (error) {
         console.error("Error saving supplier:", error);
@@ -438,9 +465,17 @@ export default function SupplierEntryClient() {
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
     if (suggestedSupplier && !values.forceUnique) {
-      return; 
+      return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
-    executeSubmit(values, callback);
+    if (isEditing) {
+        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
+        if (hasPayments) {
+            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+            setIsUpdateConfirmOpen(true);
+            return;
+        }
+    }
+    executeSubmit(values, false, callback);
   };
 
   const handleSaveAndPrint = async () => {
@@ -459,10 +494,10 @@ export default function SupplierEntryClient() {
     const fullData = {
         ...supplier,
         allTransactions: [supplier],
-        allPayments: paymentHistory?.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
+        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
     };
     setDetailsSupplier(fullData);
-  };
+  }
   
   const handleSinglePrint = (entry: Customer) => {
     setReceiptsToPrint([entry]);
@@ -519,7 +554,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, safePaymentHistory, [], 800000, []);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -616,6 +651,8 @@ export default function SupplierEntryClient() {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
+            setSuppliers([]);
+            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
@@ -764,14 +801,21 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
-      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsSupplier} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
+      <DetailsDialog
+        isOpen={!!detailsSupplier}
+        onOpenChange={() => setDetailsSupplier(null)}
+        customer={detailsSupplier}
+        paymentHistory={paymentHistory}
+      />
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}
@@ -788,6 +832,16 @@ export default function SupplierEntryClient() {
       <ReceiptSettingsDialog
         settings={receiptSettings}
         setSettings={setReceiptSettings}
+      />
+
+      <UpdateConfirmDialog
+        isOpen={isUpdateConfirmOpen}
+        onOpenChange={setIsUpdateConfirmOpen}
+        onConfirm={(deletePayments) => {
+            if(updateAction) {
+                updateAction(deletePayments);
+            }
+        }}
       />
     </div>
   );

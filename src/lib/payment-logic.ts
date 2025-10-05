@@ -195,3 +195,4 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
         await db.payments.delete(paymentToDelete.id);
     }
 };
+
