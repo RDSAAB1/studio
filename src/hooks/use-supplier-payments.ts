@@ -51,6 +51,7 @@ export const useSupplierPayments = () => {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
+                
                 let cdForThisPortion = 0;
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((s, pf) => s + pf.amount, 0);
@@ -306,6 +307,8 @@ export const useSupplierPayments = () => {
         form.setRtgsQuantity(option.quantity);
         form.setRtgsRate(option.rate);
         form.setRtgsAmount(option.calculatedAmount);
+        form.setPaymentType('Partial');
+        handleToBePaidChange(option.calculatedAmount);
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
 
