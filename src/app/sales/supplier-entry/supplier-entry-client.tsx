@@ -381,97 +381,56 @@ export default function SupplierEntryClient() {
     }
   };
 
-const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!id) {
-      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
-      return;
+        toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+        return;
     }
-
     try {
-        const entryToDelete = safeSuppliers.find(s => s.id === id);
-        if (!entryToDelete) {
-            toast({ title: "Entry not found.", variant: "destructive" });
-            return;
-        }
-
-        const associatedPayments = safePaymentHistory.filter(p =>
-            p.paidFor?.some(pf => pf.srNo === entryToDelete.srNo)
-        );
-
-        for (const payment of associatedPayments) {
-            await handleDeletePaymentLogic(payment, safePaymentHistory);
-        }
-
         await deleteSupplier(id);
-
-        toast({ title: "Entry and associated payments deleted.", variant: "success" });
+        toast({ title: "Entry deleted.", variant: "success" });
         if (currentSupplier.id === id) {
             handleNew();
         }
     } catch (error) {
-        console.error("Error deleting supplier and payments: ", error);
+        console.error("Error deleting supplier entry: ", error);
         toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
-};
+  };
 
-  const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    
+
+  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+    if (suggestedSupplier && !values.forceUnique) {
+        return; // Do not submit if a suggestion is active and user hasn't chosen an action
+    }
+
     const isForcedUnique = values.forceUnique || false;
-
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
-        id: values.srNo, // Use srNo as ID
+        id: values.srNo,
         date: format(values.date, 'yyyy-MM-dd'),
-        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
+        dueDate: currentSupplier.dueDate,
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: isForcedUnique 
-            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
+        customerId: isForcedUnique
+            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}`
             : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
         forceUnique: isForcedUnique,
     };
 
-
     try {
-        if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          await deleteSupplier(currentSupplier.id);
-        }
-
-        if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
-            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            await addSupplier(updatedEntry);
-            toast({ title: "Entry updated and payments deleted.", variant: "success" });
-            if (callback) callback(updatedEntry); else handleNew();
-        } else {
-            const savedEntry = await addSupplier(completeEntry);
-            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            if (callback) callback(savedEntry); else handleNew();
-        }
+        const savedEntry = await addSupplier(completeEntry);
+        toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
+        if (callback) callback(savedEntry); else handleNew();
     } catch (error) {
         console.error("Error saving supplier:", error);
         toast({ title: "Failed to save entry.", variant: "destructive" });
     }
-  };
-
-  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
-    if (suggestedSupplier && !values.forceUnique) {
-      return; // Do not submit if a suggestion is active and user hasn't chosen an action
-    }
-    if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
-        if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
-            setIsUpdateConfirmOpen(true);
-            return;
-        }
-    }
-    executeSubmit(values, false, callback);
   };
 
   const handleSaveAndPrint = async () => {
@@ -826,5 +785,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-    
