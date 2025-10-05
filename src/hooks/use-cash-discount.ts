@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 interface UseCashDiscountProps {
     totalOutstanding: number;
     paymentType: string;
+    paymentAmount: number; // The amount being entered by the user to pay
     selectedEntries: any[];
     paymentDate: Date | undefined;
 }
@@ -13,12 +14,13 @@ interface UseCashDiscountProps {
 export const useCashDiscount = ({
     totalOutstanding,
     paymentType,
+    paymentAmount,
     selectedEntries = [],
     paymentDate,
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
-    const [cdAt, setCdAt] = useState('on_unpaid_amount');
+    const [cdAt, setCdAt] = useState('partial_on_paid');
 
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
@@ -42,41 +44,36 @@ export const useCashDiscount = ({
         }
 
         let baseAmountForCd = 0;
+        const currentPaymentAmount = paymentAmount || 0;
         
         switch (cdAt) {
             case 'on_full_amount':
                  baseAmountForCd = totalOutstanding;
                 break;
             case 'on_unpaid_amount':
-                baseAmountForCd = totalOutstanding;
+                const remainingAfterPayment = totalOutstanding - currentPaymentAmount;
+                baseAmountForCd = remainingAfterPayment > 0 ? remainingAfterPayment : 0;
                 break;
             case 'partial_on_paid':
-                // For partial, CD is on the amount being paid from the eligible entries
-                const eligibleOutstanding = selectedEntries.reduce((sum, entry) => {
-                    const dueDate = new Date(entry.dueDate);
-                    const effectiveDate = paymentDate ? new Date(paymentDate) : new Date();
-                    return effectiveDate <= dueDate ? sum + (entry.netAmount || 0) : sum;
-                }, 0);
-                baseAmountForCd = Math.min(totalOutstanding, eligibleOutstanding);
+                baseAmountForCd = currentPaymentAmount;
                 break;
             default:
                 baseAmountForCd = 0;
         }
         
-        // Safety check to prevent NaN
-        if (isNaN(baseAmountForCd)) {
+        if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
             return 0;
         }
 
         return Math.round((baseAmountForCd * cdPercent) / 100);
 
-    }, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentDate, eligibleForCd, totalOutstanding]);
+    }, [cdEnabled, cdPercent, cdAt, paymentAmount, totalOutstanding, eligibleForCd]);
     
     useEffect(() => {
         if (paymentType === 'Full') {
             setCdAt('on_full_amount');
         } else if (paymentType === 'Partial') {
-            setCdAt('on_unpaid_amount');
+            setCdAt('partial_on_paid');
         }
     }, [paymentType]);
 
