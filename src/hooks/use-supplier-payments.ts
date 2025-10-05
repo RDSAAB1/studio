@@ -65,28 +65,27 @@ export const useSupplierPayments = () => {
     // Smart auto-correction logic for partial payments
     useEffect(() => {
         const { paymentType, paymentAmount, setPaymentAmount } = form;
-        const { calculatedCdAmount } = cdHook;
 
-        // This check is crucial for partial payments to prevent over-settlement
+        // For partial payments, ensure the settlement amount doesn't exceed the outstanding amount.
         if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
-            const settleAmount = (paymentAmount || 0) + (calculatedCdAmount || 0);
+            const currentSettlement = (paymentAmount || 0);
             
-            if (settleAmount > totalOutstandingForSelected) {
-                // Adjust the payment amount so that payment + CD equals the outstanding amount
-                const newPaymentAmount = totalOutstandingForSelected - (calculatedCdAmount || 0);
+            if (currentSettlement > totalOutstandingForSelected) {
+                // Adjust payment amount so that the total settlement equals the outstanding.
+                const newPaymentAmount = totalOutstandingForSelected;
                 
                 // Only update if the change is significant, to avoid loops
                 if (Math.abs(newPaymentAmount - (paymentAmount || 0)) > 0.01) {
                      setPaymentAmount(Math.max(0, newPaymentAmount));
                      toast({
                         title: "Payment Adjusted",
-                        description: "Payment amount adjusted to match outstanding balance with CD.",
+                        description: "Payable amount was adjusted to match the outstanding balance.",
                         variant: "default"
                      });
                 }
             }
         }
-    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected, form, toast]);
+    }, [form.paymentAmount, form.paymentType, totalOutstandingForSelected, form, toast]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -298,8 +297,8 @@ export const useSupplierPayments = () => {
 
 
     const finalAmountToSettle = useMemo(() => {
-       return (form.paymentAmount || 0) + (cdHook.calculatedCdAmount || 0);
-    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
+       return (form.paymentAmount || 0);
+    }, [form.paymentAmount]);
 
 
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
