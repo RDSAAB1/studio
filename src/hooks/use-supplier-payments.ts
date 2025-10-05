@@ -39,8 +39,10 @@ export const useSupplierPayments = () => {
     
     const selectedEntries = useMemo(() => {
         const safeSuppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
-        return safeSuppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
-    }, [data.suppliers, form.selectedEntryIds]);
+        const profile = data.customerSummaryMap.get(form.selectedCustomerKey || '');
+        if (!profile) return [];
+        return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+    }, [data.suppliers, form.selectedEntryIds, form.selectedCustomerKey, data.customerSummaryMap]);
     
      const totalOutstandingForSelected = useMemo(() => {
         if (!selectedEntries || selectedEntries.length === 0) return 0;
