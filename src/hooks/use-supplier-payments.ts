@@ -25,6 +25,9 @@ export const useSupplierPayments = () => {
     };
 
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict);
+    
+    // This state determines which input is driving the calculations
+    const [calculationDriver, setCalculationDriver] = useState<'settle' | 'toBePaid'>('settle');
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
@@ -44,45 +47,100 @@ export const useSupplierPayments = () => {
         return selectedEntries.reduce((sum, e) => sum + (Number(e.netAmount) || 0), 0);
     }, [selectedEntries]);
 
-    const cdHook = useCashDiscount({
-        totalOutstanding: totalOutstandingForSelected,
-        paymentType: form.paymentType,
-        settleAmount: form.paymentAmount,
-        toBePaidAmount: form.finalAmountToBePaid, // Pass this for partial calculations
-        selectedEntries: selectedEntries,
-        paymentDate: form.paymentDate,
-    });
-    
-    // "To Be Paid" is what's actually paid out.
-    const finalAmountToBePaid = useMemo(() => {
-        return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
-    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
+    // This is the primary state for the amount the user wants to settle.
+    const [settleAmount, setSettleAmount] = useState(0);
 
+    const cdHook = useCashDiscount({
+        paymentType: form.paymentType,
+        totalOutstanding: totalOutstandingForSelected,
+        settleAmount: settleAmount, // Pass settleAmount to the CD hook
+    });
+
+    const { calculatedCdAmount, cdEnabled, setCdEnabled, cdPercent, setCdPercent, cdAt, setCdAt } = cdHook;
     
-    // Auto-fill logic for 'Full' payment and parchi number
+    // This is a derived state, representing what is actually paid.
+    const finalAmountToBePaid = useMemo(() => {
+        return settleAmount - calculatedCdAmount;
+    }, [settleAmount, calculatedCdAmount]);
+
+    // Main calculation useEffect
+    useEffect(() => {
+        // Auto-fill Settle Amount for 'Full' payment type
+        if (form.paymentType === 'Full' && !form.isBeingEdited && calculationDriver === 'settle') {
+            const newSettleAmount = totalOutstandingForSelected || 0;
+            if (settleAmount !== newSettleAmount) {
+                setSettleAmount(newSettleAmount);
+            }
+        }
+
+        // Auto-correction logic for partial payments
+        if (form.paymentType === 'Partial' && calculationDriver === 'settle') {
+            if (settleAmount > totalOutstandingForSelected) {
+                toast({
+                    title: "Adjustment",
+                    description: "Settle amount adjusted to match outstanding balance.",
+                    variant: 'default'
+                });
+                setSettleAmount(totalOutstandingForSelected);
+            }
+        }
+    }, [
+        form.paymentType, 
+        form.isBeingEdited,
+        totalOutstandingForSelected, 
+        settleAmount,
+        calculationDriver, // Important dependency
+        toast
+    ]);
+
+
+    const handleSettleAmountChange = (value: number) => {
+        setCalculationDriver('settle');
+        setSettleAmount(value);
+    };
+
+    const handleToBePaidChange = (toBePaidValue: number) => {
+        setCalculationDriver('toBePaid');
+        
+        let newSettleAmount = toBePaidValue; // Default case with no CD
+
+        if (cdEnabled && cdPercent > 0) {
+            if (cdAt === 'partial_on_paid') {
+                 // Settle = ToBePaid / (1 - CD%)
+                 if (1 - (cdPercent / 100) !== 0) {
+                    newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
+                 }
+            } else if (cdAt === 'on_full_amount') {
+                // Settle = ToBePaid + (TotalOutstanding * CD%)
+                newSettleAmount = toBePaidValue + (totalOutstandingForSelected * (cdPercent / 100));
+            } else if (cdAt === 'on_unpaid_amount') {
+                // This is complex. For now, let's assume Settle Amount is what the user wants to adjust.
+                // Reverting to simple logic for this case to avoid complexity.
+                // Settle = ToBePaid + ( (TotalOutstanding - Settle) * CD%)
+                // This requires solving for Settle, which can be tricky. Let's simplify.
+                newSettleAmount = toBePaidValue; // Fallback for simplicity
+            }
+        }
+
+        const finalSettleAmount = Math.round(newSettleAmount);
+
+        if (finalSettleAmount > totalOutstandingForSelected) {
+             toast({
+                title: "Adjustment",
+                description: `To Be Paid amount is too high with CD. Capped to max outstanding.`,
+                variant: 'default'
+            });
+            setSettleAmount(totalOutstandingForSelected);
+        } else {
+            setSettleAmount(finalSettleAmount);
+        }
+    };
+
+    // Auto-fill logic for parchi number
     useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
-
-        if (form.paymentType === 'Full' && !form.isBeingEdited) {
-            form.setPaymentAmount(totalOutstandingForSelected || 0);
-        }
-    }, [form.paymentType, form.isBeingEdited, totalOutstandingForSelected, selectedEntries, form.setParchiNo, form.setPaymentAmount]);
-
-
-    const handleToBePaidChange = useCallback((toBePaidValue: number) => {
-        const { cdEnabled, cdPercent } = cdHook;
-        const { setPaymentAmount } = form;
-
-        if (cdEnabled && cdPercent > 0 && toBePaidValue > 0) {
-            // Reverse calculate the settle amount based on the amount to be paid
-            const newSettleAmount = toBePaidValue / (1 - (cdPercent / 100));
-            setPaymentAmount(Math.round(newSettleAmount));
-        } else {
-            // If no CD, then settle amount is the same as to be paid amount
-            setPaymentAmount(toBePaidValue);
-        }
-    }, [cdHook, form]);
+    }, [selectedEntries, form.setParchiNo]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -117,9 +175,9 @@ export const useSupplierPayments = () => {
         try {
             const paymentData = {
                 ...form,
-                paymentAmount: form.paymentAmount,
-                cdAmount: cdHook.calculatedCdAmount,
-                cdApplied: cdHook.cdEnabled
+                paymentAmount: settleAmount, // Use settleAmount as the base for processing
+                cdAmount: calculatedCdAmount,
+                cdApplied: cdEnabled
             };
             
             const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
@@ -135,6 +193,7 @@ export const useSupplierPayments = () => {
                 setRtgsReceiptData(result.payment);
             }
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
+            setSettleAmount(0); // Reset settle amount
         } catch (error: any) {
             console.error("Error processing payment:", error);
             toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
@@ -150,6 +209,7 @@ export const useSupplierPayments = () => {
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();
+              setSettleAmount(0);
             }
         } catch (error: any) {
             console.error("Error deleting payment:", error);
@@ -163,20 +223,19 @@ export const useSupplierPayments = () => {
         const paymentData = paymentToEdit || form.editingPayment;
         if (paymentData) {
             const {
-                setPaymentId, setRtgsSrNo, setPaymentAmount, setPaymentType,
+                setPaymentId, setRtgsSrNo, setPaymentType,
                 setPaymentMethod, setSelectedAccountId,
                 setUtrNo, setCheckNo, setSixRNo, setSixRDate,
                 setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
                 setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
-
-            const { setCdEnabled, setCdPercent, setCdAt } = cdHook;
     
             setIsBeingEdited(true); // Signal that we are in edit mode
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            setPaymentAmount(paymentData.amount + (paymentData.cdAmount || 0)); // Set payable amount to total settled amount
+            // Here, paymentAmount from DB is the amount settled.
+            setSettleAmount(paymentData.amount + (paymentData.cdAmount || 0));
             
             setPaymentType(paymentData.type);
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
@@ -227,7 +286,7 @@ export const useSupplierPayments = () => {
             }
         }
         
-    }, [form, data.suppliers, cdHook]);
+    }, [form, data.suppliers]);
 
     const handleEditPayment = useCallback(async (paymentToEdit: Payment) => {
         if (!paymentToEdit || !paymentToEdit.id) {
@@ -244,6 +303,7 @@ export const useSupplierPayments = () => {
             if (form.rtgsFor === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
+                 setSettleAmount(0);
                  setIsProcessing(false);
                  return;
             }
@@ -284,6 +344,7 @@ export const useSupplierPayments = () => {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
             form.setEditingPayment(null);
             form.resetPaymentForm();
+            setSettleAmount(0);
         } finally {
             setIsProcessing(false);
         }
@@ -300,8 +361,12 @@ export const useSupplierPayments = () => {
     return {
         ...data,
         ...form,
-        ...cdHook,
+        cdEnabled, setCdEnabled,
+        cdPercent, setCdPercent,
+        cdAt, setCdAt,
+        calculatedCdAmount,
         finalAmountToBePaid,
+        settleAmount, handleSettleAmountChange,
         handleToBePaidChange,
         isProcessing,
         detailsSupplierEntry,

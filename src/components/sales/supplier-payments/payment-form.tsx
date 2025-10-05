@@ -45,7 +45,8 @@ export const PaymentForm = (props: any) => {
         paymentMethod, rtgsFor,
         paymentId, setPaymentId, handlePaymentIdBlur,
         paymentType, setPaymentType, paymentDate, setPaymentDate,
-        paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
+        settleAmount, handleSettleAmountChange,
+        cdEnabled, setCdEnabled,
         cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount,
         processPayment, isProcessing, resetPaymentForm, editingPayment,
         bankAccounts, selectedAccountId, setSelectedAccountId,
@@ -139,8 +140,8 @@ export const PaymentForm = (props: any) => {
                             </div>
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
-                                <Label htmlFor="payment-amount" className="text-xs">Settle Amount</Label>
-                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                                <Label htmlFor="settle-amount" className="text-xs">Settle Amount</Label>
+                                <Input id="settle-amount" type="number" value={settleAmount} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
                             </div>
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
