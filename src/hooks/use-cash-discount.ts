@@ -49,8 +49,7 @@ export const useCashDiscount = ({
         
         if (paymentType === 'Full') {
              baseAmountForCd = settleAmount;
-        } else { // Partial payment
-            // When partial, CD is calculated on the amount being paid
+        } else { // Partial payment - CD is calculated on the amount being paid
             baseAmountForCd = toBePaidAmount;
         }
 
@@ -60,6 +59,7 @@ export const useCashDiscount = ({
 
         const calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
+        // CD cannot be more than the amount it's calculated on
         return Math.min(calculatedCd, baseAmountForCd);
 
     }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount, cdAt, totalOutstanding]);

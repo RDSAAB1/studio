@@ -6,9 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
-import { toTitleCase } from '@/lib/utils';
+import { toTitleCase } from "@/lib/utils";
 import { addBank } from '@/lib/firestore';
-import type { Customer, Payment } from '@/lib/definitions';
+import type { Customer, Payment } from "@/lib/definitions";
 import { useCashDiscount } from './use-cash-discount';
 
 
@@ -47,7 +47,6 @@ export const useSupplierPayments = () => {
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
 
-
     const cdHook = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
@@ -65,40 +64,38 @@ export const useSupplierPayments = () => {
             const newToBePaidAmount = newSettleAmount - calculatedCdAmount;
             setSettleAmount(newSettleAmount);
             setToBePaidAmount(newToBePaidAmount);
-            form.setCalcTargetAmount(newToBePaidAmount); // Update target amount
-        } else {
+            form.setCalcTargetAmount(Math.round(newToBePaidAmount)); // Update target amount as a round figure
+        } else { // Partial
+            // On switching to partial, reset amounts to allow fresh input
             setSettleAmount(0);
             setToBePaidAmount(0);
-            form.setCalcTargetAmount(0); // Reset target amount
+            form.setCalcTargetAmount(0);
         }
-    }, [form.paymentType, totalOutstandingForSelected, calculatedCdAmount]);
+    }, [form.paymentType, totalOutstandingForSelected]);
+
+    useEffect(() => {
+        if (form.paymentType === 'Full') {
+            const newToBePaid = settleAmount - calculatedCdAmount;
+            setToBePaidAmount(newToBePaid);
+            form.setCalcTargetAmount(Math.round(newToBePaid));
+        }
+    }, [settleAmount, calculatedCdAmount, form.paymentType, form.setCalcTargetAmount]);
+
+    useEffect(() => {
+        if (form.paymentType === 'Partial') {
+            const newSettle = toBePaidAmount + calculatedCdAmount;
+            setSettleAmount(newSettle);
+        }
+    }, [toBePaidAmount, calculatedCdAmount, form.paymentType]);
+
 
     const handleSettleAmountChange = (value: number) => {
-        if (form.paymentType === 'Full') {
-            let newSettleAmount = value;
-            if (value > totalOutstandingForSelected) {
-                newSettleAmount = totalOutstandingForSelected;
-                toast({
-                    title: "Adjustment",
-                    description: "Settle amount cannot exceed total outstanding.",
-                    variant: 'default'
-                });
-            }
-            const newToBePaid = newSettleAmount - calculatedCdAmount;
-            setSettleAmount(newSettleAmount);
-            setToBePaidAmount(newToBePaid);
-            form.setCalcTargetAmount(newToBePaid);
-        }
+        setSettleAmount(value);
     };
 
     const handleToBePaidChange = (value: number) => {
-        if (form.paymentType === 'Partial') {
-            const newToBePaid = value;
-            const newSettle = newToBePaid + calculatedCdAmount;
-            setToBePaidAmount(newToBePaid);
-            setSettleAmount(newSettle);
-            form.setCalcTargetAmount(newToBePaid);
-        }
+        setToBePaidAmount(value);
+        form.setCalcTargetAmount(Math.round(value)); // Update target amount
     };
     
     

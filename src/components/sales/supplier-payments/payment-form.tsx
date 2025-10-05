@@ -267,7 +267,7 @@ export const PaymentForm = (props: any) => {
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
                         <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
-                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {editingPayment ? 'Update Payment' : 'Finalize Payment'}
                         </Button>
                     </div>
