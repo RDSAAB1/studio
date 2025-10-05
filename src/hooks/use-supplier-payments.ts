@@ -51,15 +51,37 @@ export const useSupplierPayments = () => {
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
     });
-    
-     useEffect(() => {
+
+    useEffect(() => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
-    
+
+        // Auto-fill logic
         if (form.paymentType === 'Full' && !form.isBeingEdited) {
             form.setPaymentAmount(totalOutstandingForSelected || 0);
         }
     }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.isBeingEdited, form.setParchiNo, form.setPaymentAmount]);
+
+    // Smart auto-correction logic for partial payments
+    useEffect(() => {
+        const { paymentType, paymentAmount, setPaymentAmount } = form;
+        const { calculatedCdAmount } = cdHook;
+
+        if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
+            const settleAmount = (paymentAmount || 0) + (calculatedCdAmount || 0);
+            if (settleAmount > totalOutstandingForSelected) {
+                const newPaymentAmount = totalOutstandingForSelected - (calculatedCdAmount || 0);
+                if (newPaymentAmount !== paymentAmount) {
+                     setPaymentAmount(Math.max(0, newPaymentAmount));
+                     toast({
+                        title: "Payment Adjusted",
+                        description: "Payment amount adjusted to match outstanding balance with CD.",
+                        variant: "default"
+                     });
+                }
+            }
+        }
+    }, [form.paymentAmount, cdHook.calculatedCdAmount, form.paymentType, totalOutstandingForSelected, form.setPaymentAmount, toast]);
 
 
     const handleCustomerSelect = (key: string | null) => {

@@ -67,7 +67,7 @@ export const useCashDiscount = ({
 
         return Math.round((baseAmountForCd * cdPercent) / 100);
 
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, totalOutstanding, eligibleForCd]);
+    }, [cdEnabled, eligibleForCd, cdAt, paymentAmount, totalOutstanding, cdPercent]);
     
     useEffect(() => {
         if (paymentType === 'Full') {
