@@ -157,28 +157,33 @@ export const useSupplierData = () => {
         const allContacts = new Set(data.allTransactions!.map(t => t.contact));
         data.contact = Array.from(allContacts).join(', ');
 
-        data.allTransactions!.forEach(transaction => {
+        const updatedTransactions = data.allTransactions!.map(transaction => {
             const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
             let totalPaidForEntry = 0;
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                totalPaidForEntry += paidForThisDetail.amount;
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
+                if (paidForThisDetail) {
+                    totalPaidForEntry += paidForThisDetail.amount;
 
-                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-                    if(totalAmountInPayment > 0) {
-                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        totalCdForEntry += p.cdAmount * proportion;
+                    if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                        const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                        if(totalAmountInPayment > 0) {
+                            const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                            totalCdForEntry += p.cdAmount * proportion;
+                        }
                     }
                 }
             });
             
             // DYNAMIC CALCULATION OF NET AMOUNT
-            transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return { ...transaction, netAmount: calculatedNetAmount };
         });
+
+        data.allTransactions = updatedTransactions;
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
