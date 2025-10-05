@@ -54,9 +54,9 @@ export const useSupplierPayments = () => {
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
-        toBePaidAmount: toBePaidAmount,
         paymentDate: form.paymentDate,
         selectedEntries: selectedEntries,
+        toBePaidAmount: toBePaidAmount,
     });
 
     const { calculatedCdAmount, ...cdProps } = cdHook;
@@ -76,8 +76,7 @@ export const useSupplierPayments = () => {
         if (calculationDriver === 'settle') {
             setToBePaidAmount(settleAmount - calculatedCdAmount);
         } else { // driver is 'toBePaid'
-            const cdOnPaid = cdHook.cdAt === 'partial_on_paid'
-            if (cdOnPaid && cdHook.cdPercent > 0 && cdHook.cdPercent < 100) {
+            if (cdHook.cdAt === 'partial_on_paid' && cdHook.cdPercent > 0 && cdHook.cdPercent < 100) {
                  const newSettleAmount = toBePaidAmount / (1 - (cdHook.cdPercent / 100));
                  setSettleAmount(newSettleAmount);
             } else {
