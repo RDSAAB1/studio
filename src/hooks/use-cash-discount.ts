@@ -46,11 +46,19 @@ export const useCashDiscount = ({
         }
 
         let baseAmountForCd = 0;
-        
-        if (paymentType === 'Full') {
-             baseAmountForCd = settleAmount;
-        } else { // Partial payment - CD is calculated on the amount being paid
-            baseAmountForCd = toBePaidAmount;
+
+        switch (cdAt) {
+            case 'partial_on_paid':
+                baseAmountForCd = toBePaidAmount;
+                break;
+            case 'on_unpaid_amount':
+                baseAmountForCd = totalOutstanding - toBePaidAmount;
+                break;
+            case 'on_full_amount':
+                baseAmountForCd = totalOutstanding;
+                break;
+            default:
+                baseAmountForCd = 0;
         }
 
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
@@ -59,10 +67,10 @@ export const useCashDiscount = ({
 
         const calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
-        // CD cannot be more than the amount it's calculated on
-        return Math.min(calculatedCd, baseAmountForCd);
+        // CD cannot be more than the amount it's calculated on, or more than the total outstanding.
+        return Math.min(calculatedCd, baseAmountForCd, totalOutstanding);
 
-    }, [cdEnabled, eligibleForCd, settleAmount, cdPercent, paymentType, toBePaidAmount, cdAt, totalOutstanding]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding]);
     
     return {
         cdEnabled,
