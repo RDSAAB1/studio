@@ -134,7 +134,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
             paidFor: rtgsFor === 'Supplier' ? paidForDetails : [], sixRNo,
             sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-            parchiNo: parchiNo || (rtgsFor === 'Supplier' ? selectedEntries.map((e: any) => e.srNo).join(', ') : ''),
+            parchiNo: parchiNo || '',
             utrNo, checkNo,
             quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
             supplierName: toTitleCase(supplierDetails.name),

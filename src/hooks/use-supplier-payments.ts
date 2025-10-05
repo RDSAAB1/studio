@@ -316,6 +316,7 @@ export const useSupplierPayments = () => {
                 settleAmount: settleAmount, // The amount settled from outstanding
                 cdAmount: calculatedCdAmount,
                 cdApplied: cdHook.cdEnabled,
+                parchiNo: form.parchiNo,
             };
             
             const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
