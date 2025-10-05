@@ -14,13 +14,13 @@ interface UseCashDiscountProps {
 export const useCashDiscount = ({
     totalOutstanding,
     paymentType,
-    paymentAmount,
+    paymentAmount, // This is now treated as the "Settle Amount"
     selectedEntries = [],
     paymentDate,
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
-    const [cdAt, setCdAt] = useState('partial_on_paid');
+    // cdAt is removed as the logic is now simplified and more robust.
 
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
@@ -43,48 +43,24 @@ export const useCashDiscount = ({
             return 0;
         }
 
-        let baseAmountForCd = 0;
-        const currentPaymentAmount = paymentAmount || 0;
-        
-        switch (cdAt) {
-            case 'on_full_amount':
-                 baseAmountForCd = totalOutstanding;
-                break;
-            case 'on_unpaid_amount':
-                const remainingAfterPayment = totalOutstanding - currentPaymentAmount;
-                baseAmountForCd = remainingAfterPayment > 0 ? remainingAfterPayment : 0;
-                break;
-            case 'partial_on_paid':
-                baseAmountForCd = currentPaymentAmount;
-                break;
-            default:
-                baseAmountForCd = 0;
-        }
+        // The base for CD calculation is always the amount being settled (paymentAmount).
+        const baseAmountForCd = paymentAmount || 0;
         
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
             return 0;
         }
 
-        return Math.round((baseAmountForCd * cdPercent) / 100);
+        // The CD amount cannot be more than the amount being settled.
+        const calculatedCd = Math.round((baseAmountForCd * cdPercent) / 100);
+        return Math.min(calculatedCd, baseAmountForCd);
 
-    }, [cdEnabled, eligibleForCd, cdAt, paymentAmount, totalOutstanding, cdPercent]);
+    }, [cdEnabled, eligibleForCd, paymentAmount, cdPercent]);
     
-    useEffect(() => {
-        if (paymentType === 'Full') {
-            setCdAt('on_full_amount');
-        } else if (paymentType === 'Partial') {
-            setCdAt('partial_on_paid');
-        }
-    }, [paymentType]);
-
-
     return {
         cdEnabled,
         setCdEnabled,
         cdPercent,
         setCdPercent,
-        cdAt,
-        setCdAt,
         calculatedCdAmount,
     };
 };

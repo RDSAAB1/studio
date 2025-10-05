@@ -51,6 +51,11 @@ export const useSupplierPayments = () => {
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
     });
+    
+    const finalAmountToBePaid = useMemo(() => {
+        return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
+    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
+
 
     // Auto-fill logic for 'Full' payment and parchi number
     useEffect(() => {
@@ -67,21 +72,15 @@ export const useSupplierPayments = () => {
     useEffect(() => {
         const { paymentType, paymentAmount, setPaymentAmount } = form;
 
-        // For partial payments, ensure the settlement amount doesn't exceed the outstanding amount.
-        if (paymentType === 'Partial' && totalOutstandingForSelected > 0) {
-            const finalSettleAmount = paymentAmount; // The payable amount is the total settlement from the outstanding balance
-
-            if (finalSettleAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
-                const newPaymentAmount = totalOutstandingForSelected;
-                
-                if (Math.abs(newPaymentAmount - (paymentAmount || 0)) > 0.01) {
-                     setPaymentAmount(Math.max(0, newPaymentAmount));
-                     toast({
-                        title: "Payment Adjusted",
-                        description: "Payable amount was adjusted to match the outstanding balance with CD.",
-                        variant: "default"
-                     });
-                }
+        // If the intended settlement amount exceeds the outstanding, adjust it.
+        if (paymentAmount > totalOutstandingForSelected + 0.01) { // Add tolerance
+            if (Math.abs(totalOutstandingForSelected - paymentAmount) > 0.01) {
+                 setPaymentAmount(Math.max(0, totalOutstandingForSelected));
+                 toast({
+                    title: "Payment Adjusted",
+                    description: "Settle Amount cannot exceed Outstanding. It has been adjusted.",
+                    variant: "default"
+                 });
             }
         }
     }, [form, totalOutstandingForSelected, toast]);
@@ -169,7 +168,7 @@ export const useSupplierPayments = () => {
                 setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
 
-            const { setCdEnabled, setCdPercent, setCdAt } = cdHook;
+            const { setCdEnabled, setCdPercent } = cdHook;
     
             setIsBeingEdited(true); // Signal that we are in edit mode
             setPaymentId(paymentData.paymentId);
@@ -190,7 +189,6 @@ export const useSupplierPayments = () => {
                 } else {
                     setCdPercent(0);
                 }
-                setCdAt(paymentData.type === 'Full' ? 'on_full_amount' : 'partial_on_paid');
             } else {
                  setCdEnabled(false);
                  setCdPercent(0);
@@ -290,16 +288,6 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
     
 
-    const finalAmountToBePaid = useMemo(() => {
-        return (form.paymentAmount || 0) - (cdHook.calculatedCdAmount || 0);
-    }, [form.paymentAmount, cdHook.calculatedCdAmount]);
-
-
-    const finalAmountToSettle = useMemo(() => {
-       return (form.paymentAmount || 0);
-    }, [form.paymentAmount]);
-
-
     const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
         form.setRtgsQuantity(option.quantity);
         form.setRtgsRate(option.rate);
@@ -312,7 +300,6 @@ export const useSupplierPayments = () => {
         ...form,
         ...cdHook,
         finalAmountToBePaid,
-        finalAmountToSettle,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
