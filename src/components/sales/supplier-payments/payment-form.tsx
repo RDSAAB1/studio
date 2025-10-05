@@ -173,12 +173,21 @@ export const PaymentForm = (props: any) => {
                         
                         {cdEnabled && (
                              <div className="p-2 border rounded-lg bg-background flex flex-wrap items-center gap-x-4 gap-y-2">
-                                <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+                                <div className="flex items-center gap-2 flex-1 min-w-[120px]">
                                     <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
                                     <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
                                 </div>
+                                <div className="space-y-1 flex-1 min-w-[200px]">
+                                    <Label className="text-xs">CD At</Label>
+                                    <Select value={cdAt} onValueChange={setCdAt}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {cdOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                                 <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-                                    <Label className="text-xs">Amt</Label>
+                                    <Label className="text-xs">CD Amt</Label>
                                     <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
                                 </div>
                             </div>
@@ -266,5 +275,3 @@ export const PaymentForm = (props: any) => {
         </>
     );
 };
-
-    

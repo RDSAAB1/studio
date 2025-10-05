@@ -20,7 +20,7 @@ export const useCashDiscount = ({
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
-    // cdAt is removed as the logic is now simplified and more robust.
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
 
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
@@ -43,24 +43,40 @@ export const useCashDiscount = ({
             return 0;
         }
 
-        // The base for CD calculation is always the amount being settled (paymentAmount).
-        const baseAmountForCd = paymentAmount || 0;
+        let baseAmountForCd = 0;
+        const settleAmount = paymentAmount || 0;
+        const outstandingAmount = totalOutstanding || 0;
+
+        switch (cdAt) {
+            case 'partial_on_paid':
+                baseAmountForCd = settleAmount;
+                break;
+            case 'on_unpaid_amount':
+                baseAmountForCd = Math.max(0, outstandingAmount - settleAmount);
+                break;
+            case 'on_full_amount':
+                baseAmountForCd = outstandingAmount;
+                break;
+            default:
+                baseAmountForCd = 0;
+        }
         
         if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
             return 0;
         }
-
-        // The CD amount cannot be more than the amount being settled.
+        
         const calculatedCd = Math.round((baseAmountForCd * cdPercent) / 100);
-        return Math.min(calculatedCd, baseAmountForCd);
+        return Math.min(calculatedCd, settleAmount);
 
-    }, [cdEnabled, eligibleForCd, paymentAmount, cdPercent]);
+    }, [cdEnabled, eligibleForCd, paymentAmount, cdPercent, cdAt, totalOutstanding]);
     
     return {
         cdEnabled,
         setCdEnabled,
         cdPercent,
         setCdPercent,
+        cdAt,
+        setCdAt,
         calculatedCdAmount,
     };
 };
