@@ -33,6 +33,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [rtgsFor, setRtgsFor] = useState<'Supplier' | 'Outsider'>('Supplier');
 
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+    const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
+    
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
     const [minRate, setMinRate] = useState<number>(0);
@@ -184,6 +186,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (!isOutsider) setSelectedEntryIds(new Set());
         setPaymentAmount(0);
         setEditingPayment(null);
+        setIsBeingEdited(false); // Reset edit state
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
@@ -223,6 +226,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         rtgsAmount, setRtgsAmount,
         rtgsFor, setRtgsFor,
         editingPayment, setEditingPayment,
+        isBeingEdited, setIsBeingEdited,
         calcTargetAmount, setCalcTargetAmount,
         minRate, setMinRate,
         maxRate, setMaxRate,

@@ -55,11 +55,11 @@ export const useSupplierPayments = () => {
         const srNos = selectedEntries.map(e => e.srNo).join(', ');
         form.setParchiNo(srNos);
     
-        if (form.paymentType === 'Full') {
-             const payable = (totalOutstandingForSelected || 0);
+        if (form.paymentType === 'Full' && !form.isBeingEdited) {
+             const payable = (totalOutstandingForSelected || 0) - (cdHook.calculatedCdAmount || 0);
             form.setPaymentAmount(payable);
         }
-    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form]);
+    }, [selectedEntries, form.paymentType, totalOutstandingForSelected, form.setParchiNo, form.setPaymentAmount, cdHook.calculatedCdAmount, form.isBeingEdited]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -83,7 +83,6 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
-             // Automatically open the outstanding entries modal when a supplier is selected
             setIsOutstandingModalOpen(true);
         }
     };
@@ -143,23 +142,25 @@ export const useSupplierPayments = () => {
                 setPaymentMethod, setSelectedAccountId,
                 setUtrNo, setCheckNo, setSixRNo, setSixRDate,
                 setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
-                setSupplierDetails, setBankDetails, setPaymentDate
+                setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
 
             const { setCdEnabled, setCdPercent, setCdAt } = cdHook;
     
+            setIsBeingEdited(true); // Signal that we are in edit mode
             setPaymentId(paymentData.paymentId);
             setRtgsSrNo(paymentData.rtgsSrNo || '');
             
-            const totalSettledInPayment = paymentData.amount + (paymentData.cdAmount || 0);
-            setPaymentAmount(totalSettledInPayment);
+            setPaymentAmount(paymentData.amount || 0); // Set the actual payment amount being edited
             
             setPaymentType(paymentData.type);
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
             
-            setCdEnabled(!!paymentData.cdApplied);
-            if (paymentData.cdApplied && paymentData.cdAmount) {
+            const isCdApplied = !!paymentData.cdApplied;
+            setCdEnabled(isCdApplied);
+            if (isCdApplied && paymentData.cdAmount) {
+                const totalSettledInPayment = paymentData.amount + (paymentData.cdAmount || 0);
                 if(totalSettledInPayment > 0) {
                      setCdPercent(Number(((paymentData.cdAmount / totalSettledInPayment) * 100).toFixed(2)));
                 } else {
@@ -266,11 +267,11 @@ export const useSupplierPayments = () => {
     
 
     const finalAmountToBePaid = useMemo(() => {
-        if (form.paymentType === 'Full') {
+        if (form.paymentType === 'Full' && !form.isBeingEdited) {
              return (totalOutstandingForSelected || 0) - (cdHook.calculatedCdAmount || 0);
         }
         return form.paymentAmount || 0;
-    }, [form.paymentAmount, totalOutstandingForSelected, cdHook.calculatedCdAmount, form.paymentType]);
+    }, [form.paymentAmount, totalOutstandingForSelected, cdHook.calculatedCdAmount, form.paymentType, form.isBeingEdited]);
 
     const finalAmountToSettle = useMemo(() => {
         if (form.paymentType === 'Full') {
