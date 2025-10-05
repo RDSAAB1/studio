@@ -31,6 +31,8 @@ export type Customer = {
   paymentType: string;
   customerId: string;
   forceUnique?: boolean;
+  totalPaid?: number; // Total amount paid towards this entry
+  totalCd?: number;   // Total CD applied to this entry
   
   // Fields from RTGS form
   fatherName?: string;

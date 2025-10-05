@@ -49,6 +49,8 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                     <TableHead className="p-2 text-xs">SR No</TableHead>
                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                     <TableHead className="p-2 text-xs text-right">Original Amt</TableHead>
+                                    <TableHead className="p-2 text-xs text-right">Paid Amt</TableHead>
+                                    <TableHead className="p-2 text-xs text-right">CD Amt</TableHead>
                                     <TableHead className="p-2 text-xs text-right">Outstanding</TableHead>
                                     <TableHead className="p-2 text-xs text-center">Actions</TableHead>
                                 </TableRow>
@@ -66,6 +68,8 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                         <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
                                         <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
+                                        <TableCell className="text-right p-2 text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
+                                        <TableCell className="text-right p-2 text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
                                         <TableCell className="text-right p-2 text-xs font-semibold">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                         <TableCell className="text-center p-0">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
@@ -76,7 +80,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                 ))}
                                 {suppliers.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-muted-foreground h-24">No transactions found for this supplier.</TableCell>
+                                        <TableCell colSpan={8} className="text-center text-muted-foreground h-24">No transactions found for this supplier.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

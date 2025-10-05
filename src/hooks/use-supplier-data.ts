@@ -179,9 +179,13 @@ export const useSupplierData = () => {
                 totalActualPaidForEntry += (paidForThisDetail.amount - cdForThisPortion);
             });
             
-            // DYNAMIC CALCULATION OF NET AMOUNT
             const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalActualPaidForEntry - totalCdForEntry;
-            return { ...transaction, netAmount: calculatedNetAmount };
+            return { 
+                ...transaction, 
+                netAmount: calculatedNetAmount,
+                totalPaid: totalActualPaidForEntry,
+                totalCd: totalCdForEntry,
+            };
         });
 
         data.allTransactions = updatedTransactions;
