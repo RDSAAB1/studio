@@ -47,60 +47,64 @@ export const useSupplierPayments = () => {
     // These two are now the primary sources of truth, managed by user input.
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
+    const [calculationDriver, setCalculationDriver] = useState<'settle' | 'toBePaid'>('settle');
+
 
     const cdHook = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
+        toBePaidAmount: toBePaidAmount,
         paymentDate: form.paymentDate,
         selectedEntries: selectedEntries,
-        toBePaidAmount: toBePaidAmount, // Pass the new state
     });
 
     const { calculatedCdAmount, ...cdProps } = cdHook;
 
-    // This effect handles the logic when the payment type changes, resetting things.
     useEffect(() => {
         if (form.paymentType === 'Full') {
             setSettleAmount(totalOutstandingForSelected || 0);
-            setToBePaidAmount(0); // This will be recalculated below
+            setCalculationDriver('settle');
         } else { // Partial
             setSettleAmount(0);
             setToBePaidAmount(0);
+            setCalculationDriver('toBePaid');
         }
     }, [form.paymentType, totalOutstandingForSelected]);
 
-    // This effect performs the one-way calculation based on the current mode.
     useEffect(() => {
-        if (form.paymentType === 'Full') {
-            // User controls Settle Amount, we calculate To Be Paid
+        if (calculationDriver === 'settle') {
             setToBePaidAmount(settleAmount - calculatedCdAmount);
-        } else { // Partial
-            // User controls To Be Paid, we calculate Settle Amount
-            setSettleAmount(toBePaidAmount + calculatedCdAmount);
+        } else { // driver is 'toBePaid'
+            const cdOnPaid = cdHook.cdAt === 'partial_on_paid'
+            if (cdOnPaid && cdHook.cdPercent > 0 && cdHook.cdPercent < 100) {
+                 const newSettleAmount = toBePaidAmount / (1 - (cdHook.cdPercent / 100));
+                 setSettleAmount(newSettleAmount);
+            } else {
+                 setSettleAmount(toBePaidAmount + calculatedCdAmount);
+            }
         }
-    }, [settleAmount, toBePaidAmount, calculatedCdAmount, form.paymentType]);
+    }, [settleAmount, toBePaidAmount, calculatedCdAmount, calculationDriver, cdHook.cdAt, cdHook.cdPercent]);
 
     
     const handleSettleAmountChange = (value: number) => {
-        if (form.paymentType === 'Full') {
-            if (value > totalOutstandingForSelected) {
-                setSettleAmount(totalOutstandingForSelected);
-                 toast({
-                    title: "Adjustment",
-                    description: "Full payment settle amount cannot exceed total outstanding.",
-                    variant: 'default'
-                });
-            } else {
-                setSettleAmount(value);
-            }
+        setCalculationDriver('settle');
+        if (value > totalOutstandingForSelected) {
+            setSettleAmount(totalOutstandingForSelected);
+                toast({
+                title: "Adjustment",
+                description: "Settle amount cannot exceed total outstanding.",
+                variant: 'default'
+            });
+        } else {
+            setSettleAmount(value);
         }
     };
 
     const handleToBePaidChange = (value: number) => {
-        if (form.paymentType === 'Partial') {
-            setToBePaidAmount(value);
-        }
+        setCalculationDriver('toBePaid');
+        setToBePaidAmount(value);
+        form.setCalcTargetAmount(value);
     };
 
     // Auto-fill logic for parchi number
