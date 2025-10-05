@@ -38,16 +38,41 @@ export const useSupplierPayments = () => {
     const [activeTab, setActiveTab] = useState('processing');
     
     const selectedEntries = useMemo(() => {
-        const safeSuppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
-        const profile = data.customerSummaryMap.get(form.selectedCustomerKey || '');
-        if (!profile) return [];
+        if (!form.selectedCustomerKey || !Array.isArray(data.suppliers)) return [];
+        const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
+        if (!profile || !Array.isArray(profile.allTransactions)) return [];
         return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
-    }, [data.suppliers, form.selectedEntryIds, form.selectedCustomerKey, data.customerSummaryMap]);
+    }, [form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
-     const totalOutstandingForSelected = useMemo(() => {
+    
+    const totalOutstandingForSelected = useMemo(() => {
         if (!selectedEntries || selectedEntries.length === 0) return 0;
-        return selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0);
-    }, [selectedEntries]);
+
+        return selectedEntries.reduce((sum, entry) => {
+            let outstandingForEntry = Number(entry.originalNetAmount) || 0;
+
+            const allPaymentsForThisEntry = (data.paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo));
+            
+            allPaymentsForThisEntry.forEach(p => {
+                // If we are editing this payment, don't count it towards the paid amount
+                // to correctly calculate the "total possible" amount for this edit session.
+                if (form.editingPayment && p.id === form.editingPayment.id) {
+                    return;
+                }
+
+                const paidForThisDetail = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                if (paidForThisDetail) {
+                    const cdAmountForThisPortion = (p.cdApplied && p.cdAmount && (p.paidFor?.length || 0) > 0)
+                        ? (p.cdAmount / p.paidFor!.reduce((total, pf) => total + pf.amount, 0)) * paidForThisDetail.amount
+                        : 0;
+                    outstandingForEntry -= (paidForThisDetail.amount + cdAmountForThisPortion);
+                }
+            });
+
+            return sum + outstandingForEntry;
+        }, 0);
+    }, [selectedEntries, data.paymentHistory, form.editingPayment]);
+
 
     const [settleAmount, setSettleAmount] = useState(0);
     const [toBePaidAmount, setToBePaidAmount] = useState(0);
@@ -72,8 +97,8 @@ export const useSupplierPayments = () => {
     useEffect(() => {
         if (form.paymentType === 'Full') {
             const newSettleAmount = totalOutstandingForSelected;
-            handleSettleAmountChange(newSettleAmount);
             const newToBePaid = newSettleAmount - calculatedCdAmount;
+            handleSettleAmountChange(newSettleAmount);
             handleToBePaidChange(newToBePaid > 0 ? newToBePaid : 0);
         } else { // Partial
             const newSettleAmount = toBePaidAmount + calculatedCdAmount;
