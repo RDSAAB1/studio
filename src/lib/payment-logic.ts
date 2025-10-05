@@ -25,11 +25,11 @@ interface ProcessPaymentResult {
 export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
     const {
         rtgsFor, selectedCustomerKey, selectedEntries, editingPayment,
-        rtgsAmount, paymentAmount, paymentMethod, selectedAccountId,
+        paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, 
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
-        rtgsQuantity, rtgsRate, supplierDetails, bankDetails,
+        rtgsQuantity, rtgsRate, rtgsAmount, supplierDetails, bankDetails,
     } = context;
 
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -83,7 +83,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
                 if (paymentForThisEntry > 0) {
                      paidForDetails.push({
-                        srNo: entry.srNo, // Use the correct srNo from the entry
+                        srNo: entry.srNo,
                         amount: paymentForThisEntry,
                         supplierName: toTitleCase(entry.name),
                         supplierSo: toTitleCase(entry.so),

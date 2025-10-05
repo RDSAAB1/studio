@@ -310,16 +310,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const paymentData = {
-                ...form,
-                paymentAmount: toBePaidAmount, // The actual amount paid
-                settleAmount: settleAmount, // The amount settled from outstanding
-                cdAmount: calculatedCdAmount,
-                cdApplied: cdHook.cdEnabled,
-                parchiNo: form.parchiNo,
-            };
-            
-            const result = await processPaymentLogic({ ...data, ...paymentData, selectedEntries });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
