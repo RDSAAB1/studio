@@ -83,7 +83,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
                 if (paymentForThisEntry > 0) {
                      paidForDetails.push({
-                        srNo: entry.srNo, 
+                        srNo: entry.srNo, // Use the correct srNo from the entry
                         amount: paymentForThisEntry,
                         supplierName: toTitleCase(entry.name),
                         supplierSo: toTitleCase(entry.so),
