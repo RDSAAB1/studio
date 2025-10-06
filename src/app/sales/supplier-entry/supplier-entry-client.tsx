@@ -497,7 +497,7 @@ export default function SupplierEntryClient() {
         allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
     };
     setDetailsSupplier(fullData);
-  }
+  };
   
   const handleSinglePrint = (entry: Customer) => {
     setReceiptsToPrint([entry]);
@@ -801,21 +801,14 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
-
-      <DetailsDialog
-        isOpen={!!detailsSupplier}
-        onOpenChange={() => setDetailsSupplier(null)}
-        customer={detailsSupplier}
-        paymentHistory={paymentHistory}
-      />
+        
+      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                <StatementPreview data={detailsSupplier} />
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}
