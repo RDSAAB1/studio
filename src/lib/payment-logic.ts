@@ -116,7 +116,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierAddress: toTitleCase(supplierDetails.address),
             supplierContact: supplierDetails.contact,
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-            rtgsFor, expenseTransactionId: undefined, // No longer creating expense entries
+            rtgsFor,
         };
         if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
