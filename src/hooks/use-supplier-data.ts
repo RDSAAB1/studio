@@ -67,6 +67,7 @@ export const useSupplierData = () => {
         if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
     
         const profiles: CustomerSummary[] = [];
+        const supplierMapBySrNo = new Map(safeSuppliers.map(s => [s.srNo, s]));
     
         const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
     
@@ -86,7 +87,6 @@ export const useSupplierData = () => {
                     name: s.name, so: s.so, address: s.address,
                     contact: '', // Will be aggregated later
                     allTransactions: [], allPayments: [],
-                    // Initialize all other properties
                     acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                     totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                     totalOutstanding: 0, totalCdAmount: 0,
@@ -122,35 +122,52 @@ export const useSupplierData = () => {
         // 3. Assign payments to profiles
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
         safePaymentHistory.forEach(p => {
-            const pNameNorm = normalize(p.supplierName || 'Outsider');
-            const pSoNorm = normalize(p.supplierFatherName || '');
-    
-            let bestMatch = profiles.find(prof => {
-                const profNameNorm = normalize(prof.name || '');
-                const profSoNorm = normalize(prof.so || '');
-                return levenshteinDistance(pNameNorm + pSoNorm, profNameNorm + profSoNorm) < 3;
-            });
-    
-            if (bestMatch) {
-                bestMatch.allPayments!.push(p);
+            if (p.rtgsFor === 'Supplier' && p.paidFor && p.paidFor.length > 0) {
+                 const firstSrNo = p.paidFor[0].srNo;
+                 const associatedSupplier = supplierMapBySrNo.get(firstSrNo);
+                 if (associatedSupplier) {
+                    const sNameNorm = normalize(associatedSupplier.name || '');
+                    const sSoNorm = normalize(associatedSupplier.so || '');
+
+                     let bestMatch = profiles.find(prof => {
+                        const profNameNorm = normalize(prof.name || '');
+                        const profSoNorm = normalize(prof.so || '');
+                        return levenshteinDistance(sNameNorm + sSoNorm, profNameNorm + profSoNorm) < 3;
+                    });
+                    if (bestMatch) {
+                        bestMatch.allPayments!.push(p);
+                    }
+                 }
             } else if (p.rtgsFor === 'Outsider') {
-                profiles.push({
-                    name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
-                    contact: '',
-                    acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                    allTransactions: [], allPayments: [p],
-                    // Initialize other properties
-                    totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
-                    totalOutstanding: 0, totalCdAmount: 0,
-                    paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
-                    totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
-                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
-                    totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
-                    totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
-                    averageKartaPercentage: 0, averageLabouryRate: 0,
-                    totalTransactions: 0, totalOutstandingTransactions: 0,
-                    totalBrokerage: 0, totalCd: 0,
+                const pNameNorm = normalize(p.supplierName || 'Outsider');
+                const pSoNorm = normalize(p.supplierFatherName || '');
+
+                let bestMatch = profiles.find(prof => {
+                    const profNameNorm = normalize(prof.name || '');
+                    const profSoNorm = normalize(prof.so || '');
+                    return levenshteinDistance(pNameNorm + pSoNorm, profNameNorm + profSoNorm) < 3;
                 });
+
+                if (bestMatch) {
+                    bestMatch.allPayments!.push(p);
+                } else {
+                     profiles.push({
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                        contact: '',
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                        allTransactions: [], allPayments: [p],
+                        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+                        totalOutstanding: 0, totalCdAmount: 0,
+                        paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
+                        totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
+                        totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+                        totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                        totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
+                        averageKartaPercentage: 0, averageLabouryRate: 0,
+                        totalTransactions: 0, totalOutstandingTransactions: 0,
+                        totalBrokerage: 0, totalCd: 0,
+                    });
+                }
             }
         });
     
