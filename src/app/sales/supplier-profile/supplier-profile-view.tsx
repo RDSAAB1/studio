@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 type ChartType = 'financial' | 'variety';
 
@@ -45,6 +47,47 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
         </div>
     </div>
 );
+
+const TransactionTable = ({ transactions, onShowDetails }: { transactions: Supplier[], onShowDetails: (supplier: Supplier) => void }) => (
+    <ScrollArea className="h-[14rem]">
+        <div className="overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>SR No</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {transactions.map(entry => (
+                        <TableRow key={entry.id}>
+                            <TableCell className="font-mono">{entry.srNo}</TableCell>
+                            <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                            <TableCell>
+                                <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
+                                {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
+                                    <Info className="h-4 w-4" />
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    {transactions.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </div>
+    </ScrollArea>
+);
+
 
 export const SupplierProfileView = ({
     selectedSupplierData,
@@ -87,6 +130,13 @@ export const SupplierProfileView = ({
         }
         return selectedSupplierData.paymentHistory || [];
     }, [selectedSupplierData, isMillSelected]);
+    
+    const { paidTransactions, outstandingTransactions } = useMemo(() => {
+        const all = selectedSupplierData?.allTransactions || [];
+        const paid = all.filter(t => parseFloat(String(t.netAmount)) < 1);
+        const outstanding = all.filter(t => parseFloat(String(t.netAmount)) >= 1);
+        return { paidTransactions: paid, outstandingTransactions: outstanding };
+    }, [selectedSupplierData]);
 
     if (!selectedSupplierData) {
         return (
@@ -208,49 +258,28 @@ export const SupplierProfileView = ({
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                 <div className="grid grid-cols-1 gap-6">
-                  <Card>
-                      <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                            <div className="overflow-x-auto">
-                              <Table>
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead>SR No</TableHead>
-                                          <TableHead>Amount</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {(selectedSupplierData.allTransactions || []).map(entry => (
-                                          <TableRow key={entry.id}>
-                                              <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
-                                              <TableCell>
-                                                  <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                                                  {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
-                                                  </Badge>
-                                              </TableCell>
-                                              <TableCell className="text-right">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                      {(selectedSupplierData.allTransactions || []).length === 0 && (
-                                          <TableRow>
-                                              <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
-                                          </TableRow>
-                                      )}
-                                  </TableBody>
-                              </Table>
-                            </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
+                <div className="grid grid-cols-1 gap-6">
+                    <Tabs defaultValue="outstanding" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="outstanding">Outstanding Entries ({outstandingTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="paid">Paid Entries ({paidTransactions.length})</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="outstanding" className="mt-4">
+                            <Card>
+                                <CardContent className="p-0">
+                                    <TransactionTable transactions={outstandingTransactions} onShowDetails={onShowDetails} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="paid" className="mt-4">
+                            <Card>
+                                <CardContent className="p-0">
+                                    <TransactionTable transactions={paidTransactions} onShowDetails={onShowDetails} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
+                     
                    <Card>
                       <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
                       <CardContent>
