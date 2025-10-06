@@ -72,11 +72,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
 
             if(oldPaymentDoc.exists()) {
-                const oldPaymentData = oldPaymentDoc.data() as Payment;
-                if (oldPaymentData.expenseTransactionId) {
-                    const oldExpenseRef = doc(firestoreDB, "expenses", oldPaymentData.expenseTransactionId);
-                    transaction.delete(oldExpenseRef);
-                }
                 transaction.delete(oldPaymentRef);
             }
         }
@@ -104,38 +99,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 amountToDistribute -= paymentForThisEntry;
             }
         }
-
-        let expenseTransactionId = undefined;
-        if (finalAmountToPay > 0) {
-             const expenseData: Partial<Expense> = {
-                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                transactionType: 'Expense', category: 'Supplier Payments',
-                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-                amount: finalAmountToPay, payee: supplierDetails.name,
-                description: `Payment for ${rtgsFor === 'Supplier' && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
-                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
-                status: 'Paid', isRecurring: false,
-            };
-            if (paymentMethod !== 'Cash') expenseData.bankAccountId = accountIdForPayment;
-            
-            const newExpenseRef = doc(collection(firestoreDB, "expenses"));
-            transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id, transactionId: newExpenseRef.id });
-            expenseTransactionId = newExpenseRef.id;
-        }
         
-        if (cdEnabled && calculatedCdAmount > 0) {
-            const incomeTransactionRef = doc(incomesCollection);
-            const incomeData: Partial<Income> = {
-                id: incomeTransactionRef.id, 
-                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                transactionType: 'Income', category: 'Cash Discount Received',
-                subCategory: 'Supplier CD', amount: calculatedCdAmount, payee: supplierDetails.name,
-                description: `CD received for ${rtgsFor === 'Supplier' && selectedEntries.length > 0 ? 'SR# ' + selectedEntries.map((e: Customer) => e.srNo).join(', ') : 'RTGS ' + rtgsSrNo}`,
-                paymentMethod: 'Other', status: 'Paid', isRecurring: false,
-            };
-            transaction.set(incomeTransactionRef, incomeData);
-        }
-
         const paymentDataBase: Omit<Payment, 'id'> = {
             paymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
@@ -152,7 +116,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierAddress: toTitleCase(supplierDetails.address),
             supplierContact: supplierDetails.contact,
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-            rtgsFor, expenseTransactionId: expenseTransactionId,
+            rtgsFor, expenseTransactionId: undefined, // No longer creating expense entries
         };
         if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
@@ -181,16 +145,6 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
              return; // Silently fail if doc is already gone
         }
 
-        const paymentData = paymentDoc.data() as Payment;
-        
-        // This part is no longer needed because the balance is calculated dynamically.
-        // We just need to delete the payment and its associated expense.
-
-        if (paymentData.expenseTransactionId) {
-            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            transOrBatch.delete(expenseDocRef);
-        }
-      
         transOrBatch.delete(paymentDocRef);
     };
     
