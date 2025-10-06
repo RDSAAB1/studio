@@ -147,14 +147,9 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
-    const totalPaidForThisEntry = (Array.isArray(paymentHistory) ? paymentHistory : [])
-      .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
-      .reduce((sum, p) => {
-          const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
-          return sum + (paidForDetail?.amount || 0);
-      }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
+    // The netAmount for a supplier entry should always reflect its original value, not subsequent payments.
+    // The outstanding amount is calculated dynamically in the profile view.
+    const netAmount = originalNetAmount;
 
     return {
       ...values,
@@ -206,14 +201,9 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         originalNetAmount -= brokerageAmount;
     }
 
-    const totalPaidForThisEntry = (Array.isArray(paymentHistory) ? paymentHistory : [])
-        .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
-        .reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
-            return sum + (paidForDetail?.amount || 0);
-        }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
+    // The netAmount for a customer entry should always reflect its original value.
+    // The outstanding amount is calculated dynamically in the profile view.
+    const netAmount = originalNetAmount;
 
     let entryDate: Date;
     if (values.date) {
