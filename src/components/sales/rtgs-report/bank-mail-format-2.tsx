@@ -47,11 +47,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             [],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
+            [],
+            [],
         ];
         
-        ws_data.push([]);
-        ws_data.push([]);
-
         const headerRowIndex = ws_data.length; 
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
     
@@ -59,7 +58,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                p.acNo,
+                p.acNo, // Removed single quote
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -67,15 +66,16 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        const footerRowIndex = ws_data.length;
+        const footerRow1Index = ws_data.length;
         ws_data.push([]);
+        const footerRow2Index = ws_data.length;
         ws_data.push(["", "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
         const totalRowIndex = ws_data.length;
         ws_data.push([null, null, null, "GT", grandTotal, null, null]);
         
-        const ws = XLSX.utils.aoa_to_sheet(ws_data);
+        const ws = XLSX.utils.aoa_to_sheet(ws_data, { cellStyles: true });
     
         ws['!cols'] = [ { wch: 8 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
@@ -83,28 +83,33 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
 
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
         for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
             for (let C = 0; C < 7; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
                 
                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; 
+                
+                // Ensure the style object exists
                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
                 
                 // Always apply border
                 ws[cell_ref].s.border = allBorders;
 
-                if (C === 2 && R > headerRowIndex && R < totalRowIndex) { 
+                // Explicitly set Account No column to text format
+                if (C === 2 && R > headerRowIndex && R < footerRow1Index) { 
                     ws[cell_ref].t = 's';
                 }
                 
-                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRowIndex)) { 
+                // Apply bold font where needed
+                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRow2Index)) { 
                     ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
         }
         
-        // Ensure "GT" cell is also styled
         const gtCellRef = XLSX.utils.encode_cell({c: 3, r: totalRowIndex});
         if(ws[gtCellRef] && ws[gtCellRef].s) ws[gtCellRef].s.font = boldFont;
 
@@ -305,7 +310,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 {isPreview ? (
                      <>
                         <ScrollArea className="flex-grow">
-                            <div ref={printRef} className="bg-white"> 
+                             <div ref={printRef} className="bg-white"> 
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
@@ -347,10 +352,16 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                 ))}
                                             </tbody>
                                             <tfoot>
-                                                <tr className="font-bold">
+                                                 <tr className="font-bold">
                                                      <td colSpan={4} className="p-1 text-right border border-black">GT</td>
                                                      <td className="p-1 text-right font-semibold border border-black">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
                                                      <td className="p-1 border border-black" colSpan={2}></td>
+                                                 </tr>
+                                                  <tr>
+                                                      <td colSpan={7} className="h-4 p-1 border-x border-black"></td>
+                                                 </tr>
+                                                 <tr>
+                                                      <td colSpan={7} className="h-4 p-1 border-x border-b border-black"></td>
                                                  </tr>
                                                  <tr>
                                                     <td colSpan={7} className="pt-8 p-1 font-bold">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
