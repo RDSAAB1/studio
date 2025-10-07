@@ -1,5 +1,4 @@
 
-
 import {
   collection,
   getDocs,
@@ -26,6 +25,7 @@ import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
+import { format } from "date-fns";
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -381,14 +381,21 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
         if (supplierSnap.exists()) {
             const supplierData = supplierSnap.data() as Customer;
             
+            // Pass the complete existing data to the calculation function
             const recalculatedData = calculateSupplierEntry(supplierData, paymentHistory, holidays, dailyPaymentLimit, []);
             
-            const updatePayload: Partial<Customer> = {
-                ...recalculatedData
+            // Only update the calculated fields, preserving the original entry data
+            const updatePayload = {
+                weight: recalculatedData.weight,
+                kartaWeight: recalculatedData.kartaWeight,
+                kartaAmount: recalculatedData.kartaAmount,
+                netWeight: recalculatedData.netWeight,
+                labouryAmount: recalculatedData.labouryAmount,
+                amount: recalculatedData.amount,
+                originalNetAmount: recalculatedData.originalNetAmount,
+                netAmount: recalculatedData.originalNetAmount, // Reset netAmount to original
+                dueDate: recalculatedData.dueDate,
             };
-            
-            // This is just to ensure netAmount and originalNetAmount are aligned after recalc.
-            updatePayload.netAmount = recalculatedData.originalNetAmount; 
             
             batch.update(supplierRef, updatePayload);
             updatedCount++;
@@ -398,6 +405,7 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
     await batch.commit();
     return updatedCount;
 }
+
 
 // --- Customer Functions ---
 export async function addCustomer(customerData: Customer): Promise<Customer> {
@@ -1012,30 +1020,10 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
 }
 
 export async function recalculateAndUpdateAllSuppliers(): Promise<number> {
-    const allSuppliers = await getDocs(query(suppliersCollection));
-    const allPayments = await getDocs(query(supplierPaymentsCollection));
-    
-    const paymentHistory = allPayments.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-    const holidays = await getHolidays();
-    const dailyPaymentLimit = await getDailyPaymentLimit();
-
-    const batch = writeBatch(firestoreDB);
-    let updatedCount = 0;
-
-    allSuppliers.forEach(supplierDoc => {
-        const supplierData = supplierDoc.data() as Customer;
-        const recalculatedData = calculateSupplierEntry(supplierData, paymentHistory, holidays, dailyPaymentLimit, []);
-
-        const updatePayload: Partial<Customer> = {
-            ...recalculatedData,
-            netAmount: recalculatedData.originalNetAmount, // Ensure netAmount is original
-        };
-        
-        batch.update(supplierDoc.ref, updatePayload);
-        updatedCount++;
-    });
-
-    await batch.commit();
-    return updatedCount;
+    const allSuppliersSnapshot = await getDocs(query(suppliersCollection));
+    const supplierIds = allSuppliersSnapshot.docs.map(doc => doc.id);
+    return await recalculateAndUpdateSuppliers(supplierIds);
 }
+    
+
     
