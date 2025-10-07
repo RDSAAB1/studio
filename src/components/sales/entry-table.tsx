@@ -3,7 +3,7 @@
 
 import { memo } from "react";
 import type { Customer } from "@/lib/definitions";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +30,11 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
             newSelectedIds.add(id);
         }
         onSelectionChange(newSelectedIds);
+    };
+    
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return isValid(date) ? format(date, "dd-MMM-yy") : 'N/A';
     };
 
     return (
@@ -66,7 +71,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                         />
                                     </TableCell>
                                     <TableCell className="font-mono px-3 py-1 text-sm">{entry.srNo}</TableCell>
-                                    <TableCell className="px-3 py-1 text-sm">{entry.date ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{formatDate(entry.date)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.name)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.variety)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{Number(entry.netWeight).toFixed(2)}</TableCell>
