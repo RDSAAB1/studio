@@ -45,6 +45,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
         ];
         
+        ws_data.push([]); 
+        ws_data.push([]);
+
         const headerRowIndex = ws_data.length; 
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
     
@@ -52,7 +55,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                p.acNo, // Removed the prepended single quote
+                p.acNo,
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -77,43 +80,32 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
-
         const numCols = 7;
-        const totalDataRows = payments.length;
 
-        // Iterate through all required cells to apply formatting
-        for (let R = headerRowIndex; R < totalRowIndex + 1; ++R) {
+        for (let R = headerRowIndex; R <= totalRowIndex; ++R) { 
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Ensure cell exists
-
-                // Initialize cell style if it doesn't exist
+                
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; 
                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
                 
-                // 1. Apply Borders to the entire table section
-                if (R >= headerRowIndex && R < footerRowIndex - 2) {
-                     ws[cell_ref].s.border = allBorders;
+                ws[cell_ref].s.border = allBorders; 
+                
+                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4))) { 
+                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
                 
-                // 2. Format Account Number column (C=2) as Text
-                if (C === 2 && R > headerRowIndex && R < headerRowIndex + 1 + totalDataRows) {
+                if (C === 2 && R > headerRowIndex && R < totalRowIndex) { 
                     ws[cell_ref].t = 's';
-                }
-
-                // 3. Bold specific cells
-                if (R === headerRowIndex) { // Header Row
-                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
-                }
-                if (R === footerRowIndex && C === 1) { // "PL SEND..." note
-                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
-                }
-                if (R === totalRowIndex && (C === 3 || C === 4)) { // "GT" and its value
-                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
         }
-        
+        if (ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})]) {
+             if (!ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s) ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s = {};
+             ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s.font = boldFont;
+        }
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -161,78 +153,78 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     };
     
      const handlePrint = () => {
-        const node = printRef.current;
-        if (!node) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
-            return;
-        }
+         const node = printRef.current;
+         if (!node) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+             return;
+         }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
-            document.body.removeChild(iframe);
-            return;
-        }
+         const iframe = document.createElement('iframe');
+         iframe.style.position = 'absolute';
+         iframe.style.width = '0';
+         iframe.style.height = '0';
+         iframe.style.border = '0';
+         document.body.appendChild(iframe);
+         
+         const iframeDoc = iframe.contentWindow?.document;
+         if (!iframeDoc) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
+             document.body.removeChild(iframe);
+             return;
+         }
 
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>RTGS Advice</title>');
-        
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.textContent = css;
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
-            }
-        });
-        
-        const printStyles = iframeDoc.createElement('style');
-        printStyles.textContent = `
-            @media print {
-                @page {
-                    size: A4 landscape;
-                    margin: 10mm;
-                }
-                body {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-                .printable-area {
-                    background-color: #fff !important;
-                }
-                .printable-area * {
-                    border-color: #000 !important;
-                    color: #000 !important;
-                }
-                .print-header-bg {
-                     background-color: #fce5d5 !important;
-                }
-                .page-break {
-                    page-break-after: always;
-                }
-            }
-        `;
-        iframeDoc.head.appendChild(printStyles);
+         iframeDoc.open();
+         iframeDoc.write('<html><head><title>RTGS Advice</title>');
+         
+         Array.from(document.styleSheets).forEach(styleSheet => {
+             try {
+                 const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                 const style = iframeDoc.createElement('style');
+                 style.textContent = css;
+                 iframeDoc.head.appendChild(style);
+             } catch (e) {
+                 console.warn('Could not copy stylesheet:', e);
+             }
+         });
+         
+         const printStyles = iframeDoc.createElement('style');
+         printStyles.textContent = `
+             @media print {
+                 @page {
+                     size: A4 landscape;
+                     margin: 10mm;
+                 }
+                 body {
+                     -webkit-print-color-adjust: exact !important;
+                     print-color-adjust: exact !important;
+                 }
+                 .printable-area {
+                     background-color: #fff !important;
+                 }
+                 .printable-area * {
+                     border-color: #000 !important;
+                     color: #000 !important;
+                 }
+                 .print-header-bg {
+                      background-color: #fce5d5 !important;
+                 }
+                 .page-break {
+                     page-break-after: always;
+                 }
+             }
+         `;
+         iframeDoc.head.appendChild(printStyles);
 
-        iframeDoc.write('</head><body></body></html>');
-        iframeDoc.body.innerHTML = node.innerHTML;
-        iframeDoc.close();
-        
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
-    };
+         iframeDoc.write('</head><body></body></html>');
+         iframeDoc.body.innerHTML = node.innerHTML;
+         iframeDoc.close();
+         
+         setTimeout(() => {
+             iframe.contentWindow?.focus();
+             iframe.contentWindow?.print();
+             document.body.removeChild(iframe);
+         }, 500);
+     };
 
     const handleSendMail = async () => {
         const auth = getFirebaseAuth();
@@ -291,8 +283,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
 
      if (!isOpen || !settings || !payments) {
-        return null;
-    }
+         return null;
+     }
     
     const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
     const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
@@ -301,15 +293,15 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
                  <DialogHeader className="p-4 border-b">
-                    <DialogTitle>Bank Mail Format 2</DialogTitle>
-                    <DialogDescription>
-                        Preview, download, or email the custom Excel format for bank payments.
-                    </DialogDescription>
-                </DialogHeader>
+                     <DialogTitle>Bank Mail Format 2</DialogTitle>
+                     <DialogDescription>
+                         Preview, download, or email the custom Excel format for bank payments.
+                     </DialogDescription>
+                 </DialogHeader>
                 {isPreview ? (
                      <>
                         <ScrollArea className="flex-grow p-4">
-                            <div ref={printRef}>
+                            <div ref={printRef} className="bg-white">
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
@@ -341,7 +333,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                     <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
                                                         <td className="p-1 border border-black">{index + 1}</td>
                                                         <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
-                                                        <td className="p-1 border border-black font-mono">'{p.acNo}</td>
+                                                        <td className="p-1 border border-black font-mono">{p.acNo}</td>
                                                         <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
                                                         <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
                                                         <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
@@ -364,69 +356,71 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                 </div>
                             </div>
                         </ScrollArea>
-                        <DialogFooter className="p-4 border-t flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                            <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
-                            <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
-                            <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
-                        </DialogFooter>
-                    </>
+                         <DialogFooter className="p-4 border-t flex justify-end gap-2">
+                             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                             <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
+                             <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+                             <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
+                         </DialogFooter>
+                     </>
                 ) : (
-                    <>
-                        <ScrollArea className="flex-grow">
-                            <div className="p-4 space-y-3 flex flex-col min-h-0">
-                                <div className="flex items-center border-b pb-2">
-                                    <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
-                                    <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
-                                </div>
-                                <div className="flex items-center border-b pb-2">
-                                    <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
-                                    <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
-                                </div>
-                                <Textarea 
-                                    value={emailData.body}
-                                    onChange={(e) => setEmailData({...emailData, body: e.target.value})}
-                                    className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                                    {attachments.map((att, index) => (
-                                        <div key={index} className="relative flex items-center gap-2 p-2 border rounded-md">
-                                            <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
-                                            <div className="flex-grow overflow-hidden">
-                                                <p className="text-sm font-medium truncate">{att.filename}</p>
-                                                <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                onClick={() => removeAttachment(index)}
-                                                className="absolute top-1 right-1 rounded-full h-5 w-5"
-                                                variant="ghost"
-                                                size="icon"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </ScrollArea>
-                        <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
-                            <div className="relative">
-                                <Button size="icon" variant="ghost" asChild>
-                                    <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
-                                </Button>
-                                <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" onClick={() => setIsPreview(true)}>Cancel</Button>
-                                <Button onClick={handleSendMail} disabled={isSending}>
-                                    {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
-                                </Button>
-                            </div>
-                        </DialogFooter>
-                    </>
+                     <>
+                         <ScrollArea className="flex-grow">
+                             <div className="p-4 space-y-3 flex flex-col min-h-0">
+                                 <div className="flex items-center border-b pb-2">
+                                     <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
+                                     <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                 </div>
+                                 <div className="flex items-center border-b pb-2">
+                                     <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
+                                     <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                 </div>
+                                 <Textarea 
+                                     value={emailData.body}
+                                     onChange={(e) => setEmailData({...emailData, body: e.target.value})}
+                                     className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
+                                 />
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                                     {attachments.map((att, index) => (
+                                         <div key={index} className="relative flex items-center gap-2 p-2 border rounded-md">
+                                             <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                             <div className="flex-grow overflow-hidden">
+                                                 <p className="text-sm font-medium truncate">{att.filename}</p>
+                                                 <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
+                                             </div>
+                                             <Button
+                                                 type="button"
+                                                 onClick={() => removeAttachment(index)}
+                                                 className="absolute top-1 right-1 rounded-full h-5 w-5"
+                                                 variant="ghost"
+                                                 size="icon"
+                                             >
+                                                 <X className="h-3 w-3" />
+                                             </Button>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         </ScrollArea>
+                         <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
+                             <div className="relative">
+                                 <Button size="icon" variant="ghost" asChild>
+                                     <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
+                                 </Button>
+                                 <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
+                             </div>
+                             <div className="flex items-center gap-2">
+                                 <Button variant="outline" onClick={() => setIsPreview(true)}>Cancel</Button>
+                                 <Button onClick={handleSendMail} disabled={isSending}>
+                                     {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
+                                 </Button>
+                             </div>
+                         </DialogFooter>
+                     </>
                 )}
             </DialogContent>
         </Dialog>
     );
 };
+
+    
