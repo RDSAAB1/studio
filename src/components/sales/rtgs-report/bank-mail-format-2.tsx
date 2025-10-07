@@ -43,9 +43,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
         const ws_data: (string | number | Date | null)[][] = [
             [null, companyName],
-            [null, `${companyAddress1}, ${companyAddress2}`],
+            [null, `${companyAddress1}${companyAddress2 ? `, ${companyAddress2}` : ''}`],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
-            [null, `A/C.NO.. ${bankToUse.accountNumber}`],
+            [null, `A/C.NO.`]
         ];
         
         const headerRowIndex = ws_data.length; 
@@ -72,13 +72,20 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const totalRowIndex = ws_data.length;
         ws_data.push([null, null, null, "GT", grandTotal, null, null]);
         
-        const ws = XLSX.utils.aoa_to_sheet(ws_data, { cellStyles: true });
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
     
         ws['!cols'] = [ { wch: 8 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
         const borderStyle = { style: "thin" as const, color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
+        
+        const accountCellRef = XLSX.utils.encode_cell({c: 1, r: 3});
+        if(ws[accountCellRef]) {
+            ws[accountCellRef].v = `A/C.NO. ${bankToUse.accountNumber}`;
+            ws[accountCellRef].t = 's';
+        }
+
 
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
@@ -301,7 +308,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                  </DialogHeader>
                 {isPreview ? (
                      <>
-                        <ScrollArea className="flex-grow p-4">
+                        <ScrollArea className="flex-grow">
                             <div ref={printRef} className="bg-white"> 
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
@@ -310,7 +317,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                             <p className="text-xs">{companyAddress}</p>
                                             <p>BoB - {bankToUse?.bankName}</p>
                                             <p>{bankToUse?.branchName}</p>
-                                            <p>A/C.NO..'{bankToUse?.accountNumber}</p>
+                                            <p>A/C.NO. {bankToUse?.accountNumber}</p>
                                         </div>
                                         <div className="text-right">
                                             <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
