@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -16,6 +17,7 @@ import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
+import { BankMailFormatDialog2 } from '@/components/sales/rtgs-report/bank-mail-format-2';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -43,6 +45,7 @@ interface RtgsReportRow {
     sixRNo: string;
     sixRDate: string;
     parchiNo: string;
+    supplierAddress?: string;
 }
 
 export default function RtgsReportClient() {
@@ -53,6 +56,7 @@ export default function RtgsReportClient() {
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
     const [isTablePrintPreviewOpen, setIsTablePrintPreviewOpen] = useState(false);
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
+    const [isBankMailFormat2Open, setIsBankMailFormat2Open] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
 
 
@@ -108,13 +112,10 @@ export default function RtgsReportClient() {
                 sixRNo: p.sixRNo || '',
                 sixRDate: p.sixRDate || '',
                 parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
+                supplierAddress: p.supplierAddress || ''
             };
         });
-        return newReportRows.sort((a, b) => {
-            const numA = parseInt(a.sixRNo, 10) || 0;
-            const numB = parseInt(b.sixRNo, 10) || 0;
-            return numA - numB;
-        });
+        return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [payments, settings]);
 
 
@@ -148,11 +149,7 @@ export default function RtgsReportClient() {
             end.setHours(23, 59, 59, 999);
             filtered = filtered.filter(row => new Date(row.date) <= end);
         }
-        return [...filtered].sort((a, b) => {
-            const numA = parseInt(a.sixRNo, 10) || 0;
-            const numB = parseInt(b.sixRNo, 10) || 0;
-            return numA - numB;
-        });
+        return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
     const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
@@ -327,6 +324,9 @@ export default function RtgsReportClient() {
                             <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
                             </Button>
+                             <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
+                            </Button>
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
@@ -486,6 +486,13 @@ export default function RtgsReportClient() {
                 settings={settings}
             />
 
+            <BankMailFormatDialog2
+                isOpen={isBankMailFormat2Open}
+                onOpenChange={setIsBankMailFormat2Open}
+                payments={filteredReportRows}
+                settings={settings}
+            />
+
         </div>
     );
 }
@@ -495,7 +502,5 @@ export default function RtgsReportClient() {
 
 
 
-
-    
 
     
