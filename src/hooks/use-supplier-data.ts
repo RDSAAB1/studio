@@ -179,8 +179,8 @@ export const useSupplierData = () => {
                 }
             });
             
-            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-            return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+            return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
         });
 
         data.allTransactions = updatedTransactions;
@@ -274,8 +274,8 @@ export const useSupplierData = () => {
                 }
             }
         });
-        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-        return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
+        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+        return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
     });
 
     millSummary.allTransactions = allRecalculatedSuppliers;
