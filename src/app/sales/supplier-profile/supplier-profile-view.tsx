@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
@@ -94,25 +95,24 @@ export const SupplierProfileView = ({
     isMillSelected,
     onShowDetails,
     onShowPaymentDetails,
-    onGenerateStatement,
-    isCustomerView = false
+    onGenerateStatement
 }: {
     selectedSupplierData: CustomerSummary | null;
     isMillSelected: boolean;
     onShowDetails: (supplier: Supplier) => void;
-    onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
+    onShowPaymentDetails: (payment: Payment) => void;
     onGenerateStatement: () => void;
-    isCustomerView?: boolean;
 }) => {
     const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
+    const { toast } = useToast();
 
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
         return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + (selectedSupplierData.totalCdAmount || 0) },
-          { name: isCustomerView ? 'Total Receivable' : 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
+          { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
+          { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
-      }, [selectedSupplierData, isCustomerView]);
+      }, [selectedSupplierData]);
     
       const varietyPieChartData = useMemo(() => {
         if (!selectedSupplierData?.transactionsByVariety) return [];
@@ -145,7 +145,7 @@ export const SupplierProfileView = ({
                     <p>Please select a profile to view details.</p>
                 </CardContent>
             </Card>
-        );
+        )
     }
 
     return (
@@ -156,7 +156,7 @@ export const SupplierProfileView = ({
                         <div>
                             <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
                             <CardDescription>
-                                {isMillSelected ? "A complete financial and transactional overview of the entire business." : isCustomerView ? `Company: ${toTitleCase(selectedSupplierData.companyName || '')} | Contact: ${selectedSupplierData.contact}` : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
+                                {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
                             </CardDescription>
                         </div>
                         <Button onClick={onGenerateStatement} size="sm">Generate Statement</Button>
@@ -168,11 +168,11 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalGrossWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalTeirWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} Qtl`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} Qtl`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -186,25 +186,15 @@ export const SupplierProfileView = ({
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/Qtl)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
-                            {isCustomerView ? (
-                                <>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCd || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Advance</span><span className="font-semibold">{`+ ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
-                                </>
-                            )}
-                            <Separator className="my-2"/>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
+                             <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">{isCustomerView ? 'Total Receivable' : 'Total Original Amount'}</p>
+                                <p className="font-semibold text-muted-foreground">Total Original Amount</p>
                                 <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
                             </div>
                         </CardContent>
@@ -215,14 +205,14 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">{isCustomerView ? 'Total Receivable' : 'Total Net Payable'} <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/Qtl)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">RTGS/Online Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">{isCustomerView ? 'Receivable' : 'Outstanding'}</p>
+                                <p className="font-semibold text-muted-foreground">Outstanding</p>
                                 <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
                             </div>
                         </CardContent>
@@ -246,16 +236,18 @@ export const SupplierProfileView = ({
                             </Select>
                         </div>
                     </CardHeader>
-                    <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `${formatCurrency(value)}` : value} />
-                            <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
-                                {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
-                            </Pie>
-                            <Legend wrapperStyle={{ fontSize: '12px' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
+                    <CardContent>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `${formatCurrency(value)}` : value} />
+                                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
+                                    {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
                     </CardContent>
                 </Card>
                 <div className="grid grid-cols-1 gap-6">

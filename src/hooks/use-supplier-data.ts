@@ -168,15 +168,18 @@ export const useSupplierData = () => {
     
                 paymentsForThisEntry.forEach(p => {
                     const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                    totalPaidForEntry += paidForThisDetail.amount;
-    
+                    
+                    let actualPaidAmount = paidForThisDetail.amount;
                     if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                         const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                         if(totalAmountInPayment > 0) {
                             const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                            totalCdForEntry += p.cdAmount * proportion;
+                            const cdPortion = p.cdAmount * proportion;
+                            totalCdForEntry += cdPortion;
+                            actualPaidAmount -= cdPortion; // Subtract CD from the amount paid for this entry
                         }
                     }
+                    totalPaidForEntry += actualPaidAmount;
                 });
                 
                 const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
@@ -230,6 +233,7 @@ export const useSupplierData = () => {
                 varietyTally[variety] = (varietyTally[variety] || 0) + 1;
             });
             data.transactionsByVariety = varietyTally;
+
         });
     
         const finalSummaryMap = new Map<string, CustomerSummary>();
@@ -239,46 +243,76 @@ export const useSupplierData = () => {
         });
     
         // Add Mill Overview
-        const millSummary: CustomerSummary = Array.from(finalSummaryMap.values()).reduce((acc, s) => {
-            acc.totalAmount += s.totalAmount;
-            acc.totalOriginalAmount += s.totalOriginalAmount;
-            acc.totalPaid += s.totalPaid;
-            acc.totalCashPaid += s.totalCashPaid;
-            acc.totalRtgsPaid += s.totalRtgsPaid;
-            acc.totalCdAmount! += s.totalCdAmount!;
-            acc.totalGrossWeight! += s.totalGrossWeight!;
-            acc.totalTeirWeight! += s.totalTeirWeight!;
-            acc.totalFinalWeight! += s.totalFinalWeight!;
-            acc.totalKartaWeight! += s.totalKartaWeight!;
-            acc.totalNetWeight! += s.totalNetWeight!;
-            acc.totalKartaAmount! += s.totalKartaAmount!;
-            acc.totalLabouryAmount! += s.totalLabouryAmount!;
-            acc.totalKanta! += s.totalKanta!;
-            acc.totalOtherCharges! += s.totalOtherCharges!;
-            acc.totalTransactions! += s.totalTransactions!;
-            Object.entries(s.transactionsByVariety!).forEach(([variety, count]) => {
-                acc.transactionsByVariety![variety] = (acc.transactionsByVariety![variety] || 0) + count;
-            });
-            return acc;
-        }, {
+        const millSummary: CustomerSummary = {
             name: 'Mill (Total Overview)', contact: '', so: '', address: '',
             totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
             totalOutstanding: 0, totalCdAmount: 0,
-            paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+            paymentHistory: [], outstandingEntryIds: [], 
+            allTransactions: [], // This will be populated with re-calculated entries
+            allPayments: [],
             totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
             totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
             totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
             totalTransactions: 0, totalOutstandingTransactions: 0,
             transactionsByVariety: {}, totalBrokerage: 0, totalCd: 0,
+        };
+        
+        // Recalculate netAmount for all suppliers for the Mill Overview
+        const allRecalculatedSuppliers = safeSuppliers.map(transaction => {
+            const paymentsForThisEntry = safePaymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
+            let totalPaidForEntry = 0;
+            let totalCdForEntry = 0;
+            paymentsForThisEntry.forEach(p => {
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
+                let actualPaidAmount = paidForThisDetail.amount;
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                    if(totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        const cdPortion = p.cdAmount * proportion;
+                        totalCdForEntry += cdPortion;
+                        actualPaidAmount -= cdPortion;
+                    }
+                }
+                totalPaidForEntry += actualPaidAmount;
+            });
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+            return { ...transaction, netAmount: calculatedNetAmount };
         });
 
-        millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
-        millSummary.totalOutstandingTransactions = safeSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
-        millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
-        millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
-        millSummary.allTransactions = safeSuppliers;
+        millSummary.allTransactions = allRecalculatedSuppliers;
         millSummary.allPayments = safePaymentHistory;
 
+        // Now calculate mill summary stats based on the re-calculated data
+        millSummary.totalOriginalAmount = millSummary.allTransactions.reduce((sum, t) => sum + t.originalNetAmount, 0);
+        millSummary.totalPaid = millSummary.allPayments.reduce((sum, p) => sum + p.amount, 0);
+        millSummary.totalCdAmount = millSummary.allPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        millSummary.totalOutstanding = millSummary.allTransactions.reduce((sum, t) => sum + Number(t.netAmount), 0);
+
+        millSummary.totalTransactions = millSummary.allTransactions.length;
+        millSummary.totalOutstandingTransactions = millSummary.allTransactions.filter(t => Number(t.netAmount) >= 1).length;
+
+        // Copy other aggregations from individual profiles
+        Array.from(finalSummaryMap.values()).forEach(s => {
+            millSummary.totalAmount += s.totalAmount;
+            millSummary.totalCashPaid += s.totalCashPaid;
+            millSummary.totalRtgsPaid += s.totalRtgsPaid;
+            millSummary.totalGrossWeight! += s.totalGrossWeight!;
+            millSummary.totalTeirWeight! += s.totalTeirWeight!;
+            millSummary.totalFinalWeight! += s.totalFinalWeight!;
+            millSummary.totalKartaWeight! += s.totalKartaWeight!;
+            millSummary.totalNetWeight! += s.totalNetWeight!;
+            millSummary.totalKartaAmount! += s.totalKartaAmount!;
+            millSummary.totalLabouryAmount! += s.totalLabouryAmount!;
+            millSummary.totalKanta! += s.totalKanta!;
+            millSummary.totalOtherCharges! += s.totalOtherCharges!;
+            Object.entries(s.transactionsByVariety!).forEach(([variety, count]) => {
+                millSummary.transactionsByVariety![variety] = (millSummary.transactionsByVariety![variety] || 0) + count;
+            });
+        });
+
+        millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
+        millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
         const totalRateData = safeSuppliers.reduce((acc, s) => {
             if(s.rate > 0) {
                 acc.karta += s.kartaPercentage;
