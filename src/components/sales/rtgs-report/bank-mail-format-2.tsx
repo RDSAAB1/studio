@@ -57,17 +57,16 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const today = format(new Date(), 'dd-MM-yyyy');
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
     
-        // Data setup
         const ws_data: (string | number | Date | null)[][] = [
-            [companyName],
-            [`BoB - ${bankToUse.bankName}`],
-            [bankToUse.branchName],
-            [`A/C.NO..${bankToUse.accountNumber}`],
-            [],
-            [],
-            [null, null, null, null, 'DATE', today],
-            [],
-            ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]
+            [], // Row 1
+            [], // Row 2
+            [null, null, null, null, 'DATE', today], // Row 3
+            [null, companyName], // Row 4
+            [null, `BoB - ${bankToUse.bankName}`], // Row 5
+            [null, bankToUse.branchName], // Row 6
+            [null, `A/C.NO..${bankToUse.accountNumber}`], // Row 7
+            [], // Row 8
+            ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"] // Row 9
         ];
     
         payments.forEach((p: any, index: number) => {
@@ -77,12 +76,12 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        const footerRowIndex = ws_data.length + 4; // Add some space after the table
-        while (ws_data.length < footerRowIndex) {
+        const footerStartIndex = ws_data.length;
+        while (ws_data.length < footerStartIndex + 4) {
             ws_data.push([]);
         }
         
-        ws_data.push(["PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
+        ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         ws_data.push([]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
@@ -90,14 +89,12 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
     
-        // Column Widths
-        ws['!cols'] = [ { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
+        ws['!cols'] = [ { wch: 8 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
-        // Add borders to the table section
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         
-        const tableStartRow = 8; // "S.N" is on row 9 (index 8)
+        const tableStartRow = 8;
         const tableEndRow = tableStartRow + payments.length;
     
         for (let R = tableStartRow; R <= tableEndRow; ++R) {
@@ -165,15 +162,19 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 <ScrollArea className="flex-grow p-4">
                     <div ref={printRef}>
                          <div className="p-4 text-black text-sm">
-                            <div className="mb-2">
-                                <p className="font-bold text-lg">{companyName}</p>
-                                <p>BoB - {bankToUse?.bankName}</p>
-                                <p>{bankToUse?.branchName}</p>
-                                <p>A/C.NO..{bankToUse?.accountNumber}</p>
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="font-bold text-lg">{companyName}</p>
+                                    <p>BoB - {bankToUse?.bankName}</p>
+                                    <p>{bankToUse?.branchName}</p>
+                                    <p>A/C.NO..{bankToUse?.accountNumber}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p><span className="font-bold">DATE</span></p>
+                                    <p>{format(new Date(), 'dd-MM-yyyy')}</p>
+                                </div>
                             </div>
-                            <div className="flex justify-end mb-2">
-                                <p><span className="font-bold">DATE</span> {format(new Date(), 'dd-MM-yyyy')}</p>
-                            </div>
+                            
                             <div>
                                 <table className="w-full table-auto border-collapse border border-black">
                                     <thead className="font-bold">
@@ -202,7 +203,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan={7} className="pt-8 p-1 border-b border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                            <td colSpan={7} className="pt-8 p-1 border-b border-t border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                         </tr>
                                         <tr className="font-bold">
                                             <td colSpan={4} className="p-1"></td>
@@ -226,5 +227,3 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         </Dialog>
     );
 };
-
-    
