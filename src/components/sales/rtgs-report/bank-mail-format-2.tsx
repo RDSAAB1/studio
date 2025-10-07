@@ -45,10 +45,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             [null, companyName],
             [null, `${companyAddress1}${companyAddress2 ? `, ${companyAddress2}` : ''}`],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
+            [null, `A/C.NO. ${bankToUse.accountNumber}`],
         ];
 
         const headerRowIndex = ws_data.length; 
-        ws_data.push([]); // Empty row
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
     
         payments.forEach((p: any, index: number) => {
@@ -70,7 +70,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
         const totalRowIndex = ws_data.length;
-        ws_data.push([null, null, null, "GT", grandTotal, null, null]);
+        ws_data.push([null, null, null, null, grandTotal, null, null]);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
     
@@ -80,18 +80,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
         
-        const accountCellRef = XLSX.utils.encode_cell({c: 1, r: headerRowIndex});
-        if(ws[accountCellRef]) {
-            ws[accountCellRef].v = `A/C.NO. ${bankToUse.accountNumber}`;
-            ws[accountCellRef].t = 's';
-        } else {
-             ws[accountCellRef] = { t: 's', v: `A/C.NO. ${bankToUse.accountNumber}` };
-        }
-
-
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
-        for (let R = headerRowIndex + 1; R <= totalRowIndex; ++R) {
+        for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
             for (let C = 0; C < 7; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
@@ -101,19 +92,16 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 
                 ws[cell_ref].s.border = allBorders;
 
-                if (C === 2 && R > headerRowIndex + 1 && R < footerRow2Index) { 
+                if (C === 2 && R > headerRowIndex && R < footerRow2Index - 2) { 
                     ws[cell_ref].t = 's';
                 }
                 
-                if (R === headerRowIndex + 1 || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRow2Index)) { 
+                if (R === headerRowIndex || (R === totalRowIndex) || (R === footerRow2Index)) { 
                     ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
         }
         
-        const gtCellRef = XLSX.utils.encode_cell({c: 3, r: totalRowIndex});
-        if(ws[gtCellRef] && ws[gtCellRef].s) ws[gtCellRef].s.font = boldFont;
-
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -167,6 +155,12 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
              return;
          }
 
+        const clonedNode = node.cloneNode(true) as HTMLElement;
+        Array.from(clonedNode.querySelectorAll('*')).forEach(el => {
+            el.setAttribute('style', 'color: black !important;');
+        });
+
+
          const iframe = document.createElement('iframe');
          iframe.style.position = 'absolute';
          iframe.style.width = '0';
@@ -205,11 +199,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                  body {
                      -webkit-print-color-adjust: exact !important;
                      print-color-adjust: exact !important;
-                 }
-                 .printable-area {
                      background-color: #fff !important;
                  }
-                 .printable-area * {
+                 .printable-area, .printable-area * {
                      border-color: #000 !important;
                      color: #000 !important;
                  }
@@ -224,7 +216,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
          iframeDoc.head.appendChild(printStyles);
 
          iframeDoc.write('</head><body></body></html>');
-         iframeDoc.body.innerHTML = node.innerHTML;
+         iframeDoc.body.innerHTML = clonedNode.innerHTML;
          iframeDoc.close();
          
          setTimeout(() => {
@@ -311,7 +303,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 {isPreview ? (
                      <>
                         <ScrollArea className="flex-grow p-4">
-                            <div ref={printRef} className="bg-white"> 
+                            <div ref={printRef} className="bg-white">
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
