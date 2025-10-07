@@ -97,6 +97,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 }
                 
                 if (R === headerRowIndex || (R === totalRowIndex) || (R === footerRow2Index)) { 
+                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
                     ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
@@ -155,75 +156,55 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
              return;
          }
 
-        const clonedNode = node.cloneNode(true) as HTMLElement;
-        Array.from(clonedNode.querySelectorAll('*')).forEach(el => {
-            el.setAttribute('style', 'color: black !important;');
-        });
+        const newWindow = window.open('', '', 'height=800,width=1200');
+        if (newWindow) {
+            const document = newWindow.document;
+            document.write('<html><head><title>Print</title>');
 
-
-         const iframe = document.createElement('iframe');
-         iframe.style.position = 'absolute';
-         iframe.style.width = '0';
-         iframe.style.height = '0';
-         iframe.style.border = '0';
-         document.body.appendChild(iframe);
-         
-         const iframeDoc = iframe.contentWindow?.document;
-         if (!iframeDoc) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
-             document.body.removeChild(iframe);
-             return;
-         }
-
-         iframeDoc.open();
-         iframeDoc.write('<html><head><title>RTGS Advice</title>');
-         
-         Array.from(document.styleSheets).forEach(styleSheet => {
-             try {
-                 const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                 const style = iframeDoc.createElement('style');
-                 style.textContent = css;
-                 iframeDoc.head.appendChild(style);
-             } catch (e) {
-                 console.warn('Could not copy stylesheet:', e);
-             }
-         });
-         
-         const printStyles = iframeDoc.createElement('style');
-         printStyles.textContent = `
-             @media print {
-                 @page {
-                     size: A4 landscape;
-                     margin: 10mm;
-                 }
-                 body {
-                     -webkit-print-color-adjust: exact !important;
-                     print-color-adjust: exact !important;
-                     background-color: #fff !important;
-                 }
-                 .printable-area, .printable-area * {
-                     border-color: #000 !important;
-                     color: #000 !important;
-                 }
-                 .print-header-bg {
-                      background-color: #fce5d5 !important;
-                 }
-                 .page-break {
-                     page-break-after: always;
-                 }
-             }
-         `;
-         iframeDoc.head.appendChild(printStyles);
-
-         iframeDoc.write('</head><body></body></html>');
-         iframeDoc.body.innerHTML = clonedNode.innerHTML;
-         iframeDoc.close();
-         
-         setTimeout(() => {
-             iframe.contentWindow?.focus();
-             iframe.contentWindow?.print();
-             document.body.removeChild(iframe);
-         }, 500);
+            // Copy all stylesheets from the main document to the new window
+            Array.from(window.document.styleSheets).forEach(styleSheet => {
+                try {
+                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                    const styleElement = document.createElement('style');
+                    styleElement.appendChild(document.createTextNode(css));
+                    newWindow.document.head.appendChild(styleElement);
+                } catch (e) {
+                    console.warn('Could not copy stylesheet:', e);
+                }
+            });
+            
+             // Inject specific print styles
+            document.write(`
+                <style>
+                    @media print {
+                        @page { size: A4 landscape; margin: 10mm; }
+                        body { 
+                            -webkit-print-color-adjust: exact !important; 
+                            print-color-adjust: exact !important; 
+                            background-color: #fff !important;
+                        }
+                        .printable-area, .printable-area * {
+                            color: #000 !important;
+                            border-color: #000 !important;
+                        }
+                       .print-header-bg {
+                            background-color: #fce5d5 !important;
+                        }
+                    }
+                </style>
+            `);
+            
+            document.write('</head><body></body></html>');
+            document.body.innerHTML = node.innerHTML;
+            
+            setTimeout(() => {
+                newWindow.focus();
+                newWindow.print();
+                newWindow.close();
+            }, 500);
+        } else {
+             toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
+        }
      };
 
     const handleSendMail = async () => {
@@ -304,7 +285,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                      <>
                         <ScrollArea className="flex-grow p-4">
                             <div ref={printRef} className="bg-white">
-                                <div className="p-4 text-black text-sm">
+                                <div className="p-4 text-black text-sm printable-area">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
                                             <p className="font-bold text-lg">{companyName}</p>
