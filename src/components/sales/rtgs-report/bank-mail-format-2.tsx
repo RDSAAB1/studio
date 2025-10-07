@@ -19,10 +19,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         return null;
     }
 
-    const bankToUse = settings?.defaultBank || {
-        bankName: settings?.bankName,
-        branchName: settings?.branchName,
-        accountNumber: settings?.accountNo,
+    const bankToUse = settings.defaultBank || {
+        bankName: settings.bankName,
+        branchName: settings.branchName,
+        accountNumber: settings.accountNo,
     };
 
     const handleDownloadExcel = () => {
@@ -139,7 +139,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                             </thead>
                             <tbody>
                                 {payments.map((p: any, index: number) => (
-                                    <tr key={index} className="border-b">
+                                    <tr key={`${p.paymentId}-${index}`} className="border-b">
                                         <td className="p-1">{index + 1}</td>
                                         <td className="p-1">{toTitleCase(p.supplierName)}</td>
                                         <td className="p-1">{p.acNo}</td>
