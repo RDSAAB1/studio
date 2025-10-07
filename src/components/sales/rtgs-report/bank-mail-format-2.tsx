@@ -14,6 +14,11 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
 
+    // Guard clause to prevent rendering with incomplete data
+    if (!isOpen || !payments || !settings) {
+        return null;
+    }
+
     const handleDownloadExcel = () => {
         if (payments.length === 0 || !settings?.defaultBank) {
             toast({ title: "No data or settings to export", variant: "destructive" });
@@ -91,7 +96,6 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         toast({ title: "Excel file downloading...", variant: "success" });
     };
 
-    if (!isOpen) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
