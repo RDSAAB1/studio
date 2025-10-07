@@ -59,12 +59,16 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
+        // Add two empty rows for the gap
+        ws_data.push([]);
+        ws_data.push([]);
+
         const footerRowIndex = ws_data.length;
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-        ws_data.push([null, null, null, "GT", grandTotal]);
-        const totalRowIndex = ws_data.length - 1;
+        const totalRowIndex = ws_data.length;
+        ws_data.push([null, null, null, null, "GT", grandTotal]);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
     
@@ -74,34 +78,25 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
         const numCols = 7;
-        const dataEndRow = footerRowIndex -1;
+        const totalRows = ws_data.length;
 
-        for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
+        for (let R = headerRowIndex; R < totalRows; ++R) {
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
         
                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
-                if (!ws[cell_ref].s) ws[cell_ref].s = {};
-        
-                if (R >= headerRowIndex && R <= dataEndRow) {
-                    ws[cell_ref].s.border = allBorders;
+                
+                const s = ws[cell_ref].s = ws[cell_ref].s || {};
+                
+                // Apply borders to the main table and footer
+                if (R >= headerRowIndex) {
+                    s.border = allBorders;
                 }
         
-                if (R === headerRowIndex) {
-                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
-                    ws[cell_ref].s.font.bold = true;
-                }
-        
-                if (R === totalRowIndex && (C === 3 || C === 4)) {
-                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
-                    ws[cell_ref].s.font.bold = true;
-                    ws[cell_ref].s.border = allBorders;
-                }
-        
-                if (R === footerRowIndex && C === 1) {
-                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
-                    ws[cell_ref].s.font.bold = true;
+                // Bold headers and specific footer cells
+                if (R === headerRowIndex || (R === totalRowIndex && (C === 4 || C === 5)) || (R === footerRowIndex && C === 1)) {
+                    s.font = { ...s.font, ...boldFont };
                 }
             }
         }
