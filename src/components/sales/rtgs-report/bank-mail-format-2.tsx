@@ -58,7 +58,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-        const totalRowData: (string | number | null)[] = [null, null, null, 'GT', grandTotal];
+        const totalRowData: (string | number | null)[] = [null, null, null, null, 'GT', grandTotal];
         ws_data.push(totalRowData);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -76,25 +76,25 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const totalRow = footerRowIndex + 1;
         const numCols = 7;
         
-        // Apply styles to header
-        for (let C = 0; C < numCols; ++C) {
-            const cell_address = { c: C, r: headerRow };
-            const cell_ref = XLSX.utils.encode_cell(cell_address);
-            if (!ws[cell_ref]) ws[cell_ref] = {};
-            ws[cell_ref].s = { ...boldStyle, border: allBorders };
-        }
-
-        // Apply styles to data rows and set account number as text
-        for (let R = dataStartRow; R <= dataEndRow; ++R) {
+        // --- Cell-by-cell styling for robust borders ---
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        for (let R = headerRow; R <= dataEndRow; ++R) {
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-                if (!ws[cell_ref]) ws[cell_ref] = {};
-                ws[cell_ref].s = { border: allBorders };
-                // Set column C (Account No) to text format
-                if (C === 2) {
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Create cell if it doesn't exist
+                
+                const currentStyle: any = { border: allBorders };
+                
+                if (R === headerRow) {
+                    currentStyle.font = boldStyle.font;
+                }
+
+                if (C === 2) { // Account Number column
                     ws[cell_ref].t = 's';
                 }
+
+                ws[cell_ref].s = currentStyle;
             }
         }
         
@@ -102,19 +102,19 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         if(noteCell) noteCell.s = { ...boldStyle };
 
         // Style the Grand Total
-        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 3, r: totalRow})];
-        if (gtLabelCell) gtLabelCell.s = { ...boldStyle };
+        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        if (gtLabelCell) gtLabelCell.s = { ...boldStyle, border: allBorders };
         
-        const gtValueCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        const gtValueCell = ws[XLSX.utils.encode_cell({c: 5, r: totalRow})];
         if (gtValueCell) gtValueCell.s = { ...boldStyle, border: allBorders };
         
         // Ensure other cells in total row have borders if needed
         for (let C = 0; C < numCols; ++C) {
             const cell_address = { c: C, r: totalRow };
             const cell_ref = XLSX.utils.encode_cell(cell_address);
-            if (ws[cell_ref]) {
-                 ws[cell_ref].s = { ...ws[cell_ref].s, border: allBorders };
-            }
+             if (!ws[cell_ref]) ws[cell_ref] = {}; // Ensure cell exists
+            if (!ws[cell_ref].s) ws[cell_ref].s = {}; // Ensure style object exists
+            ws[cell_ref].s.border = allBorders;
         }
         
         const wb = XLSX.utils.book_new();
@@ -127,6 +127,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         };
     };
+
 
     useEffect(() => {
         if (isOpen) {
@@ -356,8 +357,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                             <td colSpan={7} className="pt-8 p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                         </tr>
                                         <tr className="font-bold">
-                                            <td colSpan={3} className="p-1"></td>
-                                            <td className="p-1 text-right">GT</td>
+                                            <td colSpan={4} className="p-1 text-right">GT</td>
                                             <td className="p-1 text-right font-semibold">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
                                             <td className="p-1" colSpan={2}></td>
                                         </tr>
