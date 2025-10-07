@@ -805,12 +805,12 @@ const handleDelete = async (id: string) => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                     A supplier with a very similar name already exists. Is this the same person?
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-                    </div>
                 </AlertDialogDescription>
+                <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                    <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                    <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                    <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+                </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
@@ -831,13 +831,14 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      <DetailsDialog 
-          isOpen={!!detailsSupplier}
-          onOpenChange={(open) => !open && setDetailsSupplier(null)}
-          customer={detailsSupplier}
-          paymentHistory={paymentHistory}
-      />
+        
+      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                <StatementPreview data={detailsSupplier} />
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}
@@ -868,3 +869,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
