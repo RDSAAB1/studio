@@ -134,7 +134,16 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
-    const kartaWeight = Math.round(weight * kartaPercentage) / 100;
+    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
+    const rawKartaWeight = weight * kartaPercentage / 100;
+
+    let kartaWeight;
+    if (decimalPart >= 5) {
+        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
+    } else {
+        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
+    }
+
     const kartaAmount = Math.round(kartaWeight * rate);
     
     const netWeight = weight - kartaWeight;
@@ -147,9 +156,9 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
-    // The netAmount for a supplier entry should always reflect its original value, not subsequent payments.
-    // The outstanding amount is calculated dynamically in the profile view.
-    const netAmount = originalNetAmount;
+    const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));
+    const totalPaid = paymentsForThisEntry.reduce((acc, p) => acc + p.amount, 0);
+    const netAmount = originalNetAmount - totalPaid;
 
     return {
       ...values,
@@ -201,9 +210,9 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         originalNetAmount -= brokerageAmount;
     }
 
-    // The netAmount for a customer entry should always reflect its original value.
-    // The outstanding amount is calculated dynamically in the profile view.
-    const netAmount = originalNetAmount;
+    const paymentsForThisEntry = (paymentHistory || []).filter((p: any) => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));
+    const totalPaid = paymentsForThisEntry.reduce((acc: number, p: any) => acc + p.amount, 0);
+    const netAmount = originalNetAmount - totalPaid;
 
     let entryDate: Date;
     if (values.date) {
