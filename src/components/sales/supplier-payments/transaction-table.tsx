@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -66,7 +66,7 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
                                             />
                                         </TableCell>
                                         <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
-                                        <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                                        <TableCell className="p-2 text-xs">{entry.date && isValid(new Date(entry.date)) ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                         <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
                                         <TableCell className="text-right p-2 text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
                                         <TableCell className="text-right p-2 text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
