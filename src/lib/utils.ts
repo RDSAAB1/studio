@@ -156,14 +156,13 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
-    const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));
-    const totalPaid = paymentsForThisEntry.reduce((acc, p) => acc + p.amount, 0);
-    const netAmount = originalNetAmount - totalPaid;
+    const netAmount = originalNetAmount;
 
     return {
       ...values,
-      date: entryDate,
-      term: String(values.term), dueDate: format(newDueDate, 'yyyy-MM-dd'),
+      date: entryDate.toISOString().split('T')[0],
+      term: String(values.term), 
+      dueDate: newDueDate.toISOString().split('T')[0],
       weight: weight,
       kartaWeight: kartaWeight,
       kartaAmount: kartaAmount,
@@ -226,7 +225,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
 
     return {
         ...values,
-        date: entryDate,
+        date: format(entryDate, 'yyyy-MM-dd'),
         dueDate: format(entryDate, 'yyyy-MM-dd'),
         weight: weight,
         netWeight: netWeight,
@@ -267,3 +266,4 @@ export const levenshteinDistance = (s1: string, s2: string): number => {
     }
     return costs[s2.length];
 };
+
