@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2 } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
@@ -30,6 +30,7 @@ interface CalculatedSummaryProps {
     onBrokerageToggle?: (checked: boolean) => void;
     onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onExport?: () => void;
+    onUpdateAll?: () => void;
     onDeleteSelected?: () => void;
     onDeleteAll?: () => void;
     isDeleting?: boolean;
@@ -68,6 +69,7 @@ export const CalculatedSummary = ({
     onBrokerageToggle,
     onImport,
     onExport,
+    onUpdateAll,
     onDeleteSelected,
     onDeleteAll,
     isDeleting = false
@@ -129,6 +131,11 @@ export const CalculatedSummary = ({
                          {onExport && (
                             <Button onClick={onExport} size="sm" variant="outline" className="h-8" type="button">
                             <Download className="mr-2 h-4 w-4"/> Export
+                            </Button>
+                         )}
+                         {onUpdateAll && (
+                            <Button onClick={onUpdateAll} size="sm" variant="outline" className="h-8" type="button">
+                                <RefreshCw className="mr-2 h-4 w-4"/> Update All
                             </Button>
                          )}
                          {onDeleteSelected && selectedIdsCount > 0 && (

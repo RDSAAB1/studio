@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateAllSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
@@ -401,7 +401,7 @@ export default function SupplierEntryClient() {
         );
 
         for (const payment of associatedPayments) {
-            await handleDeletePaymentLogic(payment, safeSuppliers);
+            await handleDeletePaymentLogic(payment, safePaymentHistory);
         }
 
         await deleteSupplier(id);
@@ -651,13 +651,21 @@ export default function SupplierEntryClient() {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            setSuppliers([]);
-            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
             console.error("Error deleting all entries:", error);
             toast({ title: "Failed to delete all entries", variant: "destructive" });
+        }
+    };
+
+    const handleUpdateAll = async () => {
+        toast({ title: "Updating all entries...", description: "This might take a moment." });
+        const updatedCount = await recalculateAndUpdateAllSuppliers();
+        if (updatedCount > 0) {
+            toast({ title: "Update Complete", description: `${updatedCount} entries were corrected.`, variant: "success" });
+        } else {
+            toast({ title: "No Updates Needed", description: "All supplier entries are already up to date.", variant: "success" });
         }
     };
     
@@ -761,6 +769,7 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
+                onUpdateAll={handleUpdateAll}
                 onDeleteAll={handleDeleteAll}
             />
         </form>
