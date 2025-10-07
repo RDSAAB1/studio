@@ -39,20 +39,20 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
 
         const ws_data: (string | number | Date | null)[][] = [
-            [], // Row 1 is empty
             [null, companyName],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
+            [], // Empty row 4
         ];
         
-        const headerRowIndex = ws_data.length;
+        const headerRowIndex = ws_data.length; // This will be 4 (5th row in 1-based index)
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
 
         payments.forEach((p: any, index: number) => {
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                p.acNo, 
+                `'${p.acNo}`, 
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -78,35 +78,44 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const dataEndRow = footerRowIndex - 1;
 
         // Apply borders and styles
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:G1');
         for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
             for (let C = 0; C < numCols; ++C) {
+                // Skip cells that are not part of the main table structure
+                if (R === footerRowIndex && C > 1) continue;
+                if (R === totalRowIndex && C > 4) continue;
+                if (R === totalRowIndex && C < 3) continue;
+
                  const cell_address = { c: C, r: R };
                  const cell_ref = XLSX.utils.encode_cell(cell_address);
-                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Create cell if it doesn't exist
+                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
 
-                let cellStyle: any = { border: allBorders };
+                 // Ensure style object exists
+                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
+
+                 // Apply border to all table cells
+                 if (R >= headerRowIndex && R < footerRowIndex) {
+                    ws[cell_ref].s.border = allBorders;
+                 }
                 
                 // Bold headers
                 if (R === headerRowIndex) {
-                    cellStyle.font = boldFont;
+                    if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                    ws[cell_ref].s.font.bold = true;
                 }
 
                 // Bold "GT" and total amount
                 if (R === totalRowIndex && (C === 3 || C === 4)) {
-                     cellStyle.font = boldFont;
+                     if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                     ws[cell_ref].s.font.bold = true;
+                     ws[cell_ref].s.border = allBorders;
                 }
                 
                 // Bold the note
                 if (R === footerRowIndex && C === 1) {
-                    cellStyle.font = boldFont;
+                    if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                    ws[cell_ref].s.font.bold = true;
                 }
-
-                 // Force text format for account numbers
-                if (C === 2 && R > headerRowIndex && R < footerRowIndex) {
-                    ws[cell_ref].t = 's';
-                }
-                
-                ws[cell_ref].s = cellStyle;
             }
         }
         
@@ -426,5 +435,3 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         </Dialog>
     );
 };
-
-    
