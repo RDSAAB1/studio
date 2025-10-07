@@ -32,25 +32,33 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
     const generateExcelBuffer = (): Attachment | null => {
         if (!payments || payments.length === 0 || !settings) return null;
-    
+
         const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
         const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
         const today = format(new Date(), 'dd-MM-yyyy');
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
-    
+
         const ws_data: (string | number | Date | null)[][] = [
-            [null, companyName],
-            [null, `BoB - ${bankToUse.bankName}`],
-            [null, bankToUse.branchName, null, null, 'DATE', today],
-            [null, `A/C.NO..${bankToUse.accountNumber}`],
+            [], // Row 1 is empty
+            [null, companyName], // Row 2
+            [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today], // Row 3
+            [null, `A/C.NO.. '${bankToUse.accountNumber}`], // Row 4
+            // Row 5 is intentionally left blank as a separator
         ];
 
+        // Row 6: Header
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
-    
+
+        // Data Rows
         payments.forEach((p: any, index: number) => {
             ws_data.push([
-                index + 1, toTitleCase(p.supplierName), p.acNo, p.ifscCode,
-                p.amount, toTitleCase(p.supplierAddress || p.branch || ''), p.bank,
+                index + 1,
+                toTitleCase(p.supplierName),
+                `'${p.acNo}`, // Prepend with ' to force text format in Excel
+                p.ifscCode,
+                p.amount,
+                toTitleCase(p.supplierAddress || p.branch || ''),
+                p.bank,
             ]);
         });
         
@@ -58,63 +66,60 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-        const totalRowData: (string | number | null)[] = [null, null, null, null, 'GT', grandTotal];
+        const totalRowData: (string | number | null)[] = [null, null, null, "GT", grandTotal];
         ws_data.push(totalRowData);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
         ws['!cols'] = [ { wch: 8 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
+        // --- RELIABLE BORDER APPLICATION ---
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldStyle = { font: { bold: true } };
 
-        const headerRow = 4;
-        const dataStartRow = 5;
+        const headerRow = 5; // Header is now on row 6 (0-indexed)
+        const dataStartRow = 6;
         const dataEndRow = dataStartRow + payments.length - 1;
-        const noteRow = footerRowIndex;
-        const totalRow = footerRowIndex + 1;
         const numCols = 7;
-        
-        // --- Cell-by-cell styling for robust borders ---
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        const totalRow = footerRowIndex + 1;
+
+
         for (let R = headerRow; R <= dataEndRow; ++R) {
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
+                
                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Create cell if it doesn't exist
                 
-                const currentStyle: any = { border: allBorders };
+                let cellStyle: any = { border: allBorders };
                 
                 if (R === headerRow) {
-                    currentStyle.font = boldStyle.font;
+                    cellStyle.font = boldStyle.font;
                 }
 
-                if (C === 2) { // Account Number column
-                    ws[cell_ref].t = 's';
-                }
-
-                ws[cell_ref].s = currentStyle;
+                ws[cell_ref].s = cellStyle;
             }
         }
         
-        const noteCell = ws[XLSX.utils.encode_cell({c: 1, r: noteRow})];
-        if(noteCell) noteCell.s = { ...boldStyle };
+        const noteCell = ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})];
+        if(noteCell) noteCell.s = { font: { bold: true } };
 
-        // Style the Grand Total
-        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
-        if (gtLabelCell) gtLabelCell.s = { ...boldStyle, border: allBorders };
+        // Style the Grand Total Row
+        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 3, r: totalRow})];
+        if (gtLabelCell) gtLabelCell.s = { font: { bold: true }, border: allBorders };
         
-        const gtValueCell = ws[XLSX.utils.encode_cell({c: 5, r: totalRow})];
-        if (gtValueCell) gtValueCell.s = { ...boldStyle, border: allBorders };
+        const gtValueCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        if (gtValueCell) gtValueCell.s = { font: { bold: true }, border: allBorders };
         
-        // Ensure other cells in total row have borders if needed
+        // Ensure surrounding cells in the GT row also have borders
         for (let C = 0; C < numCols; ++C) {
-            const cell_address = { c: C, r: totalRow };
-            const cell_ref = XLSX.utils.encode_cell(cell_address);
-             if (!ws[cell_ref]) ws[cell_ref] = {}; // Ensure cell exists
-            if (!ws[cell_ref].s) ws[cell_ref].s = {}; // Ensure style object exists
-            ws[cell_ref].s.border = allBorders;
+            if (C !== 3 && C !== 4) {
+                 const cell_address = { c: C, r: totalRow };
+                 const cell_ref = XLSX.utils.encode_cell(cell_address);
+                 if (!ws[cell_ref]) ws[cell_ref] = {};
+                 ws[cell_ref].s = { border: allBorders };
+            }
         }
         
         const wb = XLSX.utils.book_new();
@@ -127,7 +132,6 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         };
     };
-
 
     useEffect(() => {
         if (isOpen) {
@@ -165,7 +169,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         toast({ title: "Excel file downloading...", variant: "success" });
     };
     
-    const handlePrint = () => {
+     const handlePrint = () => {
         const node = printRef.current;
         if (!node) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
@@ -311,128 +315,125 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                         Preview, download, or email the custom Excel format for bank payments.
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-4">
-                    <div ref={printRef}>
-                         <div className="p-4 text-black text-sm">
-                            <div className="grid grid-cols-2 items-start mb-4">
-                                <div className='space-y-1'>
-                                    <p className="font-bold text-lg">{companyName}</p>
-                                    <p>BoB - {bankToUse?.bankName}</p>
-                                    <p>{bankToUse?.branchName}</p>
-                                    <p>A/C.NO..'{bankToUse?.accountNumber}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
+                {isPreview ? (
+                     <>
+                        <ScrollArea className="flex-grow p-4">
+                            <div ref={printRef}>
+                                <div className="p-4 text-black text-sm">
+                                    <div className="grid grid-cols-2 items-start mb-4">
+                                        <div className='space-y-1'>
+                                            <p className="font-bold text-lg">{companyName}</p>
+                                            <p>BoB - {bankToUse?.bankName}</p>
+                                            <p>{bankToUse?.branchName}</p>
+                                            <p>A/C.NO..'{bankToUse?.accountNumber}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <table className="w-full table-auto border-collapse border border-black">
+                                            <thead className="font-bold">
+                                                <tr className="border-b border-black">
+                                                    <th className="p-1 text-left border border-black">S.N</th>
+                                                    <th className="p-1 text-left border border-black">Name</th>
+                                                    <th className="p-1 text-left border border-black">Account no</th>
+                                                    <th className="p-1 text-left border border-black">IFCS Code</th>
+                                                    <th className="p-1 text-right border border-black">Amount</th>
+                                                    <th className="p-1 text-left border border-black">Place</th>
+                                                    <th className="p-1 text-left border border-black">BANK</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {payments && payments.map((p: any, index: number) => (
+                                                    <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
+                                                        <td className="p-1 border border-black">{index + 1}</td>
+                                                        <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
+                                                        <td className="p-1 border border-black font-mono">'{p.acNo}</td>
+                                                        <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
+                                                        <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
+                                                        <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
+                                                        <td className="p-1 border border-black">{p.bank}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td colSpan={7} className="pt-8 p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                                </tr>
+                                                <tr className="font-bold">
+                                                    <td colSpan={4} className="p-1 text-right">GT</td>
+                                                    <td className="p-1 text-right font-semibold">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
+                                                    <td className="p-1" colSpan={2}></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div>
-                                <table className="w-full table-auto border-collapse border border-black">
-                                    <thead className="font-bold">
-                                        <tr className="border-b border-black">
-                                            <th className="p-1 text-left border border-black">S.N</th>
-                                            <th className="p-1 text-left border border-black">Name</th>
-                                            <th className="p-1 text-left border border-black">Account no</th>
-                                            <th className="p-1 text-left border border-black">IFCS Code</th>
-                                            <th className="p-1 text-right border border-black">Amount</th>
-                                            <th className="p-1 text-left border border-black">Place</th>
-                                            <th className="p-1 text-left border border-black">BANK</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {payments && payments.map((p: any, index: number) => (
-                                            <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
-                                                <td className="p-1 border border-black">{index + 1}</td>
-                                                <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
-                                                <td className="p-1 border border-black font-mono">'{p.acNo}</td>
-                                                <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
-                                                <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
-                                                <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
-                                                <td className="p-1 border border-black">{p.bank}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td colSpan={7} className="pt-8 p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
-                                        </tr>
-                                        <tr className="font-bold">
-                                            <td colSpan={4} className="p-1 text-right">GT</td>
-                                            <td className="p-1 text-right font-semibold">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
-                                            <td className="p-1" colSpan={2}></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </ScrollArea>
-                <DialogFooter className="p-4 border-t flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
-                    <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
-                    <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
-                </DialogFooter>
-
-                {!isPreview && (
-                    <Dialog open={!isPreview} onOpenChange={(open) => !open && setIsPreview(true)}>
-                        <DialogContent className="h-full w-full max-h-full max-w-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl p-0 flex flex-col">
-                            <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
-                                <DialogTitle className="text-base font-normal">New Message</DialogTitle>
-                            </DialogHeader>
-                             <ScrollArea className="flex-grow">
-                                <div className="p-4 space-y-3 flex flex-col min-h-0">
-                                    <div className="flex items-center border-b pb-2">
-                                        <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
-                                        <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
-                                    </div>
-                                     <div className="flex items-center border-b pb-2">
-                                        <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
-                                        <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
-                                    </div>
-                                    <Textarea 
-                                        value={emailData.body}
-                                        onChange={(e) => setEmailData({...emailData, body: e.target.value})}
-                                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
-                                    />
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                                        {attachments.map((att, index) => (
-                                            <div key={index} className="relative flex items-center gap-2 p-2 border rounded-md">
-                                                <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
-                                                <div className="flex-grow overflow-hidden">
-                                                    <p className="text-sm font-medium truncate">{att.filename}</p>
-                                                    <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    onClick={() => removeAttachment(index)}
-                                                    className="absolute top-1 right-1 rounded-full h-5 w-5"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
+                        </ScrollArea>
+                        <DialogFooter className="p-4 border-t flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                            <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
+                            <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+                            <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
+                        </DialogFooter>
+                    </>
+                ) : (
+                    <>
+                        <ScrollArea className="flex-grow">
+                            <div className="p-4 space-y-3 flex flex-col min-h-0">
+                                <div className="flex items-center border-b pb-2">
+                                    <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
+                                    <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                </div>
+                                <div className="flex items-center border-b pb-2">
+                                    <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
+                                    <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                </div>
+                                <Textarea 
+                                    value={emailData.body}
+                                    onChange={(e) => setEmailData({...emailData, body: e.target.value})}
+                                    className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                                    {attachments.map((att, index) => (
+                                        <div key={index} className="relative flex items-center gap-2 p-2 border rounded-md">
+                                            <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                            <div className="flex-grow overflow-hidden">
+                                                <p className="text-sm font-medium truncate">{att.filename}</p>
+                                                <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <Button
+                                                type="button"
+                                                onClick={() => removeAttachment(index)}
+                                                className="absolute top-1 right-1 rounded-full h-5 w-5"
+                                                variant="ghost"
+                                                size="icon"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
                                 </div>
-                            </ScrollArea>
-                            <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
-                                <div className="relative">
-                                    <Button size="icon" variant="ghost" asChild>
-                                        <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
-                                    </Button>
-                                    <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" onClick={() => setIsPreview(true)}>Cancel</Button>
-                                    <Button onClick={handleSendMail} disabled={isSending}>
-                                        {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
-                                    </Button>
-                                </div>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                            </div>
+                        </ScrollArea>
+                        <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
+                            <div className="relative">
+                                <Button size="icon" variant="ghost" asChild>
+                                    <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
+                                </Button>
+                                <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" onClick={() => setIsPreview(true)}>Cancel</Button>
+                                <Button onClick={handleSendMail} disabled={isSending}>
+                                    {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
+                                </Button>
+                            </div>
+                        </DialogFooter>
+                    </>
                 )}
             </DialogContent>
         </Dialog>
