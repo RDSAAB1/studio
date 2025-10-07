@@ -32,22 +32,21 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
     const generateExcelBuffer = (): Attachment | null => {
         if (!payments || payments.length === 0 || !settings) return null;
-
+    
         const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
         const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
         const today = format(new Date(), 'dd-MM-yyyy');
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
-
+    
         const ws_data: (string | number | Date | null)[][] = [
             [null, companyName],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
-            [], // Empty row 4
         ];
         
-        const headerRowIndex = ws_data.length; // This will be 4 (5th row in 1-based index)
+        const headerRowIndex = ws_data.length; 
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
-
+    
         payments.forEach((p: any, index: number) => {
             ws_data.push([
                 index + 1,
@@ -65,55 +64,43 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
         ws_data.push([null, null, null, "GT", grandTotal]);
-        const totalRowIndex = ws_data.length -1;
+        const totalRowIndex = ws_data.length - 1;
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
-
-        ws['!cols'] = [ { wch: 8 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
+    
+        ws['!cols'] = [ { wch: 8 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
         const numCols = 7;
-        const dataEndRow = footerRowIndex - 1;
+        const dataEndRow = footerRowIndex -1;
 
-        // Apply borders and styles
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:G1');
         for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
             for (let C = 0; C < numCols; ++C) {
-                // Skip cells that are not part of the main table structure
-                if (R === footerRowIndex && C > 1) continue;
-                if (R === totalRowIndex && C > 4) continue;
-                if (R === totalRowIndex && C < 3) continue;
-
-                 const cell_address = { c: C, r: R };
-                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
-
-                 // Ensure style object exists
-                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
-
-                 // Apply border to all table cells
-                 if (R >= headerRowIndex && R < footerRowIndex) {
+                const cell_address = { c: C, r: R };
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+        
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
+                if (!ws[cell_ref].s) ws[cell_ref].s = {};
+        
+                if (R >= headerRowIndex && R <= dataEndRow) {
                     ws[cell_ref].s.border = allBorders;
-                 }
-                
-                // Bold headers
+                }
+        
                 if (R === headerRowIndex) {
-                    if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
                     ws[cell_ref].s.font.bold = true;
                 }
-
-                // Bold "GT" and total amount
+        
                 if (R === totalRowIndex && (C === 3 || C === 4)) {
-                     if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
-                     ws[cell_ref].s.font.bold = true;
-                     ws[cell_ref].s.border = allBorders;
+                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                    ws[cell_ref].s.font.bold = true;
+                    ws[cell_ref].s.border = allBorders;
                 }
-                
-                // Bold the note
+        
                 if (R === footerRowIndex && C === 1) {
-                    if(!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
+                    if (!ws[cell_ref].s.font) ws[cell_ref].s.font = {};
                     ws[cell_ref].s.font.bold = true;
                 }
             }
