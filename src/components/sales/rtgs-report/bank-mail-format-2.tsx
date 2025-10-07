@@ -12,7 +12,6 @@ import { format } from 'date-fns';
 
 export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
-    const printRef = useRef<HTMLDivElement>(null);
 
     // Guard clause to prevent rendering with incomplete data
     if (!isOpen || !payments || !settings) {
@@ -24,6 +23,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         branchName: settings.branchName,
         accountNumber: settings.accountNo,
     };
+    
+    const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
 
     const handleDownloadExcel = () => {
         if (payments.length === 0 || !bankToUse) {
@@ -35,58 +36,47 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const wb = XLSX.utils.book_new();
 
         // --- Create Data for the Sheet ---
-        
-        // Header
-        const header = [
-            ["GURU KRIPA AGRO FOODS"],
+        const ws_data = [
+            [companyName],
             [bankToUse.bankName],
             [bankToUse.branchName],
             [`A/C.NO..${bankToUse.accountNumber}`],
-            [], // Spacer row
-        ];
-        
-        const dateHeader = [
-            ['', '', '', '', 'DATE', format(new Date(), 'dd-MM-yyyy')]
+            [],
+            ['', '', '', '', 'DATE', format(new Date(), 'dd-MM-yyyy')],
+            [],
+            [ "S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK" ]
         ];
 
-        // Table Header
-        const tableHeader = [ "S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK" ];
-        
-        // Table Body
-        const tableBody = payments.map((p: any, index: number) => ([
-            index + 1,
-            toTitleCase(p.supplierName),
-            `'${p.acNo}`, // Prepend with ' to treat as text
-            p.ifscCode,
-            p.amount,
-            toTitleCase(p.supplierAddress || ''),
-            p.bank,
-        ]));
-        
         const grandTotalAmount = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
 
-        // Footer
-        const footer = [
-            [],[],[],[],[],[],[],[],[],[], // Spacer rows to push footer down
-            ["PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"],
-            [],
-            ['', '', '', '', '', 'GT', grandTotalAmount],
-        ];
-
-        // --- Create Worksheet and Add Data ---
-        const ws = XLSX.utils.aoa_to_sheet([]);
+        payments.forEach((p: any, index: number) => {
+            ws_data.push([
+                index + 1,
+                toTitleCase(p.supplierName),
+                `'${p.acNo}`, // Prepend with ' to treat as text
+                p.ifscCode,
+                p.amount,
+                toTitleCase(p.supplierAddress || ''),
+                p.bank,
+            ]);
+        });
         
-        // Append all parts
-        XLSX.utils.sheet_add_aoa(ws, header, { origin: "A1" });
-        XLSX.utils.sheet_add_aoa(ws, dateHeader, { origin: "A5" });
-        XLSX.utils.sheet_add_aoa(ws, [tableHeader], { origin: "A7" });
-        XLSX.utils.sheet_add_aoa(ws, tableBody, { origin: "A8" });
-        XLSX.utils.sheet_add_aoa(ws, footer, { origin: "A20" });
+        // Add empty rows to reach the footer
+        const emptyRowsNeeded = Math.max(0, 19 - ws_data.length);
+        for(let i=0; i<emptyRowsNeeded; i++) {
+            ws_data.push([]);
+        }
 
+        ws_data.push(["PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
+        ws_data.push([]); // Spacer before GT
+        ws_data.push(['', '', '', '', '', 'GT', grandTotalAmount]);
+
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
+        
         // --- Styling (Column Widths) ---
         ws['!cols'] = [
             { wch: 5 },  // S.N
-            { wch: 20 }, // Name
+            { wch: 25 }, // Name
             { wch: 20 }, // Account no
             { wch: 15 }, // IFCS Code
             { wch: 15 }, // Amount
@@ -112,10 +102,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                         This is a preview of the custom Excel format for bank payments.
                     </DialogDescription>
                 </DialogHeader>
-                <div ref={printRef} className="p-4 border rounded-lg bg-gray-50">
+                <div className="p-4 border rounded-lg bg-gray-50 text-black">
                     <div className="grid grid-cols-7 gap-4">
                         <div className="col-span-4">
-                             <p className="font-bold text-lg">GURU KRIPA AGRO FOODS</p>
+                             <p className="font-bold text-lg">{companyName}</p>
                              <p>{bankToUse?.bankName}</p>
                              <p>{bankToUse?.branchName}</p>
                              <p>A/C.NO..{bankToUse?.accountNumber}</p>
@@ -125,38 +115,46 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                         </div>
                     </div>
                     <div className="mt-4">
-                        <table className="w-full text-sm">
+                        <table className="w-full text-sm table-auto border-collapse">
                             <thead>
-                                <tr className="border-b">
-                                    <th className="p-1 text-left">S.N</th>
-                                    <th className="p-1 text-left">Name</th>
-                                    <th className="p-1 text-left">Account no</th>
-                                    <th className="p-1 text-left">IFCS Code</th>
-                                    <th className="p-1 text-right">Amount</th>
-                                    <th className="p-1 text-left">Place</th>
-                                    <th className="p-1 text-left">BANK</th>
+                                <tr className="border-b border-black">
+                                    <th className="p-1 text-left border border-black">S.N</th>
+                                    <th className="p-1 text-left border border-black">Name</th>
+                                    <th className="p-1 text-left border border-black">Account no</th>
+                                    <th className="p-1 text-left border border-black">IFCS Code</th>
+                                    <th className="p-1 text-right border border-black">Amount</th>
+                                    <th className="p-1 text-left border border-black">Place</th>
+                                    <th className="p-1 text-left border border-black">BANK</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {payments.map((p: any, index: number) => (
-                                    <tr key={`${p.paymentId}-${index}`} className="border-b">
-                                        <td className="p-1">{index + 1}</td>
-                                        <td className="p-1">{toTitleCase(p.supplierName)}</td>
-                                        <td className="p-1">{p.acNo}</td>
-                                        <td className="p-1">{p.ifscCode}</td>
-                                        <td className="p-1 text-right">{formatCurrency(p.amount)}</td>
-                                        <td className="p-1">{toTitleCase(p.supplierAddress || '')}</td>
-                                        <td className="p-1">{p.bank}</td>
+                                    <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
+                                        <td className="p-1 border border-black">{index + 1}</td>
+                                        <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
+                                        <td className="p-1 border border-black font-mono">{p.acNo}</td>
+                                        <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
+                                        <td className="p-1 text-right border border-black">{formatCurrency(p.amount)}</td>
+                                        <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || '')}</td>
+                                        <td className="p-1 border border-black">{p.bank}</td>
                                     </tr>
+                                ))}
+                                {/* Empty rows for consistent layout */}
+                                {Array.from({ length: Math.max(0, 19 - 7 - payments.length) }).map((_, i) => (
+                                    <tr key={`empty-${i}`} className="border-b border-black h-7"><td className="border border-black" colSpan={7}></td></tr>
                                 ))}
                             </tbody>
                             <tfoot>
-                                 <tr>
-                                    <td colSpan={7} className="pt-8 text-sm">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                 <tr className="border-b border-black">
+                                    <td colSpan={7} className="pt-8 text-sm border border-black p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                  </tr>
-                                 <tr className="font-bold">
-                                    <td colSpan={5} className="p-1 text-right">GT</td>
-                                    <td colSpan={2} className="p-1 text-left">{formatCurrency(payments.reduce((sum: number, p: any) => sum + p.amount, 0))}</td>
+                                 <tr className="font-bold border-b border-black h-7">
+                                    <td colSpan={7} className="border border-black"></td>
+                                 </tr>
+                                 <tr className="font-bold border-b border-black">
+                                    <td colSpan={5} className="p-1 text-right border-r border-black"></td>
+                                    <td className="p-1 border-r border-black">GT</td>
+                                    <td className="p-1">{formatCurrency(payments.reduce((sum: number, p: any) => sum + p.amount, 0))}</td>
                                  </tr>
                             </tfoot>
                         </table>
