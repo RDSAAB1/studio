@@ -54,7 +54,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         });
         
         ws_data.push([]);
-        ws_data.push([]);
+        
+        const footerRowIndex = ws_data.length;
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
@@ -67,28 +68,38 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldStyle = { font: { bold: true } };
+
+        const headerRow = 4;
+        const dataStartRow = 5;
+        const dataEndRow = dataStartRow + payments.length - 1;
+        const totalRow = footerRowIndex + 1;
+        const numCols = 7;
         
-        const tableStartRow = 4; // Table header is now on row 5 (0-indexed)
-        const tableEndRow = tableStartRow + payments.length;
-    
-        // Apply borders and bold to header
-        for (let C = 0; C < 7; ++C) {
-            const headerCellRef = XLSX.utils.encode_cell({ c: C, r: tableStartRow });
-            if (ws[headerCellRef]) {
-                ws[headerCellRef].s = { border: allBorders, font: boldStyle };
-            }
+        // Apply styles to header
+        for (let C = 0; C < numCols; ++C) {
+            const cell_address = { c: C, r: headerRow };
+            const cell_ref = XLSX.utils.encode_cell(cell_address);
+            if (!ws[cell_ref]) ws[cell_ref] = {};
+            ws[cell_ref].s = { ...boldStyle, border: allBorders };
         }
-        
-        // Apply borders to data rows
-        for (let R = tableStartRow + 1; R <= tableEndRow; ++R) {
-            for (let C = 0; C < 7; ++C) {
+
+        // Apply styles to data rows
+        for (let R = dataStartRow; R <= dataEndRow; ++R) {
+            for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Ensure cell exists
-                ws[cell_ref].s = { ...(ws[cell_ref].s || {}), border: allBorders };
+                if (!ws[cell_ref]) ws[cell_ref] = {};
+                ws[cell_ref].s = { border: allBorders };
             }
         }
-    
+
+        // Style the Grand Total
+        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        if (gtLabelCell) gtLabelCell.s = { ...boldStyle };
+        
+        const gtValueCell = ws[XLSX.utils.encode_cell({c: 5, r: totalRow})];
+        if (gtValueCell) gtValueCell.s = { ...boldStyle };
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -146,12 +157,12 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         // Mail sending logic...
     };
 
-     if (!isOpen) {
+     if (!isOpen || !settings || !payments) {
         return null;
     }
     
-    const bankToUse = settings?.defaultBank || { bankName: settings?.bankName, branchName: settings?.branchName, accountNumber: settings?.accountNo };
-    const companyName = settings?.companyName || "GURU KRIPA AGRO FOODS";
+    const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
+    const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
