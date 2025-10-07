@@ -96,7 +96,10 @@ export default function DailySupplierReportClient() {
     }, [suppliers, selectedDate, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, kartaPercentage: 0, totalEntries: 0 };
+        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, minRate: 0, maxRate: 0, kartaPercentage: 0, totalEntries: 0 };
+        
+        if(filteredSuppliers.length === 0) return initialSummary;
+        
         const newSummary = filteredSuppliers.reduce((acc, s) => {
             acc.gross += s.grossWeight;
             acc.tier += s.teirWeight;
@@ -115,6 +118,10 @@ export default function DailySupplierReportClient() {
 
         newSummary.totalEntries = filteredSuppliers.length;
 
+        const validRates = filteredSuppliers.map(s => s.rate).filter(rate => rate > 0);
+        newSummary.minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        newSummary.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+        
         if (newSummary.total > 0) {
             newSummary.rate = newSummary.amount / newSummary.total;
         }
@@ -264,6 +271,8 @@ export default function DailySupplierReportClient() {
                            ]}/>
                            <CategorySummaryCard title="Rate & Amount" icon={<TrendingUp size={16}/>} data={[
                                 { label: 'Avg Rate', value: formatCurrency(summary.rate) },
+                                { label: 'Min Rate', value: formatCurrency(summary.minRate) },
+                                { label: 'Max Rate', value: formatCurrency(summary.maxRate) },
                                 { label: 'Total Amt', value: formatCurrency(summary.amount), isHighlighted: true },
                            ]}/>
                            <CategorySummaryCard title="Karta Deduction" icon={<Percent size={16}/>} data={[

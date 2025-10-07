@@ -1,5 +1,4 @@
 
-
 export type Customer = {
   id: string; // Firestore unique ID
   srNo: string; // Human-readable sequential ID
@@ -230,6 +229,8 @@ export type CustomerSummary = {
     totalOtherCharges: number;
     totalCdAmount: number;
     averageRate: number;
+    minRate: number;
+    maxRate: number;
     averageOriginalPrice: number;
     averageKartaPercentage: number;
     averageLabouryRate: number;
