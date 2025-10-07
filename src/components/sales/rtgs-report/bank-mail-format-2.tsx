@@ -154,12 +154,109 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
     const handlePrint = () => {
         const node = printRef.current;
-        if (!node) return;
-        // Print logic similar to other components
+        if (!node) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+            return;
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
+            document.body.removeChild(iframe);
+            return;
+        }
+
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>RTGS Advice</title>');
+        
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                const style = iframeDoc.createElement('style');
+                style.textContent = css;
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
+        const printStyles = iframeDoc.createElement('style');
+        printStyles.textContent = `
+            @media print {
+                @page {
+                    size: A4 landscape;
+                    margin: 10mm;
+                }
+                body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .printable-area {
+                    background-color: #fff !important;
+                }
+                .printable-area * {
+                    border-color: #000 !important;
+                    color: #000 !important;
+                }
+                .print-header-bg {
+                     background-color: #fce5d5 !important;
+                }
+                .page-break {
+                    page-break-after: always;
+                }
+            }
+        `;
+        iframeDoc.head.appendChild(printStyles);
+
+        iframeDoc.write('</head><body></body></html>');
+        iframeDoc.body.innerHTML = node.innerHTML;
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500);
     };
 
     const handleSendMail = async () => {
-        // Mail sending logic...
+        const auth = getFirebaseAuth();
+        if (!auth.currentUser) {
+            toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
+            return;
+        }
+        
+        setIsSending(true);
+
+        try {
+            const result = await sendEmailWithAttachment({
+                to: emailData.to,
+                subject: emailData.subject,
+                body: emailData.body,
+                attachments: attachments,
+                userId: auth.currentUser.uid,
+                userEmail: auth.currentUser.email || '',
+            });
+
+            if (result.success) {
+                toast({ title: "Email Sent!", variant: "success" });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || "An unknown error occurred.");
+            }
+        } catch (error: any) {
+            console.error("Error sending email:", error);
+            toast({ title: "Failed to Send Email", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSending(false);
+        }
     };
 
      if (!isOpen || !settings || !payments) {
@@ -239,8 +336,69 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                     <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
                     <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
-                    <Button onClick={() => alert("Compose mail feature coming soon!")}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
+                    <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
                 </DialogFooter>
+
+                {!isPreview && (
+                    <Dialog open={!isPreview} onOpenChange={(open) => !open && setIsPreview(true)}>
+                        <DialogContent className="h-full w-full max-h-full max-w-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl p-0 flex flex-col">
+                            <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
+                                <DialogTitle className="text-base font-normal">New Message</DialogTitle>
+                            </DialogHeader>
+                             <ScrollArea className="flex-grow">
+                                <div className="p-4 space-y-3 flex flex-col min-h-0">
+                                    <div className="flex items-center border-b pb-2">
+                                        <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
+                                        <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                    </div>
+                                     <div className="flex items-center border-b pb-2">
+                                        <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
+                                        <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                                    </div>
+                                    <Textarea 
+                                        value={emailData.body}
+                                        onChange={(e) => setEmailData({...emailData, body: e.target.value})}
+                                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
+                                    />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                                        {attachments.map((att, index) => (
+                                            <div key={index} className="relative flex items-center gap-2 p-2 border rounded-md">
+                                                <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                                <div className="flex-grow overflow-hidden">
+                                                    <p className="text-sm font-medium truncate">{att.filename}</p>
+                                                    <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    onClick={() => removeAttachment(index)}
+                                                    className="absolute top-1 right-1 rounded-full h-5 w-5"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </ScrollArea>
+                            <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
+                                <div className="relative">
+                                    <Button size="icon" variant="ghost" asChild>
+                                        <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
+                                    </Button>
+                                    <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" onClick={() => setIsPreview(true)}>Cancel</Button>
+                                    <Button onClick={handleSendMail} disabled={isSending}>
+                                        {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
+                                    </Button>
+                                </div>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </DialogContent>
         </Dialog>
     );

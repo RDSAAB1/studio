@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Loader2, Paperclip, FileSpreadsheet, X, Download } from 'lucide-react';
+import { Mail, Loader2, Paperclip, FileSpreadsheet, X, Download, Printer } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -34,20 +34,52 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isPreview, setIsPreview] = useState(true);
 
+    const generateExcelBuffer = (): Attachment | null => {
+        if (payments.length === 0) return null;
+
+        let checkNoStr = '';
+        if (payments.length > 0) {
+            const firstCheckNo = payments[0].checkNo;
+            if (firstCheckNo && payments.every((p: any) => p.checkNo === firstCheckNo)) {
+                checkNoStr = `_Check_${firstCheckNo}`;
+            }
+        }
+        const filename = `RTGS_Report_${format(new Date(), 'dd-MMM-yyyy')}${checkNoStr}.xlsx`;
+        
+        const dataToExport = payments.map((p: any, index: number) => ({
+            'Sr.No': index + 1,
+            'Debit_Ac_No': settings.defaultBank?.accountNumber || settings.accountNo,
+            'Amount': p.amount,
+            'IFSC_Code': p.ifscCode,
+            'Credit_Ac_No': p.acNo,
+            'Beneficiary_Name': toTitleCase(p.supplierName),
+            'Scheme Type': 'SB'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            const debitCellAddress = XLSX.utils.encode_cell({c: 1, r: R});
+            const creditCellAddress = XLSX.utils.encode_cell({c: 4, r: R});
+            if(worksheet[debitCellAddress]) worksheet[debitCellAddress].t = 's';
+            if(worksheet[creditCellAddress]) worksheet[creditCellAddress].t = 's';
+        }
+        
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        
+        return {
+            filename,
+            buffer: Array.from(new Uint8Array(excelBuffer)),
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        };
+    };
+
     useEffect(() => {
         if (isOpen && settings) {
+            setIsPreview(true);
             const today = format(new Date(), 'dd-MMM-yyyy');
-            
-            // Determine the check number for the filename
-            let checkNoStr = '';
-            if (payments.length > 0) {
-                const firstCheckNo = payments[0].checkNo;
-                if (firstCheckNo && payments.every((p: any) => p.checkNo === firstCheckNo)) {
-                    checkNoStr = `_Check_${firstCheckNo}`;
-                }
-            }
-            const filename = `RTGS_Report_${today}${checkNoStr}.xlsx`;
-
             const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
             const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
             
@@ -56,38 +88,11 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 subject,
                 body,
             });
-
-            const dataToExport = payments.map((p: any, index: number) => ({
-                'Sr.No': index + 1,
-                'Debit_Ac_No': settings.accountNo,
-                'Amount': p.amount,
-                'IFSC_Code': p.ifscCode,
-                'Credit_Ac_No': p.acNo,
-                'Beneficiary_Name': toTitleCase(p.supplierName),
-                'Scheme Type': 'SB' // Always set Scheme Type to SB
-            }));
-            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-
-            // Set column format to Text for account numbers
-            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-            for (let R = range.s.r; R <= range.e.r; ++R) {
-                const debitCellAddress = XLSX.utils.encode_cell({c: 1, r: R});
-                const creditCellAddress = XLSX.utils.encode_cell({c: 4, r: R});
-                if(worksheet[debitCellAddress]) worksheet[debitCellAddress].t = 's';
-                if(worksheet[creditCellAddress]) worksheet[creditCellAddress].t = 's';
+            
+            const excelBuffer = generateExcelBuffer();
+            if (excelBuffer) {
+                setAttachments([excelBuffer]);
             }
-
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
-            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-            
-            setAttachments([{
-                filename: filename,
-                buffer: Array.from(new Uint8Array(excelBuffer)),
-                contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            }]);
-            
-            setIsPreview(true);
         }
     }, [isOpen, settings, payments]);
     
@@ -114,17 +119,11 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     };
 
     const handleSendMail = async () => {
-        if (payments.length === 0) {
-            toast({ title: "No data to send", variant: "destructive" });
-            return;
-        }
-
         const auth = getFirebaseAuth();
         if (!auth.currentUser) {
             toast({ title: "Authentication Error", variant: "destructive" });
             return;
         }
-        
         setIsSending(true);
 
         try {
@@ -152,13 +151,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     };
 
     const handleDownloadExcel = () => {
-        if (attachments.length === 0) {
-            toast({ title: "No Excel file generated", variant: "destructive" });
-            return;
-        }
-        const excelAttachment = attachments.find(att => att.filename.endsWith('.xlsx'));
+        const excelAttachment = generateExcelBuffer();
         if (!excelAttachment) {
-            toast({ title: "Excel attachment not found", variant: "destructive" });
+            toast({ title: "No data to export", variant: "destructive" });
             return;
         }
         const blob = new Blob([new Uint8Array(excelAttachment.buffer)], { type: excelAttachment.contentType });
@@ -177,7 +172,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogContent className="max-w-5xl">
                     <DialogHeader>
                         <DialogTitle>RTGS Data Preview</DialogTitle>
-                        <DialogDescription>Review the data that will be included in the Excel file before composing the email.</DialogDescription>
+                        <DialogDescription>Review the data that will be included in the Excel file.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[60vh] border rounded-lg">
                         <div className="overflow-x-auto">
@@ -197,7 +192,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                     {payments.map((p: any, index: number) => (
                                         <tr key={`${p.paymentId}-${index}`} className="border-t">
                                             <td className="p-2">{index + 1}</td>
-                                            <td className="p-2">{settings.accountNo}</td>
+                                            <td className="p-2">{settings.defaultBank?.accountNumber || settings.accountNo}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
                                             <td className="p-2">{p.ifscCode}</td>
                                             <td className="p-2">{p.acNo}</td>
@@ -244,7 +239,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                             {attachments.map((att, index) => (
-                                 <Card key={index} className="relative flex items-center gap-2 p-2">
+                                <Card key={index} className="relative flex items-center gap-2 p-2">
                                     <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
                                     <div className="flex-grow overflow-hidden">
                                         <p className="text-sm font-medium truncate">{att.filename}</p>
