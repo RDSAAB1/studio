@@ -44,11 +44,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const ws_data: (string | number | Date | null)[][] = [
             [null, companyName],
             [null, `${companyAddress1}, ${companyAddress2}`],
-            [],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
-            [],
-            [],
         ];
         
         const headerRowIndex = ws_data.length; 
@@ -58,7 +55,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                p.acNo, // Removed single quote
+                p.acNo,
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -66,7 +63,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        const footerRow1Index = ws_data.length;
+        ws_data.push([]);
         ws_data.push([]);
         const footerRow2Index = ws_data.length;
         ws_data.push(["", "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
@@ -91,19 +88,14 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
                 
                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; 
-                
-                // Ensure the style object exists
                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
                 
-                // Always apply border
                 ws[cell_ref].s.border = allBorders;
 
-                // Explicitly set Account No column to text format
-                if (C === 2 && R > headerRowIndex && R < footerRow1Index) { 
+                if (C === 2 && R > headerRowIndex && R < footerRow2Index) { 
                     ws[cell_ref].t = 's';
                 }
                 
-                // Apply bold font where needed
                 if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRow2Index)) { 
                     ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
@@ -309,8 +301,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                  </DialogHeader>
                 {isPreview ? (
                      <>
-                        <ScrollArea className="flex-grow">
-                             <div ref={printRef} className="bg-white"> 
+                        <ScrollArea className="flex-grow p-4">
+                            <div ref={printRef} className="bg-white"> 
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
