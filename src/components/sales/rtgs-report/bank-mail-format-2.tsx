@@ -19,8 +19,14 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         return null;
     }
 
+    const bankToUse = settings?.defaultBank || {
+        bankName: settings?.bankName,
+        branchName: settings?.branchName,
+        accountNumber: settings?.accountNo,
+    };
+
     const handleDownloadExcel = () => {
-        if (payments.length === 0 || !settings?.defaultBank) {
+        if (payments.length === 0 || !bankToUse) {
             toast({ title: "No data or settings to export", variant: "destructive" });
             return;
         }
@@ -33,9 +39,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         // Header
         const header = [
             ["GURU KRIPA AGRO FOODS"],
-            [settings.defaultBank.bankName],
-            [settings.defaultBank.branchName],
-            [`A/C.NO..${settings.defaultBank.accountNumber}`],
+            [bankToUse.bankName],
+            [bankToUse.branchName],
+            [`A/C.NO..${bankToUse.accountNumber}`],
             [], // Spacer row
         ];
         
@@ -110,9 +116,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                     <div className="grid grid-cols-7 gap-4">
                         <div className="col-span-4">
                              <p className="font-bold text-lg">GURU KRIPA AGRO FOODS</p>
-                             <p>{settings?.defaultBank?.bankName}</p>
-                             <p>{settings?.defaultBank?.branchName}</p>
-                             <p>A/C.NO..{settings?.defaultBank?.accountNumber}</p>
+                             <p>{bankToUse?.bankName}</p>
+                             <p>{bankToUse?.branchName}</p>
+                             <p>A/C.NO..{bankToUse?.accountNumber}</p>
                         </div>
                         <div className="col-span-3 text-right">
                              <p><span className="font-bold">DATE</span> {format(new Date(), 'dd-MM-yyyy')}</p>
