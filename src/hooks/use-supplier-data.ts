@@ -168,22 +168,19 @@ export const useSupplierData = () => {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                
-                let actualPaidAmount = paidForThisDetail.amount;
+                totalPaidForEntry += paidForThisDetail.amount;
+
                 if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        const cdPortion = p.cdAmount * proportion;
-                        totalCdForEntry += cdPortion;
-                        actualPaidAmount -= cdPortion; // Subtract CD from the amount paid for this entry
+                        totalCdForEntry += p.cdAmount * proportion;
                     }
                 }
-                totalPaidForEntry += actualPaidAmount;
             });
             
             const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-            return { ...transaction, netAmount: calculatedNetAmount };
+            return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
         });
 
         data.allTransactions = updatedTransactions;
@@ -268,20 +265,17 @@ export const useSupplierData = () => {
         let totalCdForEntry = 0;
         paymentsForThisEntry.forEach(p => {
             const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-            let actualPaidAmount = paidForThisDetail.amount;
+            totalPaidForEntry += paidForThisDetail.amount;
             if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                 const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                 if(totalAmountInPayment > 0) {
                     const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                    const cdPortion = p.cdAmount * proportion;
-                    totalCdForEntry += cdPortion;
-                    actualPaidAmount -= cdPortion;
+                    totalCdForEntry += p.cdAmount * proportion;
                 }
             }
-            totalPaidForEntry += actualPaidAmount;
         });
         const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-        return { ...transaction, netAmount: calculatedNetAmount };
+        return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
     });
 
     millSummary.allTransactions = allRecalculatedSuppliers;
