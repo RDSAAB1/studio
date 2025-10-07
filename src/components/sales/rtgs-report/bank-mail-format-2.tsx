@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Mail, Loader2, Paperclip, X } from 'lucide-react';
+import { Download, Printer, Mail, Loader2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -258,6 +258,29 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             setIsSending(false);
         }
     };
+    
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const buffer = e.target?.result as ArrayBuffer;
+                if (buffer) {
+                    setAttachments(prev => [...prev, {
+                        filename: file.name,
+                        buffer: Array.from(new Uint8Array(buffer)),
+                        contentType: file.type
+                    }]);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    };
+    
+    const removeAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
 
      if (!isOpen || !settings || !payments) {
         return null;
