@@ -54,13 +54,12 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        ws_data.push([]);
-        
         const footerRowIndex = ws_data.length;
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-        ws_data.push([null, null, null, null, 'GT', grandTotal]);
+        const totalRowData: (string | number | null)[] = [null, null, null, 'GT', grandTotal];
+        ws_data.push(totalRowData);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
@@ -72,7 +71,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
         const headerRow = 4;
         const dataStartRow = 5;
-        const dataEndRow = dataStartRow + payments.length -1;
+        const dataEndRow = dataStartRow + payments.length - 1;
+        const noteRow = footerRowIndex;
         const totalRow = footerRowIndex + 1;
         const numCols = 7;
         
@@ -97,14 +97,26 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 }
             }
         }
+        
+        const noteCell = ws[XLSX.utils.encode_cell({c: 1, r: noteRow})];
+        if(noteCell) noteCell.s = { ...boldStyle };
 
         // Style the Grand Total
-        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 3, r: totalRow})];
         if (gtLabelCell) gtLabelCell.s = { ...boldStyle };
         
-        const gtValueCell = ws[XLSX.utils.encode_cell({c: 5, r: totalRow})];
-        if (gtValueCell) gtValueCell.s = { ...boldStyle };
-
+        const gtValueCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
+        if (gtValueCell) gtValueCell.s = { ...boldStyle, border: allBorders };
+        
+        // Ensure other cells in total row have borders if needed
+        for (let C = 0; C < numCols; ++C) {
+            const cell_address = { c: C, r: totalRow };
+            const cell_ref = XLSX.utils.encode_cell(cell_address);
+            if (ws[cell_ref]) {
+                 ws[cell_ref].s = { ...ws[cell_ref].s, border: allBorders };
+            }
+        }
+        
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -306,7 +318,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                     <p className="font-bold text-lg">{companyName}</p>
                                     <p>BoB - {bankToUse?.bankName}</p>
                                     <p>{bankToUse?.branchName}</p>
-                                    <p>A/C.NO..{bankToUse?.accountNumber}</p>
+                                    <p>A/C.NO..'{bankToUse?.accountNumber}</p>
                                 </div>
                                 <div className="text-right">
                                     <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
@@ -331,7 +343,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                             <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
                                                 <td className="p-1 border border-black">{index + 1}</td>
                                                 <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
-                                                <td className="p-1 border border-black font-mono">{p.acNo}</td>
+                                                <td className="p-1 border border-black font-mono">'{p.acNo}</td>
                                                 <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
                                                 <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
                                                 <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
@@ -341,13 +353,13 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colSpan={7} className="pt-8 p-1 border-b border-t border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                            <td colSpan={7} className="pt-8 p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                         </tr>
                                         <tr className="font-bold">
-                                            <td colSpan={4} className="p-1"></td>
+                                            <td colSpan={3} className="p-1"></td>
                                             <td className="p-1 text-right">GT</td>
                                             <td className="p-1 text-right font-semibold">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
-                                            <td className="p-1"></td>
+                                            <td className="p-1" colSpan={2}></td>
                                         </tr>
                                     </tfoot>
                                 </table>
