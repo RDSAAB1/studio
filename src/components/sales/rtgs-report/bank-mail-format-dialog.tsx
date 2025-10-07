@@ -185,7 +185,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                 </thead>
                                 <tbody>
                                     {payments.map((p: any, index: number) => (
-                                        <tr key={p.srNo || index} className="border-t">
+                                        <tr key={`${p.paymentId}-${index}`} className="border-t">
                                             <td className="p-2">{index + 1}</td>
                                             <td className="p-2">{settings.accountNo}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
