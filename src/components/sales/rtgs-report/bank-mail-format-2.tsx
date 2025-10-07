@@ -40,21 +40,19 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
         const ws_data: (string | number | Date | null)[][] = [
             [], // Row 1 is empty
-            [null, companyName], // Row 2
-            [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today], // Row 3
-            [null, `A/C.NO.. '${bankToUse.accountNumber}`], // Row 4
-            // Row 5 is intentionally left blank as a separator
+            [null, companyName],
+            [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
+            [null, `A/C.NO.. ${bankToUse.accountNumber}`],
         ];
-
-        // Row 6: Header
+        
+        const headerRowIndex = ws_data.length;
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
 
-        // Data Rows
         payments.forEach((p: any, index: number) => {
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                `'${p.acNo}`, // Prepend with ' to force text format in Excel
+                p.acNo, 
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -66,59 +64,49 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-        const totalRowData: (string | number | null)[] = [null, null, null, "GT", grandTotal];
-        ws_data.push(totalRowData);
+        ws_data.push([null, null, null, "GT", grandTotal]);
+        const totalRowIndex = ws_data.length -1;
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
         ws['!cols'] = [ { wch: 8 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
-        // --- RELIABLE BORDER APPLICATION ---
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
-        const boldStyle = { font: { bold: true } };
-
-        const headerRow = 5; // Header is now on row 6 (0-indexed)
-        const dataStartRow = 6;
-        const dataEndRow = dataStartRow + payments.length - 1;
+        const boldFont = { bold: true };
         const numCols = 7;
-        const totalRow = footerRowIndex + 1;
+        const dataEndRow = footerRowIndex - 1;
 
-
-        for (let R = headerRow; R <= dataEndRow; ++R) {
+        // Apply borders and styles
+        for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
             for (let C = 0; C < numCols; ++C) {
-                const cell_address = { c: C, r: R };
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                
-                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Create cell if it doesn't exist
-                
+                 const cell_address = { c: C, r: R };
+                 const cell_ref = XLSX.utils.encode_cell(cell_address);
+                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Create cell if it doesn't exist
+
                 let cellStyle: any = { border: allBorders };
                 
-                if (R === headerRow) {
-                    cellStyle.font = boldStyle.font;
+                // Bold headers
+                if (R === headerRowIndex) {
+                    cellStyle.font = boldFont;
                 }
 
-                ws[cell_ref].s = cellStyle;
-            }
-        }
-        
-        const noteCell = ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})];
-        if(noteCell) noteCell.s = { font: { bold: true } };
+                // Bold "GT" and total amount
+                if (R === totalRowIndex && (C === 3 || C === 4)) {
+                     cellStyle.font = boldFont;
+                }
+                
+                // Bold the note
+                if (R === footerRowIndex && C === 1) {
+                    cellStyle.font = boldFont;
+                }
 
-        // Style the Grand Total Row
-        const gtLabelCell = ws[XLSX.utils.encode_cell({c: 3, r: totalRow})];
-        if (gtLabelCell) gtLabelCell.s = { font: { bold: true }, border: allBorders };
-        
-        const gtValueCell = ws[XLSX.utils.encode_cell({c: 4, r: totalRow})];
-        if (gtValueCell) gtValueCell.s = { font: { bold: true }, border: allBorders };
-        
-        // Ensure surrounding cells in the GT row also have borders
-        for (let C = 0; C < numCols; ++C) {
-            if (C !== 3 && C !== 4) {
-                 const cell_address = { c: C, r: totalRow };
-                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-                 if (!ws[cell_ref]) ws[cell_ref] = {};
-                 ws[cell_ref].s = { border: allBorders };
+                 // Force text format for account numbers
+                if (C === 2 && R > headerRowIndex && R < footerRowIndex) {
+                    ws[cell_ref].t = 's';
+                }
+                
+                ws[cell_ref].s = cellStyle;
             }
         }
         
@@ -143,7 +131,6 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 
                 setEmailData({ to: 'your.bank.email@example.com', subject, body });
 
-                // Generate Excel buffer for attachment
                 const excelBuffer = generateExcelBuffer();
                 if (excelBuffer) {
                     setAttachments([excelBuffer]);
@@ -154,7 +141,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
 
     const handleDownloadExcel = () => {
-        const excelAttachment = generateExcelBuffer(); // Regenerate to be sure
+        const excelAttachment = generateExcelBuffer(); 
         if (!excelAttachment) {
             toast({ title: "Excel file not generated", variant: "destructive" });
             return;
@@ -439,3 +426,5 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         </Dialog>
     );
 };
+
+    
