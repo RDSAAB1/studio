@@ -25,7 +25,7 @@ import {
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
-import { toTitleCase, generateReadableId } from "./utils";
+import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -316,38 +316,88 @@ export async function deleteSupplier(id: string): Promise<void> {
   }
 }
 
-export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
+export async function deleteMultipleSuppliers(supplierIds: string[]): Promise<void> {
     const batch = writeBatch(firestoreDB);
-    const paymentsBatch = writeBatch(firestoreDB);
+    const paymentsToDelete: string[] = [];
 
-    if (db) {
-        await db.suppliers.where('srNo').anyOf(srNos).delete();
-    }
-
-    for (const srNo of srNos) {
-        const supplierDocRef = doc(suppliersCollection, srNo);
-        batch.delete(supplierDocRef);
-        const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
+    // First, find all payments associated with the suppliers to be deleted
+    for (const supplierId of supplierIds) {
+        const supplierDoc = await getDoc(doc(suppliersCollection, supplierId));
+        if (!supplierDoc.exists()) continue;
+        const supplierSrNo = supplierDoc.data().srNo;
         
+        const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: supplierSrNo }));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+
         paymentsSnapshot.forEach(paymentDoc => {
             const payment = paymentDoc.data() as Payment;
-            if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === srNo) {
-                paymentsBatch.delete(paymentDoc.ref);
+            if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === supplierSrNo) {
+                if (!paymentsToDelete.includes(paymentDoc.id)) {
+                    paymentsToDelete.push(paymentDoc.id);
+                }
             } else {
-                const updatedPaidFor = payment.paidFor?.filter(pf => pf.srNo !== srNo);
-                const amountToDeduct = payment.paidFor?.find(pf => pf.srNo === srNo)?.amount || 0;
-                paymentsBatch.update(paymentDoc.ref, { 
+                // If payment is for multiple entries, just remove this one
+                const updatedPaidFor = payment.paidFor?.filter(pf => pf.srNo !== supplierSrNo);
+                const amountToDeduct = payment.paidFor?.find(pf => pf.srNo === supplierSrNo)?.amount || 0;
+                batch.update(paymentDoc.ref, {
                     paidFor: updatedPaidFor,
                     amount: payment.amount - amountToDeduct
                 });
             }
         });
     }
+
+    // Delete the identified single-entry payments
+    for (const paymentId of paymentsToDelete) {
+        batch.delete(doc(supplierPaymentsCollection, paymentId));
+    }
+    // Delete the suppliers themselves
+    for (const supplierId of supplierIds) {
+        batch.delete(doc(suppliersCollection, supplierId));
+    }
+    
     await batch.commit();
-    await paymentsBatch.commit();
+
+    // Sync Dexie
+    if (db) {
+        await db.suppliers.bulkDelete(supplierIds);
+        await db.payments.bulkDelete(paymentsToDelete);
+        // Handle partial payment updates in Dexie if necessary
+    }
 }
 
+export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Promise<number> {
+    const holidays = await getHolidays();
+    const dailyPaymentLimit = await getDailyPaymentLimit();
+    const paymentHistory = await db.payments.toArray(); // Assuming Dexie is populated
+    
+    const batch = writeBatch(firestoreDB);
+    let updatedCount = 0;
+
+    for (const id of supplierIds) {
+        const supplierRef = doc(firestoreDB, "suppliers", id);
+        const supplierSnap = await getDoc(supplierRef);
+        
+        if (supplierSnap.exists()) {
+            const supplierData = supplierSnap.data() as Customer;
+            
+            const recalculatedData = calculateSupplierEntry(supplierData, paymentHistory, holidays, dailyPaymentLimit, []);
+            
+            const updatePayload: Partial<Customer> = {
+                ...recalculatedData
+            };
+            
+            // This is just to ensure netAmount and originalNetAmount are aligned after recalc.
+            updatePayload.netAmount = recalculatedData.originalNetAmount; 
+            
+            batch.update(supplierRef, updatePayload);
+            updatedCount++;
+        }
+    }
+    
+    await batch.commit();
+    return updatedCount;
+}
 
 // --- Customer Functions ---
 export async function addCustomer(customerData: Customer): Promise<Customer> {
@@ -430,43 +480,6 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
       batch.delete(doc.ref);
   });
   await batch.commit();
-}
-
-export async function deletePayment(id: string, isEditing: boolean = false): Promise<void> {
-    const paymentDocRef = doc(supplierPaymentsCollection, id);
-
-    await runTransaction(firestoreDB, async (transaction) => {
-        const paymentDoc = await transaction.get(paymentDocRef);
-        if (!paymentDoc.exists()) {
-            throw new Error("Payment document not found!");
-        }
-
-        const paymentData = paymentDoc.data() as Payment;
-
-        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
-            for (const detail of paymentData.paidFor) {
-                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                const supplierDocsSnapshot = await getDocs(q); 
-                if (!supplierDocsSnapshot.empty) {
-                    const customerDoc = supplierDocsSnapshot.docs[0];
-                    const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount + (paymentData.cdApplied ? paymentData.cdAmount || 0 : 0) / paymentData.paidFor.length;
-                    const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                }
-            }
-        }
-        
-        if (paymentData.expenseTransactionId) {
-            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            transaction.delete(expenseDocRef);
-        }
-
-        transaction.delete(paymentDocRef);
-    });
-    if (db) {
-        await db.payments.delete(id); // WRITE-THROUGH
-    }
 }
 
 
@@ -998,4 +1011,31 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
     }, onError);
 }
 
+export async function recalculateAndUpdateAllSuppliers(): Promise<number> {
+    const allSuppliers = await getDocs(query(suppliersCollection));
+    const allPayments = await getDocs(query(supplierPaymentsCollection));
+    
+    const paymentHistory = allPayments.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+    const holidays = await getHolidays();
+    const dailyPaymentLimit = await getDailyPaymentLimit();
+
+    const batch = writeBatch(firestoreDB);
+    let updatedCount = 0;
+
+    allSuppliers.forEach(supplierDoc => {
+        const supplierData = supplierDoc.data() as Customer;
+        const recalculatedData = calculateSupplierEntry(supplierData, paymentHistory, holidays, dailyPaymentLimit, []);
+
+        const updatePayload: Partial<Customer> = {
+            ...recalculatedData,
+            netAmount: recalculatedData.originalNetAmount, // Ensure netAmount is original
+        };
+        
+        batch.update(supplierDoc.ref, updatePayload);
+        updatedCount++;
+    });
+
+    await batch.commit();
+    return updatedCount;
+}
     

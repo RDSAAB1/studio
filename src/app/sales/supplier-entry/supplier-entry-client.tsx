@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateSuppliers, deleteMultipleSuppliers } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateSuppliers, deleteMultipleSuppliers, recalculateAndUpdateAllSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
@@ -401,7 +401,7 @@ const handleDelete = async (id: string) => {
         );
 
         for (const payment of associatedPayments) {
-            await handleDeletePaymentLogic(payment, safePaymentHistory);
+            await handleDeletePaymentLogic(payment, safeSuppliers);
         }
 
         await deleteSupplier(id);
@@ -489,11 +489,11 @@ const handleDelete = async (id: string) => {
     }
   };
   
-  const handleShowDetails = (supplier: Customer) => {
+  const handleShowDetails = (customer: Customer) => {
     const fullData = {
-        ...supplier,
-        allTransactions: [supplier],
-        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
+        ...customer,
+        allTransactions: [customer],
+        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
     };
     setDetailsSupplier(fullData);
   };
@@ -670,22 +670,6 @@ const handleDelete = async (id: string) => {
         } catch (error) {
             console.error("Error updating selected entries:", error);
             toast({ title: "Update Failed", variant: "destructive" });
-        }
-    };
-    
-    const handleDeleteSelected = async () => {
-        if (selectedSupplierIds.size === 0) {
-             toast({ title: "No entries selected", variant: "destructive" });
-            return;
-        }
-         toast({ title: "Deleting selected entries...", description: `Deleting ${selectedSupplierIds.size} entries.` });
-        try {
-            await deleteMultipleSuppliers(Array.from(selectedSupplierIds));
-            toast({ title: "Delete Complete", description: `${selectedSupplierIds.size} entries have been deleted.`, variant: "success" });
-            setSelectedSupplierIds(new Set());
-        } catch (error) {
-            console.error("Error deleting selected entries:", error);
-            toast({ title: "Delete Failed", variant: "destructive" });
         }
     };
     
