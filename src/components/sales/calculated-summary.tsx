@@ -30,7 +30,7 @@ interface CalculatedSummaryProps {
     onBrokerageToggle?: (checked: boolean) => void;
     onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onExport?: () => void;
-    onUpdateAll?: () => void;
+    onUpdateSelected?: () => void;
     onDeleteSelected?: () => void;
     onDeleteAll?: () => void;
     isDeleting?: boolean;
@@ -69,7 +69,7 @@ export const CalculatedSummary = ({
     onBrokerageToggle,
     onImport,
     onExport,
-    onUpdateAll,
+    onUpdateSelected,
     onDeleteSelected,
     onDeleteAll,
     isDeleting = false
@@ -133,9 +133,9 @@ export const CalculatedSummary = ({
                             <Download className="mr-2 h-4 w-4"/> Export
                             </Button>
                          )}
-                         {onUpdateAll && (
-                            <Button onClick={onUpdateAll} size="sm" variant="outline" className="h-8" type="button">
-                                <RefreshCw className="mr-2 h-4 w-4"/> Update All
+                         {onUpdateSelected && selectedIdsCount > 0 && (
+                            <Button onClick={onUpdateSelected} size="sm" variant="outline" className="h-8" type="button">
+                                <RefreshCw className="mr-2 h-4 w-4"/> Update Selected ({selectedIdsCount})
                             </Button>
                          )}
                          {onDeleteSelected && selectedIdsCount > 0 && (

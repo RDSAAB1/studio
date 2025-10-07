@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateAllSuppliers } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateSuppliers, deleteMultipleSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
@@ -383,10 +383,10 @@ export default function SupplierEntryClient() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+const handleDelete = async (id: string) => {
     if (!id) {
-        toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
-        return;
+      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+      return;
     }
 
     try {
@@ -414,8 +414,7 @@ export default function SupplierEntryClient() {
         console.error("Error deleting supplier and payments: ", error);
         toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
-  };
-
+};
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     
@@ -651,7 +650,6 @@ export default function SupplierEntryClient() {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
             console.error("Error deleting all entries:", error);
@@ -659,13 +657,35 @@ export default function SupplierEntryClient() {
         }
     };
 
-    const handleUpdateAll = async () => {
-        toast({ title: "Updating all entries...", description: "This might take a moment." });
-        const updatedCount = await recalculateAndUpdateAllSuppliers();
-        if (updatedCount > 0) {
-            toast({ title: "Update Complete", description: `${updatedCount} entries were corrected.`, variant: "success" });
-        } else {
-            toast({ title: "No Updates Needed", description: "All supplier entries are already up to date.", variant: "success" });
+    const handleUpdateSelected = async () => {
+        if (selectedSupplierIds.size === 0) {
+            toast({ title: "No entries selected", variant: "destructive" });
+            return;
+        }
+        toast({ title: "Updating selected entries...", description: `Updating ${selectedSupplierIds.size} entries.` });
+        try {
+            const updatedCount = await recalculateAndUpdateSuppliers(Array.from(selectedSupplierIds));
+            toast({ title: "Update Complete", description: `${updatedCount} entries were re-calculated and saved.`, variant: "success" });
+            setSelectedSupplierIds(new Set()); // Clear selection after update
+        } catch (error) {
+            console.error("Error updating selected entries:", error);
+            toast({ title: "Update Failed", variant: "destructive" });
+        }
+    };
+    
+    const handleDeleteSelected = async () => {
+        if (selectedSupplierIds.size === 0) {
+             toast({ title: "No entries selected", variant: "destructive" });
+            return;
+        }
+         toast({ title: "Deleting selected entries...", description: `Deleting ${selectedSupplierIds.size} entries.` });
+        try {
+            await deleteMultipleSuppliers(Array.from(selectedSupplierIds));
+            toast({ title: "Delete Complete", description: `${selectedSupplierIds.size} entries have been deleted.`, variant: "success" });
+            setSelectedSupplierIds(new Set());
+        } catch (error) {
+            console.error("Error deleting selected entries:", error);
+            toast({ title: "Delete Failed", variant: "destructive" });
         }
     };
     
@@ -769,8 +789,8 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
-                onUpdateAll={handleUpdateAll}
-                onDeleteAll={handleDeleteAll}
+                onUpdateSelected={handleUpdateSelected}
+                onDeleteSelected={handleDeleteSelected}
             />
         </form>
       </FormProvider>      
