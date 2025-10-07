@@ -66,7 +66,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                         />
                                     </TableCell>
                                     <TableCell className="font-mono px-3 py-1 text-sm">{entry.srNo}</TableCell>
-                                    <TableCell className="px-3 py-1 text-sm">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{entry.date ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.name)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.variety)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{Number(entry.netWeight).toFixed(2)}</TableCell>
