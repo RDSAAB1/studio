@@ -424,7 +424,7 @@ const handleDelete = async (id: string) => {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: values.date.toISOString().split("T")[0],
+        date: format(values.date, 'yyyy-MM-dd'),
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
@@ -832,13 +832,12 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
-      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsSupplier} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <DetailsDialog 
+          isOpen={!!detailsSupplier}
+          onOpenChange={(open) => !open && setDetailsSupplier(null)}
+          customer={detailsSupplier}
+          paymentHistory={paymentHistory}
+      />
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}
@@ -869,5 +868,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-    

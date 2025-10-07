@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -18,7 +19,7 @@ import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
-import { DetailsDialog } from "@/components/sales/details-dialog";
+import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
@@ -66,7 +67,7 @@ export type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = format(today, 'yyyy-MM-dd');
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
@@ -307,8 +308,8 @@ export default function CustomerEntryClient() {
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
+    newState.date = format(today, 'yyyy-MM-dd');
+    newState.dueDate = format(today, 'yyyy-MM-dd');
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
@@ -386,9 +387,9 @@ export default function CustomerEntryClient() {
     const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
         srNo: formValues.srNo,
-        date: formValues.date.toISOString().split('T')[0],
+        date: format(formValues.date, 'yyyy-MM-dd'),
         term: '0', 
-        dueDate: formValues.date.toISOString().split('T')[0],
+        dueDate: format(formValues.date, 'yyyy-MM-dd'),
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
@@ -589,7 +590,7 @@ export default function CustomerEntryClient() {
                 for (const item of json) {
                     const customerData: Partial<Customer> = {
                         srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
-                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        date: item.date ? format(new Date(item.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         name: toTitleCase(item.name),
                         companyName: toTitleCase(item.companyName || ''),
                         address: toTitleCase(item.address || ''),
@@ -717,12 +718,11 @@ export default function CustomerEntryClient() {
         </div>
        )}
 
-      <DetailsDialog
-        isOpen={!!detailsCustomer}
-        onOpenChange={() => setDetailsCustomer(null)}
+      <CustomerDetailsDialog
         customer={detailsCustomer}
+        onOpenChange={() => setDetailsCustomer(null)}
+        onPrint={handleOpenPrintPreview}
         paymentHistory={paymentHistory}
-        entryType="Customer"
       />
         
       <DocumentPreviewDialog

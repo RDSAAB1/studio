@@ -2,7 +2,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Customer, Payment, Holiday } from './definitions';
-import { isSunday, addDays, differenceInCalendarDays, isValid, parseISO } from 'date-fns';
+import { isSunday, addDays, differenceInCalendarDays, isValid, parseISO, format } from 'date-fns';
 
 interface SupplierFormValues {
     date: Date;
@@ -109,7 +109,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     
     if (allSuppliers && allSuppliers.length > 0) {
         let dailyTotal = 0;
-        const dueDateString = newDueDate.toISOString().split('T')[0];
+        const dueDateString = format(newDueDate, 'yyyy-MM-dd');
         
         allSuppliers.forEach(supplier => {
             if (supplier.dueDate === dueDateString) {
@@ -154,7 +154,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     return {
       ...values,
       date: entryDate,
-      term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
+      term: String(values.term), dueDate: format(newDueDate, 'yyyy-MM-dd'),
       weight: weight,
       kartaWeight: kartaWeight,
       kartaAmount: kartaAmount,
@@ -218,7 +218,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     return {
         ...values,
         date: entryDate,
-        dueDate: entryDate.toISOString().split("T")[0],
+        dueDate: format(entryDate, 'yyyy-MM-dd'),
         weight: weight,
         netWeight: netWeight,
         amount: amount,

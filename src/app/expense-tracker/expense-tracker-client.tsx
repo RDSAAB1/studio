@@ -1046,16 +1046,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-    
-
-
-
-    
-
