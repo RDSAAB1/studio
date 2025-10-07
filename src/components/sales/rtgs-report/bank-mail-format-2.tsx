@@ -40,6 +40,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
         const ws_data: (string | number | Date | null)[][] = [
             [null, companyName],
+            [],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
         ];
@@ -51,7 +52,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ws_data.push([
                 index + 1,
                 toTitleCase(p.supplierName),
-                `'${p.acNo}`, 
+                p.acNo, // Removed the prepended single quote
                 p.ifscCode,
                 p.amount,
                 toTitleCase(p.supplierAddress || p.branch || ''),
@@ -59,7 +60,6 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        // Add two empty rows for the gap
         ws_data.push([]);
         ws_data.push([]);
 
@@ -68,7 +68,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
         const totalRowIndex = ws_data.length;
-        ws_data.push([null, null, null, null, "GT", grandTotal]);
+        ws_data.push([null, null, null, "GT", grandTotal, null, null]);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
     
@@ -77,26 +77,39 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
-        const numCols = 7;
-        const totalRows = ws_data.length;
 
-        for (let R = headerRowIndex; R < totalRows; ++R) {
+        const numCols = 7;
+        const totalDataRows = payments.length;
+
+        // Iterate through all required cells to apply formatting
+        for (let R = headerRowIndex; R < totalRowIndex + 1; ++R) {
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
-        
-                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; // Ensure cell exists
+
+                // Initialize cell style if it doesn't exist
+                if (!ws[cell_ref].s) ws[cell_ref].s = {};
                 
-                const s = ws[cell_ref].s = ws[cell_ref].s || {};
-                
-                // Apply borders to the main table and footer
-                if (R >= headerRowIndex) {
-                    s.border = allBorders;
+                // 1. Apply Borders to the entire table section
+                if (R >= headerRowIndex && R < footerRowIndex - 2) {
+                     ws[cell_ref].s.border = allBorders;
                 }
-        
-                // Bold headers and specific footer cells
-                if (R === headerRowIndex || (R === totalRowIndex && (C === 4 || C === 5)) || (R === footerRowIndex && C === 1)) {
-                    s.font = { ...s.font, ...boldFont };
+                
+                // 2. Format Account Number column (C=2) as Text
+                if (C === 2 && R > headerRowIndex && R < headerRowIndex + 1 + totalDataRows) {
+                    ws[cell_ref].t = 's';
+                }
+
+                // 3. Bold specific cells
+                if (R === headerRowIndex) { // Header Row
+                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
+                }
+                if (R === footerRowIndex && C === 1) { // "PL SEND..." note
+                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
+                }
+                if (R === totalRowIndex && (C === 3 || C === 4)) { // "GT" and its value
+                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
         }
