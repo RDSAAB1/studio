@@ -207,7 +207,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     </thead>
                                     <tbody>
                                         {chunk.map((p, index) => (
-                                            <tr key={p.paymentId}>
+                                            <tr key={`${p.paymentId}-${index}`}>
                                                 <td className="border border-black p-1 text-center h-6 text-black">{index + 1}</td>
                                                 <td className="border border-black p-1 text-black">{toTitleCase(p.supplierName)}</td>
                                                 <td className="border border-black p-1 text-black">'{p.acNo}</td>
