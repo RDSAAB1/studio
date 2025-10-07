@@ -35,17 +35,21 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
         const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
         const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
+        const companyAddress1 = settings.companyAddress1 || "";
+        const companyAddress2 = settings.companyAddress2 || "";
+
         const today = format(new Date(), 'dd-MM-yyyy');
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
     
         const ws_data: (string | number | Date | null)[][] = [
             [null, companyName],
+            [null, `${companyAddress1}, ${companyAddress2}`],
             [],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
             [null, `A/C.NO.. ${bankToUse.accountNumber}`],
         ];
         
-        ws_data.push([]); 
+        ws_data.push([]);
         ws_data.push([]);
 
         const headerRowIndex = ws_data.length; 
@@ -63,11 +67,9 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        ws_data.push([]);
-        ws_data.push([]);
-
         const footerRowIndex = ws_data.length;
-        ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
+        ws_data.push([]);
+        ws_data.push(["", "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         
         const grandTotal = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
         const totalRowIndex = ws_data.length;
@@ -77,34 +79,34 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
         ws['!cols'] = [ { wch: 8 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
-        const borderStyle = { style: "thin", color: { auto: 1 } };
+        const borderStyle = { style: "thin" as const, color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
-        const numCols = 7;
 
-        for (let R = headerRowIndex; R <= totalRowIndex; ++R) { 
-            for (let C = 0; C < numCols; ++C) {
+        for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
+            for (let C = 0; C < 7; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
                 
                 if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' }; 
                 if (!ws[cell_ref].s) ws[cell_ref].s = {};
                 
-                ws[cell_ref].s.border = allBorders; 
-                
-                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4))) { 
-                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
-                }
-                
+                // Always apply border
+                ws[cell_ref].s.border = allBorders;
+
                 if (C === 2 && R > headerRowIndex && R < totalRowIndex) { 
                     ws[cell_ref].t = 's';
                 }
+                
+                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRowIndex)) { 
+                    ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
+                }
             }
         }
-        if (ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})]) {
-             if (!ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s) ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s = {};
-             ws[XLSX.utils.encode_cell({c: 1, r: footerRowIndex})].s.font = boldFont;
-        }
+        
+        // Ensure "GT" cell is also styled
+        const gtCellRef = XLSX.utils.encode_cell({c: 3, r: totalRowIndex});
+        if(ws[gtCellRef] && ws[gtCellRef].s) ws[gtCellRef].s.font = boldFont;
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
@@ -288,6 +290,8 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     
     const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
     const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
+    const companyAddress = `${settings.companyAddress1 || ""}${settings.companyAddress2 ? `, ${settings.companyAddress2}` : ""}`;
+
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -300,12 +304,13 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                  </DialogHeader>
                 {isPreview ? (
                      <>
-                        <ScrollArea className="flex-grow p-4">
-                            <div ref={printRef} className="bg-white">
+                        <ScrollArea className="flex-grow">
+                            <div ref={printRef} className="bg-white"> 
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
                                         <div className='space-y-1'>
                                             <p className="font-bold text-lg">{companyName}</p>
+                                            <p className="text-xs">{companyAddress}</p>
                                             <p>BoB - {bankToUse?.bankName}</p>
                                             <p>{bankToUse?.branchName}</p>
                                             <p>A/C.NO..'{bankToUse?.accountNumber}</p>
@@ -342,13 +347,13 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                 ))}
                                             </tbody>
                                             <tfoot>
-                                                <tr>
-                                                    <td colSpan={7} className="pt-8 p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
-                                                </tr>
                                                 <tr className="font-bold">
-                                                    <td colSpan={4} className="p-1 text-right">GT</td>
-                                                    <td className="p-1 text-right font-semibold">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
-                                                    <td className="p-1" colSpan={2}></td>
+                                                     <td colSpan={4} className="p-1 text-right border border-black">GT</td>
+                                                     <td className="p-1 text-right font-semibold border border-black">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
+                                                     <td className="p-1 border border-black" colSpan={2}></td>
+                                                 </tr>
+                                                 <tr>
+                                                    <td colSpan={7} className="pt-8 p-1 font-bold">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -422,5 +427,3 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         </Dialog>
     );
 };
-
-    
