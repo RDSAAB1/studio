@@ -42,7 +42,7 @@ export const usePaymentCombination = ({
         const rawOptions: PaymentOption[] = [];
         const step = roundFigureToggle ? 100 : 5;
 
-        for (let q = 0.10; q <= 200; q = parseFloat((q + 0.10).toFixed(2))) {
+        for (let q = 0.10; q <= 500; q = parseFloat((q + 0.10).toFixed(2))) {
             for (let currentRate = minRate; currentRate <= maxRate; currentRate += 5) {
                 if (currentRate % 5 !== 0) continue;
 
