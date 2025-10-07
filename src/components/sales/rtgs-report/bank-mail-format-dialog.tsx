@@ -67,6 +67,16 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 'Scheme Type': 'SB' // Always set Scheme Type to SB
             }));
             const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+            // Set column format to Text for account numbers
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const debitCellAddress = XLSX.utils.encode_cell({c: 1, r: R});
+                const creditCellAddress = XLSX.utils.encode_cell({c: 4, r: R});
+                if(worksheet[debitCellAddress]) worksheet[debitCellAddress].t = 's';
+                if(worksheet[creditCellAddress]) worksheet[creditCellAddress].t = 's';
+            }
+
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

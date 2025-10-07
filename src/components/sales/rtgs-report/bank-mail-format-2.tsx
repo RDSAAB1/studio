@@ -43,12 +43,13 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             [null, `BoB - ${bankToUse.bankName}`],
             [null, bankToUse.branchName, null, null, 'DATE', today],
             [null, `A/C.NO..${bankToUse.accountNumber}`],
-            ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]
         ];
+
+        ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
     
         payments.forEach((p: any, index: number) => {
             ws_data.push([
-                index + 1, toTitleCase(p.supplierName), `'${p.acNo}`, p.ifscCode,
+                index + 1, toTitleCase(p.supplierName), p.acNo, p.ifscCode,
                 p.amount, toTitleCase(p.supplierAddress || p.branch || ''), p.bank,
             ]);
         });
@@ -62,7 +63,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         ws_data.push([null, null, null, null, 'GT', grandTotal]);
         
         const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    
+
         ws['!cols'] = [ { wch: 8 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
         const borderStyle = { style: "thin", color: { auto: 1 } };
@@ -71,7 +72,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
         const headerRow = 4;
         const dataStartRow = 5;
-        const dataEndRow = dataStartRow + payments.length - 1;
+        const dataEndRow = dataStartRow + payments.length -1;
         const totalRow = footerRowIndex + 1;
         const numCols = 7;
         
@@ -83,13 +84,17 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ws[cell_ref].s = { ...boldStyle, border: allBorders };
         }
 
-        // Apply styles to data rows
+        // Apply styles to data rows and set account number as text
         for (let R = dataStartRow; R <= dataEndRow; ++R) {
             for (let C = 0; C < numCols; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
                 if (!ws[cell_ref]) ws[cell_ref] = {};
                 ws[cell_ref].s = { border: allBorders };
+                // Set column C (Account No) to text format
+                if (C === 2) {
+                    ws[cell_ref].t = 's';
+                }
             }
         }
 
@@ -176,16 +181,15 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 <ScrollArea className="flex-grow p-4">
                     <div ref={printRef}>
                          <div className="p-4 text-black text-sm">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
+                            <div className="grid grid-cols-2 items-start mb-4">
+                                <div className='space-y-1'>
                                     <p className="font-bold text-lg">{companyName}</p>
                                     <p>BoB - {bankToUse?.bankName}</p>
                                     <p>{bankToUse?.branchName}</p>
                                     <p>A/C.NO..{bankToUse?.accountNumber}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p><span className="font-bold">DATE</span></p>
-                                    <p>{format(new Date(), 'dd-MM-yyyy')}</p>
+                                    <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
                                 </div>
                             </div>
                             
@@ -207,7 +211,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                             <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
                                                 <td className="p-1 border border-black">{index + 1}</td>
                                                 <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
-                                                <td className="p-1 border border-black font-mono">{`'${p.acNo}`}</td>
+                                                <td className="p-1 border border-black font-mono">{p.acNo}</td>
                                                 <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
                                                 <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
                                                 <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
