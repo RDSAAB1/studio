@@ -58,15 +58,13 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
     
         const ws_data: (string | number | Date | null)[][] = [
-            [], // Row 1
-            [], // Row 2
-            [null, null, null, null, 'DATE', today], // Row 3
-            [null, companyName], // Row 4
-            [null, `BoB - ${bankToUse.bankName}`], // Row 5
-            [null, bankToUse.branchName], // Row 6
-            [null, `A/C.NO..${bankToUse.accountNumber}`], // Row 7
-            [], // Row 8
-            ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"] // Row 9
+            [null, companyName],
+            [null, `BoB - ${bankToUse.bankName}`],
+            [null, bankToUse.branchName, null, null, 'DATE', today],
+            [null, `A/C.NO..${bankToUse.accountNumber}`],
+            [],
+            [],
+            ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]
         ];
     
         payments.forEach((p: any, index: number) => {
@@ -76,11 +74,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             ]);
         });
         
-        const footerStartIndex = ws_data.length;
-        while (ws_data.length < footerStartIndex + 4) {
-            ws_data.push([]);
-        }
-        
+        ws_data.push([]);
+        ws_data.push([]);
+        ws_data.push([]);
+        ws_data.push([]);
         ws_data.push([null, "PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
         ws_data.push([]);
         
@@ -93,11 +90,21 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+        const boldStyle = { font: { bold: true } };
         
-        const tableStartRow = 8;
+        const tableStartRow = 6;
         const tableEndRow = tableStartRow + payments.length;
     
-        for (let R = tableStartRow; R <= tableEndRow; ++R) {
+        // Apply borders and bold to header
+        for (let C = 0; C < 7; ++C) {
+            const headerCellRef = XLSX.utils.encode_cell({ c: C, r: tableStartRow });
+            if (ws[headerCellRef]) {
+                ws[headerCellRef].s = { border: allBorders, font: boldStyle };
+            }
+        }
+        
+        // Apply borders to data rows
+        for (let R = tableStartRow + 1; R <= tableEndRow; ++R) {
             for (let C = 0; C < 7; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
