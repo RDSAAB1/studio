@@ -57,32 +57,54 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const today = format(new Date(), 'dd-MM-yyyy');
         const filename = `RTGS_Report_Format2_${today}.xlsx`;
 
-        const ws_data = [
-            [companyName], [bankToUse.bankName], [bankToUse.branchName], [`A/C.NO..${bankToUse.accountNumber}`], [],
-            ['', '', '', '', 'DATE', today], [],
+        // Data setup
+        const ws_data: (string | number | Date | null)[][] = [
+            [companyName, null, null, null, null, null, null],
+            [bankToUse.bankName, null, null, null, null, null, null],
+            [bankToUse.branchName, null, null, null, null, null, null],
+            [`A/C.NO..${bankToUse.accountNumber}`, null, null, null, null, null, null],
+            [],
+            [null, null, null, null, 'DATE', today, null],
+            [],
             ["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]
         ];
 
         payments.forEach((p: any, index: number) => {
             ws_data.push([
                 index + 1, toTitleCase(p.supplierName), `'${p.acNo}`, p.ifscCode,
-                p.amount, toTitleCase(p.supplierAddress || ''), p.bank,
+                p.amount, toTitleCase(p.supplierAddress || p.branch || ''), p.bank,
             ]);
         });
         
         const emptyRowsNeeded = Math.max(0, 19 - ws_data.length);
         for(let i=0; i<emptyRowsNeeded; i++) ws_data.push([]);
         
-        ws_data.push(["PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -"]);
+        ws_data.push(["PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -", null, null, null, null, null, null]);
         ws_data.push([]);
-        ws_data.push(['', '', '', '', '', 'GT', payments.reduce((sum: number, p: any) => sum + p.amount, 0)]);
+        ws_data.push([null, null, null, null, 'GT', payments.reduce((sum: number, p: any) => sum + p.amount, 0), null]);
         
-        const ws = XLSX.utils.aoa_to_sheet(ws_data);
-        ws['!cols'] = [
-            { wch: 5 }, { wch: 25 }, { wch: 20 }, { wch: 15 },
-            { wch: 15 }, { wch: 20 }, { wch: 20 },
-        ];
+        const ws = XLSX.utils.aoa_to_sheet(ws_data, { cellStyles: true });
+
+        // Column Widths
+        ws['!cols'] = [ { wch: 5 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 } ];
         
+        // Add borders to the table section
+        const borderStyle = { style: "thin", color: { auto: 1 } };
+        const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+        
+        const tableStartRow = 7; // "S.N" is on row 8 (index 7)
+        const tableEndRow = tableStartRow + payments.length;
+
+        for (let R = tableStartRow; R <= tableEndRow; ++R) {
+            for (let C = 0; C < 7; ++C) {
+                const cell_address = { c: C, r: R };
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
+                ws[cell_ref].s = { ...ws[cell_ref].s, border: allBorders };
+            }
+        }
+
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "RTGS Format 2");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -138,21 +160,19 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4">
                     <div ref={printRef}>
-                         <div className="p-4 border rounded-lg bg-gray-50 text-black">
-                            <div className="grid grid-cols-7 gap-4">
-                                <div className="col-span-4">
-                                    <p className="font-bold text-lg">{companyName}</p>
-                                    <p>{bankToUse?.bankName}</p>
-                                    <p>{bankToUse?.branchName}</p>
-                                    <p>A/C.NO..{bankToUse?.accountNumber}</p>
-                                </div>
-                                <div className="col-span-3 text-right">
-                                    <p><span className="font-bold">DATE</span> {format(new Date(), 'dd-MM-yyyy')}</p>
-                                </div>
+                         <div className="p-4 text-black text-sm">
+                            <div className="mb-2">
+                                <p className="font-bold text-lg">{companyName}</p>
+                                <p>{bankToUse?.bankName}</p>
+                                <p>{bankToUse?.branchName}</p>
+                                <p>A/C.NO..{bankToUse?.accountNumber}</p>
                             </div>
-                            <div className="mt-4">
-                                <table className="w-full text-sm table-auto border-collapse">
-                                    <thead>
+                            <div className="flex justify-end mb-2">
+                                <p><span className="font-bold">DATE</span> {format(new Date(), 'dd-MM-yyyy')}</p>
+                            </div>
+                            <div>
+                                <table className="w-full table-auto border-collapse border border-black">
+                                    <thead className="font-bold">
                                         <tr className="border-b border-black">
                                             <th className="p-1 text-left border border-black">S.N</th>
                                             <th className="p-1 text-left border border-black">Name</th>
@@ -170,26 +190,21 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                 <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
                                                 <td className="p-1 border border-black font-mono">{p.acNo}</td>
                                                 <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
-                                                <td className="p-1 text-right border border-black">{formatCurrency(p.amount)}</td>
-                                                <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || '')}</td>
+                                                <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
+                                                <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
                                                 <td className="p-1 border border-black">{p.bank}</td>
                                             </tr>
                                         ))}
-                                        {Array.from({ length: Math.max(0, 19 - 7 - payments.length) }).map((_: any, i: number) => (
-                                            <tr key={`empty-${i}`} className="border-b border-black h-7"><td className="border border-black" colSpan={7}></td></tr>
-                                        ))}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="border-b border-black">
-                                            <td colSpan={7} className="pt-8 text-sm border border-black p-1">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                        <tr>
+                                            <td colSpan={7} className="pt-8 p-1 border-b border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
                                         </tr>
-                                        <tr className="font-bold border-b border-black h-7">
-                                            <td colSpan={7} className="border border-black"></td>
-                                        </tr>
-                                        <tr className="font-bold border-b border-black">
-                                            <td colSpan={5} className="p-1 text-right border-r border-black"></td>
-                                            <td className="p-1 border-r border-black">GT</td>
-                                            <td className="p-1">{formatCurrency(payments.reduce((sum: number, p: any) => sum + p.amount, 0))}</td>
+                                        <tr className="font-bold">
+                                            <td colSpan={4} className="p-1"></td>
+                                            <td className="p-1 text-right">GT</td>
+                                            <td className="p-1 text-right font-semibold">{formatCurrency(payments.reduce((sum: number, p: any) => sum + p.amount, 0))}</td>
+                                            <td className="p-1"></td>
                                         </tr>
                                     </tfoot>
                                 </table>
