@@ -45,10 +45,10 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
             [null, companyName],
             [null, `${companyAddress1}${companyAddress2 ? `, ${companyAddress2}` : ''}`],
             [null, bankToUse.bankName ? `BoB - ${bankToUse.bankName}` : '', null, null, 'DATE', today],
-            [null, `A/C.NO.`]
         ];
-        
+
         const headerRowIndex = ws_data.length; 
+        ws_data.push([]); // Empty row
         ws_data.push(["S.N", "Name", "Account no", "IFCS Code", "Amount", "Place", "BANK"]);
     
         payments.forEach((p: any, index: number) => {
@@ -80,16 +80,18 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
         const boldFont = { bold: true };
         
-        const accountCellRef = XLSX.utils.encode_cell({c: 1, r: 3});
+        const accountCellRef = XLSX.utils.encode_cell({c: 1, r: headerRowIndex});
         if(ws[accountCellRef]) {
             ws[accountCellRef].v = `A/C.NO. ${bankToUse.accountNumber}`;
             ws[accountCellRef].t = 's';
+        } else {
+             ws[accountCellRef] = { t: 's', v: `A/C.NO. ${bankToUse.accountNumber}` };
         }
 
 
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
-        for (let R = headerRowIndex; R <= totalRowIndex; ++R) {
+        for (let R = headerRowIndex + 1; R <= totalRowIndex; ++R) {
             for (let C = 0; C < 7; ++C) {
                 const cell_address = { c: C, r: R };
                 const cell_ref = XLSX.utils.encode_cell(cell_address);
@@ -99,11 +101,11 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 
                 ws[cell_ref].s.border = allBorders;
 
-                if (C === 2 && R > headerRowIndex && R < footerRow2Index) { 
+                if (C === 2 && R > headerRowIndex + 1 && R < footerRow2Index) { 
                     ws[cell_ref].t = 's';
                 }
                 
-                if (R === headerRowIndex || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRow2Index)) { 
+                if (R === headerRowIndex + 1 || (R === totalRowIndex && (C === 3 || C === 4)) || (R === footerRow2Index)) { 
                     ws[cell_ref].s.font = { ...ws[cell_ref].s.font, ...boldFont };
                 }
             }
@@ -308,7 +310,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                  </DialogHeader>
                 {isPreview ? (
                      <>
-                        <ScrollArea className="flex-grow">
+                        <ScrollArea className="flex-grow p-4">
                             <div ref={printRef} className="bg-white"> 
                                 <div className="p-4 text-black text-sm">
                                     <div className="grid grid-cols-2 items-start mb-4">
@@ -351,20 +353,17 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                 ))}
                                             </tbody>
                                             <tfoot>
-                                                 <tr className="font-bold">
-                                                     <td colSpan={4} className="p-1 text-right border border-black">GT</td>
-                                                     <td className="p-1 text-right font-semibold border border-black">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
-                                                     <td className="p-1 border border-black" colSpan={2}></td>
-                                                 </tr>
-                                                  <tr>
+                                                 <tr>
                                                       <td colSpan={7} className="h-4 p-1 border-x border-black"></td>
                                                  </tr>
                                                  <tr>
                                                       <td colSpan={7} className="h-4 p-1 border-x border-b border-black"></td>
                                                  </tr>
-                                                 <tr>
-                                                    <td colSpan={7} className="pt-8 p-1 font-bold">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
-                                                </tr>
+                                                 <tr className="font-bold">
+                                                     <td colSpan={4} className="p-1 text-right border border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                                     <td className="p-1 text-right font-semibold border border-black">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
+                                                     <td className="p-1 border border-black" colSpan={2}></td>
+                                                 </tr>
                                             </tfoot>
                                         </table>
                                     </div>
