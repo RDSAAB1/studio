@@ -424,7 +424,7 @@ const handleDelete = async (id: string) => {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: format(values.date, 'yyyy-MM-dd'),
+        date: values.date.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
@@ -489,11 +489,11 @@ const handleDelete = async (id: string) => {
     }
   };
   
-  const handleShowDetails = (customer: Customer) => {
+  const handleShowDetails = (supplier: Customer) => {
     const fullData = {
-        ...customer,
-        allTransactions: [customer],
-        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
+        ...supplier,
+        allTransactions: [supplier],
+        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
     };
     setDetailsSupplier(fullData);
   };
@@ -673,6 +673,22 @@ const handleDelete = async (id: string) => {
         }
     };
     
+    const handleDeleteSelected = async () => {
+      if (selectedSupplierIds.size === 0) {
+        toast({ title: "No entries selected", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Deleting selected entries...", description: `Deleting ${selectedSupplierIds.size} entries.` });
+      try {
+        await deleteMultipleSuppliers(Array.from(selectedSupplierIds));
+        toast({ title: "Delete Complete", description: `${selectedSupplierIds.size} entries and their associated payments have been deleted.`, variant: "success" });
+        setSelectedSupplierIds(new Set()); // Clear selection after delete
+      } catch (error) {
+        console.error("Error deleting selected entries:", error);
+        toast({ title: "Delete Failed", variant: "destructive" });
+      }
+    };
+    
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
             const activeElement = document.activeElement as HTMLElement;
@@ -775,6 +791,7 @@ const handleDelete = async (id: string) => {
                 onExport={handleExport}
                 onUpdateSelected={handleUpdateSelected}
                 onDeleteSelected={handleDeleteSelected}
+                onDeleteAll={handleDeleteAll}
             />
         </form>
       </FormProvider>      
@@ -814,7 +831,7 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
       <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
@@ -852,3 +869,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
