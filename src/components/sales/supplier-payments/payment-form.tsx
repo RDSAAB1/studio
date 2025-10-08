@@ -23,7 +23,7 @@ import { Separator } from '@/components/ui/separator';
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
     { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
-    { value: 'on_full_amount', label: 'Full CD (Paid + Unpaid)' },
+    { value: 'on_full_amount', label: 'Full CD on Full Amount' },
 ];
 
 const SectionTitle = ({ title, onEdit, editingPayment, icon, description }: { title: string, onEdit?: () => void, editingPayment?: boolean, icon?: React.ReactNode, description?: string }) => (

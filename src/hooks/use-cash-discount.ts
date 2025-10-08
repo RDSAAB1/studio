@@ -31,7 +31,7 @@ export const useCashDiscount = ({
     // 1. State Management
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2); // Default 2%
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount'>('partial_on_paid');
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
 
     // 2. Eligibility Check (Memoized)
     // Determines if the payment date meets the due date condition for at least one entry.
@@ -79,6 +79,9 @@ export const useCashDiscount = ({
             case 'on_unpaid_amount':
                 baseAmountForCd = totalOutstanding;
                 break;
+            case 'on_full_amount':
+                baseAmountForCd = totalOutstanding;
+                break;
             default:
                 baseAmountForCd = 0;
         }
@@ -96,7 +99,7 @@ export const useCashDiscount = ({
         // Constraint 2: Ensure final CD does not exceed the remaining outstanding balance.
         return Math.min(finalCd, totalOutstanding);
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, totalCdOnSelectedEntries]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding]);
     
     // 6. Hook Return Values
     return {
