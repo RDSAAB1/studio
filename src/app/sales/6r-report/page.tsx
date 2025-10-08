@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -152,8 +151,7 @@ export default function SixRReportPage() {
         const dataToExport = filteredReportRows.map(p => ({
             '6R No.': p.sixRNo,
             '6R Date': p.sixRDate,
-            'Payee': `${p.supplierName}, S/O: ${p.fatherName}`,
-            'Address': p.supplierAddress,
+            'Payee': `${p.supplierName}, S/O: ${p.fatherName}, ${p.supplierAddress}`,
             'Contact': p.supplierContact,
             'Bank Name': p.bankName,
             'Account No.': p.bankAcNo,
