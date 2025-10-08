@@ -215,40 +215,40 @@ export default function SixRReportPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[60vh] border rounded-md">
-                        <div ref={printRef}>
+                        <div ref={printRef} className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>6R No.</TableHead>
-                                        <TableHead>6R Date</TableHead>
-                                        <TableHead>Payee</TableHead>
-                                        <TableHead>Contact</TableHead>
-                                        <TableHead>Bank Name</TableHead>
-                                        <TableHead>A/C No.</TableHead>
-                                        <TableHead>IFSC Code</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Check No.</TableHead>
-                                        <TableHead>Parchi No.</TableHead>
+                                        <TableHead className="py-1 px-2">6R No.</TableHead>
+                                        <TableHead className="py-1 px-2">6R Date</TableHead>
+                                        <TableHead className="py-1 px-2">Payee</TableHead>
+                                        <TableHead className="py-1 px-2">Contact</TableHead>
+                                        <TableHead className="py-1 px-2">Bank Name</TableHead>
+                                        <TableHead className="py-1 px-2">A/C No.</TableHead>
+                                        <TableHead className="py-1 px-2">IFSC Code</TableHead>
+                                        <TableHead className="py-1 px-2">Amount</TableHead>
+                                        <TableHead className="py-1 px-2">Check No.</TableHead>
+                                        <TableHead className="py-1 px-2">Parchi No.</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredReportRows.length > 0 ? (
                                         filteredReportRows.map((row, index) => (
                                             <TableRow key={`${row.sixRNo}-${index}`}>
-                                                <TableCell className="font-bold">{row.sixRNo}</TableCell>
-                                                <TableCell>{row.sixRDate}</TableCell>
-                                                <TableCell>
+                                                <TableCell className="font-bold py-1 px-2">{row.sixRNo}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.sixRDate}</TableCell>
+                                                <TableCell className="py-1 px-2">
                                                     <div className="font-medium">{row.supplierName}</div>
                                                     <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
                                                     <div className="text-xs text-muted-foreground">{row.supplierAddress}</div>
                                                 </TableCell>
-                                                <TableCell>{row.supplierContact}</TableCell>
-                                                <TableCell>{row.bankName}</TableCell>
-                                                <TableCell className="font-mono">{row.bankAcNo}</TableCell>
-                                                <TableCell className="font-mono">{row.ifscCode}</TableCell>
-                                                <TableCell className="font-bold">{formatCurrency(row.amount)}</TableCell>
-                                                <TableCell>{row.checkNo}</TableCell>
-                                                <TableCell className="max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.supplierContact}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.bankName}</TableCell>
+                                                <TableCell className="font-mono py-1 px-2">{row.bankAcNo}</TableCell>
+                                                <TableCell className="font-mono py-1 px-2">{row.ifscCode}</TableCell>
+                                                <TableCell className="font-bold py-1 px-2">{formatCurrency(row.amount)}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.checkNo}</TableCell>
+                                                <TableCell className="max-w-24 truncate py-1 px-2" title={row.parchiNo}>{row.parchiNo}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
