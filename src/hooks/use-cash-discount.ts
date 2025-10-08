@@ -19,6 +19,7 @@ interface UseCashDiscountProps {
     }>;
     toBePaidAmount: number;
     paymentHistory: Payment[]; // Pass full payment history for calculations
+    selectedCustomerKey?: string | null; // Pass the key/ID of the currently selected supplier
 }
 
 // --- The Custom Hook: useCashDiscount ---
@@ -31,6 +32,7 @@ export const useCashDiscount = ({
     selectedEntries = [], // List of items being paid
     toBePaidAmount, // Amount user is paying now
     paymentHistory = [],
+    selectedCustomerKey,
 }: UseCashDiscountProps) => {
     
     // 1. State Management
@@ -83,11 +85,13 @@ export const useCashDiscount = ({
                 const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
                 return Math.max(0, remainingCD);
             }
-            case 'on_previously_paid_no_cd': {
-                const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-                const previousPaymentsWithoutCD = paymentHistory.filter(p => 
-                    p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)) &&
-                    (!p.cdApplied || p.cdAmount === 0)
+             case 'on_previously_paid_no_cd': {
+                if (!selectedCustomerKey) return 0;
+
+                const paymentsForThisCustomer = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+                
+                const previousPaymentsWithoutCD = paymentsForThisCustomer.filter(p => 
+                    !p.cdApplied || p.cdAmount === 0
                 );
                 
                 baseAmountForCd = previousPaymentsWithoutCD.reduce((sum, p) => sum + p.amount, 0);
@@ -107,7 +111,7 @@ export const useCashDiscount = ({
         
         return Math.min(finalCd, totalOutstanding);
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries, paymentHistory]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries, paymentHistory, selectedCustomerKey]);
     
     return {
         cdEnabled,
