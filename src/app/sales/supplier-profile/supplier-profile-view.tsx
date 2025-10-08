@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
@@ -56,21 +56,21 @@ const TransactionTable = ({ transactions, onShowDetails }: { transactions: Suppl
                 <TableHeader>
                     <TableRow>
                         <TableHead>SR No</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Original Amt</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>CD</TableHead>
+                        <TableHead>Outstanding</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {transactions.map(entry => (
                         <TableRow key={entry.id}>
-                            <TableCell className="font-mono">{entry.srNo}</TableCell>
-                            <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
-                            <TableCell>
-                                <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                                {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
-                                </Badge>
-                            </TableCell>
+                            <TableCell className="font-mono text-xs">{entry.srNo}</TableCell>
+                            <TableCell className="text-xs">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                            <TableCell className="text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
+                            <TableCell className="text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-red-600">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
                             <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                     <Info className="h-4 w-4" />
@@ -80,7 +80,7 @@ const TransactionTable = ({ transactions, onShowDetails }: { transactions: Suppl
                     ))}
                     {transactions.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground h-24">No transactions in this category.</TableCell>
                         </TableRow>
                     )}
                 </TableBody>
@@ -136,10 +136,10 @@ export const SupplierProfileView = ({
     const { outstandingTransactions, runningTransactions, profitableTransactions, paidTransactions } = useMemo(() => {
         const all = selectedSupplierData?.allTransactions || [];
         
-        const outstanding = all.filter(t => Math.abs(Number(t.netAmount) - t.originalNetAmount) < 0.01 && t.originalNetAmount > 0);
+        const outstanding = all.filter(t => (t.totalPaid || 0) === 0 && t.originalNetAmount > 0);
         const paid = all.filter(t => Number(t.netAmount) < 1);
         const profitable = all.filter(t => Number(t.netAmount) >= 1 && Number(t.netAmount) < 200);
-        const running = all.filter(t => Number(t.netAmount) >= 200 && Math.abs(Number(t.netAmount) - t.originalNetAmount) >= 0.01);
+        const running = all.filter(t => Number(t.netAmount) >= 200 && (t.totalPaid || 0) > 0);
 
         return { outstandingTransactions: outstanding, runningTransactions: running, profitableTransactions: profitable, paidTransactions: paid };
     }, [selectedSupplierData]);
