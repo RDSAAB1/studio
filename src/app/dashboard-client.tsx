@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -90,10 +90,14 @@ export default function DashboardClient() {
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
             return { 
-                filteredIncomes: incomes, 
-                filteredExpenses: expenses, 
-                filteredSupplierPayments: supplierPayments,
-                filteredCustomerPayments: customerPayments,
+                filteredIncomes: [], 
+                filteredExpenses: [], 
+                filteredSupplierPayments: [],
+                filteredCustomerPayments: [],
+                filteredFundTransactions: [],
+                filteredLoans: [],
+                filteredSuppliers: [],
+                filteredCustomers: [],
             };
         }
         
@@ -108,8 +112,12 @@ export default function DashboardClient() {
             filteredExpenses: expenses.filter(filterFn),
             filteredSupplierPayments: supplierPayments.filter(filterFn),
             filteredCustomerPayments: customerPayments.filter(filterFn),
+            filteredFundTransactions: fundTransactions.filter(filterFn),
+            filteredLoans: loans.filter(filterFn),
+            filteredSuppliers: suppliers.filter(filterFn),
+            filteredCustomers: customers.filter(filterFn),
         };
-    }, [date, incomes, expenses, supplierPayments, customerPayments]);
+    }, [date, incomes, expenses, supplierPayments, customerPayments, fundTransactions, loans, suppliers, customers]);
 
 
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
@@ -130,11 +138,11 @@ export default function DashboardClient() {
             totalIncome: currentTotalIncome,
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
-            totalSupplierDues: suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
-            totalCustomerReceivables: customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0),
+            totalSupplierDues: filteredData.filteredSuppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
+            totalCustomerReceivables: filteredData.filteredCustomers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0),
             totalCdReceived: cdReceived,
         }
-    }, [filteredData, suppliers, customers]);
+    }, [filteredData]);
     
      const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -142,7 +150,7 @@ export default function DashboardClient() {
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
 
-        fundTransactions.forEach(t => {
+        filteredData.filteredFundTransactions.forEach(t => {
             if (balances.has(t.source)) {
                 balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             }
@@ -151,14 +159,14 @@ export default function DashboardClient() {
             }
         });
         
-        [...incomes, ...customerPayments].forEach(t => {
+        allIncomes.forEach(t => {
             const balanceKey = t.bankAccountId || (('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
             }
         });
         
-        [...expenses, ...supplierPayments].forEach(t => {
+        allExpenses.forEach(t => {
              const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || ('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
@@ -166,12 +174,12 @@ export default function DashboardClient() {
         });
 
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
-        const totalLoanLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+        const totalLoanLiabilities = filteredData.filteredLoans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
         const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const workingCapital = totalAssets - totalLiabilities;
         
         return { balances, totalAssets, totalLiabilities, workingCapital };
-    }, [fundTransactions, incomes, expenses, supplierPayments, customerPayments, bankAccounts, loans, totalSupplierDues]);
+    }, [filteredData, allIncomes, allExpenses, bankAccounts, totalSupplierDues]);
 
     // --- Chart Data Calculation ---
     const level1Data = useMemo(() => {
@@ -402,6 +410,7 @@ export default function DashboardClient() {
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 Days</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
                     </div>
                 </CardContent>
             </Card>
