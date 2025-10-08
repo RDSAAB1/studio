@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
+import type { Payment } from '@/lib/definitions';
 
 // --- Interface for Hook Props ---
 interface UseCashDiscountProps {
@@ -10,12 +11,14 @@ interface UseCashDiscountProps {
     totalOutstanding: number;
     paymentDate: Date | undefined;
     selectedEntries: Array<{
+        srNo: string;
         dueDate?: string;  // For eligibility
         totalCd?: number;  // CD already applied from previous payments
         originalNetAmount?: number; // Original amount of the entry
         [key: string]: any;
     }>;
     toBePaidAmount: number;
+    paymentHistory: Payment[]; // Pass full payment history for calculations
 }
 
 // --- The Custom Hook: useCashDiscount ---
@@ -27,21 +30,19 @@ export const useCashDiscount = ({
     paymentDate, // Date of current payment
     selectedEntries = [], // List of items being paid
     toBePaidAmount, // Amount user is paying now
+    paymentHistory = [],
 }: UseCashDiscountProps) => {
     
     // 1. State Management
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2); // Default 2%
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount' | 'on_previously_paid_no_cd'>('partial_on_paid');
 
     // 2. Eligibility Check (Memoized)
-    // Determines if the payment date meets the due date condition for at least one entry.
     const eligibleForCd = useMemo(() => {
-        // Normalize dates to midnight for accurate comparison
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
         effectivePaymentDate.setHours(0, 0, 0, 0);
 
-        // Check if payment is made on or before the due date for ANY selected entry.
         return selectedEntries.some(e => {
             if (!e.dueDate) return false;
             const dueDate = new Date(e.dueDate);
@@ -52,12 +53,10 @@ export const useCashDiscount = ({
 
     // 3. Effect to Auto-Enable CD
     useEffect(() => {
-        // Automatically enable the discount if any entry is eligible
         setCdEnabled(eligibleForCd);
     }, [eligibleForCd]);
     
     // 4. Total CD Already Applied (Memoized)
-    // Sums up all the cash discount applied in previous payments for the selected entries.
     const totalCdOnSelectedEntries = useMemo(() => {
         return selectedEntries.reduce((sum, entry) => sum + (entry.totalCd || 0), 0);
     }, [selectedEntries]);
@@ -65,14 +64,12 @@ export const useCashDiscount = ({
 
     // 5. Final Calculated CD Amount (Memoized)
     const calculatedCdAmount = useMemo(() => {
-        // Pre-check: If disabled or percentage is zero, return 0.
         if (!cdEnabled || cdPercent <= 0) {
             return 0;
         }
 
         let baseAmountForCd = 0;
         
-        // Determine the base amount based on the 'cdAt' setting
         switch (cdAt) {
             case 'partial_on_paid':
                 baseAmountForCd = toBePaidAmount;
@@ -81,14 +78,20 @@ export const useCashDiscount = ({
                 baseAmountForCd = totalOutstanding;
                 break;
             case 'on_full_amount': {
-                // Calculate total original amount of selected entries
                 const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
-                // Calculate the total potential CD on the original amount
                 const totalPotentialCD = (totalOriginalAmount * cdPercent) / 100;
-                // The new CD to be applied is the total potential CD minus what's already been given
                 const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
-                // Ensure we don't give a negative CD
                 return Math.max(0, remainingCD);
+            }
+            case 'on_previously_paid_no_cd': {
+                const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+                const previousPaymentsWithoutCD = paymentHistory.filter(p => 
+                    p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)) &&
+                    (!p.cdApplied || p.cdAmount === 0)
+                );
+                
+                baseAmountForCd = previousPaymentsWithoutCD.reduce((sum, p) => sum + p.amount, 0);
+                break;
             }
             default:
                 baseAmountForCd = 0;
@@ -98,18 +101,14 @@ export const useCashDiscount = ({
             return 0;
         }
 
-        // Calculate the raw CD amount
         let calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
-        // Constraint 1: Ensure calculated CD is not negative.
         const finalCd = Math.max(0, calculatedCd);
         
-        // Constraint 2: Ensure final CD does not exceed the remaining outstanding balance.
         return Math.min(finalCd, totalOutstanding);
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries, paymentHistory]);
     
-    // 6. Hook Return Values
     return {
         cdEnabled,
         setCdEnabled,
@@ -117,7 +116,7 @@ export const useCashDiscount = ({
         setCdPercent,
         cdAt, 
         setCdAt,
-        calculatedCdAmount, // The final, safe, and adjusted cash discount amount
-        eligibleForCd,      // Eligibility status
+        calculatedCdAmount,
+        eligibleForCd,
     };
 };

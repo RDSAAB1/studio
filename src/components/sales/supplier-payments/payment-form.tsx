@@ -24,6 +24,7 @@ const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
     { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
     { value: 'on_full_amount', label: 'Full CD on Full Amount' },
+    { value: 'on_previously_paid_no_cd', label: 'On Paid Amount (No CD)' },
 ];
 
 const SectionTitle = ({ title, onEdit, editingPayment, icon, description }: { title: string, onEdit?: () => void, editingPayment?: boolean, icon?: React.ReactNode, description?: string }) => (
