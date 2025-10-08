@@ -23,6 +23,7 @@ interface SixRReportRow {
     sixRDate: string;
     supplierName: string;
     fatherName: string;
+    supplierAddress: string;
     amount: number;
     checkNo: string;
     parchiNo: string;
@@ -61,6 +62,7 @@ export default function SixRReportPage() {
                 sixRDate: p.sixRDate ? format(new Date(p.sixRDate), 'dd-MMM-yy') : 'N/A',
                 supplierName: toTitleCase(p.supplierName || ''),
                 fatherName: toTitleCase(p.supplierFatherName || ''),
+                supplierAddress: toTitleCase(p.supplierAddress || ''),
                 amount: p.rtgsAmount || p.amount || 0,
                 checkNo: p.checkNo || 'N/A',
                 parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
@@ -182,42 +184,39 @@ export default function SixRReportPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>6R No. / Date</TableHead>
-                                    <TableHead>Payee / Father's Name</TableHead>
-                                    <TableHead>Bank / A/C No. / IFSC</TableHead>
+                                    <TableHead>6R No.</TableHead>
+                                    <TableHead>6R Date</TableHead>
+                                    <TableHead>Payee</TableHead>
+                                    <TableHead>Bank Name</TableHead>
+                                    <TableHead>A/C No.</TableHead>
+                                    <TableHead>IFSC Code</TableHead>
                                     <TableHead>Amount</TableHead>
-                                    <TableHead>Check / Parchi No.</TableHead>
+                                    <TableHead>Check No.</TableHead>
+                                    <TableHead>Parchi No.</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredReportRows.length > 0 ? (
                                     filteredReportRows.map((row, index) => (
                                         <TableRow key={`${row.sixRNo}-${index}`}>
-                                            <TableCell>
-                                                <div className="font-bold">{row.sixRNo}</div>
-                                                <div className="text-xs text-muted-foreground">{row.sixRDate}</div>
-                                            </TableCell>
+                                            <TableCell className="font-bold">{row.sixRNo}</TableCell>
+                                            <TableCell>{row.sixRDate}</TableCell>
                                             <TableCell>
                                                 <div className="font-medium">{row.supplierName}</div>
-                                                <div className="text-xs text-muted-foreground">{row.fatherName}</div>
+                                                <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
+                                                <div className="text-xs text-muted-foreground">{row.supplierAddress}</div>
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{row.bankName}</div>
-                                                <div className="text-xs text-muted-foreground">{row.bankAcNo}</div>
-                                                <div className="text-xs text-muted-foreground">{row.ifscCode}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-bold">{formatCurrency(row.amount)}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{row.checkNo}</div>
-                                                <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
-                                            </TableCell>
+                                            <TableCell>{row.bankName}</TableCell>
+                                            <TableCell className="font-mono">{row.bankAcNo}</TableCell>
+                                            <TableCell className="font-mono">{row.ifscCode}</TableCell>
+                                            <TableCell className="font-bold">{formatCurrency(row.amount)}</TableCell>
+                                            <TableCell>{row.checkNo}</TableCell>
+                                            <TableCell className="max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
+                                        <TableCell colSpan={9} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
