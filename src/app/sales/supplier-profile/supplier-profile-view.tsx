@@ -211,7 +211,8 @@ export const SupplierProfileView = ({
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                              <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable</span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">RTGS Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
