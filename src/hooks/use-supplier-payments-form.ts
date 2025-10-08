@@ -166,11 +166,21 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const value = e.target.value.trim().toUpperCase();
         if (!value) return;
 
-        const existingPayment = paymentHistory.find(p => p.paymentId === value);
-        const existingExpense = expenses.find(ex => ex.transactionId === value);
+        const prefix = paymentMethod === 'Cash' ? 'EX' : 'P';
+        let formattedId = value;
 
-        if (existingPayment) { // This will catch both P and EX from payments
-             onEditCallback(existingPayment);
+        // Auto-format if it's just a number
+        if (/^\d+$/.test(value)) {
+            const num = parseInt(value, 10);
+            formattedId = generateReadableId(prefix, num - 1, 5); // generateReadableId adds 1
+            setPaymentId(formattedId);
+        }
+
+        const existingPayment = paymentHistory.find(p => p.paymentId === formattedId);
+        const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
+
+        if (existingPayment) {
+            onEditCallback(existingPayment);
         } else if (existingExpense) {
             onConflict(`This ID is used for an expense: ${existingExpense.description}`);
         }
