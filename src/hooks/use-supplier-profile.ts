@@ -67,7 +67,7 @@ export const useSupplierData = () => {
     const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
     const profiles: CustomerSummary[] = [];
 
-    const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+    const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
 
     // 1. Create unique profiles from suppliers
     safeSuppliers.forEach(s => {
@@ -179,8 +179,8 @@ export const useSupplierData = () => {
                 }
             });
             
-            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-            return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+            return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
         });
 
         data.allTransactions = updatedTransactions;
@@ -200,10 +200,12 @@ export const useSupplierData = () => {
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
+        // Correct calculation for cash and rtgs paid
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
+
+        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -274,8 +276,8 @@ export const useSupplierData = () => {
                 }
             }
         });
-        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
-        return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
+        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+        return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
     });
 
     millSummary.allTransactions = allRecalculatedSuppliers;
