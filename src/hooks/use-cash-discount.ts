@@ -12,6 +12,7 @@ interface UseCashDiscountProps {
     selectedEntries: Array<{
         dueDate?: string;  // For eligibility
         totalCd?: number;  // CD already applied from previous payments
+        originalNetAmount?: number; // Original amount of the entry
         [key: string]: any;
     }>;
     toBePaidAmount: number;
@@ -79,9 +80,16 @@ export const useCashDiscount = ({
             case 'on_unpaid_amount':
                 baseAmountForCd = totalOutstanding;
                 break;
-            case 'on_full_amount':
-                baseAmountForCd = totalOutstanding;
-                break;
+            case 'on_full_amount': {
+                // Calculate total original amount of selected entries
+                const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
+                // Calculate the total potential CD on the original amount
+                const totalPotentialCD = (totalOriginalAmount * cdPercent) / 100;
+                // The new CD to be applied is the total potential CD minus what's already been given
+                const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
+                // Ensure we don't give a negative CD
+                return Math.max(0, remainingCD);
+            }
             default:
                 baseAmountForCd = 0;
         }
@@ -99,7 +107,7 @@ export const useCashDiscount = ({
         // Constraint 2: Ensure final CD does not exceed the remaining outstanding balance.
         return Math.min(finalCd, totalOutstanding);
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries]);
     
     // 6. Hook Return Values
     return {
