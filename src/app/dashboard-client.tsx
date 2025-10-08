@@ -152,14 +152,14 @@ export default function DashboardClient() {
         });
         
         [...incomes, ...customerPayments].forEach(t => {
-            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+            const balanceKey = t.bankAccountId || (('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
             }
         });
         
         [...expenses, ...supplierPayments].forEach(t => {
-             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' || ('receiptType' in t && t.receiptType === 'Cash') ? 'CashInHand' : '');
+             const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || ('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
              }
@@ -219,13 +219,20 @@ export default function DashboardClient() {
         const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
             const day = format(new Date(t.date), 'MMM dd');
             if (!acc[day]) acc[day] = { date: day, income: 0, expense: 0 };
-            if ('transactionType' in t && t.transactionType === 'Income' || 'customerId' in t) {
+            
+            // Check if it's an income type from incomes collection
+            const isIncomeEntry = 'transactionType' in t && t.transactionType === 'Income';
+            // Check if it's a customer payment
+            const isCustomerPayment = 'customerId' in t && 'paymentId' in t && t.paymentId.startsWith('CP');
+
+            if (isIncomeEntry || isCustomerPayment) {
                 acc[day].income += t.amount;
             } else {
                  acc[day].expense += t.amount;
             }
             return acc;
         }, {} as Record<string, { date: string, income: number, expense: number }>);
+
         return Object.values(grouped).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [allIncomes, allExpenses]);
     
@@ -254,9 +261,9 @@ export default function DashboardClient() {
             if(item.bankAccountId) {
                  const bank = bankAccounts.find(b => b.id === item.bankAccountId);
                  key = bank ? bank.accountHolderName : 'Other Bank';
-            } else if (item.paymentMethod === 'Cash' || ('receiptType' in item && item.receiptType === 'Cash')) {
+            } else if (('paymentMethod' in item && item.paymentMethod === 'Cash') || ('receiptType' in item && item.receiptType === 'Cash')) {
                 key = 'Cash in Hand';
-            } else if (item.paymentMethod === 'RTGS' || ('receiptType' in item && item.receiptType === 'RTGS')) {
+            } else if (('paymentMethod' in item && item.paymentMethod === 'RTGS') || ('receiptType' in item && item.receiptType === 'RTGS')) {
                 key = 'RTGS';
             }
             acc[key] = (acc[key] || 0) + item.amount;
