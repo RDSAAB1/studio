@@ -200,12 +200,10 @@ export const useSupplierData = () => {
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
-        // Correct calculation for cash and rtgs paid
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
-
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -288,6 +286,10 @@ export const useSupplierData = () => {
     millSummary.totalPaid = millSummary.allPayments.reduce((sum, p) => sum + p.amount, 0);
     millSummary.totalCdAmount = millSummary.allPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
     millSummary.totalOutstanding = millSummary.allTransactions.reduce((sum, t) => sum + Number(t.netAmount), 0);
+    
+    millSummary.totalCashPaid = millSummary.allPayments.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
+    millSummary.totalRtgsPaid = millSummary.allPayments.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
+
 
     millSummary.totalTransactions = millSummary.allTransactions.length;
     millSummary.totalOutstandingTransactions = millSummary.allTransactions.filter(t => Number(t.netAmount) >= 1).length;
@@ -295,8 +297,6 @@ export const useSupplierData = () => {
     // Copy other aggregations from individual profiles
     Array.from(finalSummaryMap.values()).forEach(s => {
         millSummary.totalAmount += s.totalAmount;
-        millSummary.totalCashPaid += s.totalCashPaid;
-        millSummary.totalRtgsPaid += s.totalRtgsPaid;
         millSummary.totalGrossWeight! += s.totalGrossWeight!;
         millSummary.totalTeirWeight! += s.totalTeirWeight!;
         millSummary.totalFinalWeight! += s.totalFinalWeight!;
