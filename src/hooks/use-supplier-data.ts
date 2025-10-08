@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
-import { toTitleCase, levenshteinDistance } from "@/lib/utils";
+import { toTitleCase } from "@/lib/utils";
 
 
 export const useSupplierData = () => {
@@ -65,28 +65,16 @@ export const useSupplierData = () => {
     const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
     const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
-    const profiles: CustomerSummary[] = [];
+    const profiles: { [key: string]: CustomerSummary } = {};
 
-    const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
-
-    // 1. Create unique profiles from suppliers
+    // 1. Create profiles from suppliers based on customerId
     safeSuppliers.forEach(s => {
-        const sNameNorm = normalize(s.name || '');
-        const sSoNorm = normalize(s.so || '');
-        
-        let bestMatch = profiles.find(p => {
-            const pNameNorm = normalize(p.name || '');
-            const pSoNorm = normalize(p.so || '');
-            return levenshteinDistance(sNameNorm + sSoNorm, pNameNorm + pSoNorm) < 3;
-        });
-
-        if (!bestMatch) {
-            bestMatch = {
-                name: s.name, so: s.so, address: s.address,
-                contact: '', // Will be aggregated later
-                allTransactions: [], allPayments: [],
-                // Initialize all other properties
+        if (s.customerId && !profiles[s.customerId]) {
+            profiles[s.customerId] = {
+                name: s.name, so: s.so, address: s.address, contact: s.contact,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
+                allTransactions: [], allPayments: [], 
+                // Initialize all other properties
                 totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                 totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [],
                 transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
@@ -95,73 +83,45 @@ export const useSupplierData = () => {
                 averageKartaPercentage: 0, averageLabouryRate: 0, totalTransactions: 0,
                 totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
             };
-            profiles.push(bestMatch);
         }
     });
-
-    // 2. Assign transactions to profiles
-    safeSuppliers.forEach(s => {
-        const sNameNorm = normalize(s.name || '');
-        const sSoNorm = normalize(s.so || '');
-
-        let bestMatch = profiles.find(p => {
-            const pNameNorm = normalize(p.name || '');
-            const pSoNorm = normalize(p.so || '');
-            return levenshteinDistance(sNameNorm + sSoNorm, pNameNorm + pSoNorm) < 3;
-        });
-
-        if (bestMatch) {
-            bestMatch.allTransactions!.push({ ...s });
-        }
-    });
-
-    // 3. Assign payments to profiles
+    
+    // Add outsider payments as profiles
     safePaymentHistory.forEach(p => {
-         if (p.rtgsFor === 'Outsider') {
-            const key = `${normalize(p.supplierName || 'Outsider')}|${normalize(p.supplierFatherName || '')}`;
-            let bestMatch = profiles.find(prof => `${normalize(prof.name || '')}|${normalize(prof.so || '')}` === key);
-
-            if (!bestMatch) {
-                bestMatch = {
-                    name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
-                    contact: '', allTransactions: [], allPayments: [],
-                    acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                    totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
-                    totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
-                    totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
-                    totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
-                    totalDeductions: 0, averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
-                    totalTransactions: 0, totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
-                };
-                profiles.push(bestMatch);
-            }
-            bestMatch.allPayments!.push(p);
-
-         } else if (p.paidFor && p.paidFor.length > 0) {
-             const firstSrNo = p.paidFor[0].srNo;
-             const associatedSupplier = safeSuppliers.find(s => s.srNo === firstSrNo);
-             if (associatedSupplier) {
-                let bestMatch = profiles.find(prof => {
-                    const profNameNorm = normalize(prof.name || '');
-                    const profSoNorm = normalize(prof.so || '');
-                    const supNameNorm = normalize(associatedSupplier.name || '');
-                    const supSoNorm = normalize(associatedSupplier.so || '');
-                    return levenshteinDistance(profNameNorm + profSoNorm, supNameNorm + supSoNorm) < 3;
-                });
-                if (bestMatch) {
-                    bestMatch.allPayments!.push(p);
-                }
-             }
+         if (p.rtgsFor === 'Outsider' && p.customerId && !profiles[p.customerId]) {
+            profiles[p.customerId] = {
+                name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                contact: '', allTransactions: [], allPayments: [],
+                acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+                totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
+                totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+                totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                totalDeductions: 0, averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
+                totalTransactions: 0, totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
+            };
         }
     });
 
-    // 4. Calculate stats for each profile
-    profiles.forEach(data => {
-        const allContacts = new Set(data.allTransactions!.map(t => t.contact));
-        data.contact = Array.from(allContacts).join(', ');
+    // 2. Assign transactions and payments to the correct profile
+    safeSuppliers.forEach(s => {
+        if(s.customerId && profiles[s.customerId]) {
+            profiles[s.customerId].allTransactions!.push(s);
+        }
+    });
+    safePaymentHistory.forEach(p => {
+        if(p.customerId && profiles[p.customerId]) {
+            profiles[p.customerId].allPayments!.push(p);
+        }
+    });
 
-        const updatedTransactions = data.allTransactions!.map(transaction => {
-            const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
+    // 3. Calculate stats for each profile
+    Object.values(profiles).forEach(data => {
+        const allTransactions = data.allTransactions!;
+        const allPayments = data.allPayments!;
+
+        const updatedTransactions = allTransactions.map(transaction => {
+            const paymentsForThisEntry = allPayments.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
             let totalPaidForEntry = 0;
             let totalCdForEntry = 0;
@@ -179,7 +139,7 @@ export const useSupplierData = () => {
                 }
             });
             
-            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+            const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
             return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
         });
 
@@ -234,23 +194,19 @@ export const useSupplierData = () => {
             varietyTally[variety] = (varietyTally[variety] || 0) + 1;
         });
         data.transactionsByVariety = varietyTally;
-
     });
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
-    profiles.forEach((data, index) => {
-        const uniqueKey = `${data.name}|${data.so || ''}|${index}`;
-        finalSummaryMap.set(uniqueKey, data);
+    Object.keys(profiles).forEach(key => {
+        finalSummaryMap.set(key, profiles[key]);
     });
 
-    // Add Mill Overview
     const millSummary: CustomerSummary = {
         name: 'Mill (Total Overview)', contact: '', so: '', address: '',
         totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
         totalOutstanding: 0, totalCdAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], 
-        allTransactions: [], // This will be populated with re-calculated entries
-        allPayments: [],
+        allTransactions: [], allPayments: [],
         totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
         totalDeductions: 0, averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
@@ -274,27 +230,19 @@ export const useSupplierData = () => {
                 }
             }
         });
-        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+        const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
         return { ...transaction, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
     });
 
     millSummary.allTransactions = allRecalculatedSuppliers;
     millSummary.allPayments = safePaymentHistory;
-
-    // Now calculate mill summary stats based on the re-calculated data
-    millSummary.totalOriginalAmount = millSummary.allTransactions.reduce((sum, t) => sum + t.originalNetAmount, 0);
-    millSummary.totalPaid = millSummary.allPayments.reduce((sum, p) => sum + p.amount, 0);
-    millSummary.totalCdAmount = millSummary.allPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-    millSummary.totalOutstanding = millSummary.allTransactions.reduce((sum, t) => sum + Number(t.netAmount), 0);
-
-    millSummary.totalTransactions = millSummary.allTransactions.length;
-    millSummary.totalOutstandingTransactions = millSummary.allTransactions.filter(t => Number(t.netAmount) >= 1).length;
-
-    // Copy other aggregations from individual profiles
-    Array.from(finalSummaryMap.values()).forEach(s => {
-        millSummary.totalAmount += s.totalAmount;
+    
+    finalSummaryMap.forEach(s => {
+        millSummary.totalOriginalAmount += s.totalOriginalAmount;
+        millSummary.totalPaid += s.totalPaid;
         millSummary.totalCashPaid += s.totalCashPaid;
         millSummary.totalRtgsPaid += s.totalRtgsPaid;
+        millSummary.totalCdAmount! += s.totalCdAmount!;
         millSummary.totalGrossWeight! += s.totalGrossWeight!;
         millSummary.totalTeirWeight! += s.totalTeirWeight!;
         millSummary.totalFinalWeight! += s.totalFinalWeight!;
@@ -308,6 +256,10 @@ export const useSupplierData = () => {
             millSummary.transactionsByVariety![variety] = (millSummary.transactionsByVariety![variety] || 0) + count;
         });
     });
+    
+    millSummary.totalOutstanding = millSummary.allTransactions.reduce((sum, t) => sum + Number(t.netAmount), 0);
+    millSummary.totalTransactions = millSummary.allTransactions.length;
+    millSummary.totalOutstandingTransactions = millSummary.allTransactions.filter(t => Number(t.netAmount) >= 1).length;
 
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
