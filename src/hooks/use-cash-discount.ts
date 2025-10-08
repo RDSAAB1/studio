@@ -87,13 +87,16 @@ export const useCashDiscount = ({
             }
              case 'on_previously_paid_no_cd': {
                 if (!selectedCustomerKey) return 0;
-
+                
+                // Find all payments for the selected supplier/customer profile
                 const paymentsForThisCustomer = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
                 
+                // Filter those payments to find ones where no CD was applied
                 const previousPaymentsWithoutCD = paymentsForThisCustomer.filter(p => 
                     !p.cdApplied || p.cdAmount === 0
                 );
                 
+                // Sum the amounts of those payments
                 baseAmountForCd = previousPaymentsWithoutCD.reduce((sum, p) => sum + p.amount, 0);
                 break;
             }
