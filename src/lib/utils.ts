@@ -25,7 +25,7 @@ interface CustomerFormValues {
     bagWeightKg?: number;
     rate?: number;
     brokerageRate?: number;
-    cdRate?: number;
+    cd?: number;
     kanta?: number;
     bagRate?: number;
     isBrokerageIncluded?: boolean;
@@ -194,7 +194,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const brokerageRate = Number(values.brokerageRate) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
-    const cdRate = Number(values.cdRate) || 0;
+    const cdRate = Number(values.cd) || 0;
     const cdAmount = Math.round((amount * cdRate) / 100);
     
     const kanta = Number(values.kanta) || 0;
@@ -266,4 +266,3 @@ export const levenshteinDistance = (s1: string, s2: string): number => {
     }
     return costs[s2.length];
 };
-
