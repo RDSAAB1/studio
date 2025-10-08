@@ -18,6 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface SixRReportRow {
@@ -213,50 +214,52 @@ export default function SixRReportPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-auto h-[60vh] border rounded-md" ref={printRef}>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>6R No.</TableHead>
-                                    <TableHead>6R Date</TableHead>
-                                    <TableHead>Payee</TableHead>
-                                    <TableHead>Contact</TableHead>
-                                    <TableHead>Bank Name</TableHead>
-                                    <TableHead>A/C No.</TableHead>
-                                    <TableHead>IFSC Code</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Check No.</TableHead>
-                                    <TableHead>Parchi No.</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredReportRows.length > 0 ? (
-                                    filteredReportRows.map((row, index) => (
-                                        <TableRow key={`${row.sixRNo}-${index}`}>
-                                            <TableCell className="font-bold">{row.sixRNo}</TableCell>
-                                            <TableCell>{row.sixRDate}</TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{row.supplierName}</div>
-                                                <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
-                                                <div className="text-xs text-muted-foreground">{row.supplierAddress}</div>
-                                            </TableCell>
-                                            <TableCell>{row.supplierContact}</TableCell>
-                                            <TableCell>{row.bankName}</TableCell>
-                                            <TableCell className="font-mono">{row.bankAcNo}</TableCell>
-                                            <TableCell className="font-mono">{row.ifscCode}</TableCell>
-                                            <TableCell className="font-bold">{formatCurrency(row.amount)}</TableCell>
-                                            <TableCell>{row.checkNo}</TableCell>
-                                            <TableCell className="max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
+                    <ScrollArea className="h-[60vh] border rounded-md">
+                        <div ref={printRef}>
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={10} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
+                                        <TableHead>6R No.</TableHead>
+                                        <TableHead>6R Date</TableHead>
+                                        <TableHead>Payee</TableHead>
+                                        <TableHead>Contact</TableHead>
+                                        <TableHead>Bank Name</TableHead>
+                                        <TableHead>A/C No.</TableHead>
+                                        <TableHead>IFSC Code</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Check No.</TableHead>
+                                        <TableHead>Parchi No.</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredReportRows.length > 0 ? (
+                                        filteredReportRows.map((row, index) => (
+                                            <TableRow key={`${row.sixRNo}-${index}`}>
+                                                <TableCell className="font-bold">{row.sixRNo}</TableCell>
+                                                <TableCell>{row.sixRDate}</TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium">{row.supplierName}</div>
+                                                    <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
+                                                    <div className="text-xs text-muted-foreground">{row.supplierAddress}</div>
+                                                </TableCell>
+                                                <TableCell>{row.supplierContact}</TableCell>
+                                                <TableCell>{row.bankName}</TableCell>
+                                                <TableCell className="font-mono">{row.bankAcNo}</TableCell>
+                                                <TableCell className="font-mono">{row.ifscCode}</TableCell>
+                                                <TableCell className="font-bold">{formatCurrency(row.amount)}</TableCell>
+                                                <TableCell>{row.checkNo}</TableCell>
+                                                <TableCell className="max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={10} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         </div>
