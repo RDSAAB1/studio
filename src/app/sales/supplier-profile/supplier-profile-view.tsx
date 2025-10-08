@@ -133,11 +133,15 @@ export const SupplierProfileView = ({
         return selectedSupplierData.paymentHistory || [];
     }, [selectedSupplierData, isMillSelected]);
     
-    const { paidTransactions, outstandingTransactions } = useMemo(() => {
+    const { outstandingTransactions, runningTransactions, profitableTransactions, paidTransactions } = useMemo(() => {
         const all = selectedSupplierData?.allTransactions || [];
-        const paid = all.filter(t => parseFloat(String(t.netAmount)) < 1);
-        const outstanding = all.filter(t => parseFloat(String(t.netAmount)) >= 1);
-        return { paidTransactions: paid, outstandingTransactions: outstanding };
+        
+        const outstanding = all.filter(t => Math.abs(Number(t.netAmount) - t.originalNetAmount) < 0.01 && t.originalNetAmount > 0);
+        const paid = all.filter(t => Number(t.netAmount) < 1);
+        const profitable = all.filter(t => Number(t.netAmount) >= 1 && Number(t.netAmount) < 200);
+        const running = all.filter(t => Number(t.netAmount) >= 200 && Math.abs(Number(t.netAmount) - t.originalNetAmount) >= 0.01);
+
+        return { outstandingTransactions: outstanding, runningTransactions: running, profitableTransactions: profitable, paidTransactions: paid };
     }, [selectedSupplierData]);
 
     if (!selectedSupplierData) {
@@ -211,8 +215,8 @@ export const SupplierProfileView = ({
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                              <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable</span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">RTGS Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total RTGS Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
@@ -256,14 +260,30 @@ export const SupplierProfileView = ({
                 </Card>
                  <div className="grid grid-cols-1 gap-6">
                     <Tabs defaultValue="outstanding" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="outstanding">Outstanding Entries ({outstandingTransactions.length})</TabsTrigger>
-                            <TabsTrigger value="paid">Paid Entries ({paidTransactions.length})</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-4">
+                            <TabsTrigger value="outstanding">Outstanding ({outstandingTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="running">Running ({runningTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="profitable">May Be Profitable ({profitableTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="paid">Paid ({paidTransactions.length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="outstanding" className="mt-4">
                             <Card>
                                 <CardContent className="p-0">
                                     <TransactionTable transactions={outstandingTransactions} onShowDetails={onShowDetails} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="running" className="mt-4">
+                            <Card>
+                                <CardContent className="p-0">
+                                    <TransactionTable transactions={runningTransactions} onShowDetails={onShowDetails} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="profitable" className="mt-4">
+                            <Card>
+                                <CardContent className="p-0">
+                                    <TransactionTable transactions={profitableTransactions} onShowDetails={onShowDetails} />
                                 </CardContent>
                             </Card>
                         </TabsContent>
