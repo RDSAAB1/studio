@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,7 +8,6 @@ interface UseCashDiscountProps {
     paymentType: string;
     settleAmount: number;
     totalOutstanding: number;
-    totalOriginalAmount: number;
     paymentDate: Date | undefined;
     selectedEntries: Array<{
         dueDate?: string;  // For eligibility
@@ -23,7 +23,6 @@ export const useCashDiscount = ({
     paymentType, // Not used in calculation logic, but part of context
     settleAmount, // Not used in calculation logic
     totalOutstanding, // Current unpaid amount
-    totalOriginalAmount, // Original amount before any payments
     paymentDate, // Date of current payment
     selectedEntries = [], // List of items being paid
     toBePaidAmount, // Amount user is paying now
@@ -32,7 +31,7 @@ export const useCashDiscount = ({
     // 1. State Management
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2); // Default 2%
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount'>('partial_on_paid');
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount'>('partial_on_paid');
 
     // 2. Eligibility Check (Memoized)
     // Determines if the payment date meets the due date condition for at least one entry.
@@ -80,9 +79,6 @@ export const useCashDiscount = ({
             case 'on_unpaid_amount':
                 baseAmountForCd = totalOutstanding;
                 break;
-            case 'on_full_amount':
-                baseAmountForCd = totalOriginalAmount;
-                break;
             default:
                 baseAmountForCd = 0;
         }
@@ -94,20 +90,13 @@ export const useCashDiscount = ({
         // Calculate the raw CD amount
         let calculatedCd = (baseAmountForCd * cdPercent) / 100;
         
-        // **CRITICAL LOGIC FOR 'on_full_amount'**
-        if (cdAt === 'on_full_amount') {
-            // Subtract CD that has already been applied in previous partial payments.
-            // This prevents the discount from being calculated on an amount where CD was already given.
-            calculatedCd -= totalCdOnSelectedEntries;
-        }
-        
         // Constraint 1: Ensure calculated CD is not negative.
         const finalCd = Math.max(0, calculatedCd);
         
         // Constraint 2: Ensure final CD does not exceed the remaining outstanding balance.
         return Math.min(finalCd, totalOutstanding);
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, totalOriginalAmount, totalCdOnSelectedEntries]);
+    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, totalCdOnSelectedEntries]);
     
     // 6. Hook Return Values
     return {
