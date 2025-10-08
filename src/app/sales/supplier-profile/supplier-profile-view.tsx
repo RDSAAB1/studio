@@ -95,13 +95,15 @@ export const SupplierProfileView = ({
     isMillSelected,
     onShowDetails,
     onShowPaymentDetails,
-    onGenerateStatement
+    onGenerateStatement,
+    isCustomerView = false
 }: {
     selectedSupplierData: CustomerSummary | null;
     isMillSelected: boolean;
     onShowDetails: (supplier: Supplier) => void;
     onShowPaymentDetails: (payment: Payment) => void;
     onGenerateStatement: () => void;
+    isCustomerView?: boolean;
 }) => {
     const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
     const { toast } = useToast();
@@ -174,7 +176,7 @@ export const SupplierProfileView = ({
                              <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
                              <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Avg Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Min Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.minRate || 0)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Max Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.maxRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -207,10 +209,9 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable</span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">RTGS/Online Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
@@ -252,7 +253,7 @@ export const SupplierProfileView = ({
                         </div>
                     </CardContent>
                 </Card>
-                <div className="grid grid-cols-1 gap-6">
+                 <div className="grid grid-cols-1 gap-6">
                     <Tabs defaultValue="outstanding" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="outstanding">Outstanding Entries ({outstandingTransactions.length})</TabsTrigger>
