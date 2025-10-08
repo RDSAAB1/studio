@@ -203,7 +203,8 @@ export const useSupplierData = () => {
         data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
+        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
+
         
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -288,7 +289,7 @@ export const useSupplierData = () => {
     millSummary.totalOutstanding = millSummary.allTransactions.reduce((sum, t) => sum + Number(t.netAmount), 0);
     
     millSummary.totalCashPaid = millSummary.allPayments.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-    millSummary.totalRtgsPaid = millSummary.allPayments.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
+    millSummary.totalRtgsPaid = millSummary.allPayments.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
 
 
     millSummary.totalTransactions = millSummary.allTransactions.length;
@@ -382,5 +383,3 @@ export const useSupplierData = () => {
         financialState,
     };
 };
-
-    
