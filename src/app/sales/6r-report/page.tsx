@@ -220,6 +220,7 @@ export default function SixRReportPage() {
                                     <TableHead>6R No.</TableHead>
                                     <TableHead>6R Date</TableHead>
                                     <TableHead>Payee</TableHead>
+                                    <TableHead>Contact</TableHead>
                                     <TableHead>Bank Name</TableHead>
                                     <TableHead>A/C No.</TableHead>
                                     <TableHead>IFSC Code</TableHead>
@@ -238,8 +239,8 @@ export default function SixRReportPage() {
                                                 <div className="font-medium">{row.supplierName}</div>
                                                 <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
                                                 <div className="text-xs text-muted-foreground">{row.supplierAddress}</div>
-                                                <div className="text-xs text-muted-foreground">Contact: {row.supplierContact}</div>
                                             </TableCell>
+                                            <TableCell>{row.supplierContact}</TableCell>
                                             <TableCell>{row.bankName}</TableCell>
                                             <TableCell className="font-mono">{row.bankAcNo}</TableCell>
                                             <TableCell className="font-mono">{row.ifscCode}</TableCell>
@@ -250,7 +251,7 @@ export default function SixRReportPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
+                                        <TableCell colSpan={10} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
