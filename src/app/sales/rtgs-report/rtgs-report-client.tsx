@@ -485,7 +485,7 @@ export default function RtgsReportClient() {
                 settings={settings}
             />
 
-             <BankMailFormatDialog2 
+            <BankMailFormatDialog2 
                 isOpen={isBankMailFormat2Open}
                 onOpenChange={setIsBankMailFormat2Open}
                 payments={filteredReportRows}
