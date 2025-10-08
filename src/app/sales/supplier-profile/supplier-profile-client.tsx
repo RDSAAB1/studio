@@ -183,38 +183,45 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
 
             {/* Summary Section */}
-            <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-4 mb-6">
-                 <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3></CardHeader>
-                    <CardContent className="p-2 pt-1 text-xs space-y-0.5">
-                        <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between font-bold border-t border-gray-200 pt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Karta Wt</span><span className="font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
-                    </CardContent>
-                </Card>
-                 <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Deductions</h3></CardHeader>
-                     <CardContent className="p-2 pt-1 text-xs space-y-0.5">
-                        <div className="flex justify-between"><span className="text-gray-600">Total Amount</span><span className="font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
-                        <div className="flex justify-between border-t border-gray-200 pt-1"><span className="text-gray-600">Karta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Laboury</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Kanta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Other</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
-                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Original Amount</span><span>{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Financial</h3></CardHeader>
-                     <CardContent className="p-2 pt-1 text-xs space-y-0.5">
-                        <div className="flex justify-between"><span className="text-gray-600">Original Purchases</span><span className="font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
-                        <div className="flex justify-between border-t border-gray-200 pt-1"><span className="text-gray-600">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Total CD Granted</span><span className="font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</span></div>
-                        <div className="flex justify-between font-bold text-destructive border-t border-gray-200 pt-1"><span>Outstanding Balance</span><span>{`${formatCurrency(data.totalOutstanding)}`}</span></div>
-                    </CardContent>
-                </Card>
-            </div>
+            <Card className="mb-6 bg-white border-gray-200">
+                <CardContent className="p-4">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
+                        {/* Operational Summary */}
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Operational</h3>
+                             <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr className="font-bold border-t border-gray-200"><td className="py-1 text-black">Final Wt</td><td className="py-1 text-right font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
+                            </tbody></table>
+                        </div>
+                        {/* Deduction Summary */}
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Deductions</h3>
+                            <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-gray-600">Total Amount</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
+                                <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Karta</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Laboury</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Kanta</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Other</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
+                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
+                            </tbody></table>
+                        </div>
+                        {/* Financial Summary */}
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Financial</h3>
+                            <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-gray-600">Original Purchases</td><td className="py-0.5 text-right font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
+                                <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Total CD Granted</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
+                                <tr className="font-bold text-destructive border-t border-gray-200"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
+                            </tbody></table>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Transaction Table */}
             <div>
@@ -277,7 +284,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
 
 export default function SupplierProfileClient() {
-  const { suppliers, paymentHistory, customerSummaryMap, loading, isClient } = useSupplierData();
+  const { suppliers, paymentHistory, loading, isClient } = useSupplierData();
 
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
@@ -287,8 +294,201 @@ export default function SupplierProfileClient() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
+  const filteredData = useMemo(() => {
+    let filteredSuppliers = suppliers;
+    let filteredPayments = paymentHistory;
 
-  const selectedSupplierData = selectedSupplierKey ? customerSummaryMap.get(selectedSupplierKey) : null;
+    if (startDate || endDate) {
+        const start = startDate ? new Date(startDate.setHours(0, 0, 0, 0)) : null;
+        const end = endDate ? new Date(endDate.setHours(23, 59, 59, 999)) : null;
+    
+        const filterByDate = (dateStr: string) => {
+            const date = new Date(dateStr);
+            if (start && end) return date >= start && date <= end;
+            if (start) return date >= start;
+            if (end) return date <= end;
+            return true;
+        };
+    
+        filteredSuppliers = suppliers.filter(s => filterByDate(s.date));
+        filteredPayments = paymentHistory.filter(p => filterByDate(p.date));
+    }
+
+    return { filteredSuppliers, filteredPayments };
+  }, [suppliers, paymentHistory, startDate, endDate]);
+
+  const supplierSummaryMap = useMemo(() => {
+    const { filteredSuppliers, filteredPayments } = filteredData;
+    const summary = new Map<string, CustomerSummary>();
+
+    // Initialize map with all unique suppliers
+    filteredSuppliers.forEach(s => {
+        if (s.customerId && !summary.has(s.customerId)) {
+            summary.set(s.customerId, {
+                name: s.name, contact: s.contact, so: s.so, address: s.address,
+                acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
+                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0, totalCdAmount: 0,
+                paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+                transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
+                totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
+                totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
+                averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0,
+                totalBrokerage: 0, totalCd: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+            });
+        }
+    });
+
+    let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
+
+    filteredSuppliers.forEach(s => {
+        if (!s.customerId) return;
+        const data = summary.get(s.customerId)!;
+        data.allTransactions!.push(s);
+    });
+
+    filteredPayments.forEach(p => {
+        if (p.customerId && summary.has(p.customerId)) {
+            summary.get(p.customerId)!.allPayments!.push(p);
+        }
+    });
+
+    summary.forEach((data, key) => {
+        const updatedTransactions = (data.allTransactions || []).map(t => {
+            const paymentsForThisEntry = (data.allPayments || []).filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            let totalPaidForEntry = 0;
+            let totalCdForEntry = 0;
+
+            paymentsForThisEntry.forEach(p => {
+                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo)!;
+                totalPaidForEntry += paidForThisDetail.amount;
+
+                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
+                    if(totalAmountInPayment > 0) {
+                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
+                        totalCdForEntry += p.cdAmount * proportion;
+                    }
+                }
+            });
+            
+            const calculatedNetAmount = (t.originalNetAmount || 0) - totalPaidForEntry;
+            return { ...t, netAmount: calculatedNetAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
+        });
+
+        data.allTransactions = updatedTransactions;
+
+        data.totalOriginalAmount = data.allTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+        data.totalAmount = data.allTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+        data.totalBrokerage = data.allTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0);
+        data.totalCd = data.allTransactions.reduce((sum, t) => sum + (t.cd || 0), 0);
+        data.totalOtherCharges = data.allTransactions.reduce((sum, t) => sum + (t.advanceFreight || 0), 0);
+        data.totalGrossWeight = data.allTransactions.reduce((sum, t) => sum + t.grossWeight, 0);
+        data.totalTeirWeight = data.allTransactions.reduce((sum, t) => sum + t.teirWeight, 0);
+        data.totalFinalWeight = data.allTransactions.reduce((sum, t) => sum + t.weight, 0);
+        data.totalKartaWeight = data.allTransactions.reduce((sum, t) => sum + (t.kartaWeight || 0), 0);
+        data.totalNetWeight = data.allTransactions.reduce((sum, t) => sum + t.netWeight, 0);
+        data.totalKartaAmount = data.allTransactions.reduce((sum, t) => sum + (t.kartaAmount || 0), 0);
+        data.totalLabouryAmount = data.allTransactions.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
+        data.totalKanta = data.allTransactions.reduce((sum, t) => sum + t.kanta, 0);
+        data.totalTransactions = data.allTransactions.length;
+        
+        data.totalPaid = data.allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        data.totalCdAmount = data.allPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount;
+        
+        data.totalOutstandingTransactions = updatedTransactions.filter(t => (t.netAmount || 0) >= 1).length;
+        
+        data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
+        data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
+        data.paymentHistory = data.allPayments;
+        
+        const validRates = data.allTransactions.map(t => t.rate).filter(rate => rate > 0);
+        data.minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        data.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+        
+        const rateData = data.allTransactions.reduce((acc, s) => {
+            if(s.rate > 0) {
+                acc.karta += s.kartaPercentage;
+                acc.laboury += s.labouryRate;
+                acc.count++;
+            }
+            return acc;
+        }, { karta: 0, laboury: 0, count: 0 });
+
+        if(rateData.count > 0) {
+            data.averageKartaPercentage = rateData.karta / rateData.count;
+            data.averageLabouryRate = rateData.laboury / rateData.count;
+        }
+
+        data.transactionsByVariety = data.allTransactions.reduce((acc, s) => {
+            const variety = toTitleCase(s.variety) || 'Unknown';
+            acc[variety] = (acc[variety] || 0) + 1;
+            return acc;
+        }, {} as {[key: string]: number});
+    });
+
+    const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
+        acc.totalOriginalAmount += s.totalOriginalAmount;
+        acc.totalPaid += s.totalPaid;
+        acc.totalCashPaid += s.totalCashPaid;
+        acc.totalRtgsPaid += s.totalRtgsPaid;
+        acc.totalCdAmount! += s.totalCdAmount!;
+        acc.totalGrossWeight! += s.totalGrossWeight!;
+        acc.totalTeirWeight! += s.totalTeirWeight!;
+        acc.totalFinalWeight! += s.totalFinalWeight!;
+        acc.totalKartaWeight! += s.totalKartaWeight!;
+        acc.totalNetWeight! += s.totalNetWeight!;
+        acc.totalKartaAmount! += s.totalKartaAmount!;
+        acc.totalLabouryAmount! += s.totalLabouryAmount!;
+        acc.totalKanta! += s.totalKanta!;
+        acc.totalOtherCharges! += s.totalOtherCharges!;
+        acc.totalTransactions! += s.totalTransactions!;
+        acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
+        acc.totalAmount += s.totalAmount;
+        Object.entries(s.transactionsByVariety!).forEach(([variety, count]) => {
+            acc.transactionsByVariety![variety] = (acc.transactionsByVariety![variety] || 0) + count;
+        });
+        return acc;
+    }, {
+        name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
+        averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
+        allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0,
+        totalBrokerage: 0, totalCd: 0, so: '', totalCashPaid: 0, totalRtgsPaid: 0
+    });
+    
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
+    millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
+    millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
+    const allValidRates = filteredSuppliers.map(s => s.rate).filter(rate => rate > 0);
+    millSummary.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
+    millSummary.maxRate = allValidRates.length > 0 ? Math.max(...allValidRates) : 0;
+    
+    const totalRateData = filteredSuppliers.reduce((acc, s) => {
+        if(s.rate > 0) {
+            acc.karta += s.kartaPercentage;
+            acc.laboury += s.labouryRate;
+            acc.count++;
+        }
+        return acc;
+    }, { karta: 0, laboury: 0, count: 0 });
+
+    if(totalRateData.count > 0) {
+        millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
+        millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
+    }
+     
+    const finalSummaryMap = new Map<string, CustomerSummary>();
+    finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
+    summary.forEach((value, key) => finalSummaryMap.set(key, value));
+
+    return finalSummaryMap;
+  }, [filteredData]);
+
+  const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
   if (!isClient || loading) {
     return (
@@ -328,7 +528,7 @@ export default function SupplierProfileClient() {
                 
                 <div className="w-full sm:w-[300px]">
                     <CustomDropdown
-                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
                         onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
