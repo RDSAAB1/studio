@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -101,7 +101,7 @@ export const SupplierProfileView = ({
     selectedSupplierData: CustomerSummary | null;
     isMillSelected: boolean;
     onShowDetails: (supplier: Supplier) => void;
-    onShowPaymentDetails: (payment: Payment) => void;
+    onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
     onGenerateStatement: () => void;
     isCustomerView?: boolean;
 }) => {
@@ -312,8 +312,8 @@ export const SupplierProfileView = ({
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                      {currentPaymentHistory.map(payment => (
-                                          <TableRow key={payment.id}>
+                                      {currentPaymentHistory.map((payment, index) => (
+                                          <TableRow key={`${payment.id}-${payment.paymentId}-${index}`}>
                                               <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                               <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
                                               <TableCell className="text-xs">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
