@@ -125,6 +125,8 @@ export const SupplierProfileView = ({
                              <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Min Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.minRate || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Max Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.maxRate || 0)}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Transactions</span><span className="font-semibold">{`${selectedSupplierData.totalTransactions} Entries`}</span></div>
                              <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries</span><span>{`${selectedSupplierData.totalOutstandingTransactions} Entries`}</span></div>

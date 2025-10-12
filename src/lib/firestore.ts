@@ -46,6 +46,7 @@ const projectsCollection = collection(firestoreDB, "projects");
 const employeesCollection = collection(firestoreDB, "employees");
 const payrollCollection = collection(firestoreDB, 'payroll');
 const inventoryItemsCollection = collection(firestoreDB, 'inventoryItems');
+const expenseTemplatesCollection = collection(firestoreDB, 'expenseTemplates');
 
 
 // --- User Refresh Token Functions ---
@@ -638,7 +639,14 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
         return generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
     })());
 
+    // SAFETY CHECK: Prevent overwriting existing document
     const docRef = doc(incomesCollection, newTransactionId);
+    const existingDoc = await getDoc(docRef);
+    
+    if (existingDoc.exists()) {
+        throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
+    }
+    
     const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
     await setDoc(docRef, newIncome);
     return newIncome;
@@ -663,7 +671,14 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
         return generateReadableId(formatSettings.expense?.prefix || 'EX', lastNum, formatSettings.expense?.padding || 5);
     })());
     
+    // SAFETY CHECK: Prevent overwriting existing document
     const docRef = doc(expensesCollection, newTransactionId);
+    const existingDoc = await getDoc(docRef);
+    
+    if (existingDoc.exists()) {
+        throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
+    }
+    
     const newExpense = { ...expenseData, transactionId: newTransactionId, id: docRef.id };
     await setDoc(docRef, newExpense);
     return newExpense;
@@ -1025,5 +1040,53 @@ export async function recalculateAndUpdateAllSuppliers(): Promise<number> {
     return await recalculateAndUpdateSuppliers(supplierIds);
 }
     
+// --- Expense Templates Functions ---
+export interface ExpenseTemplate {
+  id?: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  amount: number;
+  payee: string;
+  paymentMethod: string;
+  expenseNature: 'Seasonal' | 'Permanent';
+  createdAt?: string;
+}
 
+export async function addExpenseTemplate(template: Omit<ExpenseTemplate, 'id'>): Promise<string> {
+  const templateData = {
+    ...template,
+    createdAt: new Date().toISOString()
+  };
+  const docRef = await addDoc(expenseTemplatesCollection, templateData);
+  return docRef.id;
+}
+
+export async function getExpenseTemplates(): Promise<ExpenseTemplate[]> {
+  const snapshot = await getDocs(query(expenseTemplatesCollection, orderBy("createdAt", "desc")));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseTemplate));
+}
+
+export function getExpenseTemplatesRealtime(
+  callback: (data: ExpenseTemplate[]) => void, 
+  onError: (error: Error) => void
+) {
+  return onSnapshot(
+    query(expenseTemplatesCollection, orderBy("createdAt", "desc")), 
+    (snapshot) => {
+      const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseTemplate));
+      callback(templates);
+    }, 
+    onError
+  );
+}
+
+export async function updateExpenseTemplate(id: string, template: Partial<ExpenseTemplate>): Promise<void> {
+  const docRef = doc(expenseTemplatesCollection, id);
+  await updateDoc(docRef, template);
+}
+
+export async function deleteExpenseTemplate(id: string): Promise<void> {
+  await deleteDoc(doc(expenseTemplatesCollection, id));
+}
     

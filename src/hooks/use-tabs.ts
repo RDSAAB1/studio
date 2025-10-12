@@ -42,6 +42,8 @@ import {
   PieChart,
   CalendarClock,
   UserCheck,
+  Wrench,
+  Search,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -155,6 +157,15 @@ export const allMenuItems: MenuItem[] = [
         { id: "settings", name: "General Settings", icon: Settings },
         { id: "settings/bank-management", name: "Bank Management", icon: Landmark },
         { id: "settings/printer", name: "Printer Settings", icon: Printer },
+    ]
+  },
+  {
+    id: "admin",
+    name: "Admin Tools",
+    icon: Wrench,
+    subMenus: [
+        { id: "admin/migrations", name: "Database Migrations", icon: Database },
+        { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search },
     ]
   },
 ];

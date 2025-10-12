@@ -260,34 +260,34 @@ export const SupplierProfileView = ({
                 </Card>
                  <div className="grid grid-cols-1 gap-6">
                     <Tabs defaultValue="outstanding" className="w-full">
-                        <TabsList className="grid w-full grid-cols-4">
-                            <TabsTrigger value="outstanding">Outstanding ({outstandingTransactions.length})</TabsTrigger>
-                            <TabsTrigger value="running">Running ({runningTransactions.length})</TabsTrigger>
-                            <TabsTrigger value="profitable">May Be Profitable ({profitableTransactions.length})</TabsTrigger>
-                            <TabsTrigger value="paid">Paid ({paidTransactions.length})</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1 rounded-lg">
+                            <TabsTrigger value="outstanding" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">Outstanding ({outstandingTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="running" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">Running ({runningTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="profitable" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">May Be Profitable ({profitableTransactions.length})</TabsTrigger>
+                            <TabsTrigger value="paid" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">Paid ({paidTransactions.length})</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="outstanding" className="mt-4">
+                        <TabsContent value="outstanding" className="mt-4 animate-in fade-in-50 duration-200">
                             <Card>
                                 <CardContent className="p-0">
                                     <TransactionTable transactions={outstandingTransactions} onShowDetails={onShowDetails} />
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                        <TabsContent value="running" className="mt-4">
+                        <TabsContent value="running" className="mt-4 animate-in fade-in-50 duration-200">
                             <Card>
                                 <CardContent className="p-0">
                                     <TransactionTable transactions={runningTransactions} onShowDetails={onShowDetails} />
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                        <TabsContent value="profitable" className="mt-4">
+                        <TabsContent value="profitable" className="mt-4 animate-in fade-in-50 duration-200">
                             <Card>
                                 <CardContent className="p-0">
                                     <TransactionTable transactions={profitableTransactions} onShowDetails={onShowDetails} />
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                        <TabsContent value="paid" className="mt-4">
+                        <TabsContent value="paid" className="mt-4 animate-in fade-in-50 duration-200">
                             <Card>
                                 <CardContent className="p-0">
                                     <TransactionTable transactions={paidTransactions} onShowDetails={onShowDetails} />

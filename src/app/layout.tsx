@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useRef, type ReactNode } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
@@ -39,6 +39,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [isSetupComplete, setIsSetupComplete] = useState<boolean | undefined>(undefined);
     const router = useRouter();
     const pathname = usePathname();
+    const redirectHandledRef = useRef(false);
 
     useEffect(() => {
         const auth = getFirebaseAuth();
@@ -62,7 +63,6 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         if (!authChecked) return;
 
         const isPublicPage = ['/login', '/signup', '/forgot-password'].includes(pathname);
-        const isRootPage = pathname === '/';
         const isSettingsPage = pathname === '/settings';
         
         if (user) { // User is logged in
@@ -70,16 +70,29 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 return; // Still loading setup status, show loader
             }
 
+            // Only redirect if necessary and not already handled
             if (!isSetupComplete && !isSettingsPage) {
-                // If setup is incomplete, force redirect to settings page
+                if (!redirectHandledRef.current) {
                 router.replace('/settings');
-            } else if (isSetupComplete && (isPublicPage || isRootPage)) {
-                 // If setup is complete and user is on a public page, redirect to dashboard.
-                 if(pathname !== '/') router.replace('/');
+                    redirectHandledRef.current = true;
+                }
+            } else if (isSetupComplete && isPublicPage) {
+                if (!redirectHandledRef.current) {
+                    router.replace('/');
+                    redirectHandledRef.current = true;
+                }
+            } else {
+                // User is on a valid protected page - mark as handled
+                redirectHandledRef.current = true;
             }
         } else { // User is not logged in
              if (!isPublicPage) {
+                if (!redirectHandledRef.current) {
                 router.replace('/login');
+                    redirectHandledRef.current = true;
+                }
+            } else {
+                redirectHandledRef.current = true;
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);

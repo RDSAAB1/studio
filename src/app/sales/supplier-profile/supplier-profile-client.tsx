@@ -5,8 +5,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency, levenshteinDistance } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, startOfYear, endOfYear, subDays } from 'date-fns';
 import { useSupplierData } from '@/hooks/use-supplier-data';
+import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
 
 
 // UI Components
@@ -26,7 +27,7 @@ import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
+import { Users, Calendar as CalendarIcon, Download, Printer, Loader2, X } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -51,7 +52,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             date: p.date,
             particulars: `Payment (ID# ${p.paymentId})`,
             debit: 0,
-            credit: p.amount + (p.cdAmount || 0),
+            credit: p.amount + (('cdAmount' in p ? p.cdAmount : null) || 0),
         }));
 
         const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -286,13 +287,28 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 export default function SupplierProfileClient() {
   const { suppliers, paymentHistory, loading, isClient } = useSupplierData();
 
-  const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
+
+  const [selectedSupplierKey, setSelectedSupplierKey] = usePersistedSelection('supplier-profile-selected', MILL_OVERVIEW_KEY);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [startDate, setStartDate] = usePersistedState<Date | undefined>(
+    'supplier-profile-start-date',
+    undefined,
+    {
+        serialize: (date) => date ? date.toISOString() : '',
+        deserialize: (str) => str ? new Date(str) : undefined
+    }
+  );
+  const [endDate, setEndDate] = usePersistedState<Date | undefined>(
+    'supplier-profile-end-date',
+    undefined,
+    {
+        serialize: (date) => date ? date.toISOString() : '',
+        deserialize: (str) => str ? new Date(str) : undefined
+    }
+  );
 
  const supplierSummaryMap = useMemo(() => {
     const processedSuppliers = suppliers.map(s => {
@@ -302,7 +318,10 @@ export default function SupplierProfileClient() {
 
       paymentsForEntry.forEach(p => {
         const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === s.srNo)!;
+        // paidFor.amount already includes CD portion
         totalPaidForEntry += paidForThisDetail.amount;
+        
+        // Calculate CD portion for display purposes only
         if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
             const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
             if(totalAmountInPayment > 0) {
@@ -312,19 +331,42 @@ export default function SupplierProfileClient() {
         }
       });
       
+      // Outstanding = Original - (Payment + CD), where totalPaidForEntry already includes CD
       const outstandingAmount = (s.originalNetAmount || 0) - totalPaidForEntry;
-      return { ...s, netAmount: outstandingAmount, totalPaid: totalPaidForEntry, totalCd: totalCdForEntry };
+      // For display: show actual payment (without CD) and CD separately
+      return { ...s, netAmount: outstandingAmount, totalPaid: totalPaidForEntry - totalCdForEntry, totalCd: totalCdForEntry };
     });
 
-    const profiles: { [key: string]: CustomerSummary } = {};
+    // Use fuzzy matching to group suppliers by name + father name
+    const summaryList: CustomerSummary[] = [];
+    const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
     processedSuppliers.forEach(s => {
-      if (s.customerId && !profiles[s.customerId]) {
-        profiles[s.customerId] = {
-            name: s.name, contact: s.contact, so: s.so, address: s.address,
+        const sNameNorm = normalize(s.name || '');
+        const sSoNorm = normalize(s.so || '');
+
+        let bestMatch: CustomerSummary | null = null;
+        let minDistance = 5; // Levenshtein distance threshold
+
+        for (const existingSummary of summaryList) {
+            const eNameNorm = normalize(existingSummary.name || '');
+            const eSoNorm = normalize(existingSummary.so || '');
+
+            const distance = levenshteinDistance(sNameNorm + sSoNorm, eNameNorm + eSoNorm);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestMatch = existingSummary;
+            }
+        }
+
+        if (bestMatch) {
+            bestMatch.allTransactions.push(s);
+        } else {
+            const newSummary: CustomerSummary = {
+                name: s.name, so: s.so, address: s.address, contact: '',
             acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
-            allTransactions: [], allPayments: [], 
-            // Initialize all other properties to 0 or empty arrays
+                allTransactions: [s], allPayments: [], 
             totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
             totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
             totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
@@ -332,16 +374,50 @@ export default function SupplierProfileClient() {
             averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
             totalTransactions: 0, totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
         };
-      }
-      if(s.customerId) {
-        profiles[s.customerId].allTransactions.push(s);
+            summaryList.push(newSummary);
       }
     });
 
+    // Add payments to matching suppliers using paidFor.srNo
     paymentHistory.forEach(p => {
-        if(p.customerId && profiles[p.customerId]) {
-            profiles[p.customerId].allPayments.push(p);
+        // Match payment to supplier through paidFor.srNo (direct link)
+        if (p.paidFor && p.paidFor.length > 0) {
+            const srNos = p.paidFor.map(pf => pf.srNo);
+            
+            // Find which supplier profile has these transactions
+            let matched = false;
+            for (const profile of summaryList) {
+                const hasTransaction = profile.allTransactions.some(t => srNos.includes(t.srNo));
+                if (hasTransaction) {
+                    profile.allPayments.push(p);
+                    matched = true;
+                    break; // Payment matched, stop searching
+                }
+            }
+            
+            if (!matched && p.rtgsFor === 'Outsider') {
+                // Create separate profile for outsider payments
+                const newSummary: CustomerSummary = {
+                    name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                    contact: '', 
+                    acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                    allTransactions: [], allPayments: [p], 
+            totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+            totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [], transactionsByVariety: {},
+            totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+            totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
+            averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
+            totalTransactions: 0, totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
+        };
+                summaryList.push(newSummary);
+            }
         }
+    });
+
+    // Merge contacts
+    summaryList.forEach(profile => {
+        const allContacts = new Set(profile.allTransactions.map(t => t.contact));
+        profile.contact = Array.from(allContacts).join(', ');
     });
     
     // Now filter transactions and payments based on date range for final calculation
@@ -358,15 +434,19 @@ export default function SupplierProfileClient() {
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
     
-    Object.values(profiles).forEach(profile => {
+    summaryList.forEach((profile, index) => {
         const filteredTransactions = profile.allTransactions.filter(t => filterByDate(t.date));
         
+        // If no date filter is applied, use all payments. Otherwise, filter payments based on transactions.
+        let filteredPayments = profile.allPayments;
+        if (start || end) {
         const relevantPaymentIds = new Set<string>();
         filteredTransactions.forEach(t => {
-            const paymentsForEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+                const paymentsForEntry = profile.allPayments.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
             paymentsForEntry.forEach(p => relevantPaymentIds.add(p.id));
         });
-        const filteredPayments = paymentHistory.filter(p => relevantPaymentIds.has(p.id));
+            filteredPayments = profile.allPayments.filter(p => relevantPaymentIds.has(p.id));
+        }
 
         const data: CustomerSummary = { ...profile, allTransactions: filteredTransactions, allPayments: filteredPayments };
         
@@ -384,18 +464,63 @@ export default function SupplierProfileClient() {
         data.totalOtherCharges = data.allTransactions.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions.length;
         
-        data.totalPaid = data.allPayments.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
-        data.totalCdAmount = data.allPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        data.totalCashPaid = data.allPayments.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        data.totalRtgsPaid = data.allPayments.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
+        // Calculate total paid (sum of all payments)
+        data.totalPaid = data.allPayments.reduce((sum, p) => {
+            const amount = ('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0;
+            return sum + amount;
+        }, 0);
+        
+        data.totalCdAmount = data.allPayments.reduce((sum, p) => sum + (('cdAmount' in p ? p.cdAmount : null) || 0), 0);
+        
+        // Calculate Cash payments (receiptType === 'Cash')
+        data.totalCashPaid = data.allPayments
+            .filter(p => 'receiptType' in p && p.receiptType === 'Cash')
+            .reduce((sum, p) => sum + p.amount, 0);
+        
+        // Calculate RTGS/Bank payments (receiptType !== 'Cash' OR doesn't have receiptType)
+        data.totalRtgsPaid = data.allPayments
+            .filter(p => !('receiptType' in p) || ('receiptType' in p && p.receiptType !== 'Cash'))
+            .reduce((sum, p) => sum + (('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0), 0);
+        
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
 
-        data.totalOutstandingTransactions = data.allTransactions.filter(t => (t.netAmount || 0) >= 1).length;
+        data.totalOutstandingTransactions = data.allTransactions.filter(t => Number(t.netAmount || 0) >= 1).length;
+        data.averageRate = data.totalFinalWeight > 0 ? data.totalAmount / data.totalFinalWeight : 0;
+        data.averageOriginalPrice = data.totalNetWeight > 0 ? data.totalOriginalAmount / data.totalNetWeight : 0;
         
-        const customerId = data.allTransactions[0]?.customerId;
-        if(customerId) {
-            finalSummaryMap.set(customerId, data);
+        // Calculate min/max rate
+        const validRates = data.allTransactions.map(t => t.rate).filter(rate => rate > 0);
+        data.minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        data.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+
+        // Calculate average karta and laboury
+        const rateData = data.allTransactions.reduce((acc, s) => {
+            if(s.rate > 0) {
+                acc.karta += s.kartaPercentage;
+                acc.laboury += s.labouryRate;
+                acc.count++;
+            }
+            return acc;
+        }, { karta: 0, laboury: 0, count: 0 });
+
+        if(rateData.count > 0) {
+            data.averageKartaPercentage = rateData.karta / rateData.count;
+            data.averageLabouryRate = rateData.laboury / rateData.count;
         }
+
+        // Calculate variety tally
+        const varietyTally: { [key: string]: number } = {};
+        data.allTransactions.forEach(t => {
+            const variety = toTitleCase(t.variety) || 'Unknown';
+            varietyTally[variety] = (varietyTally[variety] || 0) + 1;
+        });
+        data.transactionsByVariety = varietyTally;
+        
+        // Set payment history for display
+        data.paymentHistory = data.allPayments;
+        
+        const uniqueKey = data.name + (data.so || '') + index;
+        finalSummaryMap.set(uniqueKey, data);
     });
 
     const millSummary = Array.from(finalSummaryMap.values()).reduce((acc, s) => {
@@ -437,12 +562,79 @@ export default function SupplierProfileClient() {
     millSummary.allPayments = finalSummaryMap.size > 0 ? Array.from(finalSummaryMap.values()).flatMap(p => p.allPayments) : paymentHistory;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
 
+    // Calculate averages and min/max for mill overview
+    millSummary.averageRate = millSummary.totalFinalWeight > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight : 0;
+    millSummary.averageOriginalPrice = millSummary.totalNetWeight > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight : 0;
+    
+    const allValidRates = millSummary.allTransactions.map(s => s.rate).filter(rate => rate > 0);
+    millSummary.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
+    millSummary.maxRate = allValidRates.length > 0 ? Math.max(...allValidRates) : 0;
+
+    const totalRateData = millSummary.allTransactions.reduce((acc, s) => {
+        if(s.rate > 0) {
+            acc.karta += s.kartaPercentage;
+            acc.laboury += s.labouryRate;
+            acc.count++;
+        }
+        return acc;
+    }, { karta: 0, laboury: 0, count: 0 });
+
+    if(totalRateData.count > 0) {
+        millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
+        millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
+    }
+    
+    // Set payment history for mill overview
+    millSummary.paymentHistory = millSummary.allPayments;
 
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
     return finalSummaryMap;
   }, [suppliers, paymentHistory, startDate, endDate]);
 
-  const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
+  const selectedSupplierData = (selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null) as CustomerSummary | null;
+  
+  // Filter suppliers based on date range
+  const filteredSupplierOptions = useMemo(() => {
+    const allOptions = Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ 
+      value: key, 
+      label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim(),
+      data 
+    }));
+
+    // If no date range, show all
+    if (!startDate && !endDate) {
+      return allOptions;
+    }
+
+    // Filter suppliers who have transactions in the date range
+    return allOptions.filter(({ value, data }) => {
+      // Always include Mill Overview
+      if (value === MILL_OVERVIEW_KEY) return true;
+
+      const hasTransactionsInRange = data.allTransactions?.some(t => {
+        if (!t.date) return false;
+        const transactionDate = new Date(t.date);
+        
+        if (startDate && endDate) {
+          return transactionDate >= startDate && transactionDate <= endDate;
+        } else if (startDate) {
+          return transactionDate >= startDate;
+        } else if (endDate) {
+          return transactionDate <= endDate;
+        }
+        return true;
+      });
+
+      return hasTransactionsInRange;
+    });
+  }, [supplierSummaryMap, startDate, endDate]);
+
+  // Auto-switch to Mill Overview if selected supplier is not in filtered list
+  useEffect(() => {
+    if (selectedSupplierKey && !filteredSupplierOptions.some(opt => opt.value === selectedSupplierKey)) {
+      setSelectedSupplierKey(MILL_OVERVIEW_KEY);
+    }
+  }, [filteredSupplierOptions, selectedSupplierKey]);
   
   if (!isClient || loading) {
     return (
@@ -455,38 +647,85 @@ export default function SupplierProfileClient() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold">Select Profile</h3>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                 <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+        <CardContent className="p-3">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Users className="h-5 w-5 text-primary" />
+                        <h3 className="text-base font-semibold">Select Profile</h3>
+                    </div>
+                    
+                    {/* Quick Date Filters */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                                const today = new Date();
+                                setStartDate(startOfYear(today));
+                                setEndDate(endOfYear(today));
+                            }}
+                            className="h-8 text-xs"
+                        >
+                            This Year
                         </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
-                </Popover>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                                const today = new Date();
+                                setStartDate(subDays(today, 365));
+                                setEndDate(today);
+                            }}
+                            className="h-8 text-xs"
+                        >
+                            Last 365 Days
                         </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
-                </Popover>
-                
-                <div className="w-full sm:w-[300px]">
-                    <CustomDropdown
-                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
-                        value={selectedSupplierKey}
-                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
-                        placeholder="Search and select profile..."
-                    />
+                        {(startDate || endDate) && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                    setStartDate(undefined);
+                                    setEndDate(undefined);
+                                }}
+                                className="h-8 text-xs"
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                    </Popover>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                    </Popover>
+                    
+                    <div className="w-full sm:flex-1">
+                        <CustomDropdown
+                            options={filteredSupplierOptions.map(({ value, label }) => ({ value, label }))}
+                            value={selectedSupplierKey}
+                            onChange={(value: string | null) => setSelectedSupplierKey(value)}
+                            placeholder="Search and select profile..."
+                        />
+                    </div>
                 </div>
             </div>
         </CardContent>

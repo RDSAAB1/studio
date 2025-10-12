@@ -30,11 +30,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-3">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <div className="text-muted-foreground">{icon}</div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 pb-3">
             <div className={`text-xl font-bold ${colorClass}`}>{value}</div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
@@ -627,3 +627,1267 @@ export default function CashBankClient() {
         </div>
     );
 }
+    }
+
+
+
+    const openLoanDialogForAdd = () => {
+
+        setCurrentLoan(initialLoanFormState);
+
+        setIsLoanDialogOpen(true);
+
+    };
+
+
+
+    const openLoanDialogForEdit = (loan: Loan) => {
+
+        setCurrentLoan(loan);
+
+        setIsLoanDialogOpen(true);
+
+    };
+
+
+
+    const handleEditFundTransaction = (transaction: FundTransaction) => {
+
+        setCurrentFundTransaction(transaction);
+
+        setIsFundTransactionDialogOpen(true);
+
+    };
+
+
+
+    const handleUpdateFundTransaction = async () => {
+
+        if (!currentFundTransaction || !currentFundTransaction.id) return;
+
+        try {
+
+            await updateFundTransaction(currentFundTransaction.id, {
+
+                amount: currentFundTransaction.amount,
+
+                description: currentFundTransaction.description,
+
+            });
+
+            toast({ title: 'Transaction updated successfully', variant: 'success' });
+
+            setIsFundTransactionDialogOpen(false);
+
+        } catch (error) {
+
+            toast({ title: 'Failed to update transaction', variant: 'destructive' });
+
+            console.error(error);
+
+        }
+
+    };
+
+
+
+    const handleDeleteFundTransaction = async (id: string) => {
+
+        try {
+
+            await deleteFundTransaction(id);
+
+            toast({ title: 'Transaction deleted successfully', variant: 'success' });
+
+        } catch (error) {
+
+            toast({ title: 'Failed to delete transaction', variant: 'destructive' });
+
+            console.error(error);
+
+        }
+
+    };
+
+
+
+
+
+    if (!isClient) {
+
+        return null;
+
+    }
+
+
+
+    return (
+
+        <div className="space-y-6">
+
+            <Card>
+
+                <CardHeader>
+
+                    <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary"/>Financial Overview</CardTitle>
+
+                    <CardDescription>A real-time overview of your business's financial health.</CardDescription>
+
+                </CardHeader>
+
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+
+                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+
+                        const account = bankAccounts.find(acc => acc.id === key);
+
+                        if (account) {
+
+                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
+
+                        }
+
+                        if (key === 'CashInHand') {
+
+                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+
+                        }
+
+                        if (key === 'CashAtHome') {
+
+                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+
+                        }
+
+                        return null;
+
+                    })}
+
+                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
+
+                </CardContent>
+
+            </Card>
+
+
+
+            <Tabs defaultValue="funds" className="w-full">
+
+                <TabsList className="grid w-full grid-cols-2">
+
+                    <TabsTrigger value="funds">Fund Management</TabsTrigger>
+
+                    <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
+
+                </TabsList>
+
+                <TabsContent value="funds" className="mt-6">
+
+                     <Card>
+
+                        <CardHeader>
+
+                            <CardTitle className="flex items-center gap-2 text-lg">
+
+                                <ArrowLeftRight className="h-5 w-5 text-primary"/>Fund Transfer
+
+                            </CardTitle>
+
+                            <CardDescription>Move funds between your accounts.</CardDescription>
+
+                        </CardHeader>
+
+                        <CardContent>
+
+                           <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+
+                                   <div className="space-y-1">
+
+                                        <Label>From</Label>
+
+                                        <Controller name="source" control={transferForm.control} render={({ field }) => (
+
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Source" />
+
+                                        )} />
+
+                                   </div>
+
+                                    <div className="space-y-1">
+
+                                        <Label>To</Label>
+
+                                        <Controller name="destination" control={transferForm.control} render={({ field }) => (
+
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Destination" />
+
+                                        )} />
+
+                                   </div>
+
+                                   <div className="space-y-1">
+
+                                        <Label htmlFor="transfer-amount">Amount <span className="text-destructive">*</span></Label>
+
+                                        <Input id="transfer-amount" type="number" {...transferForm.register('amount')} />
+
+                                        {transferForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{transferForm.formState.errors.amount.message}</p>}
+
+                                    </div>
+
+                               </div>
+
+                                <div className="space-y-1">
+
+                                    <Label htmlFor="transfer-description">Description</Label>
+
+                                    <Textarea id="transfer-description" {...transferForm.register('description')} />
+
+                                </div>
+
+                                <Button type="submit">Transfer Funds</Button>
+
+                            </form>
+
+                        </CardContent>
+
+                    </Card>
+
+                </TabsContent>
+
+                 <TabsContent value="loans" className="mt-6">
+
+                    <Card>
+
+                        <CardHeader className="flex flex-row items-center justify-between">
+
+                            <div>
+
+                                <CardTitle className="text-xl font-semibold">Loan & Capital Management</CardTitle>
+
+                                <CardDescription>Track all your loans and add capital injections here.</CardDescription>
+
+                            </div>
+
+                            <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Entry</Button>
+
+                        </CardHeader>
+
+                        <CardContent>
+
+                            <div className="overflow-x-auto">
+
+                                <Table>
+
+                                    <TableHeader>
+
+                                        <TableRow>
+
+                                            <TableHead>Loan / Lender</TableHead>
+
+                                            <TableHead>Type</TableHead>
+
+                                            <TableHead>Total Amount</TableHead>
+
+                                            <TableHead>Remaining</TableHead>
+
+                                            <TableHead>Interest Rate</TableHead>
+
+                                            <TableHead className="text-right">Actions</TableHead>
+
+                                        </TableRow>
+
+                                    </TableHeader>
+
+                                    <TableBody>
+
+                                    {loansWithCalculatedRemaining.map((loan) => (
+
+                                        <TableRow key={loan.id}>
+
+                                            <TableCell>
+
+                                                <div className="font-medium">{loan.loanName}</div>
+
+                                                <div className="text-xs text-muted-foreground">{loan.lenderName || loan.productName}</div>
+
+                                            </TableCell>
+
+                                            <TableCell>{toTitleCase(loan.loanType.replace('Loan', ' Loan'))}</TableCell>
+
+                                            <TableCell>{formatCurrency(loan.totalAmount)}</TableCell>
+
+                                            <TableCell className="font-semibold text-destructive">{formatCurrency(loan.remainingAmount || 0)}</TableCell>
+
+                                            <TableCell>{loan.interestRate}%</TableCell>
+
+                                            <TableCell className="text-right">
+
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => openLoanDialogForEdit(loan)}><Edit className="h-4 w-4" /></Button>
+
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteLoan(loan.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+
+                                            </TableCell>
+
+                                        </TableRow>
+
+                                    ))}
+
+                                    {loans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">No loans found.</TableCell></TableRow>}
+
+                                    </TableBody>
+
+                                </Table>
+
+                            </div>
+
+                        </CardContent>
+
+                    </Card>
+
+                </TabsContent>
+
+            </Tabs>
+
+
+
+            <Card>
+
+                <CardHeader>
+
+                    <CardTitle>Fund Transaction History</CardTitle>
+
+                    <CardDescription>A log of all capital and internal fund movements.</CardDescription>
+
+                </CardHeader>
+
+                <CardContent>
+
+                    <div className="overflow-x-auto max-h-96">
+
+                        <Table>
+
+                            <TableHeader>
+
+                                <TableRow>
+
+                                    <TableHead>Date</TableHead>
+
+                                    <TableHead>Type</TableHead>
+
+                                    <TableHead className="text-right">Amount</TableHead>
+
+                                    <TableHead>Description</TableHead>
+
+                                    <TableHead className="text-right">Actions</TableHead>
+
+                                </TableRow>
+
+                            </TableHeader>
+
+                            <TableBody>
+
+                                {fundTransactions.map(t => (
+
+                                    <TableRow key={t.id}>
+
+                                        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
+
+                                        <TableCell>
+
+                                            <div className="flex items-center gap-2">
+
+                                                {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
+
+                                                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
+
+                                                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
+
+                                            </div>
+
+                                             <p className="text-xs text-muted-foreground">{formSourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {formSourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
+
+                                        </TableCell>
+
+                                        <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
+
+                                        <TableCell>{t.description}</TableCell>
+
+                                        <TableCell className="text-right">
+
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditFundTransaction(t)}><Pen className="h-4 w-4" /></Button>
+
+                                            <AlertDialog>
+
+                                                <AlertDialogTrigger asChild>
+
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+
+                                                </AlertDialogTrigger>
+
+                                                <AlertDialogContent>
+
+                                                    <AlertDialogHeader><AlertDialogTitle>Delete Transaction?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the transaction of {formatCurrency(t.amount)}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteFundTransaction(t.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+
+                                                </AlertDialogContent>
+
+                                            </AlertDialog>
+
+                                        </TableCell>
+
+                                    </TableRow>
+
+                                ))}
+
+                                {fundTransactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No fund transactions found.</TableCell></TableRow>}
+
+                            </TableBody>
+
+                        </Table>
+
+                    </div>
+
+                </CardContent>
+
+            </Card>
+
+
+
+             <Dialog open={isLoanDialogOpen} onOpenChange={setIsLoanDialogOpen}>
+
+                <DialogContent className="sm:max-w-md">
+
+                    <DialogHeader>
+
+                        <DialogTitle>{currentLoan?.id ? 'Edit Entry' : 'Add New Entry'}</DialogTitle>
+
+                        <DialogDescription>Fill in the details of the capital or loan below.</DialogDescription>
+
+                    </DialogHeader>
+
+                    <ScrollArea className="max-h-[70vh] -mr-4 pr-4">
+
+                        <div className="grid gap-4 py-4 pr-1">
+
+                             <div className="space-y-1">
+
+                                <Label>Type</Label>
+
+                                <CustomDropdown options={[{value: 'OwnerCapital', label: "Owner's Capital"}, {value: 'Product', label: 'Product Loan'}, {value: 'Bank', label: 'Bank Loan'}, {value: 'Outsider', label: 'Outsider Loan'}]} value={currentLoan?.loanType || 'Product'} onChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))} />
+
+                            </div>
+
+
+
+                            {currentLoan.loanType === 'OwnerCapital' && (<div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Capital Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+                            
+
+                            {currentLoan.loanType === 'Product' && (<div className="space-y-4">
+
+                                <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
+
+                                <div className="space-y-1"><Label htmlFor="lenderName">Financed By (Bank/Lender)</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Product Cost</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="amountPaid">Down Payment</Label><Input id="amountPaid" name="amountPaid" type="number" value={currentLoan?.amountPaid || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="emiAmount">EMI Amount</Label><Input id="emiAmount" name="emiAmount" type="number" value={currentLoan?.emiAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} readOnly className="bg-muted" /></div>
+
+                            </div>)}
+
+
+
+                            {currentLoan.loanType === 'Outsider' && (<div className="space-y-4">
+
+                                <div className="space-y-1"><Label htmlFor="lenderName">Lender Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Loan Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+                            
+
+                            {currentLoan.loanType === 'Bank' && (<div className="space-y-4">
+
+                               <div className="space-y-1"><Label>Bank Loan Type</Label>
+
+                                <CustomDropdown options={[{value: 'Fixed', label: 'Fixed Loan'}, {value: 'Limit', label: 'Limit Loan'}, {value: 'Overdraft', label: 'Overdraft Loan'}, {value: 'CashCredit', label: 'Cash Credit'}]} value={currentLoan?.bankLoanType || 'Fixed'} onChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))} />
+
+                               </div>
+
+                               <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+
+                               <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                               <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+
+
+                             <div className="space-y-1">
+
+                                <Label htmlFor="startDate">Start Date</Label>
+
+                                <Input id="startDate" name="startDate" type="date" value={currentLoan?.startDate || ''} onChange={(e) => setCurrentLoan(prev => ({...prev, startDate: e.target.value}))} />
+
+                            </div>
+
+                             <div className="space-y-1">
+
+                                <Label>Deposit To</Label>
+
+                                <CustomDropdown options={formSourcesAndDestinations} value={currentLoan?.depositTo || 'CashInHand'} onChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))} />
+
+                            </div>
+
+                        </div>
+
+                    </ScrollArea>
+
+                    <DialogFooter>
+
+                         <DialogClose asChild>
+
+                            <Button variant="outline">Cancel</Button>
+
+                         </DialogClose>
+
+                        <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
+
+                    </DialogFooter>
+
+                </DialogContent>
+
+            </Dialog>
+
+
+
+            <Dialog open={isFundTransactionDialogOpen} onOpenChange={setIsFundTransactionDialogOpen}>
+
+                <DialogContent>
+
+                    <DialogHeader>
+
+                        <DialogTitle>Edit Fund Transaction</DialogTitle>
+
+                    </DialogHeader>
+
+                    <ScrollArea className="max-h-[70vh]">
+
+                        {currentFundTransaction && (
+
+                            <div className="space-y-4 py-4">
+
+                                <div className="space-y-1">
+
+                                    <Label>Amount</Label>
+
+                                    <Input 
+
+                                        type="number" 
+
+                                        value={currentFundTransaction.amount || 0}
+
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
+
+                                        readOnly={currentFundTransaction.type === 'CapitalInflow'}
+
+                                    />
+
+                                </div>
+
+                                <div className="space-y-1">
+
+                                    <Label>Description</Label>
+
+                                    <Textarea 
+
+                                        value={currentFundTransaction.description || ''}
+
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
+
+                                    />
+
+                                </div>
+
+                            </div>
+
+                        )}
+
+                    </ScrollArea>
+
+                    <DialogFooter>
+
+                        <Button variant="outline" onClick={() => setIsFundTransactionDialogOpen(false)}>Cancel</Button>
+
+                        <Button onClick={handleUpdateFundTransaction}>Save Changes</Button>
+
+                    </DialogFooter>
+
+                </DialogContent>
+
+            </Dialog>
+
+
+
+        </div>
+
+    );
+
+}
+
+
+    }
+
+
+
+    const openLoanDialogForAdd = () => {
+
+        setCurrentLoan(initialLoanFormState);
+
+        setIsLoanDialogOpen(true);
+
+    };
+
+
+
+    const openLoanDialogForEdit = (loan: Loan) => {
+
+        setCurrentLoan(loan);
+
+        setIsLoanDialogOpen(true);
+
+    };
+
+
+
+    const handleEditFundTransaction = (transaction: FundTransaction) => {
+
+        setCurrentFundTransaction(transaction);
+
+        setIsFundTransactionDialogOpen(true);
+
+    };
+
+
+
+    const handleUpdateFundTransaction = async () => {
+
+        if (!currentFundTransaction || !currentFundTransaction.id) return;
+
+        try {
+
+            await updateFundTransaction(currentFundTransaction.id, {
+
+                amount: currentFundTransaction.amount,
+
+                description: currentFundTransaction.description,
+
+            });
+
+            toast({ title: 'Transaction updated successfully', variant: 'success' });
+
+            setIsFundTransactionDialogOpen(false);
+
+        } catch (error) {
+
+            toast({ title: 'Failed to update transaction', variant: 'destructive' });
+
+            console.error(error);
+
+        }
+
+    };
+
+
+
+    const handleDeleteFundTransaction = async (id: string) => {
+
+        try {
+
+            await deleteFundTransaction(id);
+
+            toast({ title: 'Transaction deleted successfully', variant: 'success' });
+
+        } catch (error) {
+
+            toast({ title: 'Failed to delete transaction', variant: 'destructive' });
+
+            console.error(error);
+
+        }
+
+    };
+
+
+
+
+
+    if (!isClient) {
+
+        return null;
+
+    }
+
+
+
+    return (
+
+        <div className="space-y-6">
+
+            <Card>
+
+                <CardHeader>
+
+                    <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary"/>Financial Overview</CardTitle>
+
+                    <CardDescription>A real-time overview of your business's financial health.</CardDescription>
+
+                </CardHeader>
+
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+
+                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+
+                        const account = bankAccounts.find(acc => acc.id === key);
+
+                        if (account) {
+
+                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
+
+                        }
+
+                        if (key === 'CashInHand') {
+
+                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+
+                        }
+
+                        if (key === 'CashAtHome') {
+
+                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+
+                        }
+
+                        return null;
+
+                    })}
+
+                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
+
+                </CardContent>
+
+            </Card>
+
+
+
+            <Tabs defaultValue="funds" className="w-full">
+
+                <TabsList className="grid w-full grid-cols-2">
+
+                    <TabsTrigger value="funds">Fund Management</TabsTrigger>
+
+                    <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
+
+                </TabsList>
+
+                <TabsContent value="funds" className="mt-6">
+
+                     <Card>
+
+                        <CardHeader>
+
+                            <CardTitle className="flex items-center gap-2 text-lg">
+
+                                <ArrowLeftRight className="h-5 w-5 text-primary"/>Fund Transfer
+
+                            </CardTitle>
+
+                            <CardDescription>Move funds between your accounts.</CardDescription>
+
+                        </CardHeader>
+
+                        <CardContent>
+
+                           <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+
+                                   <div className="space-y-1">
+
+                                        <Label>From</Label>
+
+                                        <Controller name="source" control={transferForm.control} render={({ field }) => (
+
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Source" />
+
+                                        )} />
+
+                                   </div>
+
+                                    <div className="space-y-1">
+
+                                        <Label>To</Label>
+
+                                        <Controller name="destination" control={transferForm.control} render={({ field }) => (
+
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Destination" />
+
+                                        )} />
+
+                                   </div>
+
+                                   <div className="space-y-1">
+
+                                        <Label htmlFor="transfer-amount">Amount <span className="text-destructive">*</span></Label>
+
+                                        <Input id="transfer-amount" type="number" {...transferForm.register('amount')} />
+
+                                        {transferForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{transferForm.formState.errors.amount.message}</p>}
+
+                                    </div>
+
+                               </div>
+
+                                <div className="space-y-1">
+
+                                    <Label htmlFor="transfer-description">Description</Label>
+
+                                    <Textarea id="transfer-description" {...transferForm.register('description')} />
+
+                                </div>
+
+                                <Button type="submit">Transfer Funds</Button>
+
+                            </form>
+
+                        </CardContent>
+
+                    </Card>
+
+                </TabsContent>
+
+                 <TabsContent value="loans" className="mt-6">
+
+                    <Card>
+
+                        <CardHeader className="flex flex-row items-center justify-between">
+
+                            <div>
+
+                                <CardTitle className="text-xl font-semibold">Loan & Capital Management</CardTitle>
+
+                                <CardDescription>Track all your loans and add capital injections here.</CardDescription>
+
+                            </div>
+
+                            <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Entry</Button>
+
+                        </CardHeader>
+
+                        <CardContent>
+
+                            <div className="overflow-x-auto">
+
+                                <Table>
+
+                                    <TableHeader>
+
+                                        <TableRow>
+
+                                            <TableHead>Loan / Lender</TableHead>
+
+                                            <TableHead>Type</TableHead>
+
+                                            <TableHead>Total Amount</TableHead>
+
+                                            <TableHead>Remaining</TableHead>
+
+                                            <TableHead>Interest Rate</TableHead>
+
+                                            <TableHead className="text-right">Actions</TableHead>
+
+                                        </TableRow>
+
+                                    </TableHeader>
+
+                                    <TableBody>
+
+                                    {loansWithCalculatedRemaining.map((loan) => (
+
+                                        <TableRow key={loan.id}>
+
+                                            <TableCell>
+
+                                                <div className="font-medium">{loan.loanName}</div>
+
+                                                <div className="text-xs text-muted-foreground">{loan.lenderName || loan.productName}</div>
+
+                                            </TableCell>
+
+                                            <TableCell>{toTitleCase(loan.loanType.replace('Loan', ' Loan'))}</TableCell>
+
+                                            <TableCell>{formatCurrency(loan.totalAmount)}</TableCell>
+
+                                            <TableCell className="font-semibold text-destructive">{formatCurrency(loan.remainingAmount || 0)}</TableCell>
+
+                                            <TableCell>{loan.interestRate}%</TableCell>
+
+                                            <TableCell className="text-right">
+
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => openLoanDialogForEdit(loan)}><Edit className="h-4 w-4" /></Button>
+
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteLoan(loan.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+
+                                            </TableCell>
+
+                                        </TableRow>
+
+                                    ))}
+
+                                    {loans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">No loans found.</TableCell></TableRow>}
+
+                                    </TableBody>
+
+                                </Table>
+
+                            </div>
+
+                        </CardContent>
+
+                    </Card>
+
+                </TabsContent>
+
+            </Tabs>
+
+
+
+            <Card>
+
+                <CardHeader>
+
+                    <CardTitle>Fund Transaction History</CardTitle>
+
+                    <CardDescription>A log of all capital and internal fund movements.</CardDescription>
+
+                </CardHeader>
+
+                <CardContent>
+
+                    <div className="overflow-x-auto max-h-96">
+
+                        <Table>
+
+                            <TableHeader>
+
+                                <TableRow>
+
+                                    <TableHead>Date</TableHead>
+
+                                    <TableHead>Type</TableHead>
+
+                                    <TableHead className="text-right">Amount</TableHead>
+
+                                    <TableHead>Description</TableHead>
+
+                                    <TableHead className="text-right">Actions</TableHead>
+
+                                </TableRow>
+
+                            </TableHeader>
+
+                            <TableBody>
+
+                                {fundTransactions.map(t => (
+
+                                    <TableRow key={t.id}>
+
+                                        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
+
+                                        <TableCell>
+
+                                            <div className="flex items-center gap-2">
+
+                                                {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
+
+                                                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
+
+                                                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
+
+                                            </div>
+
+                                             <p className="text-xs text-muted-foreground">{formSourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {formSourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
+
+                                        </TableCell>
+
+                                        <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
+
+                                        <TableCell>{t.description}</TableCell>
+
+                                        <TableCell className="text-right">
+
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditFundTransaction(t)}><Pen className="h-4 w-4" /></Button>
+
+                                            <AlertDialog>
+
+                                                <AlertDialogTrigger asChild>
+
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+
+                                                </AlertDialogTrigger>
+
+                                                <AlertDialogContent>
+
+                                                    <AlertDialogHeader><AlertDialogTitle>Delete Transaction?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the transaction of {formatCurrency(t.amount)}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteFundTransaction(t.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+
+                                                </AlertDialogContent>
+
+                                            </AlertDialog>
+
+                                        </TableCell>
+
+                                    </TableRow>
+
+                                ))}
+
+                                {fundTransactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No fund transactions found.</TableCell></TableRow>}
+
+                            </TableBody>
+
+                        </Table>
+
+                    </div>
+
+                </CardContent>
+
+            </Card>
+
+
+
+             <Dialog open={isLoanDialogOpen} onOpenChange={setIsLoanDialogOpen}>
+
+                <DialogContent className="sm:max-w-md">
+
+                    <DialogHeader>
+
+                        <DialogTitle>{currentLoan?.id ? 'Edit Entry' : 'Add New Entry'}</DialogTitle>
+
+                        <DialogDescription>Fill in the details of the capital or loan below.</DialogDescription>
+
+                    </DialogHeader>
+
+                    <ScrollArea className="max-h-[70vh] -mr-4 pr-4">
+
+                        <div className="grid gap-4 py-4 pr-1">
+
+                             <div className="space-y-1">
+
+                                <Label>Type</Label>
+
+                                <CustomDropdown options={[{value: 'OwnerCapital', label: "Owner's Capital"}, {value: 'Product', label: 'Product Loan'}, {value: 'Bank', label: 'Bank Loan'}, {value: 'Outsider', label: 'Outsider Loan'}]} value={currentLoan?.loanType || 'Product'} onChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))} />
+
+                            </div>
+
+
+
+                            {currentLoan.loanType === 'OwnerCapital' && (<div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Capital Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+                            
+
+                            {currentLoan.loanType === 'Product' && (<div className="space-y-4">
+
+                                <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
+
+                                <div className="space-y-1"><Label htmlFor="lenderName">Financed By (Bank/Lender)</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Product Cost</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="amountPaid">Down Payment</Label><Input id="amountPaid" name="amountPaid" type="number" value={currentLoan?.amountPaid || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="emiAmount">EMI Amount</Label><Input id="emiAmount" name="emiAmount" type="number" value={currentLoan?.emiAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} readOnly className="bg-muted" /></div>
+
+                            </div>)}
+
+
+
+                            {currentLoan.loanType === 'Outsider' && (<div className="space-y-4">
+
+                                <div className="space-y-1"><Label htmlFor="lenderName">Lender Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Loan Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+                            
+
+                            {currentLoan.loanType === 'Bank' && (<div className="space-y-4">
+
+                               <div className="space-y-1"><Label>Bank Loan Type</Label>
+
+                                <CustomDropdown options={[{value: 'Fixed', label: 'Fixed Loan'}, {value: 'Limit', label: 'Limit Loan'}, {value: 'Overdraft', label: 'Overdraft Loan'}, {value: 'CashCredit', label: 'Cash Credit'}]} value={currentLoan?.bankLoanType || 'Fixed'} onChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))} />
+
+                               </div>
+
+                               <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+
+                               <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                               <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+
+                            </div>)}
+
+
+
+                             <div className="space-y-1">
+
+                                <Label htmlFor="startDate">Start Date</Label>
+
+                                <Input id="startDate" name="startDate" type="date" value={currentLoan?.startDate || ''} onChange={(e) => setCurrentLoan(prev => ({...prev, startDate: e.target.value}))} />
+
+                            </div>
+
+                             <div className="space-y-1">
+
+                                <Label>Deposit To</Label>
+
+                                <CustomDropdown options={formSourcesAndDestinations} value={currentLoan?.depositTo || 'CashInHand'} onChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))} />
+
+                            </div>
+
+                        </div>
+
+                    </ScrollArea>
+
+                    <DialogFooter>
+
+                         <DialogClose asChild>
+
+                            <Button variant="outline">Cancel</Button>
+
+                         </DialogClose>
+
+                        <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
+
+                    </DialogFooter>
+
+                </DialogContent>
+
+            </Dialog>
+
+
+
+            <Dialog open={isFundTransactionDialogOpen} onOpenChange={setIsFundTransactionDialogOpen}>
+
+                <DialogContent>
+
+                    <DialogHeader>
+
+                        <DialogTitle>Edit Fund Transaction</DialogTitle>
+
+                    </DialogHeader>
+
+                    <ScrollArea className="max-h-[70vh]">
+
+                        {currentFundTransaction && (
+
+                            <div className="space-y-4 py-4">
+
+                                <div className="space-y-1">
+
+                                    <Label>Amount</Label>
+
+                                    <Input 
+
+                                        type="number" 
+
+                                        value={currentFundTransaction.amount || 0}
+
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
+
+                                        readOnly={currentFundTransaction.type === 'CapitalInflow'}
+
+                                    />
+
+                                </div>
+
+                                <div className="space-y-1">
+
+                                    <Label>Description</Label>
+
+                                    <Textarea 
+
+                                        value={currentFundTransaction.description || ''}
+
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
+
+                                    />
+
+                                </div>
+
+                            </div>
+
+                        )}
+
+                    </ScrollArea>
+
+                    <DialogFooter>
+
+                        <Button variant="outline" onClick={() => setIsFundTransactionDialogOpen(false)}>Cancel</Button>
+
+                        <Button onClick={handleUpdateFundTransaction}>Save Changes</Button>
+
+                    </DialogFooter>
+
+                </DialogContent>
+
+            </Dialog>
+
+
+
+        </div>
+
+    );
+
+}
+
+
+
+
+
+
+
+

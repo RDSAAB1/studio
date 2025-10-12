@@ -30,16 +30,16 @@ interface CustomSidebarProps {
   toggleSidebar: () => void;
 }
 
-const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarActive, toggleSidebar }: { item: MenuItemType, activePath: string, onTabSelect: (menuItem: MenuItemType) => void, isMobile: boolean, isSidebarActive: boolean, toggleSidebar: () => void }) => {
-    const [isOpen, setIsOpen] = useState(false);
+const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarActive, toggleSidebar, openMenuId, setOpenMenuId, scheduleClose }: { item: MenuItemType, activePath: string, onTabSelect: (menuItem: MenuItemType) => void, isMobile: boolean, isSidebarActive: boolean, toggleSidebar: () => void, openMenuId: string | null, setOpenMenuId: (id: string | null) => void, scheduleClose: () => void }) => {
+    const isOpen = openMenuId === item.id;
     
     // Check if the item itself is active or if any of its sub-items are active
     const isSubMenuActive = item.subMenus?.some(sub => sub.id === activePath.substring(1)) ?? false;
     const isActive = item.id === (activePath === '/' ? 'dashboard-overview' : activePath.substring(1));
 
-
     const handleLinkClick = (menuItem: MenuItemType) => {
         onTabSelect(menuItem);
+        setOpenMenuId(null);
         if (isMobile) {
             toggleSidebar();
         }
@@ -60,7 +60,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
 
         return (
             <li className={cn("item", (isSubMenuActive || isOpen) && 'active')}>
-                <button className="link" onClick={() => setIsOpen(prev => !prev)}>
+                <button className="link" onClick={() => setOpenMenuId(isOpen ? null : item.id)}>
                      <div className="flex items-center">
                         <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
                         <span className="text">{item.name}</span>
@@ -99,12 +99,12 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
     }
     
     return (
-        <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenu open={isOpen} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)}>
             <DropdownMenuTrigger asChild>
                 <Button 
                     variant="ghost" 
-                    onMouseEnter={() => setIsOpen(true)} 
-                    onMouseLeave={() => setIsOpen(false)}
+                    onPointerEnter={() => setOpenMenuId(item.id)}
+                    onPointerLeave={scheduleClose}
                     className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
                  >
                     <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
@@ -113,13 +113,21 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
              <DropdownMenuContent 
                 side="right" 
                 align="start"
-                className="w-[var(--sidebar-width-icon)]" 
-                onMouseEnter={() => setIsOpen(true)}
-                onMouseLeave={() => setIsOpen(false)}
+                sideOffset={4}
+                className="w-[var(--sidebar-width-icon)] animate-in slide-in-from-left-1 fade-in-0 duration-150"
+                onPointerEnter={() => setOpenMenuId(item.id)}
+                onPointerLeave={scheduleClose}
              >
                 <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
                 {item.subMenus.map(subItem => (
-                    <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)} className={cn(`/${subItem.id}` === activePath && "bg-accent")}>
+                    <DropdownMenuItem 
+                        key={subItem.id} 
+                        onClick={() => handleLinkClick(subItem)} 
+                        className={cn(
+                            "cursor-pointer transition-colors duration-200",
+                            `/${subItem.id}` === activePath && "bg-accent"
+                        )}
+                    >
                         {subItem.name}
                     </DropdownMenuItem>
                 ))}
@@ -131,7 +139,26 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [companyName, setCompanyName] = useState('BizSuite DataFlow');
   const [isMobile, setIsMobile] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const closeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const activePath = usePathname();
+  
+  const handleSetOpenMenu = (menuId: string | null) => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setOpenMenuId(menuId);
+  };
+  
+  const handleScheduleClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => {
+      setOpenMenuId(null);
+    }, 200);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -180,6 +207,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
                             isMobile={isMobile}
                             isSidebarActive={isSidebarActive}
                             toggleSidebar={toggleSidebar}
+                            openMenuId={openMenuId}
+                            setOpenMenuId={handleSetOpenMenu}
+                            scheduleClose={handleScheduleClose}
                         />
                     ))}
                  </TooltipProvider>

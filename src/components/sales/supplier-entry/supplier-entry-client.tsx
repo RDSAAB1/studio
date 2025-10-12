@@ -393,10 +393,10 @@ export default function SupplierEntryClient() {
         const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
         
         const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(supSoNorm, supSoNorm);
+        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
         const totalDist = nameDist + soDist;
         
-        if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
+        if (totalDist > 0 && totalDist < 5 && totalDist < minDistance) {
             minDistance = totalDist;
             bestMatch = supplier;
         }
@@ -452,8 +452,8 @@ export default function SupplierEntryClient() {
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
         customerId: isForcedUnique 
-            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
-            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+            ? `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}|${Date.now()}` 
+            : `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
         forceUnique: isForcedUnique,
     };
 

@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateSuppliers, deleteMultipleSuppliers, recalculateAndUpdateAllSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
@@ -28,7 +29,8 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { Dialog, DialogContent, ScrollArea } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
@@ -94,7 +96,7 @@ export default function SupplierEntryClient() {
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = usePersistedState('supplier-entry-search', '');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -361,10 +363,10 @@ export default function SupplierEntryClient() {
         const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
         
         const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(supSoNorm, supSoNorm);
+        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
         const totalDist = nameDist + soDist;
         
-        if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
+        if (totalDist > 0 && totalDist < 5 && totalDist < minDistance) {
             minDistance = totalDist;
             bestMatch = supplier;
         }
@@ -433,8 +435,8 @@ const handleDelete = async (id: string) => {
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
         customerId: isForcedUnique 
-            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
-            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+            ? `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}|${Date.now()}` 
+            : `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
         forceUnique: isForcedUnique,
     };
 
@@ -869,5 +871,4 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
     

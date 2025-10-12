@@ -27,12 +27,13 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
+import { QuickExpenseEntry } from "@/components/expense/quick-expense-entry";
 import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; 
 
 
-import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
+import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins, Zap } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,11 +94,6 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
   };
 };
 
-const SectionCard = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
-        {children}
-    </Card>
-);
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -110,11 +106,11 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
   <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-3">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       <div className="text-muted-foreground">{icon}</div>
     </CardHeader>
-    <CardContent>
+    <CardContent className="px-3 pb-3">
       <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
     </CardContent>
@@ -180,8 +176,11 @@ export default function IncomeExpenseClient() {
   }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
-      const relevantTransactions = allTransactions.filter(t => t.transactionId?.startsWith(type === 'Income' ? 'IN' : 'EX'));
-      const lastNum = relevantTransactions.reduce((max, t) => {
+      const prefix = type === 'Income' ? 'IN' : 'EX';
+      
+      // Check transactions
+      const relevantTransactions = allTransactions.filter(t => t.transactionId?.startsWith(prefix));
+      let lastNum = relevantTransactions.reduce((max, t) => {
           const numMatch = t.transactionId?.match(/^(IN|EX)(\d+)$/);
           if (numMatch && numMatch[2]) {
               const num = parseInt(numMatch[2], 10);
@@ -189,8 +188,24 @@ export default function IncomeExpenseClient() {
           }
           return max;
       }, 0);
-      return generateReadableId(type === 'Income' ? 'IN' : 'EX', lastNum, 5);
-  }, [allTransactions]);
+      
+      // For Expenses, also check supplier payments (they use EX prefix too!)
+      if (type === 'Expense' && payments && payments.length > 0) {
+          const paymentLastNum = payments.reduce((max, p) => {
+              if (p.paymentId?.startsWith('EX')) {
+                  const numMatch = p.paymentId?.match(/^EX(\d+)$/);
+                  if (numMatch && numMatch[1]) {
+                      const num = parseInt(numMatch[1], 10);
+                      return num > max ? num : max;
+                  }
+              }
+              return max;
+          }, 0);
+          lastNum = Math.max(lastNum, paymentLastNum);
+      }
+      
+      return generateReadableId(prefix, lastNum, 5);
+  }, [allTransactions, payments]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -481,6 +496,30 @@ export default function IncomeExpenseClient() {
         }
     }
   
+    // Validate transaction ID is unique (not editing)
+    if (!editingTransaction && values.transactionId) {
+        const idExists = allTransactions.some(t => t.transactionId === values.transactionId);
+        const paymentIdExists = values.transactionType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
+        
+        if (idExists) {
+            toast({
+                title: "ID Already Exists",
+                description: `Transaction ID ${values.transactionId} already exists. Cannot save.`,
+                variant: "destructive"
+            });
+            return;
+        }
+        
+        if (paymentIdExists) {
+            toast({
+                title: "ID Already Exists",
+                description: `ID ${values.transactionId} is already used for a supplier payment. Cannot save.`,
+                variant: "destructive"
+            });
+            return;
+        }
+    }
+  
     setIsSubmitting(true);
     try {
       const transactionData: Partial<TransactionFormValues> = {
@@ -621,31 +660,26 @@ export default function IncomeExpenseClient() {
 
   return (
     <div className="space-y-6">
-      <SectionCard>
-          <CardHeader>
-              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Transactions Overview</CardTitle>
-              <CardDescription>A summary of your recorded income and expenses.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<CircleDollarSign />} colorClass="text-green-500"/>
               <StatCard title="Total Expense" value={formatCurrency(totalExpense)} icon={<CircleDollarSign />} colorClass="text-red-500"/>
               <StatCard title="Net Profit/Loss" value={formatCurrency(netProfitLoss)} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
               <StatCard title="Total Transactions" value={String(totalTransactions)} icon={<Hash />} />
-          </CardContent>
-      </SectionCard>
+      </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{editingTransaction ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
+            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</TabsTrigger>
             <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
           </TabsList>
           <div className="w-full sm:w-auto flex items-center gap-2">
             <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button>
           </div>
         </div>
+        
         <TabsContent value="history" className="mt-4">
-          <SectionCard>
+          <Card>
             <CardContent className="p-0">
                 <ScrollArea className="h-[calc(100vh-350px)]">
                   <Table>
@@ -699,10 +733,45 @@ export default function IncomeExpenseClient() {
                   </Table>
                 </ScrollArea>
             </CardContent>
-          </SectionCard>
+          </Card>
         </TabsContent>
         <TabsContent value="form" className="mt-4">
-           <SectionCard>
+           {/* Side-by-Side Layout: Templates Left (40%), Form Right (60%) */}
+           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+             
+             {/* Left Side - Quick Templates (40% = 2 out of 5 columns) */}
+             <div className="lg:col-span-2">
+               <QuickExpenseEntry 
+                isAdvanced={isAdvanced}
+                onTemplateSelect={(template) => {
+                  // Fill detailed form with template data
+                  setValue('transactionType', 'Expense');
+                  setValue('amount', template.amount);
+                  setValue('payee', template.payee);
+                  setValue('description', template.name);
+                  setValue('paymentMethod', template.paymentMethod);
+                  setValue('expenseNature', template.expenseNature);
+                  setValue('status', 'Paid');
+                  
+                  // Set category and subcategory with delays for proper loading
+                  setTimeout(() => {
+                    setValue('category', template.category);
+                    setTimeout(() => {
+                      setValue('subCategory', template.subCategory);
+                    }, 100);
+                  }, 50);
+                  
+                  toast({
+                    title: "Template Loaded",
+                    description: `"${template.name}" loaded into form`,
+                  });
+                }}
+              />
+             </div>
+             
+             {/* Right Side - Detailed Form (60% = 3 out of 5 columns) */}
+             <div className="lg:col-span-3">
+               <Card className={isAdvanced ? "h-auto" : "h-[calc(100vh-150px)]"}>
               <CardContent className="p-6">
                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1029,19 +1098,17 @@ export default function IncomeExpenseClient() {
                     </div>
                  </form>
               </CardContent>
-           </SectionCard>
+           </Card>
+         </div>
+       </div>
         </TabsContent>
       </Tabs>
+
       <CategoryManagerDialog
         isOpen={isCategoryManagerOpen}
         onOpenChange={setIsCategoryManagerOpen}
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
-        onAddCategory={addCategory}
-        onUpdateCategoryName={updateCategoryName}
-        onDeleteCategory={deleteCategory}
-        onAddSubCategory={addSubCategory}
-        onDeleteSubCategory={deleteSubCategory}
       />
     </div>
   );

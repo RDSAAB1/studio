@@ -100,8 +100,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }
         }
         
+        // For RTGS, paymentId should be rtgsSrNo
+        const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
+        
         const paymentDataBase: Omit<Payment, 'id'> = {
-            paymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+            paymentId: finalPaymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,

@@ -46,7 +46,15 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
         const value = toTitleCase(e.target.value);
         form.setValue('name', value);
         if (value.length > 1) {
-            const uniqueSuppliers = Array.from(new Map(allSuppliers.map((s: Customer) => [s.customerId, s])).values());
+            // Group by name+so to avoid duplicates with different contacts
+            const uniqueMap = new Map<string, Customer>();
+            allSuppliers.forEach((s: Customer) => {
+                const key = `${s.name.toLowerCase()}|${(s.so || '').toLowerCase()}`;
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, s);
+                }
+            });
+            const uniqueSuppliers = Array.from(uniqueMap.values());
             const filtered = uniqueSuppliers.filter((s: Customer) => 
                 s.name.toLowerCase().startsWith(value.toLowerCase()) || s.contact.startsWith(value)
             );

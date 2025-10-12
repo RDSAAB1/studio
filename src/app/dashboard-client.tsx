@@ -16,7 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 
-const StatCard = ({ title, value, icon, colorClass, isLoading }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean }) => (
+const StatCard = ({ title, value, icon, colorClass, isLoading, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, description?: string }) => (
     <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -26,7 +26,10 @@ const StatCard = ({ title, value, icon, colorClass, isLoading }: { title: string
             {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             ) : (
+                <>
                 <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+                    {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+                </>
             )}
         </CardContent>
     </Card>
@@ -123,12 +126,16 @@ export default function DashboardClient() {
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
     const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
-    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived } = useMemo(() => {
+    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived, expenseBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
         const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + (item.cdAmount || 0), 0);
         
         const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
+        
+        // Breakdown supplier payments by type
+        const supplierPaymentRegular = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor !== 'Outsider').reduce((sum, item) => sum + item.amount, 0);
+        const outsiderRTGS = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor === 'Outsider').reduce((sum, item) => sum + item.amount, 0);
         const expenseForSuppliers = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
         
         const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
@@ -141,6 +148,11 @@ export default function DashboardClient() {
             totalSupplierDues: filteredData.filteredSuppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
             totalCustomerReceivables: filteredData.filteredCustomers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0),
             totalCdReceived: cdReceived,
+            expenseBreakdown: {
+                supplierPayment: supplierPaymentRegular,
+                expenses: expenseFromEntries,
+                outsiderRTGS: outsiderRTGS,
+            }
         }
     }, [filteredData]);
     
@@ -417,7 +429,14 @@ export default function DashboardClient() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" isLoading={isLoading}/>
-                <StatCard title="Total Expense" value={formatCurrency(totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" isLoading={isLoading}/>
+                <StatCard 
+                    title="Total Expense" 
+                    value={formatCurrency(totalExpense)} 
+                    icon={<TrendingDown />} 
+                    colorClass="text-red-500" 
+                    isLoading={isLoading}
+                    description={`Supplier: ${formatCurrency(expenseBreakdown.supplierPayment)} | Expense: ${formatCurrency(expenseBreakdown.expenses)} | Outsider: ${formatCurrency(expenseBreakdown.outsiderRTGS)}`}
+                />
                 <StatCard title="Net Profit/Loss" value={formatCurrency(netProfit)} icon={<DollarSign />} colorClass={netProfit >= 0 ? "text-green-500" : "text-red-500"} isLoading={isLoading}/>
                 <StatCard title="Total CD Received" value={formatCurrency(totalCdReceived)} icon={<HandCoins />} colorClass="text-blue-500" isLoading={isLoading}/>
                 <StatCard title="Supplier Dues" value={formatCurrency(totalSupplierDues)} icon={<Users />} colorClass="text-amber-500" isLoading={isLoading}/>
@@ -579,5 +598,3 @@ export default function DashboardClient() {
         </div>
     );
 }
-
-    
