@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,10 +12,26 @@ import { Info, CheckSquare } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Checkbox } from '@/components/ui/checkbox';
 
-export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSelectionChange }: any) => {
+export const TransactionTable = React.memo(({ suppliers, onShowDetails, selectedIds, onSelectionChange }: any) => {
     
+    const outstandingSuppliers = useMemo(() => 
+        suppliers.filter((s:any) => parseFloat(String(s.netAmount)) > 0),
+        [suppliers]
+    );
+    
+    // Debug: Check what values are in the first supplier entry
+    if (suppliers.length > 0) {
+        console.log('TransactionTable - First entry:', {
+            srNo: suppliers[0].srNo,
+            totalPaid: suppliers[0].totalPaid,
+            totalCd: suppliers[0].totalCd,
+            netAmount: suppliers[0].netAmount,
+            originalNetAmount: suppliers[0].originalNetAmount
+        });
+    }
+
     const handleSelectAll = (checked: boolean) => {
-        const allEntryIds = suppliers.filter((s:any) => parseFloat(String(s.netAmount)) > 0).map((c: any) => c.id);
+        const allEntryIds = outstandingSuppliers.map((c: any) => c.id);
         onSelectionChange(checked ? new Set(allEntryIds) : new Set());
     };
 
@@ -28,8 +44,6 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
         }
         onSelectionChange(newSelectedIds);
     };
-
-    const outstandingSuppliers = suppliers.filter((s:any) => parseFloat(String(s.netAmount)) > 0);
 
     return (
         <Card className="mt-3">
@@ -90,4 +104,4 @@ export const TransactionTable = ({ suppliers, onShowDetails, selectedIds, onSele
             </CardContent>
         </Card>
     );
-};
+});

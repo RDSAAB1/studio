@@ -38,7 +38,7 @@ export const useCashDiscount = ({
     // 1. State Management
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2); // Default 2%
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount' | 'on_previously_paid_no_cd'>('partial_on_paid');
+    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount' | 'on_previously_paid_no_cd'>('on_full_amount'); // Changed to on_full_amount for proper CD tracking
 
     // 2. Eligibility Check (Memoized)
     const eligibleForCd = useMemo(() => {
@@ -53,9 +53,15 @@ export const useCashDiscount = ({
         });
     }, [selectedEntries, paymentDate]);
 
-    // 3. Effect to Auto-Enable CD
+    // 3. Effect to Auto-Enable CD based on eligibility
     useEffect(() => {
-        setCdEnabled(eligibleForCd);
+        // Only update if different to prevent infinite loop
+        setCdEnabled(prev => {
+            if (prev !== eligibleForCd) {
+                return eligibleForCd;
+            }
+            return prev;
+        });
     }, [eligibleForCd]);
     
     // 4. Total CD Already Applied (Memoized)
@@ -98,6 +104,16 @@ export const useCashDiscount = ({
                 
                 // Sum the amounts of those payments
                 baseAmountForCd = previousPaymentsWithoutCD.reduce((sum, p) => sum + p.amount, 0);
+                
+                // Debug log
+                console.log('CD on previously paid (no CD):', {
+                    selectedCustomerKey,
+                    totalPaymentsForCustomer: paymentsForThisCustomer.length,
+                    paymentsWithoutCD: previousPaymentsWithoutCD.length,
+                    baseAmountForCd,
+                    cdPercent,
+                    calculatedCD: (baseAmountForCd * cdPercent) / 100
+                });
                 break;
             }
             default:

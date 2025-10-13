@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { generateReadableId } from '@/lib/utils';
 import type { Payment, Expense, BankAccount } from '@/lib/definitions';
 import { format } from 'date-fns';
@@ -70,38 +70,69 @@ export const useSupplierPayments = () => {
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
 
-    const [settleAmount, setSettleAmount] = useState(0);
-    const [toBePaidAmount, setToBePaidAmount] = useState(0);
+    // Use useMemo to derive values instead of useState to avoid infinite loops
+    const settleAmountDerived = useMemo(() => {
+        if (form.paymentType === 'Full') {
+            return totalOutstandingForSelected;
+        }
+        // For Partial, this will be overridden by state
+        return 0;
+    }, [form.paymentType, totalOutstandingForSelected]);
+
+    const [settleAmountManual, setSettleAmountManual] = useState(0);
+    const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
+
+    const settleAmount = form.paymentType === 'Full' ? settleAmountDerived : settleAmountManual;
+    const toBePaidAmount = form.paymentType === 'Full' ? 0 : toBePaidAmountManual; // Will be calculated below
 
     const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
-        toBePaidAmount: toBePaidAmount,
+        toBePaidAmount: settleAmount, // Use settle amount as base
         selectedEntries: selectedEntries,
     });
     
+    // Derive toBePaid from settle - CD
+    const finalToBePaid = useMemo(() => {
+        if (form.paymentType === 'Full') {
+            return Math.max(0, settleAmount - calculatedCdAmount);
+        }
+        return toBePaidAmountManual;
+    }, [form.paymentType, settleAmount, calculatedCdAmount, toBePaidAmountManual]);
+    
     const handleSettleAmountChange = (value: number) => {
-        setSettleAmount(value);
+        if (form.paymentType === 'Partial') {
+            setSettleAmountManual(value);
+        }
     };
 
     const handleToBePaidChange = (value: number) => {
-        setToBePaidAmount(value);
-        form.setCalcTargetAmount(Math.round(value)); // Update target amount
+        setToBePaidAmountManual(value);
+        form.setCalcTargetAmount(Math.round(value));
     };
-    
+
+    // Auto-calculate settle amount for Partial payment type
+    useEffect(() => {
+        if (form.paymentType === 'Partial') {
+            const newSettleAmount = toBePaidAmountManual + calculatedCdAmount;
+            const roundedSettle = Math.round(newSettleAmount * 100) / 100;
+            const currentSettle = Math.round(settleAmountManual * 100) / 100;
+            
+            if (roundedSettle !== currentSettle) {
+                setSettleAmountManual(roundedSettle);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [toBePaidAmountManual, calculatedCdAmount, form.paymentType]);
+
+    // Auto-update Target Amount when To Be Paid changes in Full mode
     useEffect(() => {
         if (form.paymentType === 'Full') {
-            const newSettleAmount = totalOutstandingForSelected;
-            const newToBePaid = newSettleAmount - calculatedCdAmount;
-            handleSettleAmountChange(newSettleAmount);
-            handleToBePaidChange(newToBePaid > 0 ? newToBePaid : 0);
-        } else { // Partial
-            const newSettleAmount = toBePaidAmount + calculatedCdAmount;
-            handleSettleAmountChange(newSettleAmount);
+            form.setCalcTargetAmount(Math.round(finalToBePaid));
         }
-    }, [totalOutstandingForSelected, form.paymentType, calculatedCdAmount, toBePaidAmount]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [finalToBePaid, form.paymentType]);
 
     // Auto-fill logic for parchi number
     useEffect(() => {
@@ -279,8 +310,13 @@ export const useSupplierPayments = () => {
         form.setRtgsQuantity(option.quantity);
         form.setRtgsRate(option.rate);
         form.setRtgsAmount(option.calculatedAmount);
-        form.setPaymentType('Partial');
-        handleToBePaidChange(option.calculatedAmount);
+        form.setPaymentType('Partial'); // Set to Partial first
+        
+        // For Partial mode, manually set the amounts
+        setToBePaidAmountManual(option.calculatedAmount);
+        setSettleAmountManual(option.calculatedAmount);
+        form.setCalcTargetAmount(Math.round(option.calculatedAmount));
+        
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
 
@@ -333,9 +369,10 @@ export const useSupplierPayments = () => {
         ...form,
         ...cdProps,
         calculatedCdAmount,
-        finalAmountToBePaid: toBePaidAmount,
+        finalAmountToBePaid: finalToBePaid,
         settleAmount, handleSettleAmountChange,
         handleToBePaidChange,
+        toBePaidAmount: finalToBePaid, // Add this for compatibility
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,

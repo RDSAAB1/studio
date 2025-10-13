@@ -191,7 +191,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
              setRtgsSrNo(getNextPaymentId('RTGS'));
              setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
         }
-    }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [paymentHistory, expenses, editingPayment, paymentMethod]);
     
 
     const resetPaymentForm = useCallback((isOutsider: boolean = false) => {

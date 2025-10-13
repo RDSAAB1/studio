@@ -113,43 +113,62 @@ export const useSupplierData = () => {
 
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
     safePaymentHistory.forEach(p => {
-            const sNameNorm = normalize(p.supplierName || 'Outsider');
-            const sSoNorm = normalize(p.supplierFatherName || '');
+            // NEW LOGIC: Match by Serial Number from paidFor array
+            if (p.paidFor && p.paidFor.length > 0) {
+                // This payment has paidFor array - match by srNo
+                p.paidFor.forEach(pf => {
+                    // Find which supplier has a transaction with this srNo
+                    for (const summary of summaryList) {
+                        const matchingTransaction = summary.allTransactions?.find(t => t.srNo === pf.srNo);
+                        if (matchingTransaction) {
+                            // Found the supplier with this srNo - add payment to their allPayments
+                            if (!summary.allPayments!.some(existingP => existingP.id === p.id)) {
+                                summary.allPayments!.push(p);
+                            }
+                            break; // Found match, no need to check other summaries
+                        }
+                    }
+                });
+            } else {
+                // OLD LOGIC: No paidFor array - match by supplier name (for backward compatibility)
+                const sNameNorm = normalize(p.supplierName || 'Outsider');
+                const sSoNorm = normalize(p.supplierFatherName || '');
 
-            let bestMatch: CustomerSummary | null = null;
-            let minDistance = 3;
+                let bestMatch: CustomerSummary | null = null;
+                let minDistance = 3;
 
-            for (const existingSummary of summaryList) {
-                const eNameNorm = normalize(existingSummary.name || '');
-                const eSoNorm = normalize(existingSummary.so || '');
-                const distance = levenshteinDistance(sNameNorm + sSoNorm, eNameNorm + eSoNorm);
+                for (const existingSummary of summaryList) {
+                    const eNameNorm = normalize(existingSummary.name || '');
+                    const eSoNorm = normalize(existingSummary.so || '');
+                    const distance = levenshteinDistance(sNameNorm + sSoNorm, eNameNorm + eSoNorm);
 
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    bestMatch = existingSummary;
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = existingSummary;
+                    }
                 }
-            }
-            
-            if (bestMatch) {
-                bestMatch.allPayments!.push(p);
-            } else if (p.rtgsFor === 'Outsider') {
-                const newSummary: CustomerSummary = {
-                name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
-                    contact: '', 
-                acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
-                    totalOutstanding: 0, totalCdAmount: 0,
-                    paymentHistory: [], outstandingEntryIds: [],
-                    allTransactions: [], allPayments: [p], transactionsByVariety: {},
-                    totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
-                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
-                    totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
-                    totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
-                    averageKartaPercentage: 0, averageLabouryRate: 0,
-                    totalTransactions: 0, totalOutstandingTransactions: 0,
-                    totalBrokerage: 0, totalCd: 0,
-                };
-                summaryList.push(newSummary);
+                
+                if (bestMatch) {
+                    bestMatch.allPayments!.push(p);
+                } else if (p.rtgsFor === 'Outsider') {
+                    const newSummary: CustomerSummary = {
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                        contact: '', 
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+                        totalOutstanding: 0, totalCdAmount: 0,
+                        paymentHistory: [], outstandingEntryIds: [],
+                        allTransactions: [], allPayments: [p], transactionsByVariety: {},
+                        totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
+                        totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+                        totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                        totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
+                        averageKartaPercentage: 0, averageLabouryRate: 0,
+                        totalTransactions: 0, totalOutstandingTransactions: 0,
+                        totalBrokerage: 0, totalCd: 0,
+                    };
+                    summaryList.push(newSummary);
+                }
             }
         });
 
@@ -163,14 +182,41 @@ export const useSupplierData = () => {
             data.allTransactions!.forEach(transaction => {
                 const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
+                // Debug: Log all payments to see what's available
+                console.log('All payments for supplier:', {
+                    supplierName: data.name,
+                    totalPayments: data.allPayments!.length,
+                    paymentsWithRTGS: data.allPayments!.filter(p => p.receiptType === 'RTGS' || p.rtgsAmount).length,
+                    paymentsWithPaidFor: data.allPayments!.filter(p => p.paidFor && p.paidFor.length > 0).length
+                });
+                
+                // Debug: Log if we found payments for this transaction
+                if (paymentsForThisEntry.length > 0) {
+                    console.log('Found payments for transaction:', {
+                        srNo: transaction.srNo,
+                        paymentsCount: paymentsForThisEntry.length,
+                        payments: paymentsForThisEntry.map(p => ({
+                            id: p.id,
+                            receiptType: p.receiptType,
+                            amount: p.amount,
+                            rtgsAmount: p.rtgsAmount,
+                            paidFor: p.paidFor,
+                            cdApplied: p.cdApplied,
+                            cdAmount: p.cdAmount
+                        }))
+                    });
+                }
+            
             let totalPaidForEntry = 0;
             let totalCdForEntry = 0;
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
+                // paidFor.amount already includes CD portion, so we add it directly
                 totalPaidForEntry += paidForThisDetail.amount;
 
-                if (p.cdApplied && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                // Calculate CD portion for display purposes only
+                if ('cdApplied' in p && p.cdApplied && 'cdAmount' in p && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
                         const proportion = paidForThisDetail.amount / totalAmountInPayment;
@@ -179,7 +225,25 @@ export const useSupplierData = () => {
                 }
             });
             
-                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+                // Store amounts for display (totalPaid already includes CD)
+                // For display: show actual payment separately from CD
+                transaction.totalPaid = totalPaidForEntry - totalCdForEntry; // Actual payment without CD
+                transaction.totalCd = totalCdForEntry; // CD amount
+                // Outstanding: Original - (Payment + CD) = Original - totalPaidForEntry
+                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+                
+                // Debug log
+                if (totalPaidForEntry > 0 || totalCdForEntry > 0) {
+                    console.log('Transaction calculation:', {
+                        srNo: transaction.srNo,
+                        totalPaidForEntry,
+                        totalCdForEntry,
+                        totalPaid: transaction.totalPaid,
+                        totalCd: transaction.totalCd,
+                        netAmount: transaction.netAmount,
+                        paymentsCount: paymentsForThisEntry.length
+                    });
+                }
         });
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
