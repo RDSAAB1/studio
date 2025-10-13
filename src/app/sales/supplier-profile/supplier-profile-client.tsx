@@ -650,10 +650,10 @@ export default function SupplierProfileClient() {
         <CardContent className="p-3">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Users className="h-5 w-5 text-primary" />
-                        <h3 className="text-base font-semibold">Select Profile</h3>
-                    </div>
+            <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-primary" />
+                <h3 className="text-base font-semibold">Select Profile</h3>
+            </div>
                     
                     {/* Quick Date Filters */}
                     <div className="flex items-center gap-2 flex-wrap">
@@ -699,32 +699,32 @@ export default function SupplierProfileClient() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
-                    </Popover>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
-                    </Popover>
-                    
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                </Popover>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                </Popover>
+                
                     <div className="w-full sm:flex-1">
-                        <CustomDropdown
+                    <CustomDropdown
                             options={filteredSupplierOptions.map(({ value, label }) => ({ value, label }))}
-                            value={selectedSupplierKey}
-                            onChange={(value: string | null) => setSelectedSupplierKey(value)}
-                            placeholder="Search and select profile..."
-                        />
+                        value={selectedSupplierKey}
+                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
+                        placeholder="Search and select profile..."
+                    />
                     </div>
                 </div>
             </div>
