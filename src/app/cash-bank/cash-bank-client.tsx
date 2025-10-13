@@ -627,7 +627,6 @@ export default function CashBankClient() {
         </div>
     );
 }
-    }
 
 
 
