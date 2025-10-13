@@ -152,10 +152,10 @@ export const useSupplierData = () => {
                     bestMatch.allPayments!.push(p);
                 } else if (p.rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
-                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
                         contact: '', 
-                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+                acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                         totalOutstanding: 0, totalCdAmount: 0,
                         paymentHistory: [], outstandingEntryIds: [],
                         allTransactions: [], allPayments: [p], transactionsByVariety: {},
