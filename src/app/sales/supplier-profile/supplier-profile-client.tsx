@@ -798,7 +798,7 @@ export default function SupplierProfileClient() {
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
                 </Popover>
-
+                
                     {/* Serial Number Search */}
                     <div className="w-full sm:w-[200px] relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -869,3 +869,491 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
+
+    };
+
+
+
+    const finalSummaryMap = new Map<string, CustomerSummary>();
+
+    
+
+    summaryList.forEach((profile, index) => {
+        const filteredTransactions = profile.allTransactions.filter(t => filterByDate(t.date));
+
+        
+
+        // If no date filter is applied, use all payments. Otherwise, filter payments based on transactions.
+        let filteredPayments = profile.allPayments;
+        if (start || end) {
+        const relevantPaymentIds = new Set<string>();
+
+        filteredTransactions.forEach(t => {
+
+                const paymentsForEntry = profile.allPayments.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+            paymentsForEntry.forEach(p => relevantPaymentIds.add(p.id));
+
+        });
+
+            filteredPayments = profile.allPayments.filter(p => relevantPaymentIds.has(p.id));
+        }
+
+
+        const data: CustomerSummary = { ...profile, allTransactions: filteredTransactions, allPayments: filteredPayments };
+
+        
+
+        // Recalculate stats based on filtered data
+
+        data.totalAmount = data.allTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+        data.totalOriginalAmount = data.allTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+
+        data.totalGrossWeight = data.allTransactions.reduce((sum, t) => sum + t.grossWeight, 0);
+
+        data.totalTeirWeight = data.allTransactions.reduce((sum, t) => sum + t.teirWeight, 0);
+
+        data.totalFinalWeight = data.allTransactions.reduce((sum, t) => sum + t.weight, 0);
+
+        data.totalKartaWeight = data.allTransactions.reduce((sum, t) => sum + (t.kartaWeight || 0), 0);
+
+        data.totalNetWeight = data.allTransactions.reduce((sum, t) => sum + t.netWeight, 0);
+
+        data.totalKartaAmount = data.allTransactions.reduce((sum, t) => sum + (t.kartaAmount || 0), 0);
+
+        data.totalLabouryAmount = data.allTransactions.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
+
+        data.totalKanta = data.allTransactions.reduce((sum, t) => sum + t.kanta, 0);
+
+        data.totalOtherCharges = data.allTransactions.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
+
+        data.totalTransactions = data.allTransactions.length;
+
+        
+
+        // Calculate total paid (sum of all payments)
+        data.totalPaid = data.allPayments.reduce((sum, p) => {
+            const amount = ('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0;
+            return sum + amount;
+        }, 0);
+        
+        data.totalCdAmount = data.allPayments.reduce((sum, p) => sum + (('cdAmount' in p ? p.cdAmount : null) || 0), 0);
+        
+        // Calculate Cash payments (receiptType === 'Cash')
+        data.totalCashPaid = data.allPayments
+            .filter(p => 'receiptType' in p && p.receiptType === 'Cash')
+            .reduce((sum, p) => sum + p.amount, 0);
+        
+        // Calculate RTGS/Bank payments (receiptType !== 'Cash' OR doesn't have receiptType)
+        data.totalRtgsPaid = data.allPayments
+            .filter(p => !('receiptType' in p) || ('receiptType' in p && p.receiptType !== 'Cash'))
+            .reduce((sum, p) => sum + (('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0), 0);
+        
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
+
+
+
+        data.totalOutstandingTransactions = data.allTransactions.filter(t => Number(t.netAmount || 0) >= 1).length;
+        data.averageRate = data.totalFinalWeight > 0 ? data.totalAmount / data.totalFinalWeight : 0;
+        data.averageOriginalPrice = data.totalNetWeight > 0 ? data.totalOriginalAmount / data.totalNetWeight : 0;
+        
+        // Calculate min/max rate
+        const validRates = data.allTransactions.map(t => t.rate).filter(rate => rate > 0);
+        data.minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        data.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+
+        // Calculate average karta and laboury
+        const rateData = data.allTransactions.reduce((acc, s) => {
+            if(s.rate > 0) {
+                acc.karta += s.kartaPercentage;
+                acc.laboury += s.labouryRate;
+                acc.count++;
+            }
+            return acc;
+        }, { karta: 0, laboury: 0, count: 0 });
+
+        if(rateData.count > 0) {
+            data.averageKartaPercentage = rateData.karta / rateData.count;
+            data.averageLabouryRate = rateData.laboury / rateData.count;
+        }
+
+        // Calculate variety tally
+        const varietyTally: { [key: string]: number } = {};
+        data.allTransactions.forEach(t => {
+            const variety = toTitleCase(t.variety) || 'Unknown';
+            varietyTally[variety] = (varietyTally[variety] || 0) + 1;
+        });
+        data.transactionsByVariety = varietyTally;
+        
+        // Set payment history for display
+        data.paymentHistory = data.allPayments;
+        
+        const uniqueKey = data.name + (data.so || '') + index;
+        finalSummaryMap.set(uniqueKey, data);
+    });
+
+
+
+    const millSummary = Array.from(finalSummaryMap.values()).reduce((acc, s) => {
+
+        // Aggregate all stats for the mill overview
+
+        acc.totalOriginalAmount += s.totalOriginalAmount;
+
+        acc.totalPaid += s.totalPaid;
+
+        acc.totalCashPaid += s.totalCashPaid;
+
+        acc.totalRtgsPaid += s.totalRtgsPaid;
+
+        acc.totalCdAmount! += s.totalCdAmount!;
+
+        acc.totalGrossWeight! += s.totalGrossWeight!;
+
+        acc.totalTeirWeight! += s.totalTeirWeight!;
+
+        acc.totalFinalWeight! += s.totalFinalWeight!;
+
+        acc.totalKartaWeight! += s.totalKartaWeight!;
+
+        acc.totalNetWeight! += s.totalNetWeight!;
+
+        acc.totalKartaAmount! += s.totalKartaAmount!;
+
+        acc.totalLabouryAmount! += s.totalLabouryAmount!;
+
+        acc.totalKanta! += s.totalKanta!;
+
+        acc.totalOtherCharges! += s.totalOtherCharges!;
+
+        acc.totalTransactions! += s.totalTransactions!;
+
+        acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
+
+        acc.totalAmount += s.totalAmount;
+
+        Object.entries(s.transactionsByVariety!).forEach(([variety, count]) => {
+
+            acc.transactionsByVariety![variety] = (acc.transactionsByVariety![variety] || 0) + count;
+
+        });
+
+        return acc;
+
+    }, {
+
+         name: 'Mill (Total Overview)', contact: '', so: '', address: '',
+
+        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+
+        totalOutstanding: 0, totalCdAmount: 0,
+
+        paymentHistory: [], outstandingEntryIds: [], allTransactions: [], 
+
+        allPayments: [], transactionsByVariety: {},
+
+        totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalDeductions: 0,
+
+        averageRate: 0, minRate: 0, maxRate: 0, averageOriginalPrice: 0, averageKartaPercentage: 0, averageLabouryRate: 0,
+
+        totalTransactions: 0, totalOutstandingTransactions: 0, totalBrokerage: 0, totalCd: 0,
+
+    });
+
+    
+
+    millSummary.allTransactions = finalSummaryMap.size > 0 ? Array.from(finalSummaryMap.values()).flatMap(p => p.allTransactions) : processedSuppliers;
+
+    millSummary.allPayments = finalSummaryMap.size > 0 ? Array.from(finalSummaryMap.values()).flatMap(p => p.allPayments) : paymentHistory;
+
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
+
+
+
+    // Calculate averages and min/max for mill overview
+    millSummary.averageRate = millSummary.totalFinalWeight > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight : 0;
+    millSummary.averageOriginalPrice = millSummary.totalNetWeight > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight : 0;
+    
+    const allValidRates = millSummary.allTransactions.map(s => s.rate).filter(rate => rate > 0);
+    millSummary.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
+    millSummary.maxRate = allValidRates.length > 0 ? Math.max(...allValidRates) : 0;
+
+    const totalRateData = millSummary.allTransactions.reduce((acc, s) => {
+        if(s.rate > 0) {
+            acc.karta += s.kartaPercentage;
+            acc.laboury += s.labouryRate;
+            acc.count++;
+        }
+        return acc;
+    }, { karta: 0, laboury: 0, count: 0 });
+
+    if(totalRateData.count > 0) {
+        millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
+        millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
+    }
+    
+    // Set payment history for mill overview
+    millSummary.paymentHistory = millSummary.allPayments;
+
+
+    finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
+
+    return finalSummaryMap;
+
+  }, [suppliers, paymentHistory, startDate, endDate]);
+
+
+
+  const selectedSupplierData = (selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null) as CustomerSummary | null;
+  
+  // Filter suppliers based on date range
+  const filteredSupplierOptions = useMemo(() => {
+    const allOptions = Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ 
+      value: key, 
+      label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim(),
+      data 
+    }));
+
+    // If no date range, show all
+    if (!startDate && !endDate) {
+      return allOptions;
+    }
+
+    // Filter suppliers who have transactions in the date range
+    return allOptions.filter(({ value, data }) => {
+      // Always include Mill Overview
+      if (value === MILL_OVERVIEW_KEY) return true;
+
+      const hasTransactionsInRange = data.allTransactions?.some(t => {
+        if (!t.date) return false;
+        const transactionDate = new Date(t.date);
+        
+        if (startDate && endDate) {
+          return transactionDate >= startDate && transactionDate <= endDate;
+        } else if (startDate) {
+          return transactionDate >= startDate;
+        } else if (endDate) {
+          return transactionDate <= endDate;
+        }
+        return true;
+      });
+
+      return hasTransactionsInRange;
+    });
+  }, [supplierSummaryMap, startDate, endDate]);
+
+  // Auto-switch to Mill Overview if selected supplier is not in filtered list
+  useEffect(() => {
+    if (selectedSupplierKey && !filteredSupplierOptions.some(opt => opt.value === selectedSupplierKey)) {
+      setSelectedSupplierKey(MILL_OVERVIEW_KEY);
+    }
+  }, [filteredSupplierOptions, selectedSupplierKey]);
+  
+
+  if (!isClient || loading) {
+
+    return (
+
+        <div className="flex items-center justify-center h-64">
+
+            <Loader2 className="animate-spin h-8 w-8 text-primary" />
+
+        </div>
+
+    );
+
+  }
+
+
+
+  return (
+
+    <div className="space-y-6">
+
+      <Card>
+
+        <CardContent className="p-3">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+
+                <Users className="h-5 w-5 text-primary" />
+
+                <h3 className="text-base font-semibold">Select Profile</h3>
+
+            </div>
+
+                    
+                    {/* Quick Date Filters */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                                const today = new Date();
+                                setStartDate(startOfYear(today));
+                                setEndDate(endOfYear(today));
+                            }}
+                            className="h-8 text-xs"
+                        >
+                            This Year
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                                const today = new Date();
+                                setStartDate(subDays(today, 365));
+                                setEndDate(today);
+                            }}
+                            className="h-8 text-xs"
+                        >
+                            Last 365 Days
+                        </Button>
+                        {(startDate || endDate) && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                    setStartDate(undefined);
+                                    setEndDate(undefined);
+                                }}
+                                className="h-8 text-xs"
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                 <Popover>
+
+                    <PopoverTrigger asChild>
+
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
+
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+
+                            {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+
+                        </Button>
+
+                    </PopoverTrigger>
+
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+
+                </Popover>
+
+                 <Popover>
+
+                    <PopoverTrigger asChild>
+
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
+
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+
+                            {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+
+                        </Button>
+
+                    </PopoverTrigger>
+
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+
+                </Popover>
+
+                
+
+                    <div className="w-full sm:flex-1">
+                    <CustomDropdown
+
+                            options={filteredSupplierOptions.map(({ value, label }) => ({ value, label }))}
+                        value={selectedSupplierKey}
+
+                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
+
+                        placeholder="Search and select profile..."
+
+                    />
+
+                    </div>
+                </div>
+
+            </div>
+
+        </CardContent>
+
+      </Card>
+
+
+
+      <SupplierProfileView 
+
+        selectedSupplierData={selectedSupplierData}
+
+        isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
+
+        onShowDetails={setDetailsCustomer}
+
+        onShowPaymentDetails={setSelectedPaymentForDetails}
+
+        onGenerateStatement={() => setIsStatementOpen(true)}
+
+      />
+
+
+
+      <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
+
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+
+                <StatementPreview data={selectedSupplierData} />
+
+            </ScrollArea>
+
+        </DialogContent>
+
+      </Dialog>
+
+      
+
+      <DetailsDialog 
+
+          isOpen={!!detailsCustomer}
+
+          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+
+          customer={detailsCustomer}
+
+          paymentHistory={paymentHistory}
+
+      />
+
+      
+
+      <PaymentDetailsDialog
+
+        payment={selectedPaymentForDetails}
+
+        suppliers={suppliers}
+
+        onOpenChange={() => setSelectedPaymentForDetails(null)}
+
+        onShowEntryDetails={setDetailsCustomer}
+
+      />
+
+      
+
+    </div>
+
+  );
+
+}
+

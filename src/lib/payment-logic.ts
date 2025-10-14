@@ -32,6 +32,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         rtgsQuantity, rtgsRate, rtgsAmount, supplierDetails, bankDetails,
     } = context;
 
+    console.log('🔵 Payment Logic Input:', {
+        paymentAmount,
+        calculatedCdAmount,
+        settleAmount,
+        selectedEntries: selectedEntries?.length || 0,
+        totalOutstandingForSelected
+    });
+
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
         return { success: false, message: "No supplier selected" };
     }
@@ -78,7 +86,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
-            let amountToDistribute = Math.round(totalToSettle); // Distribute based on total settlement amount
+            // Distribute total settlement amount (payment + CD) across entries
+            let amountToDistribute = Math.round(totalToSettle);
 
             for (const entry of selectedEntries) {
                 if (amountToDistribute <= 0) break;
@@ -89,7 +98,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 if (paymentForThisEntry > 0) {
                      paidForDetails.push({
                         srNo: entry.srNo,
-                        amount: paymentForThisEntry,
+                        amount: paymentForThisEntry, // This includes both payment and CD
                         supplierName: toTitleCase(entry.name),
                         supplierSo: toTitleCase(entry.so),
                         supplierContact: entry.contact,
@@ -129,6 +138,18 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         const newPaymentRef = doc(firestoreDB, "payments", paymentIdToUse);
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
+        
+        // Debug: Log payment saved
+        console.log('💰 Payment Saved:', {
+            paymentId: newPaymentRef.id,
+            amount: paymentDataBase.amount,
+            cdAmount: paymentDataBase.cdAmount,
+            totalSettle: paymentDataBase.amount + paymentDataBase.cdAmount,
+            paidFor: paymentDataBase.paidFor.map(pf => ({
+                srNo: pf.srNo,
+                amount: pf.amount
+            }))
+        });
     });
     return { success: true, payment: finalPaymentData };
 };
@@ -163,3 +184,4 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
         await db.payments.delete(paymentToDelete.id);
     }
 };
+

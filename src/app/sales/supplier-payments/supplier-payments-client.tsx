@@ -93,6 +93,13 @@ export default function SupplierPaymentsClient() {
                                                 value={hook.serialNoSearch}
                                                 onChange={(e) => hook.handleSerialNoSearch(e.target.value)}
                                                 onBlur={hook.handleSerialNoBlur}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        hook.handleSerialNoBlur();
+                                                        e.currentTarget.blur();
+                                                    }
+                                                }}
                                                 className="pl-8 h-9"
                                             />
                                         </div>

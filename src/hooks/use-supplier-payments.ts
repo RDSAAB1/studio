@@ -83,7 +83,6 @@ export const useSupplierPayments = () => {
     const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
 
     const settleAmount = form.paymentType === 'Full' ? settleAmountDerived : settleAmountManual;
-    const toBePaidAmount = form.paymentType === 'Full' ? 0 : toBePaidAmountManual; // Will be calculated below
 
     const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
@@ -102,6 +101,9 @@ export const useSupplierPayments = () => {
         }
         return toBePaidAmountManual;
     }, [form.paymentType, settleAmount, calculatedCdAmount, toBePaidAmountManual]);
+    
+    // Use finalToBePaid as the actual toBePaidAmount
+    const toBePaidAmount = finalToBePaid;
     
     const handleSettleAmountChange = (value: number) => {
         if (form.paymentType === 'Partial') {
@@ -387,17 +389,18 @@ export const useSupplierPayments = () => {
             // Find the supplier key in the summary map
             for (const [key, summary] of data.customerSummaryMap.entries()) {
                 if (summary.allTransactions?.some(t => t.srNo === supplier.srNo)) {
-                    form.setSelectedCustomerKey(key);
+                    // Use handleCustomerSelect to auto-fill payee details
+                    handleCustomerSelect(key);
                     // Auto-select this specific entry
                     const newSelection = new Set<string>();
                     newSelection.add(supplier.id);
                     form.setSelectedEntryIds(newSelection);
-                    form.setSerialNoSearch(''); // Clear search after selecting
+                    // Don't clear - keep the serial number visible
                     break;
                 }
             }
         }
-    }, [data.suppliers, data.customerSummaryMap, form]);
+    }, [data.suppliers, data.customerSummaryMap, form, handleCustomerSelect]);
 
     return {
         ...data,
