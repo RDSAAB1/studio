@@ -9,8 +9,9 @@ import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, History } from "lucide-react";
+import { Loader2, History, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,6 +85,18 @@ export default function SupplierPaymentsClient() {
                             {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
                                 <div className="mb-4">
                                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                                        {/* Serial Number Search */}
+                                        <div className="w-full md:w-[200px] relative">
+                                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Search by Serial No..."
+                                                value={hook.serialNoSearch}
+                                                onChange={(e) => hook.handleSerialNoSearch(e.target.value)}
+                                                onBlur={hook.handleSerialNoBlur}
+                                                className="pl-8 h-9"
+                                            />
+                                        </div>
+                                        
                                         <div className="flex-1">
                                             <CustomDropdown
                                                 options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} (${data.contact})` }))}

@@ -91,6 +91,8 @@ export const useSupplierPayments = () => {
         settleAmount: settleAmount,
         toBePaidAmount: settleAmount, // Use settle amount as base
         selectedEntries: selectedEntries,
+        paymentDate: form.paymentDate,
+        paymentHistory: data.paymentHistory,
     });
     
     // Derive toBePaid from settle - CD
@@ -210,9 +212,9 @@ export const useSupplierPayments = () => {
             
             setUtrNo(paymentData.utrNo || '');
             setCheckNo(paymentData.checkNo || '');
-            setSixRNo(paymentData.sixRNo || '');
-            if (paymentData.sixRDate) {
-                const sixRDateObj = new Date(paymentData.sixRDate + "T00:00:00"); 
+            setSixRNo((paymentData as any).sixRNo || '');
+            if ((paymentData as any).sixRDate) {
+                const sixRDateObj = new Date((paymentData as any).sixRDate + "T00:00:00"); 
                 setSixRDate(sixRDateObj);
             } else {
                 setSixRDate(undefined);
@@ -364,6 +366,39 @@ export const useSupplierPayments = () => {
         }
     };
     
+    // Handle serial number search with auto-format
+    const handleSerialNoSearch = useCallback((srNo: string) => {
+        form.setSerialNoSearch(srNo);
+    }, [form]);
+
+    const handleSerialNoBlur = useCallback(() => {
+        if (!form.serialNoSearch.trim()) return;
+
+        // Auto-format: if only numbers, convert to S00XXX format
+        let formattedSrNo = form.serialNoSearch.trim();
+        if (/^\d+$/.test(formattedSrNo)) {
+            formattedSrNo = `S${formattedSrNo.padStart(5, '0')}`;
+            form.setSerialNoSearch(formattedSrNo);
+        }
+
+        // Find supplier with this serial number
+        const supplier = data.suppliers.find(s => s.srNo.toLowerCase() === formattedSrNo.toLowerCase());
+        if (supplier) {
+            // Find the supplier key in the summary map
+            for (const [key, summary] of data.customerSummaryMap.entries()) {
+                if (summary.allTransactions?.some(t => t.srNo === supplier.srNo)) {
+                    form.setSelectedCustomerKey(key);
+                    // Auto-select this specific entry
+                    const newSelection = new Set<string>();
+                    newSelection.add(supplier.id);
+                    form.setSelectedEntryIds(newSelection);
+                    form.setSerialNoSearch(''); // Clear search after selecting
+                    break;
+                }
+            }
+        }
+    }, [data.suppliers, data.customerSummaryMap, form]);
+
     return {
         ...data,
         ...form,
@@ -372,6 +407,8 @@ export const useSupplierPayments = () => {
         finalAmountToBePaid: finalToBePaid,
         settleAmount, handleSettleAmountChange,
         handleToBePaidChange,
+        handleSerialNoSearch,
+        handleSerialNoBlur,
         toBePaidAmount: finalToBePaid, // Add this for compatibility
         isProcessing,
         detailsSupplierEntry,

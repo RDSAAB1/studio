@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+    const [serialNoSearch, setSerialNoSearch] = useState('');
     const [paymentId, setPaymentId] = useState('');
     const [rtgsSrNo, setRtgsSrNo] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
@@ -219,6 +220,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     return {
         selectedCustomerKey, setSelectedCustomerKey,
         selectedEntryIds, setSelectedEntryIds,
+        serialNoSearch, setSerialNoSearch,
         paymentId, setPaymentId, handlePaymentIdBlur,
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
         paymentDate, setPaymentDate,

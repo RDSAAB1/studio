@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { Input } from '@/components/ui/input';
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
@@ -27,7 +28,7 @@ import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer, Loader2, X } from "lucide-react";
+import { Users, Calendar as CalendarIcon, Download, Printer, Loader2, X, Search } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -290,6 +291,7 @@ export default function SupplierProfileClient() {
 
   const [selectedSupplierKey, setSelectedSupplierKey] = usePersistedSelection('supplier-profile-selected', MILL_OVERVIEW_KEY);
   const [selectedVariety, setSelectedVariety] = usePersistedState<string>('supplier-profile-variety-filter', 'All');
+  const [serialNoSearch, setSerialNoSearch] = useState<string>('');
   
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
@@ -631,9 +633,9 @@ export default function SupplierProfileClient() {
       totalFinalWeight: filteredTransactions.reduce((sum, t) => sum + t.weight, 0),
       totalNetWeight: filteredTransactions.reduce((sum, t) => sum + t.netWeight, 0),
       totalTransactions: filteredTransactions.length,
-      totalPaid: filteredTransactions.reduce((sum, t) => sum + ((t as any).totalPaid || 0), 0),
-      totalOutstanding: filteredTransactions.reduce((sum, t) => sum + (t.netAmount || 0), 0),
-      totalOutstandingTransactions: filteredTransactions.filter(t => (t.netAmount || 0) >= 1).length,
+      totalPaid: filteredTransactions.reduce((sum, t) => sum + (Number((t as any).totalPaid) || 0), 0),
+      totalOutstanding: filteredTransactions.reduce((sum, t) => sum + (Number(t.netAmount) || 0), 0),
+      totalOutstandingTransactions: filteredTransactions.filter(t => (Number(t.netAmount) || 0) >= 1).length,
     };
 
     filteredData.averageRate = filteredData.totalFinalWeight > 0 ? filteredData.totalAmount / filteredData.totalFinalWeight : 0;
@@ -642,6 +644,35 @@ export default function SupplierProfileClient() {
   }, [supplierSummaryMap, selectedSupplierKey, selectedVariety]);
 
   const selectedSupplierData = filteredSupplierData as CustomerSummary | null;
+
+  // Handle serial number search with auto-format
+  const handleSerialNoSearch = (srNo: string) => {
+    setSerialNoSearch(srNo);
+  };
+
+  const handleSerialNoBlur = () => {
+    if (!serialNoSearch.trim()) return;
+
+    // Auto-format: if only numbers, convert to S00XXX format
+    let formattedSrNo = serialNoSearch.trim();
+    if (/^\d+$/.test(formattedSrNo)) {
+      formattedSrNo = `S${formattedSrNo.padStart(5, '0')}`;
+      setSerialNoSearch(formattedSrNo);
+    }
+
+    // Find supplier with this serial number
+    const supplier = suppliers.find(s => s.srNo.toLowerCase() === formattedSrNo.toLowerCase());
+    if (supplier) {
+      // Find the supplier key in the summary map
+      for (const [key, summary] of supplierSummaryMap.entries()) {
+        if (key !== MILL_OVERVIEW_KEY && summary.allTransactions?.some(t => t.srNo === supplier.srNo)) {
+          setSelectedSupplierKey(key);
+          setSerialNoSearch(''); // Clear search after selecting
+          break;
+        }
+      }
+    }
+  };
   
   // Filter suppliers based on date range
   const filteredSupplierOptions = useMemo(() => {
@@ -767,12 +798,24 @@ export default function SupplierProfileClient() {
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
                 </Popover>
+
+                    {/* Serial Number Search */}
+                    <div className="w-full sm:w-[200px] relative">
+                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by Serial No..."
+                            value={serialNoSearch}
+                            onChange={(e) => handleSerialNoSearch(e.target.value)}
+                            onBlur={handleSerialNoBlur}
+                            className="pl-8 h-9"
+                        />
+                    </div>
                 
                     <div className="w-full sm:flex-1">
                     <CustomDropdown
                             options={filteredSupplierOptions.map(({ value, label }) => ({ value, label }))}
                         value={selectedSupplierKey}
-                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
+                        onChange={(value: string | null) => value && setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
                     />
                     </div>
@@ -780,12 +823,12 @@ export default function SupplierProfileClient() {
                     {/* Variety Filter - Only show for Mill Overview */}
                     {selectedSupplierKey === MILL_OVERVIEW_KEY && (
                         <div className="w-full sm:w-[200px]">
-                            <CustomDropdown
-                                options={availableVarieties.map(v => ({ value: v, label: v }))}
-                                value={selectedVariety}
-                                onChange={(value: string | null) => setSelectedVariety(value || 'All')}
-                                placeholder="Filter by variety..."
-                            />
+                        <CustomDropdown
+                            options={availableVarieties.map(v => ({ value: v, label: v }))}
+                            value={selectedVariety}
+                            onChange={(value: string | null) => setSelectedVariety((value || 'All') as string)}
+                            placeholder="Filter by variety..."
+                        />
                         </div>
                     )}
                 </div>
