@@ -289,6 +289,7 @@ export default function SupplierProfileClient() {
 
 
   const [selectedSupplierKey, setSelectedSupplierKey] = usePersistedSelection('supplier-profile-selected', MILL_OVERVIEW_KEY);
+  const [selectedVariety, setSelectedVariety] = usePersistedState<string>('supplier-profile-variety-filter', 'All');
   
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
@@ -591,7 +592,56 @@ export default function SupplierProfileClient() {
     return finalSummaryMap;
   }, [suppliers, paymentHistory, startDate, endDate]);
 
-  const selectedSupplierData = (selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null) as CustomerSummary | null;
+  // Get all unique varieties from suppliers for filter
+  const availableVarieties = useMemo(() => {
+    const varieties = new Set<string>();
+    suppliers.forEach(s => {
+      const variety = toTitleCase(s.variety) || 'Unknown';
+      varieties.add(variety);
+    });
+    return ['All', ...Array.from(varieties).sort()];
+  }, [suppliers]);
+
+  // Filter supplier data based on selected variety (only for Mill Overview)
+  const filteredSupplierData = useMemo(() => {
+    if (!selectedSupplierKey || selectedSupplierKey !== MILL_OVERVIEW_KEY || selectedVariety === 'All') {
+      return selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
+    }
+
+    // Filter Mill Overview data by variety
+    const millData = supplierSummaryMap.get(MILL_OVERVIEW_KEY);
+    if (!millData) return null;
+
+    const filteredTransactions = millData.allTransactions?.filter(t => {
+      const variety = toTitleCase(t.variety) || 'Unknown';
+      return variety === selectedVariety;
+    }) || [];
+
+    // Recalculate totals for filtered data
+    const filteredData: CustomerSummary = {
+      ...millData,
+      allTransactions: filteredTransactions,
+      totalOriginalAmount: filteredTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0),
+      totalAmount: filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
+      totalBrokerage: filteredTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0),
+      totalCd: filteredTransactions.reduce((sum, t) => sum + (t.cd || 0), 0),
+      totalOtherCharges: filteredTransactions.reduce((sum, t) => sum + (t.advanceFreight || 0), 0),
+      totalGrossWeight: filteredTransactions.reduce((sum, t) => sum + t.grossWeight, 0),
+      totalTeirWeight: filteredTransactions.reduce((sum, t) => sum + t.teirWeight, 0),
+      totalFinalWeight: filteredTransactions.reduce((sum, t) => sum + t.weight, 0),
+      totalNetWeight: filteredTransactions.reduce((sum, t) => sum + t.netWeight, 0),
+      totalTransactions: filteredTransactions.length,
+      totalPaid: filteredTransactions.reduce((sum, t) => sum + ((t as any).totalPaid || 0), 0),
+      totalOutstanding: filteredTransactions.reduce((sum, t) => sum + (t.netAmount || 0), 0),
+      totalOutstandingTransactions: filteredTransactions.filter(t => (t.netAmount || 0) >= 1).length,
+    };
+
+    filteredData.averageRate = filteredData.totalFinalWeight > 0 ? filteredData.totalAmount / filteredData.totalFinalWeight : 0;
+    
+    return filteredData;
+  }, [supplierSummaryMap, selectedSupplierKey, selectedVariety]);
+
+  const selectedSupplierData = filteredSupplierData as CustomerSummary | null;
   
   // Filter suppliers based on date range
   const filteredSupplierOptions = useMemo(() => {
@@ -726,6 +776,18 @@ export default function SupplierProfileClient() {
                         placeholder="Search and select profile..."
                     />
                     </div>
+
+                    {/* Variety Filter - Only show for Mill Overview */}
+                    {selectedSupplierKey === MILL_OVERVIEW_KEY && (
+                        <div className="w-full sm:w-[200px]">
+                            <CustomDropdown
+                                options={availableVarieties.map(v => ({ value: v, label: v }))}
+                                value={selectedVariety}
+                                onChange={(value: string | null) => setSelectedVariety(value || 'All')}
+                                placeholder="Filter by variety..."
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         </CardContent>

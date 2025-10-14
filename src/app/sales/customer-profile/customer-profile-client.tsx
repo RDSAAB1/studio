@@ -33,6 +33,7 @@ export default function CustomerProfileClient() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = usePersistedSelection('customer-profile-selected', MILL_OVERVIEW_KEY);
+  const [selectedVariety, setSelectedVariety] = usePersistedState<string>('customer-profile-variety-filter', 'All');
   
   const [detailsCustomer, setDetailsCustomer] = useState<any | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
@@ -199,7 +200,56 @@ export default function CustomerProfileClient() {
     return finalSummaryMap;
   }, [filteredData]);
 
-  const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
+  // Get all unique varieties from customers for filter
+  const availableVarieties = useMemo(() => {
+    const varieties = new Set<string>();
+    customers.forEach(c => {
+      const variety = toTitleCase(c.variety) || 'Unknown';
+      varieties.add(variety);
+    });
+    return ['All', ...Array.from(varieties).sort()];
+  }, [customers]);
+
+  // Filter customer data based on selected variety (only for Mill Overview)
+  const filteredCustomerData = useMemo(() => {
+    if (!selectedCustomerKey || selectedCustomerKey !== MILL_OVERVIEW_KEY || selectedVariety === 'All') {
+      return selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
+    }
+
+    // Filter Mill Overview data by variety
+    const millData = customerSummaryMap.get(MILL_OVERVIEW_KEY);
+    if (!millData) return null;
+
+    const filteredTransactions = millData.allTransactions?.filter(t => {
+      const variety = toTitleCase(t.variety) || 'Unknown';
+      return variety === selectedVariety;
+    }) || [];
+
+    // Recalculate totals for filtered data
+    const filteredData: CustomerSummary = {
+      ...millData,
+      allTransactions: filteredTransactions,
+      totalOriginalAmount: filteredTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0),
+      totalAmount: filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
+      totalBrokerage: filteredTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0),
+      totalCd: filteredTransactions.reduce((sum, t) => sum + (t.cd || 0), 0),
+      totalOtherCharges: filteredTransactions.reduce((sum, t) => sum + (t.advanceFreight || 0), 0),
+      totalGrossWeight: filteredTransactions.reduce((sum, t) => sum + t.grossWeight, 0),
+      totalTeirWeight: filteredTransactions.reduce((sum, t) => sum + t.teirWeight, 0),
+      totalFinalWeight: filteredTransactions.reduce((sum, t) => sum + t.weight, 0),
+      totalNetWeight: filteredTransactions.reduce((sum, t) => sum + t.netWeight, 0),
+      totalTransactions: filteredTransactions.length,
+      totalPaid: filteredTransactions.reduce((sum, t) => sum + ((t as any).totalPaid || 0), 0),
+      totalOutstanding: filteredTransactions.reduce((sum, t) => sum + (t.netAmount || 0), 0),
+      totalOutstandingTransactions: filteredTransactions.filter(t => (t.netAmount || 0) >= 1).length,
+    };
+
+    filteredData.averageRate = filteredData.totalFinalWeight > 0 ? filteredData.totalAmount / filteredData.totalFinalWeight : 0;
+    
+    return filteredData;
+  }, [customerSummaryMap, selectedCustomerKey, selectedVariety]);
+
+  const selectedCustomerData = filteredCustomerData as CustomerSummary | null;
   
   if (!isClient) {
     return (
@@ -226,7 +276,7 @@ export default function CustomerProfileClient() {
                     <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{endDate ? format(endDate, "PPP") : <span>End Date</span>}</Button></PopoverTrigger>
                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} /></PopoverContent>
                 </Popover>
-                <div className="w-full sm:w-[300px]">
+                <div className="w-full sm:flex-1">
                     <CustomDropdown
                         options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.companyName ? `(${data.companyName})` : ''}`.trim() }))}
                         value={selectedCustomerKey}
@@ -234,6 +284,18 @@ export default function CustomerProfileClient() {
                         placeholder="Search and select profile..."
                     />
                 </div>
+
+                {/* Variety Filter - Only show for Mill Overview */}
+                {selectedCustomerKey === MILL_OVERVIEW_KEY && (
+                    <div className="w-full sm:w-[200px]">
+                        <CustomDropdown
+                            options={availableVarieties.map(v => ({ value: v, label: v }))}
+                            value={selectedVariety}
+                            onChange={(value: string | null) => setSelectedVariety(value || 'All')}
+                            placeholder="Filter by variety..."
+                        />
+                    </div>
+                )}
             </div>
         </CardContent>
       </Card>
