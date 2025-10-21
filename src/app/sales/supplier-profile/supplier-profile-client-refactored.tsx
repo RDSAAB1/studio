@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { useToast } from '@/hooks/use-toast';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 // UI Components
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -22,6 +23,10 @@ import { useSupplierFiltering } from "./hooks/use-supplier-filtering";
 
 export default function SupplierProfileClient() {
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedSupplierKey, setSelectedSupplierKey] = usePersistedSelection('selectedSupplierKey', null);
   const [startDate, setStartDate] = usePersistedState<Date | undefined>('startDate', undefined);
   const [endDate, setEndDate] = usePersistedState<Date | undefined>('endDate', undefined);
@@ -29,10 +34,7 @@ export default function SupplierProfileClient() {
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [serialNoSearch, setSerialNoSearch] = useState('');
-  const [selectedVariety, setSelectedVariety] = usePersistedSelection('selectedVariety', null as string | null);
-
-  // Use the existing hook for data loading
-  const { suppliers, paymentHistory, loading } = useSupplierData();
+  const [selectedVariety, setSelectedVariety] = usePersistedSelection('selectedVariety', null);
 
   // Use custom hooks for data processing
   const { supplierSummaryMap, MILL_OVERVIEW_KEY } = useSupplierSummary(
@@ -45,7 +47,7 @@ export default function SupplierProfileClient() {
   const { filteredSupplierOptions } = useSupplierFiltering(
     supplierSummaryMap,
     selectedSupplierKey,
-    setSelectedSupplierKey as (key: string | null) => void,
+    setSelectedSupplierKey,
     startDate,
     endDate,
     MILL_OVERVIEW_KEY
@@ -57,7 +59,7 @@ export default function SupplierProfileClient() {
     if (!selectedData || !selectedVariety) return selectedData;
 
     const filteredTransactions = selectedData.allTransactions?.filter(t => 
-      t.variety?.toLowerCase() === (selectedVariety as string)?.toLowerCase()
+      t.variety?.toLowerCase() === selectedVariety.toLowerCase()
     ) || [];
 
     const filteredPayments = selectedData.allPayments?.filter(p => 
@@ -82,11 +84,11 @@ export default function SupplierProfileClient() {
     filteredData.totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
     filteredData.totalKanta = filteredTransactions.reduce((sum, t) => sum + (t.kanta || 0), 0);
     filteredData.totalOtherCharges = filteredTransactions.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
-    filteredData.totalDeductions = filteredTransactions.reduce((sum, t) => sum + ((t as any).deductions || 0), 0);
+    filteredData.totalDeductions = filteredTransactions.reduce((sum, t) => sum + (t.deductions || 0), 0);
     filteredData.totalPaid = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
     filteredData.totalCashPaid = filteredPayments.filter(p => p.type === 'cash').reduce((sum, p) => sum + p.amount, 0);
     filteredData.totalRtgsPaid = filteredPayments.filter(p => p.type === 'rtgs').reduce((sum, p) => sum + p.amount, 0);
-    filteredData.totalCdAmount = filteredPayments.reduce((sum, p) => sum + ((p as any).cdAmount || 0), 0);
+    filteredData.totalCdAmount = filteredPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
     filteredData.totalOutstanding = filteredData.totalOriginalAmount - filteredData.totalPaid;
     filteredData.totalTransactions = filteredTransactions.length;
     filteredData.totalOutstandingTransactions = filteredTransactions.filter(t => {
@@ -98,7 +100,7 @@ export default function SupplierProfileClient() {
       return totalPaidForEntry < (t.amount || 0);
     }).length;
     filteredData.totalBrokerage = filteredTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0);
-    filteredData.totalCd = filteredPayments.reduce((sum, p) => sum + ((p as any).cdAmount || 0), 0);
+    filteredData.totalCd = filteredPayments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
 
     // Group transactions by variety
     filteredData.transactionsByVariety = filteredTransactions.reduce((acc, t) => {
@@ -152,7 +154,7 @@ export default function SupplierProfileClient() {
     const matchingSupplier = suppliers.find(s => s.srNo === formattedSrNo);
     if (matchingSupplier) {
       const supplierKey = `${matchingSupplier.name}_${matchingSupplier.contact}`.trim();
-      setSelectedSupplierKey(supplierKey as any);
+      setSelectedSupplierKey(supplierKey);
       toast({
         title: "Supplier Found",
         description: `Selected ${matchingSupplier.name}`,
@@ -166,7 +168,36 @@ export default function SupplierProfileClient() {
     }
   };
 
-  if (loading) {
+  // Load data on component mount
+  useEffect(() => {
+    setIsClient(true);
+    
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [suppliersData, paymentsData] = await Promise.all([
+          getSuppliersRealtime(),
+          getPaymentsRealtime()
+        ]);
+        
+        setSuppliers(suppliersData);
+        setPaymentHistory(paymentsData);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load supplier data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [toast]);
+
+  if (!isClient || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="animate-spin h-8 w-8 text-primary" />
@@ -182,15 +213,15 @@ export default function SupplierProfileClient() {
         setStartDate={setStartDate}
         setEndDate={setEndDate}
         selectedSupplierKey={selectedSupplierKey}
-        setSelectedSupplierKey={setSelectedSupplierKey as (key: string | null) => void}
+        setSelectedSupplierKey={setSelectedSupplierKey}
         filteredSupplierOptions={filteredSupplierOptions}
       />
       
       <SupplierProfileView 
         selectedSupplierData={selectedSupplierData}
         isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
-        onShowDetails={setDetailsCustomer as any}
-        onShowPaymentDetails={setSelectedPaymentForDetails as any}
+        onShowDetails={setDetailsCustomer}
+        onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
       />
       
@@ -205,7 +236,7 @@ export default function SupplierProfileClient() {
       <DetailsDialog 
         isOpen={!!detailsCustomer}
         onOpenChange={(open) => !open && setDetailsCustomer(null)}
-        customer={detailsCustomer as any}
+        customer={detailsCustomer}
         paymentHistory={paymentHistory}
       />
       
