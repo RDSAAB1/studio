@@ -241,7 +241,8 @@ export const useSupplierData = () => {
                         totalPaid: transaction.totalPaid,
                         totalCd: transaction.totalCd,
                         netAmount: transaction.netAmount,
-                        paymentsCount: paymentsForThisEntry.length
+                        paymentsCount: paymentsForThisEntry.length,
+                        paymentsWithCD: paymentsForThisEntry.filter(p => p.cdApplied && p.cdAmount).length
                     });
                 }
         });

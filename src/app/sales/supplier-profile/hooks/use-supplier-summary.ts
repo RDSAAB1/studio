@@ -111,11 +111,15 @@ export const useSupplierSummary = (
         ...s,
         totalPaidForEntry,
         totalCdForEntry,
+        totalCd: totalCdForEntry, // Map totalCdForEntry to totalCd for compatibility
+        totalPaid: totalPaidForEntry - totalCdForEntry, // Actual payment without CD (for compatibility)
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
         paymentsForEntry,
         // Calculate outstanding for this specific purchase (excluding CD)
         outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
+        // Set netAmount for compatibility with payment logic
+        netAmount: (s.originalNetAmount || 0) - totalPaidForEntry,
       };
     });
 

@@ -26,7 +26,8 @@ export const TransactionTable = React.memo(({ suppliers, onShowDetails, selected
             totalPaid: suppliers[0].totalPaid,
             totalCd: suppliers[0].totalCd,
             netAmount: suppliers[0].netAmount,
-            originalNetAmount: suppliers[0].originalNetAmount
+            originalNetAmount: suppliers[0].originalNetAmount,
+            allKeys: Object.keys(suppliers[0])
         });
     }
 

@@ -72,6 +72,16 @@ export const useCashDiscount = ({
 
     // 5. Final Calculated CD Amount (Memoized)
     const calculatedCdAmount = useMemo(() => {
+        console.log('CD Calculation:', {
+            cdEnabled,
+            cdPercent,
+            cdAt,
+            toBePaidAmount,
+            totalOutstanding,
+            selectedEntriesCount: selectedEntries.length,
+            totalCdOnSelectedEntries
+        });
+        
         if (!cdEnabled || cdPercent <= 0) {
             return 0;
         }
@@ -92,24 +102,73 @@ export const useCashDiscount = ({
                 return Math.max(0, remainingCD);
             }
              case 'on_previously_paid_no_cd': {
-                if (!selectedCustomerKey) return 0;
+                console.log('4th Option - On Paid Amount (No CD) - Starting calculation:', {
+                    selectedCustomerKey,
+                    selectedEntriesCount: selectedEntries.length,
+                    selectedEntries: selectedEntries.map(e => e.srNo),
+                    paymentHistoryLength: paymentHistory.length,
+                    cdEnabled,
+                    cdPercent
+                });
                 
-                // Find all payments for the selected supplier/customer profile
-                const paymentsForThisCustomer = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+                if (!selectedCustomerKey || selectedEntries.length === 0) {
+                    console.log('4th Option - No selectedCustomerKey or selectedEntries, returning 0');
+                    return 0;
+                }
+                
+                // Get all serial numbers from selected entries
+                const selectedSrNos = selectedEntries.map(e => e.srNo);
+                console.log('4th Option - Selected Serial Numbers:', selectedSrNos);
+                
+                // Find all payments that were made for these specific serial numbers
+                const paymentsForSelectedEntries = paymentHistory.filter(p => 
+                    p.paidFor && p.paidFor.some(pf => selectedSrNos.includes(pf.srNo))
+                );
+                
+                console.log('4th Option - Payments for selected entries:', {
+                    totalPayments: paymentsForSelectedEntries.length,
+                    payments: paymentsForSelectedEntries.map(p => ({
+                        id: p.id,
+                        amount: p.amount,
+                        cdApplied: p.cdApplied,
+                        cdAmount: p.cdAmount,
+                        paidFor: p.paidFor?.map(pf => ({
+                            srNo: pf.srNo,
+                            amount: pf.amount
+                        }))
+                    }))
+                });
                 
                 // Filter those payments to find ones where no CD was applied
-                const previousPaymentsWithoutCD = paymentsForThisCustomer.filter(p => 
+                const previousPaymentsWithoutCD = paymentsForSelectedEntries.filter(p => 
                     !p.cdApplied || p.cdAmount === 0
                 );
                 
-                // Sum the amounts of those payments
-                baseAmountForCd = previousPaymentsWithoutCD.reduce((sum, p) => sum + p.amount, 0);
+                // Calculate the total amount paid for selected entries without CD
+                let totalPaidWithoutCD = 0;
+                previousPaymentsWithoutCD.forEach(payment => {
+                    payment.paidFor?.forEach(pf => {
+                        if (selectedSrNos.includes(pf.srNo)) {
+                            totalPaidWithoutCD += pf.amount;
+                        }
+                    });
+                });
+                
+                baseAmountForCd = totalPaidWithoutCD;
                 
                 // Debug log
-                console.log('CD on previously paid (no CD):', {
-                    selectedCustomerKey,
-                    totalPaymentsForCustomer: paymentsForThisCustomer.length,
+                console.log('4th Option - CD on previously paid (no CD):', {
+                    selectedSrNos,
+                    totalPaymentsForEntries: paymentsForSelectedEntries.length,
                     paymentsWithoutCD: previousPaymentsWithoutCD.length,
+                    paymentsWithoutCDDetails: previousPaymentsWithoutCD.map(p => ({
+                        id: p.id,
+                        amount: p.amount,
+                        cdApplied: p.cdApplied,
+                        cdAmount: p.cdAmount,
+                        paidFor: p.paidFor?.filter(pf => selectedSrNos.includes(pf.srNo))
+                    })),
+                    totalPaidWithoutCD,
                     baseAmountForCd,
                     cdPercent,
                     calculatedCD: (baseAmountForCd * cdPercent) / 100
