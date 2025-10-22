@@ -59,20 +59,26 @@ export const useSupplierSummary = (
           const totalPaidForAmount = payment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
           const proportion = totalPaidForAmount > 0 ? paidForThisPurchase.amount / totalPaidForAmount : 0;
           
-          // Calculate actual payment amount for this purchase (excluding CD)
-          const actualPaymentAmount = (payment.amount - (payment.cdAmount || 0)) * proportion;
-          
-          // Split by payment type (cash/rtgs) - use receiptType field
+          // Calculate payment amount based on type
           const receiptType = payment.receiptType?.toLowerCase();
+          let actualPaymentAmount;
+          
           if (receiptType === 'cash') {
+            // For cash payments, deduct CD amount
+            actualPaymentAmount = (payment.amount - (payment.cdAmount || 0)) * proportion;
             totalCashPaidForEntry += actualPaymentAmount;
           } else if (receiptType === 'rtgs') {
+            // For RTGS payments, use rtgsAmount if available, otherwise use amount
+            const rtgsPaymentAmount = payment.rtgsAmount || payment.amount;
+            actualPaymentAmount = rtgsPaymentAmount * proportion;
             totalRtgsPaidForEntry += actualPaymentAmount;
             // Debug: Log RTGS payment details
             console.log('RTGS Payment:', {
               paymentId: payment.paymentId || payment.id,
               receiptType: payment.receiptType,
               paymentAmount: payment.amount,
+              rtgsAmount: payment.rtgsAmount,
+              usedAmount: rtgsPaymentAmount,
               cdAmount: payment.cdAmount,
               paidForAmount: paidForThisPurchase.amount,
               totalPaidForAmount: totalPaidForAmount,
@@ -112,14 +118,14 @@ export const useSupplierSummary = (
         totalPaidForEntry,
         totalCdForEntry,
         totalCd: totalCdForEntry, // Map totalCdForEntry to totalCd for compatibility
-        totalPaid: totalPaidForEntry - totalCdForEntry, // Actual payment without CD (for compatibility)
+        totalPaid: totalCashPaidForEntry + totalRtgsPaidForEntry, // Actual payment without CD (for compatibility)
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
         paymentsForEntry,
-        // Calculate outstanding for this specific purchase (excluding CD)
-        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
-        // Set netAmount for compatibility with payment logic
-        netAmount: (s.originalNetAmount || 0) - totalPaidForEntry,
+        // Calculate outstanding for this specific purchase (including CD deduction)
+        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
+        // Set netAmount for compatibility with payment logic (including CD deduction)
+        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
       };
     });
 
@@ -151,7 +157,7 @@ export const useSupplierSummary = (
         totalCashPaid: groupSuppliers.reduce((sum, s) => sum + s.totalCashPaidForEntry, 0),
         totalRtgsPaid: groupSuppliers.reduce((sum, s) => sum + s.totalRtgsPaidForEntry, 0),
         totalCdAmount: groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0),
-        totalOutstanding: groupSuppliers.reduce((sum, s) => sum + s.outstandingForEntry, 0),
+        totalOutstanding: groupSuppliers.filter(s => s.outstandingForEntry > 0).reduce((sum, s) => sum + s.outstandingForEntry, 0),
         paymentHistory: groupSuppliers.flatMap(s => s.paymentsForEntry),
         outstandingEntryIds: groupSuppliers.filter(s => s.outstandingForEntry > 0).map(s => s.srNo),
         allTransactions: groupSuppliers,

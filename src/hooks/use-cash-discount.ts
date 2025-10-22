@@ -35,10 +35,26 @@ export const useCashDiscount = ({
     selectedCustomerKey,
 }: UseCashDiscountProps) => {
     
-    // 1. State Management
+    // 1. State Management with Persistence
     const [cdEnabled, setCdEnabled] = useState(false);
-    const [cdPercent, setCdPercent] = useState(2); // Default 2%
+    
+    // CD Percent with localStorage persistence
+    const [cdPercent, setCdPercent] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('cdPercent');
+            return saved ? parseFloat(saved) : 2; // Default 2%
+        }
+        return 2;
+    });
+    
     const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount' | 'on_previously_paid_no_cd'>('on_full_amount'); // Changed to on_full_amount for proper CD tracking
+
+    // Save CD percent to localStorage when it changes
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cdPercent', cdPercent.toString());
+        }
+    }, [cdPercent]);
 
     // 2. Eligibility Check (Memoized)
     const eligibleForCd = useMemo(() => {

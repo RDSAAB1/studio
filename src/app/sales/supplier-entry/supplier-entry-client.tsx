@@ -228,12 +228,21 @@ export default function SupplierEntryClient() {
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
       newState.srNo = formatSrNo(nextSrNum, 'S');
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      newState.date = format(today, 'yyyy-MM-dd');
-      newState.dueDate = format(today, 'yyyy-MM-dd');
+      
+      // Use persistent date from localStorage, fallback to today
+      let persistentDate = new Date();
+      if (typeof window !== 'undefined') {
+        const savedDate = localStorage.getItem('supplierEntryDate');
+        if (savedDate) {
+          persistentDate = new Date(savedDate);
+        }
+      }
+      persistentDate.setHours(0,0,0,0);
+      
+      newState.date = format(persistentDate, 'yyyy-MM-dd');
+      newState.dueDate = format(persistentDate, 'yyyy-MM-dd');
       resetFormToState(newState);
-      form.setValue('date', new Date()); // Set today's date
+      form.setValue('date', persistentDate); // Set persistent date
       setTimeout(() => form.setFocus('srNo'), 50);
   }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
@@ -242,6 +251,16 @@ export default function SupplierEntryClient() {
       setIsClient(true);
     }
   }, []);
+
+  // Save date to localStorage when it changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'date' && value.date && typeof window !== 'undefined') {
+        localStorage.setItem('supplierEntryDate', value.date.toISOString());
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
   
   useEffect(() => {
     if (suppliers !== undefined) {

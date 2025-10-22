@@ -373,9 +373,10 @@ export const useSupplierPayments = () => {
             }
 
             toast({ title: `Payment processed successfully.`, variant: 'success' });
-            if (form.paymentMethod === 'RTGS' && result.payment) {
-                setRtgsReceiptData(result.payment);
-            }
+            // RTGS receipt dialog disabled - receipt window should not open automatically
+            // if (form.paymentMethod === 'RTGS' && result.payment) {
+            //     setRtgsReceiptData(result.payment);
+            // }
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
             handleSettleAmountChange(0); 
             handleToBePaidChange(0);

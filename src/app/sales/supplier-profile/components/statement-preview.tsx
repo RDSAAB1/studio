@@ -34,34 +34,95 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
         console.log('Deduplicated Payments:', deduplicatedPayments.length);
         
         const mappedTransactions = allTransactions.map(t => {
-            const quantity = t.finalWeight || t.netWeight || t.weight || 0;
+            const quantity = t.netWeight || t.weight || 0;
             const formattedQuantity = typeof quantity === 'number' ? quantity.toFixed(2) : quantity;
             
             return {
                 date: t.date,
-                particulars: `PRCH: SR#${t.srNo} | Qty:${formattedQuantity} | Rate:₹${t.rate || 0} | Lab:₹${t.labouryAmount || 0} | Karta:₹${t.kartaAmount || 0} | Net:₹${t.originalNetAmount || 0}`,
+                particulars: `PRCH\n${t.srNo}\nQty:${formattedQuantity} | Rate:₹${t.rate || 0} | Net:₹${t.originalNetAmount || 0}`,
                 debit: t.originalNetAmount || 0,
                 credit: 0,
             };
         });
 
         const mappedPayments = deduplicatedPayments.map(p => {
+            // Debug: Log current payment
+            console.log('Processing Payment:', {
+                paymentId: p.paymentId || p.id,
+                date: p.date,
+                amount: p.amount,
+                rtgsAmount: (p as any).rtgsAmount,
+                cdAmount: (p as any).cdAmount,
+                paidFor: p.paidFor?.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount }))
+            });
+            
             // Group all purchases this payment was made for into one entry
-            const paidForDetails = p.paidFor?.map(pf => {
+            const paidForDetails = p.paidFor?.map((pf: any) => {
                 const purchase = allTransactions.find(t => t.srNo === pf.srNo);
                 const originalAmount = purchase?.originalNetAmount || 0;
                 const paidAmount = pf.amount;
-                const outstanding = originalAmount - paidAmount;
-                return `SR#${pf.srNo}(Orig:₹${originalAmount}, Paid:₹${paidAmount}, Bal:₹${outstanding})`;
-            }).join(', ') || 'Unknown Purchase';
+                
+                // Calculate CD portion for this entry
+                const cdPortionForThisEntry = (p as any).cdAmount && p.paidFor ? 
+                    (pf.amount / p.paidFor.reduce((sum: any, pf: any) => sum + pf.amount, 0)) * (p as any).cdAmount : 0;
+                const actualPaymentForThisEntry = paidAmount - cdPortionForThisEntry;
+                
+                // Calculate previously paid amount (all payments before this one)
+               // Calculate previously paid amount for this specific purchase entry
+               let previouslyPaid = 0;
+               const previousPaymentsForThisEntry: any[] = [];
+               deduplicatedPayments.forEach(prevPayment => {
+                   if (new Date(prevPayment.date) < new Date(p.date)) {
+                       const prevPaidForThisEntry = prevPayment.paidFor?.find((prevPf: any) => prevPf.srNo === pf.srNo);
+                       if (prevPaidForThisEntry) {
+                           // Calculate the proportion of CD for this specific entry
+                           const totalPaidForThisPayment = prevPayment.paidFor?.reduce((sum: any, pf: any) => sum + pf.amount, 0) || 0;
+                           const cdPortionForThisEntry = (prevPayment as any).cdAmount && totalPaidForThisPayment > 0 ? 
+                               (prevPaidForThisEntry.amount / totalPaidForThisPayment) * (prevPayment as any).cdAmount : 0;
+                           
+                           const actualPrevPayment = prevPaidForThisEntry.amount - cdPortionForThisEntry;
+                           previouslyPaid += actualPrevPayment;
+                           
+                           previousPaymentsForThisEntry.push({
+                               paymentId: prevPayment.paymentId || prevPayment.id,
+                               date: prevPayment.date,
+                               amount: prevPaidForThisEntry.amount,
+                               cdPortion: cdPortionForThisEntry,
+                               actualPayment: actualPrevPayment
+                           });
+                       }
+                   }
+               });
+               
+               // Debug: Log previously paid calculation for this entry
+               if (previousPaymentsForThisEntry.length > 0) {
+                   console.log(`Previously Paid for ${pf.srNo}:`, {
+                       totalPreviouslyPaid: previouslyPaid,
+                       previousPayments: previousPaymentsForThisEntry as any[]
+                   });
+               }
+                
+                const remaining = originalAmount - previouslyPaid - actualPaymentForThisEntry - cdPortionForThisEntry;
+                
+                return `${pf.srNo}(Orig:₹${originalAmount}, Prev:₹${Math.round(previouslyPaid)}, Now:₹${Math.round(actualPaymentForThisEntry)}, Bal:₹${Math.round(remaining)})`;
+            }).join('\n') || 'Unknown Purchase';
+            
+            // Use rtgsAmount for RTGS payments, otherwise use amount - cdAmount
+            const actualPaymentAmount = p.receiptType?.toLowerCase() === 'rtgs' && (p as any).rtgsAmount 
+                ? (p as any).rtgsAmount 
+                : p.amount - ((p as any).cdAmount || 0);
+            
+            // Format particulars with proper line breaks
+            const paymentType = p.receiptType || p.type;
+            const particulars = `PAY: ${paymentType}\nAgainst:\n${paidForDetails}`;
             
             return {
                 date: p.date,
-                particulars: `PAY: ${p.receiptType || p.type} | Against: ${paidForDetails}`,
+                particulars: particulars,
                 debit: 0,
-                creditPaid: p.amount - (p.cdAmount || 0), // Actual payment amount (excluding CD)
-                creditCd: p.cdAmount || 0, // CD amount
-                credit: p.amount - (p.cdAmount || 0), // Total credit (excluding CD for balance calculation)
+                creditPaid: actualPaymentAmount, // Use rtgsAmount for RTGS, otherwise amount - CD
+                creditCd: (p as any).cdAmount || 0, // CD amount
+                credit: actualPaymentAmount + ((p as any).cdAmount || 0), // Total credit (including CD for balance calculation)
             };
         });
 
@@ -93,10 +154,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             <style>
                                 body { font-family: Arial, sans-serif; margin: 20px; }
                                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
                                 th { background-color: #f2f2f2; }
                                 .header { text-align: center; margin-bottom: 20px; }
                                 .summary { margin-top: 20px; }
+                                .particulars-column { width: 50%; font-size: 10px; line-height: 1.2; white-space: pre-line; }
+                                .amount-columns { width: 12.5%; font-size: 11px; text-align: right; }
+                                .date-column { width: 10%; font-size: 11px; }
                             </style>
                         </head>
                         <body>
@@ -146,24 +210,24 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             const balance = transactions.slice(0, index + 1).reduce((sum, t) => sum + t.debit - t.credit, 0);
                             return (
                                 <tr key={index} className="hover:bg-gray-50">
-                                    <td className="border border-gray-300 px-2 py-1 text-xs">
+                                    <td className="border border-gray-300 px-2 py-1 text-xs date-column">
                                         {new Date(transaction.date).toLocaleDateString()}
                                     </td>
-                                    <td className="border border-gray-300 px-2 py-1 text-xs">
-                                        <div className="max-w-xs truncate" title={transaction.particulars}>
+                                    <td className="border border-gray-300 px-2 py-1 text-xs particulars-column">
+                                        <div className="whitespace-pre-line text-xs leading-tight" title={transaction.particulars}>
                                             {transaction.particulars}
                                         </div>
                                     </td>
-                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">
+                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs amount-columns">
                                         {transaction.debit > 0 ? formatCurrency(transaction.debit) : '-'}
                                     </td>
-                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">
+                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs amount-columns">
                                         {(transaction as any).creditPaid > 0 ? formatCurrency((transaction as any).creditPaid) : '-'}
                                     </td>
-                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">
+                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs amount-columns">
                                         {(transaction as any).creditCd > 0 ? formatCurrency((transaction as any).creditCd) : '-'}
                                     </td>
-                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs font-medium">
+                                    <td className="border border-gray-300 px-2 py-1 text-right text-xs font-medium amount-columns">
                                         {formatCurrency(balance)}
                                     </td>
                                 </tr>

@@ -66,7 +66,7 @@ export const SupplierProfileView = ({
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
         return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
+          { name: 'Total Paid', value: selectedSupplierData.totalPaid },
           { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
       }, [selectedSupplierData]);
