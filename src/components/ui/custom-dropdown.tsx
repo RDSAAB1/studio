@@ -38,14 +38,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        // Only update search term if a valid selection is made and it differs
+        // Only update search term if a valid selection is made and user is not actively typing
         // This prevents overwriting user's typing
-        if (selectedItem) {
+        if (selectedItem && !isOpen) {
             setSearchTerm(selectedItem.label);
-        } else if (!value) {
+        } else if (!value && !isOpen) {
             setSearchTerm('');
         }
-    }, [value, selectedItem]);
+    }, [value, selectedItem, isOpen]);
     
     const filteredItems = useMemo(() => {
         if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
@@ -71,6 +71,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
+            // Only reset search term if we have a valid selection
             if (selectedItem) {
                 setSearchTerm(selectedItem.label);
             } else if (value) {
@@ -80,12 +81,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                  } else {
                     setSearchTerm(value);
                  }
-            } else {
-                setSearchTerm('');
-                onChange(null); // Clear value if nothing valid is selected
             }
+            // Don't clear the value automatically - let user decide
         }
-    }, [selectedItem, value, options, onChange]);
+    }, [selectedItem, value, options]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);

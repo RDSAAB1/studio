@@ -18,7 +18,6 @@ import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profi
 import { StatementPreview } from "./components/statement-preview";
 import { SupplierProfileHeader } from "./components/supplier-profile-header";
 import { SupplierGroupingInfo } from "./components/supplier-grouping-info";
-import { PurchasePaymentDetails } from "./components/purchase-payment-details";
 import { useSupplierSummary } from "./hooks/use-supplier-summary";
 import { useSupplierFiltering } from "./hooks/use-supplier-filtering";
 import { useSupplierGrouping } from "./hooks/use-supplier-grouping";
@@ -223,11 +222,6 @@ export default function SupplierProfileClient() {
         </div>
       )}
       
-      {/* Purchase Payment Details */}
-      <PurchasePaymentDetails 
-        supplierData={selectedSupplierData}
-        isMillOverview={selectedSupplierKey === MILL_OVERVIEW_KEY}
-      />
       
       {/* Fuzzy Matching Information */}
       {selectedSupplier && (
