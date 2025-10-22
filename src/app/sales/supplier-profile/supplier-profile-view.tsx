@@ -52,28 +52,28 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 const TransactionTable = ({ transactions, onShowDetails }: { transactions: Supplier[], onShowDetails: (supplier: Supplier) => void }) => (
     <ScrollArea className="h-[14rem]">
         <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[600px]">
                 <TableHeader>
                     <TableRow>
-                        <TableHead>SR No</TableHead>
-                        <TableHead>Original Amt</TableHead>
-                        <TableHead>Paid</TableHead>
-                        <TableHead>CD</TableHead>
-                        <TableHead>Outstanding</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="w-[60px]">SR No</TableHead>
+                        <TableHead className="w-[100px]">Original Amt</TableHead>
+                        <TableHead className="w-[80px]">Paid</TableHead>
+                        <TableHead className="w-[60px]">CD</TableHead>
+                        <TableHead className="w-[100px]">Outstanding</TableHead>
+                        <TableHead className="text-right w-[60px]">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {transactions.map(entry => (
                         <TableRow key={entry.id}>
-                            <TableCell className="font-mono text-xs">{entry.srNo}</TableCell>
-                            <TableCell className="text-xs">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
-                            <TableCell className="text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
-                            <TableCell className="text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-red-600">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
-                            <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
-                                    <Info className="h-4 w-4" />
+                            <TableCell className="font-mono text-xs w-[60px]">{entry.srNo}</TableCell>
+                            <TableCell className="text-xs w-[100px]">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                            <TableCell className="text-xs text-green-600 w-[80px]">{formatCurrency(entry.totalPaid || 0)}</TableCell>
+                            <TableCell className="text-xs text-blue-600 w-[60px]">{formatCurrency(entry.totalCd || 0)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-red-600 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                            <TableCell className="text-right w-[60px]">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onShowDetails(entry)}>
+                                    <Info className="h-3 w-3" />
                                 </Button>
                             </TableCell>
                         </TableRow>
@@ -228,8 +228,8 @@ export const SupplierProfileView = ({
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1">
                         <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Visual Overview</CardTitle>
                         <div className="w-48">
@@ -258,7 +258,7 @@ export const SupplierProfileView = ({
                         </div>
                     </CardContent>
                 </Card>
-                 <div className="grid grid-cols-1 gap-6">
+                 <div className="grid grid-cols-1 gap-6 lg:col-span-2">
                     <Tabs defaultValue="outstanding" className="w-full">
                         <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1 rounded-lg">
                             <TabsTrigger value="outstanding" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">Outstanding ({outstandingTransactions.length})</TabsTrigger>
@@ -301,24 +301,24 @@ export const SupplierProfileView = ({
                       <CardContent>
                           <ScrollArea className="h-[14rem]">
                              <div className="overflow-x-auto">
-                              <Table>
+                              <Table className="min-w-[800px]">
                                   <TableHeader>
                                       <TableRow>
-                                          <TableHead>ID</TableHead>
-                                          <TableHead>Date</TableHead>
-                                          <TableHead>Paid For (SR No.)</TableHead>
-                                          <TableHead className="text-right">Amount</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
+                                          <TableHead className="w-[100px]">ID</TableHead>
+                                          <TableHead className="w-[120px]">Date</TableHead>
+                                          <TableHead className="w-[250px]">Paid For (SR No.)</TableHead>
+                                          <TableHead className="text-right w-[100px]">Amount</TableHead>
+                                          <TableHead className="text-right w-[80px]">Actions</TableHead>
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
                                       {currentPaymentHistory.map((payment, index) => (
                                           <TableRow key={`${payment.id}-${payment.paymentId}-${index}`}>
-                                              <TableCell className="font-mono">{payment.paymentId}</TableCell>
-                                              <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
-                                              <TableCell className="text-xs">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
-                                              <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
-                                               <TableCell className="text-right">
+                                              <TableCell className="font-mono w-[100px]">{payment.paymentId}</TableCell>
+                                              <TableCell className="w-[120px]">{format(new Date(payment.date), "PPP")}</TableCell>
+                                              <TableCell className="text-xs w-[250px]">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
+                                              <TableCell className="font-semibold text-right w-[100px]">{formatCurrency(payment.amount)}</TableCell>
+                                               <TableCell className="text-right w-[80px]">
                                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowPaymentDetails(payment)}>
                                                       <Info className="h-4 w-4" />
                                                   </Button>
