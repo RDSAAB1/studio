@@ -241,7 +241,8 @@ export const useSupplierData = () => {
                         totalPaid: transaction.totalPaid,
                         totalCd: transaction.totalCd,
                         netAmount: transaction.netAmount,
-                        paymentsCount: paymentsForThisEntry.length
+                        paymentsCount: paymentsForThisEntry.length,
+                        paymentsWithCD: paymentsForThisEntry.filter(p => p.cdApplied && p.cdAmount).length
                     });
                 }
         });
@@ -261,7 +262,25 @@ export const useSupplierData = () => {
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
+        
+        // Debug: Log the outstanding calculation
+        console.log('CustomerSummary - Outstanding calculation for:', data.name, {
+            totalOriginalAmount: data.totalOriginalAmount,
+            totalPaid: data.totalPaid,
+            totalCdAmount: data.totalCdAmount,
+            netAmountSum: data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0),
+            transactionsCount: data.allTransactions!.length,
+            firstTransaction: data.allTransactions![0] ? {
+                srNo: data.allTransactions![0].srNo,
+                originalNetAmount: data.allTransactions![0].originalNetAmount,
+                netAmount: data.allTransactions![0].netAmount,
+                totalPaid: data.allTransactions![0].totalPaid,
+                totalCd: data.allTransactions![0].totalCd
+            } : null
+        });
+        
+        // Calculate outstanding as: Original Amount - Total Paid (excluding CD)
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
         
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);

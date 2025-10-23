@@ -75,15 +75,69 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
   return `${prefix}${String(newNumber).padStart(padding, '0')}`;
 };
 
-export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
+// Lightweight calculation function - only essential calculations for real-time updates
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>) => {
+    // Add null/undefined check to prevent runtime errors
+    if (!values) {
+        return {
+            weight: 0,
+            kartaWeight: 0,
+            kartaAmount: 0,
+            netWeight: 0,
+            amount: 0,
+            labouryAmount: 0,
+            originalNetAmount: 0,
+            netAmount: 0
+        };
+    }
+    
+    const grossWeight = values.grossWeight || 0;
+    const teirWeight = values.teirWeight || 0;
+    const weight = grossWeight - teirWeight;
+    const kartaPercentage = values.kartaPercentage || 0;
+    const rate = values.rate || 0;
+    
+    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
+    const rawKartaWeight = weight * kartaPercentage / 100;
+
+    let kartaWeight;
+    if (decimalPart >= 5) {
+        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
+    } else {
+        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
+    }
+
+    const kartaAmount = Math.round(kartaWeight * rate);
+    const netWeight = weight - kartaWeight;
+    const amount = Math.round(weight * rate); 
+    const labouryRate = values.labouryRate || 0;
+    const labouryAmount = Math.round(weight * labouryRate);
+    const kanta = values.kanta || 0;
+    const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
+    const netAmount = originalNetAmount;
+
+    return {
+      ...values,
+      weight,
+      kartaWeight,
+      kartaAmount,
+      netWeight,
+      amount,
+      labouryAmount,
+      originalNetAmount,
+      netAmount
+    };
+};
+
+// Heavy calculations moved to background - only called when needed (onBlur, onSubmit)
+export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
     const termDays = Number(values.term) || 0;
     
     let entryDate: Date;
     if (values.date) {
-        // If it's already a Date object, use it. If it's a string, parse it.
         entryDate = typeof values.date === 'string' ? parseISO(values.date) : values.date;
         if (!isValid(entryDate)) {
-            entryDate = new Date(); // Fallback to today if parsing fails
+            entryDate = new Date();
         }
     } else {
         entryDate = new Date();
@@ -91,7 +145,6 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     entryDate.setHours(0, 0, 0, 0);
 
     let newDueDate = addDays(entryDate, termDays);
-
     let warning = '';
     let suggestedTerm: number | null = null;
     
@@ -128,52 +181,16 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         }
     }
 
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
-    const kartaPercentage = values.kartaPercentage || 0;
-    const rate = values.rate || 0;
-    
-    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
-    const rawKartaWeight = weight * kartaPercentage / 100;
-
-    let kartaWeight;
-    if (decimalPart >= 5) {
-        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
-    } else {
-        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
-    }
-
-    const kartaAmount = Math.round(kartaWeight * rate);
-    
-    const netWeight = weight - kartaWeight;
-    
-    const amount = Math.round(weight * rate); 
-
-    const labouryRate = values.labouryRate || 0;
-    const labouryAmount = Math.round(weight * labouryRate);
-    const kanta = values.kanta || 0;
-
-    const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
-
-    const netAmount = originalNetAmount;
+    // Get basic calculations
+    const basicCalculations = calculateSupplierEntry(values);
 
     return {
-      ...values,
+      ...basicCalculations,
       date: entryDate.toISOString().split('T')[0],
       term: String(values.term), 
       dueDate: newDueDate.toISOString().split('T')[0],
-      weight: weight,
-      kartaWeight: kartaWeight,
-      kartaAmount: kartaAmount,
-      netWeight: netWeight,
-      amount: amount, 
-      labouryAmount: labouryAmount,
-      kanta: kanta, 
-      originalNetAmount: originalNetAmount,
-      netAmount: netAmount,
-      warning: warning,
-      suggestedTerm: suggestedTerm,
+      warning,
+      suggestedTerm
     };
 };
 

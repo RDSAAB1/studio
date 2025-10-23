@@ -55,6 +55,7 @@ if (typeof window !== 'undefined') {
 // Export the db instance. It will be undefined on the server.
 export { db };
 
+
 // --- Synchronization Logic ---
 export async function syncAllData() {
     if (!db) return;

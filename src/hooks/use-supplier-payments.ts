@@ -65,7 +65,25 @@ export const useSupplierPayments = () => {
         }
         
         // NEW PAYMENT MODE: Sum of the current net amounts of selected entries.
-        return selectedEntries.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+        const totalOutstanding = selectedEntries.reduce((sum, entry) => {
+            const netAmount = Number(entry.netAmount) || 0;
+            console.log('Outstanding calculation for entry:', {
+                srNo: entry.srNo,
+                originalNetAmount: entry.originalNetAmount,
+                netAmount: netAmount,
+                totalPaid: entry.totalPaid,
+                totalCd: entry.totalCd
+            });
+            return sum + netAmount;
+        }, 0);
+        
+        console.log('Total outstanding for selected entries:', {
+            selectedEntriesCount: selectedEntries.length,
+            totalOutstanding: totalOutstanding,
+            selectedEntries: selectedEntries.map(e => ({ srNo: e.srNo, netAmount: e.netAmount }))
+        });
+        
+        return totalOutstanding;
 
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
@@ -84,6 +102,19 @@ export const useSupplierPayments = () => {
 
     const settleAmount = form.paymentType === 'Full' ? settleAmountDerived : settleAmountManual;
 
+    // Debug: Log payment history and selected customer key
+    console.log('useCashDiscount - Parameters being passed:', {
+        selectedCustomerKey: form.selectedCustomerKey,
+        paymentHistoryLength: data.paymentHistory?.length || 0,
+        paymentHistory: data.paymentHistory?.map(p => ({
+            id: p.id,
+            customerId: p.customerId,
+            amount: p.amount,
+            cdApplied: p.cdApplied,
+            cdAmount: p.cdAmount
+        })) || []
+    });
+
     const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
@@ -92,6 +123,7 @@ export const useSupplierPayments = () => {
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
         paymentHistory: data.paymentHistory,
+        selectedCustomerKey: form.selectedCustomerKey, // Add missing selectedCustomerKey
     });
     
     // Derive toBePaid from settle - CD
@@ -142,6 +174,11 @@ export const useSupplierPayments = () => {
     useEffect(() => {
         if (!form.isBeingEdited) {
             const srNos = selectedEntries.map(e => e.srNo).join(', ');
+            console.log('Auto-filling Parchi No with serial numbers:', {
+                selectedEntriesCount: selectedEntries.length,
+                srNos: srNos,
+                isBeingEdited: form.isBeingEdited
+            });
             form.setParchiNo(srNos);
         }
     }, [selectedEntries, form.setParchiNo, form.isBeingEdited]);
@@ -336,9 +373,10 @@ export const useSupplierPayments = () => {
             }
 
             toast({ title: `Payment processed successfully.`, variant: 'success' });
-            if (form.paymentMethod === 'RTGS' && result.payment) {
-                setRtgsReceiptData(result.payment);
-            }
+            // RTGS receipt dialog disabled - receipt window should not open automatically
+            // if (form.paymentMethod === 'RTGS' && result.payment) {
+            //     setRtgsReceiptData(result.payment);
+            // }
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
             handleSettleAmountChange(0); 
             handleToBePaidChange(0);

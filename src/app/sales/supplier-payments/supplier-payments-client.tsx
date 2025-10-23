@@ -25,20 +25,56 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
+import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
+import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
 
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     
-    const hook = useSupplierPayments();
-    const { activeTab, setActiveTab } = hook;
+  const hook = useSupplierPayments();
+  const { activeTab, setActiveTab } = hook;
+
+  // Use the same supplier summary and filtering as supplier profile
+  const { supplierSummaryMap, MILL_OVERVIEW_KEY } = useSupplierSummary(
+    hook.suppliers,
+    hook.paymentHistory,
+    undefined,
+    undefined
+  );
+
+  const onSelectSupplierKey = useCallback((key: string | null) => {
+    if (key) {
+      hook.handleCustomerSelect(key);
+    }
+  }, [hook]);
+
+  // Update the hook's customerSummaryMap to use our new supplierSummaryMap
+  useEffect(() => {
+    if (supplierSummaryMap.size > 0) {
+      // Replace the hook's customerSummaryMap with our new one
+      hook.customerSummaryMap.clear();
+      supplierSummaryMap.forEach((value, key) => {
+        hook.customerSummaryMap.set(key, value);
+      });
+    }
+  }, [supplierSummaryMap, hook.customerSummaryMap]);
+
+  const { filteredSupplierOptions } = useSupplierFiltering(
+    supplierSummaryMap,
+    hook.selectedCustomerKey as string | null,
+    onSelectSupplierKey as (key: string | null) => void,
+    undefined,
+    undefined,
+    MILL_OVERVIEW_KEY
+  );
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey) return [];
-        const summary = hook.customerSummaryMap.get(hook.selectedCustomerKey);
+        const summary = supplierSummaryMap.get(hook.selectedCustomerKey);
         return summary ? summary.allTransactions || [] : [];
-    }, [hook.selectedCustomerKey, hook.customerSummaryMap]);
+    }, [hook.selectedCustomerKey, supplierSummaryMap]);
 
 
     if (!hook.isClient || hook.loading) {
@@ -106,17 +142,20 @@ export default function SupplierPaymentsClient() {
                                         
                                         <div className="flex-1">
                                             <CustomDropdown
-                                                options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} S/O ${toTitleCase(data.so || '')} (${data.contact})` }))}
+                                                options={filteredSupplierOptions.map(({ value, data }) => ({
+                                                    value,
+                                                    label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim()
+                                                }))}
                                                 value={hook.selectedCustomerKey}
-                                                onChange={hook.handleCustomerSelect}
-                                                placeholder="Search and select supplier..."
+                                                onChange={onSelectSupplierKey}
+                                                placeholder="Search by Name, Father, Address..."
                                             />
                                         </div>
                                         {hook.selectedCustomerKey && (
                                             <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
                                                 <div className="flex items-baseline gap-2 text-sm">
                                                     <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                    <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                                    <p className="font-bold text-base text-destructive">{formatCurrency(supplierSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
                                                 </div>
                                             </div>
                                         )}

@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, calculateSupplierEntryWithValidation, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -73,8 +73,22 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
-  const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
+  // REMOVED: useLiveQuery to eliminate database queries during typing
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  
+  // Load data once on mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (db) {
+        const suppliersData = await db.suppliers.orderBy('srNo').reverse().toArray();
+        const paymentsData = await db.payments.toArray();
+        setSuppliers(suppliersData);
+        setPaymentHistory(paymentsData);
+      }
+    };
+    loadData();
+  }, []);
 
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
@@ -96,8 +110,10 @@ export default function SupplierEntryClient() {
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
-  const [searchTerm, setSearchTerm] = usePersistedState('supplier-entry-search', '');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  // REMOVED: All search optimizations to eliminate delay
+  const [searchTerm, setSearchTerm] = useState('');
+  // No more usePersistedState - causes localStorage writes
+  // No more useDebounce - causes 300ms delay
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
@@ -105,22 +121,12 @@ export default function SupplierEntryClient() {
   const [suggestedSupplier, setSuggestedSupplier] = useState<Customer | null>(null);
   const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
 
-  const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
-  const safePaymentHistory = useMemo(() => Array.isArray(paymentHistory) ? paymentHistory : [], [paymentHistory]);
+  // REMOVED: useMemo to eliminate unnecessary re-renders
+  const safeSuppliers = suppliers || [];
+  const safePaymentHistory = paymentHistory || [];
   
-  const filteredSuppliers = useMemo(() => {
-    if (!debouncedSearchTerm) {
-      return safeSuppliers;
-    }
-    const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-    return safeSuppliers.filter(supplier => {
-      return (
-        supplier.name?.toLowerCase().startsWith(lowercasedFilter) ||
-        supplier.contact?.startsWith(lowercasedFilter) ||
-        supplier.srNo?.toLowerCase().startsWith(lowercasedFilter)
-      );
-    });
-  }, [safeSuppliers, debouncedSearchTerm]);
+  // REMOVED: Heavy filtering to eliminate delay
+  const filteredSuppliers = safeSuppliers; // No more filtering - causes delay
 
 
   const form = useForm<FormValues>({
@@ -131,8 +137,31 @@ export default function SupplierEntryClient() {
     shouldFocusError: false,
   });
 
-  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+  // Lightweight calculations for real-time updates - memoized to prevent unnecessary re-renders
+  const performCalculations = useCallback((data: Partial<FormValues>) => {
+      // Add safety check to prevent errors with undefined data
+      if (!data) return;
+      
+      const calculatedState = calculateSupplierEntry(data);
+      setCurrentSupplier(prev => {
+        // Only update if values actually changed
+        const hasChanges = Object.keys(calculatedState).some(key => 
+          prev[key as keyof Customer] !== calculatedState[key as keyof typeof calculatedState]
+        );
+        return hasChanges ? {...prev, ...calculatedState} : prev;
+      });
+  }, []);
+
+  // Individual field change handlers for calculation fields only
+  const handleCalculationFieldChange = useCallback((fieldName: string, value: any) => {
+      const currentValues = form.getValues();
+      const updatedValues = { ...currentValues, [fieldName]: value };
+      performCalculations(updatedValues);
+  }, [form, performCalculations]);
+
+  // Heavy calculations for validation (onBlur, onSubmit)
+  const performHeavyCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntryWithValidation(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -199,12 +228,21 @@ export default function SupplierEntryClient() {
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
       newState.srNo = formatSrNo(nextSrNum, 'S');
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      newState.date = format(today, 'yyyy-MM-dd');
-      newState.dueDate = format(today, 'yyyy-MM-dd');
+      
+      // Use persistent date from localStorage, fallback to today
+      let persistentDate = new Date();
+      if (typeof window !== 'undefined') {
+        const savedDate = localStorage.getItem('supplierEntryDate');
+        if (savedDate) {
+          persistentDate = new Date(savedDate);
+        }
+      }
+      persistentDate.setHours(0,0,0,0);
+      
+      newState.date = format(persistentDate, 'yyyy-MM-dd');
+      newState.dueDate = format(persistentDate, 'yyyy-MM-dd');
       resetFormToState(newState);
-      form.setValue('date', new Date()); // Set today's date
+      form.setValue('date', persistentDate); // Set persistent date
       setTimeout(() => form.setFocus('srNo'), 50);
   }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
@@ -213,6 +251,16 @@ export default function SupplierEntryClient() {
       setIsClient(true);
     }
   }, []);
+
+  // Save date to localStorage when it changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'date' && value.date && typeof window !== 'undefined') {
+        localStorage.setItem('supplierEntryDate', value.date.toISOString());
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
   
   useEffect(() => {
     if (suppliers !== undefined) {
@@ -277,12 +325,8 @@ export default function SupplierEntryClient() {
     }
   }
   
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>, false);
-    });
-    return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
+  // REMOVED: form.watch completely to eliminate all lag
+  // Individual field handlers will be used instead
 
   
   const handleEdit = (id: string) => {
@@ -315,63 +359,26 @@ export default function SupplierEntryClient() {
         }));
         form.setValue('srNo', formattedSrNo);
     }
+    
+    // Run heavy calculations on blur for validation
+    const currentData = form.getValues();
+    performHeavyCalculations(currentData, true);
   }
 
+  // REMOVED: Search blur handler - no more persistence
+  // const handleSearchBlur = () => { ... }
+
+  // Optimize: Only search when contact is complete (10 digits), not on every keystroke
+  // REMOVED: Contact auto-fill suggestions to prevent lag
   const onContactChange = (contactValue: string) => {
     form.setValue('contact', contactValue);
-    if (contactValue.length === 10 && suppliers) {
-      const latestEntryForContact = suppliers
-          .filter(c => c.contact === contactValue)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-          
-      if (latestEntryForContact && latestEntryForContact.id !== currentSupplier.id) {
-          form.setValue('name', latestEntryForContact.name);
-          form.setValue('so', latestEntryForContact.so);
-          form.setValue('address', latestEntryForContact.address);
-          toast({ title: "Supplier Found: Details auto-filled from last entry." });
-      }
-    }
+    // No more auto-fill suggestions - causes lag
   };
 
+  // REMOVED: Similar supplier suggestions to prevent lag
   const findAndSuggestSimilarSupplier = () => {
-    if (form.formState.isSubmitting || isEditing) {
-        setSuggestedSupplier(null);
-        return;
-    }
-
-    const { name, so } = form.getValues();
-    if (!name) {
-        setSuggestedSupplier(null);
-        return;
-    }
-
-    const currentNameNorm = name.replace(/\s+/g, '').toLowerCase();
-    const currentSoNorm = (so || '').replace(/\s+/g, '').toLowerCase();
-    
-    if (currentNameNorm.length < 3) {
-      setSuggestedSupplier(null);
-      return;
-    }
-    
-    let bestMatch: Customer | null = null;
-    let minDistance = Infinity;
-
-    const uniqueSuppliers = Array.from(new Map(suppliers?.map(s => [s.customerId, s])).values());
-    
-    for (const supplier of uniqueSuppliers) {
-        const supNameNorm = supplier.name.replace(/\s+/g, '').toLowerCase();
-        const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
-        
-        const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
-        const totalDist = nameDist + soDist;
-        
-        if (totalDist > 0 && totalDist < 5 && totalDist < minDistance) {
-            minDistance = totalDist;
-            bestMatch = supplier;
-        }
-    }
-    setSuggestedSupplier(bestMatch);
+    // No more suggestions - causes lag with heavy processing
+    setSuggestedSupplier(null);
   };
   
   const applySuggestion = () => {
@@ -422,12 +429,16 @@ const handleDelete = async (id: string) => {
     
     const isForcedUnique = values.forceUnique || false;
 
+    // Run final validation before submit
+    const validatedData = calculateSupplierEntryWithValidation(values, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
+        ...validatedData, // Include validated calculations
         id: values.srNo, // Use srNo as ID
         date: format(values.date, 'yyyy-MM-dd'),
-        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
+        dueDate: validatedData.dueDate, // Use validated due date
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
@@ -778,6 +789,7 @@ const handleDelete = async (id: string) => {
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
                 allSuppliers={safeSuppliers}
+                handleCalculationFieldChange={handleCalculationFieldChange}
             />
             
             <CalculatedSummary 
