@@ -47,20 +47,44 @@ export const useSupplierPayments = () => {
     const totalOutstandingForSelected = useMemo(() => {
         if (form.editingPayment) {
             // EDIT MODE: Calculate the maximum amount this payment can be.
-            // It's the original amount of all selected entries minus OTHER payments.
+            // TEMPORARY REVERSAL: Add back the payment amount and CD from the payment being edited
+            const editingPayment = form.editingPayment; // Store reference to avoid null checks
             return selectedEntries.reduce((sum, entry) => {
                 const originalAmount = Number(entry.originalNetAmount) || 0;
                 
                 // Find all payments for this entry *except* the one being edited
                 const otherPaymentsForThisEntry = (data.paymentHistory || [])
-                    .filter(p => p.id !== form.editingPayment!.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
+                    .filter(p => p.id !== editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
 
                 const otherPaymentsTotal = otherPaymentsForThisEntry.reduce((paymentSum, p) => {
                     const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === entry.srNo)!;
                     return paymentSum + paidForThisDetail.amount + (p.cdAmount || 0);
                 }, 0);
 
-                return sum + (originalAmount - otherPaymentsTotal);
+                // TEMPORARY REVERSAL: Add back the payment being edited to allow higher payment
+                const editingPaymentForThisEntry = editingPayment.paidFor?.find(pf => pf.srNo === entry.srNo);
+                const editingPaymentAmount = editingPaymentForThisEntry ? editingPaymentForThisEntry.amount : 0;
+                const editingPaymentCD = editingPayment.cdAmount || 0;
+                
+                // Calculate proportion of CD for this entry
+                const totalEditingPaymentAmount = editingPayment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
+                const cdProportionForThisEntry = totalEditingPaymentAmount > 0 ? editingPaymentAmount / totalEditingPaymentAmount : 0;
+                const editingPaymentCDForThisEntry = editingPaymentCD * cdProportionForThisEntry;
+                
+                // Add back the payment amount and CD temporarily
+                const temporaryReversalAmount = editingPaymentAmount + editingPaymentCDForThisEntry;
+                
+                console.log('Temporary Reversal for Entry:', {
+                    srNo: entry.srNo,
+                    originalAmount,
+                    otherPaymentsTotal,
+                    editingPaymentAmount,
+                    editingPaymentCDForThisEntry,
+                    temporaryReversalAmount,
+                    finalOutstanding: originalAmount - otherPaymentsTotal + temporaryReversalAmount
+                });
+
+                return sum + (originalAmount - otherPaymentsTotal + temporaryReversalAmount);
             }, 0);
         }
         
@@ -124,6 +148,7 @@ export const useSupplierPayments = () => {
         paymentDate: form.paymentDate,
         paymentHistory: data.paymentHistory,
         selectedCustomerKey: form.selectedCustomerKey, // Add missing selectedCustomerKey
+        editingPayment: form.editingPayment, // Pass editing payment to exclude from CD calculations
     });
     
     // Derive toBePaid from settle - CD

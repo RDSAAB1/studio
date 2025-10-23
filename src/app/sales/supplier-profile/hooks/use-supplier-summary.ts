@@ -64,8 +64,8 @@ export const useSupplierSummary = (
           let actualPaymentAmount;
           
           if (receiptType === 'cash') {
-            // For cash payments, deduct CD amount
-            actualPaymentAmount = (payment.amount - (payment.cdAmount || 0)) * proportion;
+            // For cash payments, payment.amount is already the actual payment amount (₹5000)
+            actualPaymentAmount = payment.amount * proportion;
             totalCashPaidForEntry += actualPaymentAmount;
           } else if (receiptType === 'rtgs') {
             // For RTGS payments, use rtgsAmount if available, otherwise use amount

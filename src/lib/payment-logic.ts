@@ -86,8 +86,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
-            // Distribute total settlement amount (payment + CD) across entries
-            let amountToDistribute = Math.round(totalToSettle);
+            // Distribute only the actual payment amount (not including CD)
+            let amountToDistribute = Math.round(finalAmountToPay);
 
             for (const entry of selectedEntries) {
                 if (amountToDistribute <= 0) break;
@@ -98,7 +98,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 if (paymentForThisEntry > 0) {
                      paidForDetails.push({
                         srNo: entry.srNo,
-                        amount: paymentForThisEntry, // This includes both payment and CD
+                        amount: paymentForThisEntry, // This is only the actual payment amount (₹5000)
                         supplierName: toTitleCase(entry.name),
                         supplierSo: toTitleCase(entry.so),
                         supplierContact: entry.contact,

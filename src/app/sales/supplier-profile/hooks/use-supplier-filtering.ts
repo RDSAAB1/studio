@@ -49,6 +49,18 @@ export const useSupplierFiltering = (
       if (address) label += ` - ${address}`;
       if (contact) label += ` (${contact})`;
       
+      // Debug: Log the first few options to see what's being created
+      if (profileKey && (profileKey.includes('1') || profileKey.includes('2') || profileKey.includes('3'))) {
+        console.log('Supplier Option Created:', {
+          profileKey,
+          name,
+          fatherName,
+          address,
+          contact,
+          label: label.trim()
+        });
+      }
+      
       return { 
         value: profileKey, 
         label: label.trim(),
