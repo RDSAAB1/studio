@@ -200,11 +200,22 @@ export const PaymentForm = (props: any) => {
                  {(props.selectedCustomerKey || props.rtgsFor === 'Outsider') && (
                     <Card>
                         <CardHeader>
-                            <SectionTitle title="Payee Details" icon={<User size={18}/>} onEdit={() => setIsPayeeEditing(true)} editingPayment={editingPayment} />
+                            <SectionTitle 
+                                title="Payee Details" 
+                                icon={<User size={18}/>} 
+                                onEdit={() => setIsPayeeEditing(true)} 
+                                editingPayment={editingPayment}
+                                description={editingPayment ? "Click to edit payee details" : undefined}
+                            />
                         </CardHeader>
                         <CardContent className="space-y-3 p-3">
                              {isPayeeEditing ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-lg bg-background">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-lg bg-background border-blue-200 bg-blue-50/50">
+                                    {editingPayment && (
+                                        <div className="col-span-full mb-2">
+                                            <p className="text-xs text-blue-600 font-medium">✏️ Editing payee details for payment {editingPayment.paymentId || editingPayment.rtgsSrNo}</p>
+                                        </div>
+                                    )}
                                     <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1 sm:col-span-2 grid grid-cols-2 gap-2">
