@@ -209,38 +209,28 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                     <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center space-x-2 text-sm">
                                             <span className="font-medium text-foreground">
-                                                {item.data?.name ? item.data.name : item.label.split(' - ')[0]}
+                                                {item.data?.name ? item.data.name : 
+                                                 item.label.includes(' | ') ? item.label.split(' | ')[0] : 
+                                                 item.label.split(' - ')[0]}
                                             </span>
                                             {(() => {
                                                 // Parse father name from label if data is not available
-                                                let fatherName = item.data?.fatherName;
+                                                let fatherName = item.data?.fatherName || item.data?.so;
                                                 
-                                                // Debug: Log the data structure
-                                                console.log('Supplier data debug:', {
-                                                    hasData: !!item.data,
-                                                    dataKeys: item.data ? Object.keys(item.data) : [],
-                                                    fatherName: item.data?.fatherName,
-                                                    name: item.data?.name,
-                                                    address: item.data?.address,
-                                                    contact: item.data?.contact,
-                                                    label: item.label
-                                                });
-                                                
-                                                if (!fatherName && item.label.includes(' - ')) {
+                                                if (!fatherName && item.label.includes(' | F:')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 1 && parts[1].startsWith('F:')) {
+                                                        fatherName = parts[1].substring(2).trim(); // Remove "F:" prefix
+                                                    }
+                                                } else if (!fatherName && item.label.includes(' - ')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
                                                     const parts = item.label.split(' - ');
-                                                    // Debug: Log the parsing
-                                                    console.log('Label parsing debug:', {
-                                                        label: item.label,
-                                                        parts: parts,
-                                                        partsLength: parts.length,
-                                                        part1: parts[1],
-                                                        part2: parts[2]
-                                                    });
-                                                    // Father name is the second part (index 1), but we need to remove contact if it's there
                                                     if (parts.length > 1) {
                                                         fatherName = parts[1].replace(/\s*\([^)]*\)$/, '').trim();
                                                     }
                                                 }
+                                                
                                                 return fatherName && (
                                                     <span className="text-muted-foreground">
                                                         Son of {fatherName}
@@ -250,9 +240,15 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                             {(() => {
                                                 // Parse address from label if data is not available
                                                 let address = item.data?.address;
-                                                if (!address && item.label.includes(' - ')) {
+                                                if (!address && item.label.includes(' | ')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 2) {
+                                                        address = parts[2].trim();
+                                                    }
+                                                } else if (!address && item.label.includes(' - ')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
                                                     const parts = item.label.split(' - ');
-                                                    // Address is the third part (index 2), but we need to remove contact if it's there
                                                     if (parts.length > 2) {
                                                         address = parts[2].replace(/\s*\([^)]*\)$/, '').trim();
                                                     }
@@ -266,7 +262,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                             {(() => {
                                                 // Parse contact from label if data is not available
                                                 let contact = item.data?.contact;
-                                                if (!contact && item.label.includes('(')) {
+                                                if (!contact && item.label.includes(' | ')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 3) {
+                                                        contact = parts[3].trim();
+                                                    }
+                                                } else if (!contact && item.label.includes('(')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
                                                     const match = item.label.match(/\(([^)]+)\)/);
                                                     if (match) {
                                                         contact = match[1].trim();

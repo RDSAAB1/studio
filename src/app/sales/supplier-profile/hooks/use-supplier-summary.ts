@@ -300,25 +300,6 @@ export const useSupplierSummary = (
 
     // Set mill overview data in the map
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
-    
-    // Debug: Log mill overview data
-    console.log('Mill Overview Final Totals:', {
-      totalCashPaid: millSummary.totalCashPaid,
-      totalRtgsPaid: millSummary.totalRtgsPaid,
-      totalPaid: millSummary.totalPaid,
-      totalOriginalAmount: millSummary.totalOriginalAmount,
-      totalOutstanding: millSummary.totalOutstanding
-    });
-    
-    // Debug: Log individual supplier totals that contribute to mill overview
-    console.log('Individual Supplier Totals:');
-    Array.from(finalSummaryMap.values()).forEach(s => {
-      if (s.totalRtgsPaid > 0) {
-        console.log(`${s.name}: RTGS=${s.totalRtgsPaid}, Cash=${s.totalCashPaid}, Total=${s.totalPaid}`);
-      }
-    });
-    console.log('Final Summary Map Keys:', Array.from(finalSummaryMap.keys()));
-    console.log('Mill Overview Key:', MILL_OVERVIEW_KEY);
 
     return finalSummaryMap;
   }, [suppliers, paymentHistory, startDate, endDate]);

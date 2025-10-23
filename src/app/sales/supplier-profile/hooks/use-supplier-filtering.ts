@@ -39,27 +39,14 @@ export const useSupplierFiltering = (
     const allOptions = Array.from(uniqueProfiles.entries()).map(([profileKey, data]) => {
       // Create a detailed label with name, father name, and address
       const name = toTitleCase(data.name || '');
-      const fatherName = toTitleCase(data.fatherName || '');
+      const fatherName = toTitleCase(data.fatherName || data.so || '');
       const address = toTitleCase(data.address || '');
       const contact = data.contact || '';
       
-      // Format the label with all available information
-      let label = name;
-      if (fatherName) label += ` - ${fatherName}`;
-      if (address) label += ` - ${address}`;
-      if (contact) label += ` (${contact})`;
       
-      // Debug: Log the first few options to see what's being created
-      if (profileKey && (profileKey.includes('1') || profileKey.includes('2') || profileKey.includes('3'))) {
-        console.log('Supplier Option Created:', {
-          profileKey,
-          name,
-          fatherName,
-          address,
-          contact,
-          label: label.trim()
-        });
-      }
+      // Format the label to match supplier payments format
+      const label = `${name} | F:${fatherName} | ${address} | ${contact}`.trim();
+      
       
       return { 
         value: profileKey, 
@@ -79,9 +66,6 @@ export const useSupplierFiltering = (
     const millOverviewData = supplierSummaryMap.get(MILL_OVERVIEW_KEY);
     let optionsWithMillOverview = filteredOptions;
     
-    console.log('Mill Overview Data Check:', millOverviewData);
-    console.log('Has Data:', millOverviewData && millOverviewData.totalTransactions > 0);
-    
     if (millOverviewData && millOverviewData.totalTransactions > 0) {
       const millOverviewOption = {
         value: MILL_OVERVIEW_KEY,
@@ -89,9 +73,6 @@ export const useSupplierFiltering = (
         data: millOverviewData
       };
       optionsWithMillOverview = [millOverviewOption, ...filteredOptions];
-      console.log('Added Mill Overview with data');
-    } else {
-      console.log('Skipped Mill Overview - no data');
     }
 
     // If no date range, show all including Mill Overview
