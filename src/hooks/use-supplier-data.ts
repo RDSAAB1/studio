@@ -212,10 +212,10 @@ export const useSupplierData = () => {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                // paidFor.amount already includes CD portion, so we add it directly
+                // paidFor.amount is now only the actual payment amount (₹5000), not including CD
                 totalPaidForEntry += paidForThisDetail.amount;
 
-                // Calculate CD portion for display purposes only
+                // Calculate CD portion for this entry
                 if ('cdApplied' in p && p.cdApplied && 'cdAmount' in p && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
@@ -225,12 +225,13 @@ export const useSupplierData = () => {
                 }
             });
             
-                // Store amounts for display (totalPaid already includes CD)
-                // For display: show actual payment separately from CD
-                transaction.totalPaid = totalPaidForEntry - totalCdForEntry; // Actual payment without CD
-                transaction.totalCd = totalCdForEntry; // CD amount
-                // Outstanding: Original - (Payment + CD) = Original - totalPaidForEntry
-                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+                // Store amounts for display
+                // totalPaidForEntry = actual payment amount (₹5000)
+                // totalCdForEntry = CD amount (₹50)
+                transaction.totalPaid = totalPaidForEntry; // Actual payment amount (₹5000)
+                transaction.totalCd = totalCdForEntry; // CD amount (₹50)
+                // Outstanding: Original - (Payment + CD) = Original - (totalPaidForEntry + totalCdForEntry)
+                transaction.netAmount = (transaction.originalNetAmount || 0) - (totalPaidForEntry + totalCdForEntry);
                 
                 // Debug log
                 if (totalPaidForEntry > 0 || totalCdForEntry > 0) {

@@ -20,6 +20,7 @@ interface UseCashDiscountProps {
     toBePaidAmount: number;
     paymentHistory: Payment[]; // Pass full payment history for calculations
     selectedCustomerKey?: string | null; // Pass the key/ID of the currently selected supplier
+    editingPayment?: Payment | null; // Pass the payment being edited to exclude it from calculations
 }
 
 // --- The Custom Hook: useCashDiscount ---
@@ -33,6 +34,7 @@ export const useCashDiscount = ({
     toBePaidAmount, // Amount user is paying now
     paymentHistory = [],
     selectedCustomerKey,
+    editingPayment, // Payment being edited to exclude from calculations
 }: UseCashDiscountProps) => {
     
     // 1. State Management with Persistence
@@ -80,10 +82,51 @@ export const useCashDiscount = ({
         });
     }, [eligibleForCd]);
     
-    // 4. Total CD Already Applied (Memoized)
+    // 4. Total CD Already Applied (Memoized) - Exclude editing payment
     const totalCdOnSelectedEntries = useMemo(() => {
+        if (editingPayment) {
+            // During editing, calculate CD excluding the payment being edited
+            // This ensures fresh CD calculation based on total invoice value
+            const selectedSrNos = selectedEntries.map(e => e.srNo);
+            
+            // Find all payments for these entries except the one being edited
+            const otherPaymentsForEntries = paymentHistory.filter(p => 
+                p.id !== editingPayment.id && 
+                p.paidFor && 
+                p.paidFor.some(pf => selectedSrNos.includes(pf.srNo))
+            );
+            
+            // Calculate total CD from other payments
+            let totalCdFromOtherPayments = 0;
+            otherPaymentsForEntries.forEach(payment => {
+                if (payment.cdApplied && payment.cdAmount) {
+                    // Calculate proportion of this payment that applies to selected entries
+                    const totalPaymentAmount = payment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
+                    const amountForSelectedEntries = payment.paidFor?.reduce((sum, pf) => {
+                        return selectedSrNos.includes(pf.srNo) ? sum + pf.amount : sum;
+                    }, 0) || 0;
+                    
+                    if (totalPaymentAmount > 0) {
+                        const proportion = amountForSelectedEntries / totalPaymentAmount;
+                        totalCdFromOtherPayments += payment.cdAmount * proportion;
+                    }
+                }
+            });
+            
+            console.log('CD Calculation - Excluding editing payment:', {
+                editingPaymentId: editingPayment.id,
+                selectedSrNos,
+                otherPaymentsCount: otherPaymentsForEntries.length,
+                totalCdFromOtherPayments,
+                originalTotalCd: selectedEntries.reduce((sum, entry) => sum + (entry.totalCd || 0), 0)
+            });
+            
+            return totalCdFromOtherPayments;
+        }
+        
+        // Normal mode: use the total CD from selected entries
         return selectedEntries.reduce((sum, entry) => sum + (entry.totalCd || 0), 0);
-    }, [selectedEntries]);
+    }, [selectedEntries, editingPayment, paymentHistory]);
 
 
     // 5. Final Calculated CD Amount (Memoized)
@@ -114,7 +157,20 @@ export const useCashDiscount = ({
             case 'on_full_amount': {
                 const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
                 const totalPotentialCD = (totalOriginalAmount * cdPercent) / 100;
+                
+                // During editing, ignore previous CD to allow fresh calculation
+                // This ensures CD is calculated based on total invoice value, not remaining CD
                 const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
+                
+                console.log('CD Calculation - on_full_amount:', {
+                    totalOriginalAmount,
+                    cdPercent,
+                    totalPotentialCD,
+                    totalCdOnSelectedEntries,
+                    remainingCD,
+                    finalCD: Math.max(0, remainingCD)
+                });
+                
                 return Math.max(0, remainingCD);
             }
              case 'on_previously_paid_no_cd': {

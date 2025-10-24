@@ -36,6 +36,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
     
+    // Auto-enable payee editing when in edit mode
+    useEffect(() => {
+        if (editingPayment && !isPayeeEditing) {
+            setIsPayeeEditing(true);
+        }
+    }, [editingPayment, isPayeeEditing]);
+    
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
     const [minRate, setMinRate] = useState<number>(0);
@@ -201,6 +208,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setPaymentAmount(0);
         setEditingPayment(null);
         setIsBeingEdited(false); // Reset edit state
+        setIsPayeeEditing(false); // Reset payee editing state
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));

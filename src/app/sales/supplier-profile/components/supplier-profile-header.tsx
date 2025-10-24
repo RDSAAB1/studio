@@ -177,10 +177,10 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
           {/* Full Width Name/Supplier Selection */}
           <div className="w-full">
             <CustomDropdown
-              options={filteredSupplierOptions.map(({ value, label }) => ({ value, label }))}
+              options={filteredSupplierOptions.map(({ value, label, data }) => ({ value, label, data }))}
               value={selectedSupplierKey}
               onChange={(value: string | null) => setSelectedSupplierKey(value)}
-              placeholder="Search and select profile..."
+              placeholder="Search by name, father name, address, or contact..."
             />
           </div>
 

@@ -160,13 +160,55 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
         suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
     }
     
+    // Get basic calculations first
+    const basicCalculations = calculateSupplierEntry(values);
+
     if (allSuppliers && allSuppliers.length > 0) {
         let dailyTotal = 0;
         const dueDateString = format(newDueDate, 'yyyy-MM-dd');
         
+        // Calculate daily total from existing suppliers
         allSuppliers.forEach(supplier => {
             if (supplier.dueDate === dueDateString) {
                 dailyTotal += Number(supplier.netAmount) || 0;
+            }
+        });
+
+        // Add the current entry's amount to the daily total
+        // Use the calculated netAmount from basicCalculations
+        const currentEntryAmount = Number(basicCalculations.netAmount) || 0;
+        
+        // Only add positive amounts to avoid negative values
+        if (currentEntryAmount > 0) {
+            dailyTotal += currentEntryAmount;
+        }
+
+        // Debug: Log the daily limit calculation
+        console.log('Daily Limit Debug:', {
+            dueDateString,
+            existingSuppliersTotal: dailyTotal - currentEntryAmount,
+            currentEntryAmount,
+            totalDailyAmount: dailyTotal,
+            dailyPaymentLimit,
+            isLimitExceeded: dailyTotal > dailyPaymentLimit,
+            suppliersOnThisDate: allSuppliers.filter(s => s.dueDate === dueDateString).length,
+            basicCalculationsNetAmount: basicCalculations.netAmount,
+            inputValues: {
+                grossWeight: values.grossWeight,
+                teirWeight: values.teirWeight,
+                rate: values.rate,
+                labouryRate: values.labouryRate,
+                kanta: values.kanta,
+                kartaPercentage: values.kartaPercentage
+            },
+            calculatedValues: {
+                weight: basicCalculations.weight,
+                amount: basicCalculations.amount,
+                labouryAmount: basicCalculations.labouryAmount,
+                kartaAmount: basicCalculations.kartaAmount,
+                kartaWeight: basicCalculations.kartaWeight,
+                originalNetAmount: basicCalculations.originalNetAmount,
+                netAmount: basicCalculations.netAmount
             }
         });
 
@@ -180,9 +222,6 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
             suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
         }
     }
-
-    // Get basic calculations
-    const basicCalculations = calculateSupplierEntry(values);
 
     return {
       ...basicCalculations,
