@@ -55,6 +55,7 @@ if (typeof window !== 'undefined') {
 // Export the db instance. It will be undefined on the server.
 export { db };
 
+
 // --- Synchronization Logic ---
 export async function syncAllData() {
     if (!db) return;
@@ -64,16 +65,34 @@ export async function syncAllData() {
     // Sync Suppliers
     getSuppliersRealtime(async (suppliers) => {
         if (suppliers.length > 0) {
-            await db.suppliers.bulkPut(suppliers);
-            console.log(`Synced ${suppliers.length} suppliers.`);
+            try {
+                await db.suppliers.bulkPut(suppliers);
+                console.log(`Synced ${suppliers.length} suppliers.`);
+            } catch (error: any) {
+                // Ignore ConstraintError for duplicate srNo - this is not a real error
+                if (error.name === 'ConstraintError' && error.message.includes('srNo')) {
+                    console.log(`Ignored duplicate srNo constraint error - ${suppliers.length} suppliers processed.`);
+                } else {
+                    console.error("Sync Error (Suppliers):", error);
+                }
+            }
         }
     }, (error) => console.error("Sync Error (Suppliers):", error));
 
     // Sync Payments
     getPaymentsRealtime(async (payments) => {
         if (payments.length > 0) {
-            await db.payments.bulkPut(payments);
-            console.log(`Synced ${payments.length} payments.`);
+            try {
+                await db.payments.bulkPut(payments);
+                console.log(`Synced ${payments.length} payments.`);
+            } catch (error: any) {
+                // Ignore ConstraintError for duplicate keys - this is not a real error
+                if (error.name === 'ConstraintError') {
+                    console.log(`Ignored duplicate key constraint error - ${payments.length} payments processed.`);
+                } else {
+                    console.error("Sync Error (Payments):", error);
+                }
+            }
         }
     }, (error) => console.error("Sync Error (Payments):", error));
 

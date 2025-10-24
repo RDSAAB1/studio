@@ -484,10 +484,28 @@ export default function SupplierProfileClient() {
                 
                 <div className="w-full sm:w-[300px]">
                     <CustomDropdown
-                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => {
+                            // Create a detailed label with name, father name, address, and contact
+                            const name = toTitleCase(data.name || '');
+                            const fatherName = toTitleCase(data.fatherName || '');
+                            const address = toTitleCase(data.address || '');
+                            const contact = data.contact || '';
+                            
+                            // Format the label with all available information
+                            let label = name;
+                            if (fatherName) label += ` - ${fatherName}`;
+                            if (address) label += ` - ${address}`;
+                            if (contact) label += ` (${contact})`;
+                            
+                            return { 
+                                value: key, 
+                                label: label.trim(),
+                                data: data
+                            };
+                        })}
                         value={selectedSupplierKey}
                         onChange={(value: string | null) => setSelectedSupplierKey(value)}
-                        placeholder="Search and select profile..."
+                        placeholder="Search by name, father name, address, or contact..."
                     />
                 </div>
             </div>

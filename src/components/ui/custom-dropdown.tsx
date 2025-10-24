@@ -9,6 +9,7 @@ import { Input } from './input';
 export interface CustomDropdownOption {
     value: string;
     label: string;
+    data?: any; // Additional data for enhanced display
 }
 
 interface CustomDropdownProps {
@@ -38,31 +39,55 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        // Only update search term if a valid selection is made and it differs
+        // Only update search term if a valid selection is made and user is not actively typing
         // This prevents overwriting user's typing
-        if (selectedItem) {
+        if (selectedItem && !isOpen) {
             setSearchTerm(selectedItem.label);
-        } else if (!value) {
+        } else if (!value && !isOpen) {
             setSearchTerm('');
         }
-    }, [value, selectedItem]);
+    }, [value, selectedItem, isOpen]);
     
     const filteredItems = useMemo(() => {
         if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
             return options;
         }
         
-        const lowercasedSearchTerm = searchTerm.toLowerCase();
+        const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
         
         return options
-            .map(item => ({
-                ...item,
-                // Calculate Levenshtein distance for fuzzy matching
-                distance: levenshteinDistance(lowercasedSearchTerm, item.label.toLowerCase())
-            }))
+            .map(item => {
+                const lowercasedLabel = item.label.toLowerCase();
+                
+                // Check for exact matches first
+                if (lowercasedLabel.includes(lowercasedSearchTerm)) {
+                    return { ...item, distance: 0 };
+                }
+                
+                // Check for partial matches in different parts of the label
+                const labelParts = lowercasedLabel.split(/[\s\-\(\)]+/);
+                let minDistance = Infinity;
+                
+                for (const part of labelParts) {
+                    if (part.includes(lowercasedSearchTerm)) {
+                        minDistance = 0;
+                        break;
+                    }
+                    const distance = levenshteinDistance(lowercasedSearchTerm, part);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                    }
+                }
+                
+                // Also check the full label for fuzzy matching
+                const fullDistance = levenshteinDistance(lowercasedSearchTerm, lowercasedLabel);
+                minDistance = Math.min(minDistance, fullDistance);
+                
+                return { ...item, distance: minDistance };
+            })
             .filter(item => 
                 // Keep items that include the search term OR are very similar (low distance)
-                item.label.toLowerCase().includes(lowercasedSearchTerm) || item.distance <= 2
+                item.distance <= 3
             )
             .sort((a, b) => a.distance - b.distance); // Sort by similarity
 
@@ -71,6 +96,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
+            // Only reset search term if we have a valid selection
             if (selectedItem) {
                 setSearchTerm(selectedItem.label);
             } else if (value) {
@@ -80,12 +106,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                  } else {
                     setSearchTerm(value);
                  }
-            } else {
-                setSearchTerm('');
-                onChange(null); // Clear value if nothing valid is selected
             }
+            // Don't clear the value automatically - let user decide
         }
-    }, [selectedItem, value, options, onChange]);
+    }, [selectedItem, value, options]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
@@ -182,7 +206,83 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                         selectedItem?.value === item.value ? 'bg-accent font-medium' : ''
                                     )}
                                 >
-                                    {item.label}
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center space-x-2 text-sm">
+                                            <span className="font-medium text-foreground">
+                                                {item.data?.name ? item.data.name : 
+                                                 item.label.includes(' | ') ? item.label.split(' | ')[0] : 
+                                                 item.label.split(' - ')[0]}
+                                            </span>
+                                            {(() => {
+                                                // Parse father name from label if data is not available
+                                                let fatherName = item.data?.fatherName || item.data?.so;
+                                                
+                                                if (!fatherName && item.label.includes(' | F:')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 1 && parts[1].startsWith('F:')) {
+                                                        fatherName = parts[1].substring(2).trim(); // Remove "F:" prefix
+                                                    }
+                                                } else if (!fatherName && item.label.includes(' - ')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
+                                                    const parts = item.label.split(' - ');
+                                                    if (parts.length > 1) {
+                                                        fatherName = parts[1].replace(/\s*\([^)]*\)$/, '').trim();
+                                                    }
+                                                }
+                                                
+                                                return fatherName && (
+                                                    <span className="text-muted-foreground">
+                                                        Son of {fatherName}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {(() => {
+                                                // Parse address from label if data is not available
+                                                let address = item.data?.address;
+                                                if (!address && item.label.includes(' | ')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 2) {
+                                                        address = parts[2].trim();
+                                                    }
+                                                } else if (!address && item.label.includes(' - ')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
+                                                    const parts = item.label.split(' - ');
+                                                    if (parts.length > 2) {
+                                                        address = parts[2].replace(/\s*\([^)]*\)$/, '').trim();
+                                                    }
+                                                }
+                                                return address && (
+                                                    <span className="text-muted-foreground">
+                                                        | {address}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {(() => {
+                                                // Parse contact from label if data is not available
+                                                let contact = item.data?.contact;
+                                                if (!contact && item.label.includes(' | ')) {
+                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
+                                                    const parts = item.label.split(' | ');
+                                                    if (parts.length > 3) {
+                                                        contact = parts[3].trim();
+                                                    }
+                                                } else if (!contact && item.label.includes('(')) {
+                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
+                                                    const match = item.label.match(/\(([^)]+)\)/);
+                                                    if (match) {
+                                                        contact = match[1].trim();
+                                                    }
+                                                }
+                                                return contact && (
+                                                    <span className="text-muted-foreground">
+                                                        | {contact}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
                                 </li>
                             ))
                         ) : (

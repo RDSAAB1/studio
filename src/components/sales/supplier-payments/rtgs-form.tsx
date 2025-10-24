@@ -27,9 +27,17 @@ export const RtgsForm = (props: any) => {
         editingPayment, setIsBankSettingsOpen,
         handleEditPayment,
         paymentDate, setPaymentDate,
+        finalAmountToBePaid, // Add this prop to get the To Be Paid amount
     } = props;
     
     const { banks, bankBranches } = useSupplierData();
+    
+    // Auto-fill RTGS amount from To Be Paid amount
+    React.useEffect(() => {
+        if (finalAmountToBePaid && finalAmountToBePaid > 0 && !editingPayment) {
+            setRtgsAmount(finalAmountToBePaid);
+        }
+    }, [finalAmountToBePaid, editingPayment, setRtgsAmount]);
     
     const bankOptions = React.useMemo(() => {
         if (!Array.isArray(banks)) return [];
@@ -152,7 +160,7 @@ export const RtgsForm = (props: any) => {
                      <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                         <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                        <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
+                        <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" placeholder="Auto-filled from To Be Paid" /></div>
                      </CardContent>
                 </Card>
                  <Card>

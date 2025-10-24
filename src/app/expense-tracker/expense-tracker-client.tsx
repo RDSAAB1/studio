@@ -72,8 +72,17 @@ type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 type DisplayTransaction = (Income | Expense) & { id: string };
 
 const getInitialFormState = (nextTxId: string): TransactionFormValues => {
+  // Use persistent date from localStorage, fallback to today
+  let persistentDate = new Date();
+  if (typeof window !== 'undefined') {
+    const savedDate = localStorage.getItem('incomeExpenseDate');
+    if (savedDate) {
+      persistentDate = new Date(savedDate);
+    }
+  }
+  
   return {
-    date: new Date(),
+    date: persistentDate,
     transactionType: 'Expense',
     category: '',
     subCategory: '',
@@ -231,6 +240,15 @@ export default function IncomeExpenseClient() {
   const quantity = watch('quantity');
   const rate = watch('rate');
 
+  // Save date to localStorage when it changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'date' && value.date && typeof window !== 'undefined') {
+        localStorage.setItem('incomeExpenseDate', value.date.toISOString());
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
     useEffect(() => {
         if (!editingTransaction) {

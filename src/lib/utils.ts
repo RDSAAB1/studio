@@ -75,59 +75,22 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
   return `${prefix}${String(newNumber).padStart(padding, '0')}`;
 };
 
-export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
-    const termDays = Number(values.term) || 0;
-    
-    let entryDate: Date;
-    if (values.date) {
-        // If it's already a Date object, use it. If it's a string, parse it.
-        entryDate = typeof values.date === 'string' ? parseISO(values.date) : values.date;
-        if (!isValid(entryDate)) {
-            entryDate = new Date(); // Fallback to today if parsing fails
-        }
-    } else {
-        entryDate = new Date();
-    }
-    entryDate.setHours(0, 0, 0, 0);
-
-    let newDueDate = addDays(entryDate, termDays);
-
-    let warning = '';
-    let suggestedTerm: number | null = null;
-    
-    const isHoliday = (d: Date) => isSunday(d) || holidays.some(h => new Date(h.date).toDateString() === d.toDateString());
-
-    if (isHoliday(newDueDate)) {
-        let shiftedDate = new Date(newDueDate);
-        while (isHoliday(shiftedDate)) {
-            shiftedDate = addDays(shiftedDate, 1);
-        }
-        warning = `Due date was on a holiday/Sunday.`;
-        newDueDate = shiftedDate;
-        suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
+// Lightweight calculation function - only essential calculations for real-time updates
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>) => {
+    // Add null/undefined check to prevent runtime errors
+    if (!values) {
+        return {
+            weight: 0,
+            kartaWeight: 0,
+            kartaAmount: 0,
+            netWeight: 0,
+            amount: 0,
+            labouryAmount: 0,
+            originalNetAmount: 0,
+            netAmount: 0
+        };
     }
     
-    if (allSuppliers && allSuppliers.length > 0) {
-        let dailyTotal = 0;
-        const dueDateString = format(newDueDate, 'yyyy-MM-dd');
-        
-        allSuppliers.forEach(supplier => {
-            if (supplier.dueDate === dueDateString) {
-                dailyTotal += Number(supplier.netAmount) || 0;
-            }
-        });
-
-        if (dailyTotal > dailyPaymentLimit) {
-            let nextAvailableDate = addDays(newDueDate, 1);
-            while (isHoliday(nextAvailableDate)) {
-                 nextAvailableDate = addDays(nextAvailableDate, 1);
-            }
-            warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached.`;
-            newDueDate = nextAvailableDate;
-            suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
-        }
-    }
-
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
@@ -145,35 +108,128 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     }
 
     const kartaAmount = Math.round(kartaWeight * rate);
-    
     const netWeight = weight - kartaWeight;
-    
     const amount = Math.round(weight * rate); 
-
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = Math.round(weight * labouryRate);
     const kanta = values.kanta || 0;
-
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
-
     const netAmount = originalNetAmount;
 
     return {
       ...values,
+      weight,
+      kartaWeight,
+      kartaAmount,
+      netWeight,
+      amount,
+      labouryAmount,
+      originalNetAmount,
+      netAmount
+    };
+};
+
+// Heavy calculations moved to background - only called when needed (onBlur, onSubmit)
+export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
+    const termDays = Number(values.term) || 0;
+    
+    let entryDate: Date;
+    if (values.date) {
+        entryDate = typeof values.date === 'string' ? parseISO(values.date) : values.date;
+        if (!isValid(entryDate)) {
+            entryDate = new Date();
+        }
+    } else {
+        entryDate = new Date();
+    }
+    entryDate.setHours(0, 0, 0, 0);
+
+    let newDueDate = addDays(entryDate, termDays);
+    let warning = '';
+    let suggestedTerm: number | null = null;
+    
+    const isHoliday = (d: Date) => isSunday(d) || holidays.some(h => new Date(h.date).toDateString() === d.toDateString());
+
+    if (isHoliday(newDueDate)) {
+        let shiftedDate = new Date(newDueDate);
+        while (isHoliday(shiftedDate)) {
+            shiftedDate = addDays(shiftedDate, 1);
+        }
+        warning = `Due date was on a holiday/Sunday.`;
+        newDueDate = shiftedDate;
+        suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
+    }
+    
+    // Get basic calculations first
+    const basicCalculations = calculateSupplierEntry(values);
+
+    if (allSuppliers && allSuppliers.length > 0) {
+        let dailyTotal = 0;
+        const dueDateString = format(newDueDate, 'yyyy-MM-dd');
+        
+        // Calculate daily total from existing suppliers
+        allSuppliers.forEach(supplier => {
+            if (supplier.dueDate === dueDateString) {
+                dailyTotal += Number(supplier.netAmount) || 0;
+            }
+        });
+
+        // Add the current entry's amount to the daily total
+        // Use the calculated netAmount from basicCalculations
+        const currentEntryAmount = Number(basicCalculations.netAmount) || 0;
+        
+        // Only add positive amounts to avoid negative values
+        if (currentEntryAmount > 0) {
+            dailyTotal += currentEntryAmount;
+        }
+
+        // Debug: Log the daily limit calculation
+        console.log('Daily Limit Debug:', {
+            dueDateString,
+            existingSuppliersTotal: dailyTotal - currentEntryAmount,
+            currentEntryAmount,
+            totalDailyAmount: dailyTotal,
+            dailyPaymentLimit,
+            isLimitExceeded: dailyTotal > dailyPaymentLimit,
+            suppliersOnThisDate: allSuppliers.filter(s => s.dueDate === dueDateString).length,
+            basicCalculationsNetAmount: basicCalculations.netAmount,
+            inputValues: {
+                grossWeight: values.grossWeight,
+                teirWeight: values.teirWeight,
+                rate: values.rate,
+                labouryRate: values.labouryRate,
+                kanta: values.kanta,
+                kartaPercentage: values.kartaPercentage
+            },
+            calculatedValues: {
+                weight: basicCalculations.weight,
+                amount: basicCalculations.amount,
+                labouryAmount: basicCalculations.labouryAmount,
+                kartaAmount: basicCalculations.kartaAmount,
+                kartaWeight: basicCalculations.kartaWeight,
+                originalNetAmount: basicCalculations.originalNetAmount,
+                netAmount: basicCalculations.netAmount
+            }
+        });
+
+        if (dailyTotal > dailyPaymentLimit) {
+            let nextAvailableDate = addDays(newDueDate, 1);
+            while (isHoliday(nextAvailableDate)) {
+                 nextAvailableDate = addDays(nextAvailableDate, 1);
+            }
+            warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached.`;
+            newDueDate = nextAvailableDate;
+            suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
+        }
+    }
+
+    return {
+      ...basicCalculations,
       date: entryDate.toISOString().split('T')[0],
       term: String(values.term), 
       dueDate: newDueDate.toISOString().split('T')[0],
-      weight: weight,
-      kartaWeight: kartaWeight,
-      kartaAmount: kartaAmount,
-      netWeight: netWeight,
-      amount: amount, 
-      labouryAmount: labouryAmount,
-      kanta: kanta, 
-      originalNetAmount: originalNetAmount,
-      netAmount: netAmount,
-      warning: warning,
-      suggestedTerm: suggestedTerm,
+      warning,
+      suggestedTerm
     };
 };
 

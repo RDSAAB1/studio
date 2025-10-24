@@ -212,10 +212,10 @@ export const useSupplierData = () => {
 
             paymentsForThisEntry.forEach(p => {
                 const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                // paidFor.amount already includes CD portion, so we add it directly
+                // paidFor.amount is now only the actual payment amount (₹5000), not including CD
                 totalPaidForEntry += paidForThisDetail.amount;
 
-                // Calculate CD portion for display purposes only
+                // Calculate CD portion for this entry
                 if ('cdApplied' in p && p.cdApplied && 'cdAmount' in p && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
                     const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     if(totalAmountInPayment > 0) {
@@ -225,12 +225,13 @@ export const useSupplierData = () => {
                 }
             });
             
-                // Store amounts for display (totalPaid already includes CD)
-                // For display: show actual payment separately from CD
-                transaction.totalPaid = totalPaidForEntry - totalCdForEntry; // Actual payment without CD
-                transaction.totalCd = totalCdForEntry; // CD amount
-                // Outstanding: Original - (Payment + CD) = Original - totalPaidForEntry
-                transaction.netAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry;
+                // Store amounts for display
+                // totalPaidForEntry = actual payment amount (₹5000)
+                // totalCdForEntry = CD amount (₹50)
+                transaction.totalPaid = totalPaidForEntry; // Actual payment amount (₹5000)
+                transaction.totalCd = totalCdForEntry; // CD amount (₹50)
+                // Outstanding: Original - (Payment + CD) = Original - (totalPaidForEntry + totalCdForEntry)
+                transaction.netAmount = (transaction.originalNetAmount || 0) - (totalPaidForEntry + totalCdForEntry);
                 
                 // Debug log
                 if (totalPaidForEntry > 0 || totalCdForEntry > 0) {
@@ -241,7 +242,8 @@ export const useSupplierData = () => {
                         totalPaid: transaction.totalPaid,
                         totalCd: transaction.totalCd,
                         netAmount: transaction.netAmount,
-                        paymentsCount: paymentsForThisEntry.length
+                        paymentsCount: paymentsForThisEntry.length,
+                        paymentsWithCD: paymentsForThisEntry.filter(p => p.cdApplied && p.cdAmount).length
                     });
                 }
         });
@@ -261,7 +263,25 @@ export const useSupplierData = () => {
         
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
+        
+        // Debug: Log the outstanding calculation
+        console.log('CustomerSummary - Outstanding calculation for:', data.name, {
+            totalOriginalAmount: data.totalOriginalAmount,
+            totalPaid: data.totalPaid,
+            totalCdAmount: data.totalCdAmount,
+            netAmountSum: data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0),
+            transactionsCount: data.allTransactions!.length,
+            firstTransaction: data.allTransactions![0] ? {
+                srNo: data.allTransactions![0].srNo,
+                originalNetAmount: data.allTransactions![0].originalNetAmount,
+                netAmount: data.allTransactions![0].netAmount,
+                totalPaid: data.allTransactions![0].totalPaid,
+                totalCd: data.allTransactions![0].totalCd
+            } : null
+        });
+        
+        // Calculate outstanding as: Original Amount - Total Paid (excluding CD)
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
         
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
