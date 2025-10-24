@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntryWithValidation } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -58,7 +58,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '20', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
   };
 };
@@ -170,7 +170,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntryWithValidation(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -193,6 +193,15 @@ export default function SupplierEntryClient() {
       const currentValues = form.getValues();
       const updatedValues = { ...currentValues, [fieldName]: parseFloat(value) || 0 };
       performCalculations(updatedValues, false);
+    }, 0);
+  }, [form, performCalculations]);
+
+  const handleTermBlur = useCallback((value: string) => {
+    // Trigger due date calculation when term changes
+    setTimeout(() => {
+      const currentValues = form.getValues();
+      const updatedValues = { ...currentValues, term: value };
+      performCalculations(updatedValues, true); // Show warnings for term changes
     }, 0);
   }, [form, performCalculations]);
 
@@ -422,7 +431,7 @@ export default function SupplierEntryClient() {
   // This function was running expensive Levenshtein distance calculations on every keystroke
   const findAndSuggestSimilarSupplier = () => {
     // No-op function to prevent errors
-    setSuggestedSupplier(null);
+        setSuggestedSupplier(null);
   };
   
   const applySuggestion = () => {
@@ -591,7 +600,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
+            const calculated = calculateSupplierEntryWithValidation(c as FormValues, paymentHistory || [], [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -777,6 +786,7 @@ export default function SupplierEntryClient() {
                 handleSrNoBlur={handleSrNoBlur}
                 onContactChange={onContactChange}
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
+                handleTermBlur={handleTermBlur}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
@@ -884,3 +894,810 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+        if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
+
+          await deleteSupplier(currentSupplier.id);
+
+          setSuppliers(prev => prev.filter(s => s.id !== currentSupplier.id));
+
+        }
+
+
+
+        if (deletePayments) {
+
+            await deletePaymentsForSrNo(completeEntry.srNo);
+
+            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+
+            const savedEntry = await addSupplier(updatedEntry);
+
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
+
+            toast({ title: "Entry updated and payments deleted.", variant: "success" });
+
+            if (callback) callback(savedEntry); else handleNew();
+
+        } else {
+
+            const savedEntry = await addSupplier(completeEntry);
+
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
+
+            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
+
+            if (callback) callback(savedEntry); else handleNew();
+
+        }
+
+    } catch (error) {
+
+        console.error("Error saving supplier:", error);
+
+        toast({ title: "Failed to save entry.", variant: "destructive" });
+
+    }
+
+  };
+
+
+
+  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+
+    if (suggestedSupplier && !values.forceUnique) {
+
+      return; // Do not submit if a suggestion is active and user hasn't chosen an action
+
+    }
+
+    if (isEditing) {
+
+        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
+
+        if (hasPayments) {
+
+            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+
+            setIsUpdateConfirmOpen(true);
+
+            return;
+
+        }
+
+    }
+
+    executeSubmit(values, false, callback);
+
+  };
+
+
+
+  const handleSaveAndPrint = async () => {
+
+    const isValid = await form.trigger();
+
+    if (isValid) {
+
+      onSubmit(form.getValues(), (savedEntry) => {
+
+        handleSinglePrint(savedEntry);
+
+        handleNew();
+
+      });
+
+    } else {
+
+      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
+
+    }
+
+  };
+
+  
+
+  const handleShowDetails = (customer: Customer) => {
+
+    // Show details using existing DetailsDialog (same as supplier profile)
+    setDetailsSupplier(customer);
+
+  }
+
+  
+
+  const handleSinglePrint = (entry: Customer) => {
+
+    setReceiptsToPrint([entry]);
+
+    setConsolidatedReceiptData(null);
+
+  };
+
+  
+
+  const handlePrint = () => {
+
+    if (selectedSupplierIds.size > 0) {
+
+        const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
+
+        if (entriesToPrint.length === 0) {
+
+            toast({ title: "No selected entries found.", variant: "destructive" });
+
+            return;
+
+        }
+
+
+
+        if (entriesToPrint.length === 1) {
+
+            setReceiptsToPrint(entriesToPrint);
+
+            setConsolidatedReceiptData(null);
+
+        } else {
+
+            const firstCustomerId = entriesToPrint[0].customerId;
+
+            const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
+
+    
+
+            if (!allSameCustomer) {
+
+                toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
+
+                return;
+
+            }
+
+            
+
+            const supplier = entriesToPrint[0];
+
+            const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+
+            
+
+            setConsolidatedReceiptData({
+
+                supplier: {
+
+                    name: supplier.name,
+
+                    so: supplier.so,
+
+                    address: supplier.address,
+
+                    contact: supplier.contact,
+
+                },
+
+                entries: entriesToPrint,
+
+                totalAmount: totalAmount,
+
+                date: format(new Date(), "dd-MMM-yy"),
+
+            });
+
+            setReceiptsToPrint([]);
+
+        }
+
+    } else {
+
+      const formValues = form.getValues();
+
+      const isValid = form.trigger();
+
+      if(isValid && formValues.name && formValues.contact){
+
+        handleSaveAndPrint();
+
+      } else {
+
+         toast({ title: "Please fill form or select entries to print.", variant: "destructive" });
+
+      }
+
+    }
+
+  };
+
+
+
+    const handleExport = () => {
+
+        if (!suppliers) return;
+
+        const dataToExport = suppliers.map(c => {
+
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
+
+            return {
+
+                'SR NO.': c.srNo,
+
+                'DATE': c.date,
+
+                'TERM': c.term,
+
+                'DUE DATE': calculated.dueDate,
+
+                'NAME': c.name,
+
+                'S/O': c.so,
+
+                'ADDRESS': c.address,
+
+                'CONTACT': c.contact,
+
+                'VEHICLE NO': c.vehicleNo,
+
+                'VARIETY': c.variety,
+
+                'GROSS WT': c.grossWeight,
+
+                'TEIR WT': c.teirWeight,
+
+                'FINAL WT': calculated.weight,
+
+                'KARTA %': c.kartaPercentage,
+
+                'KARTA WT': calculated.kartaWeight,
+
+                'NET WT': calculated.netWeight,
+
+                'RATE': c.rate,
+
+                'LABOURY RATE': c.labouryRate,
+
+                'LABOURY AMT': calculated.labouryAmount,
+
+                'KANTA': c.kanta,
+
+                'AMOUNT': calculated.amount,
+
+                'NET AMOUNT': calculated.originalNetAmount,
+
+                'PAYMENT TYPE': c.paymentType,
+
+            };
+
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+        const workbook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+
+        XLSX.writeFile(workbook, "SupplierEntries.xlsx");
+
+        toast({title: "Exported", description: "Supplier data has been exported."});
+
+    };
+
+
+
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+
+
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+
+            try {
+
+                const data = e.target?.result;
+
+                const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
+
+                const sheetName = workbook.SheetNames[0];
+
+                const worksheet = workbook.Sheets[sheetName];
+
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                
+
+                let nextSrNum = (suppliers || []).length > 0 ? Math.max(...(suppliers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+
+
+                for (const item of json) {
+
+                     const supplierData: Customer = {
+
+                        id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+
+                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+
+                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+
+                        term: String(item['TERM'] || '20'),
+
+                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+
+                        name: toTitleCase(item['NAME']),
+
+                        so: toTitleCase(item['S/O'] || ''),
+
+                        address: toTitleCase(item['ADDRESS'] || ''),
+
+                        contact: String(item['CONTACT'] || ''),
+
+                        vehicleNo: toTitleCase(item['VEHICLE NO'] || ''),
+
+                        variety: toTitleCase(item['VARIETY'] || ''),
+
+                        grossWeight: parseFloat(item['GROSS WT']) || 0,
+
+                        teirWeight: parseFloat(item['TEIR WT']) || 0,
+
+                        weight: parseFloat(item['FINAL WT']) || 0,
+
+                        kartaPercentage: parseFloat(item['KARTA %']) || 0,
+
+                        kartaWeight: parseFloat(item['KARTA WT']) || 0,
+
+                        kartaAmount: parseFloat(item['KARTA AMT']) || 0,
+
+                        netWeight: parseFloat(item['NET WT']) || 0,
+
+                        rate: parseFloat(item['RATE']) || 0,
+
+                        labouryRate: parseFloat(item['LABOURY RATE']) || 0,
+
+                        labouryAmount: parseFloat(item['LABOURY AMT']) || 0,
+
+                        kanta: parseFloat(item['KANTA']) || 0,
+
+                        amount: parseFloat(item['AMOUNT']) || 0,
+
+                        originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
+
+                        netAmount: parseFloat(item['NET AMOUNT']) || 0,
+
+                        paymentType: item['PAYMENT TYPE'] || 'Full',
+
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+
+                        barcode: '',
+
+                        receiptType: 'Cash',
+
+                    };
+
+
+
+                    await addSupplier(supplierData);
+
+                }
+
+                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+
+            } catch (error) {
+
+                console.error("Import failed:", error);
+
+                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+
+            }
+
+        };
+
+        reader.readAsBinaryString(file);
+
+    };
+
+  
+
+    const handleDeleteAll = async () => {
+
+        try {
+
+            await deleteAllSuppliers();
+
+            await deleteAllPayments();
+
+            setSuppliers([]);
+
+            setPaymentHistory([]);
+
+            toast({ title: "All entries deleted successfully", variant: "success" });
+
+            handleNew();
+
+        } catch (error) {
+
+            console.error("Error deleting all entries:", error);
+
+            toast({ title: "Failed to delete all entries", variant: "destructive" });
+
+        }
+
+    };
+
+    
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+
+        if (e.key === 'Enter') {
+
+            const activeElement = document.activeElement as HTMLElement;
+
+            if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
+
+                return;
+
+            }
+
+            e.preventDefault(); // Prevent form submission
+
+            const formEl = e.currentTarget;
+
+            const formElements = Array.from(formEl.elements).filter(el => 
+
+                (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
+
+                !el.hasAttribute('disabled') && 
+
+                (el as HTMLElement).offsetParent !== null
+
+            ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+
+
+
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+
+            
+
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+
+                formElements[currentElementIndex + 1].focus();
+
+            } else if (currentElementIndex === formElements.length - 1) {
+
+                // Optional: loop back to the first element or submit
+
+                // formElements[0].focus();
+
+            }
+
+        }
+
+    };
+
+    
+
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+
+      if (event.ctrlKey) {
+
+          switch (event.key.toLowerCase()) {
+
+              case 's':
+
+                  event.preventDefault();
+
+                  form.handleSubmit((values) => onSubmit(values))();
+
+                  break;
+
+              case 'p':
+
+                  event.preventDefault();
+
+                  handleSaveAndPrint();
+
+                  break;
+
+              case 'n':
+
+                  event.preventDefault();
+
+                  handleNew();
+
+                  break;
+
+              case 'd':
+
+                  event.preventDefault();
+
+                  if (isEditing && currentSupplier.id) {
+
+                      handleDelete(currentSupplier.id);
+
+                  }
+
+                  break;
+
+          }
+
+      }
+
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
+
+
+
+  useEffect(() => {
+
+      document.addEventListener('keydown', handleKeyboardShortcuts);
+
+      return () => {
+
+          document.removeEventListener('keydown', handleKeyboardShortcuts);
+
+      };
+
+  }, [handleKeyboardShortcuts]);
+
+
+
+
+
+  if (!isClient) {
+
+    return null;
+
+  }
+
+
+
+  if (isLoading) {
+
+    return (
+
+      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+
+        <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
+
+      </div>
+
+    );
+
+  }
+
+
+
+  return (
+
+    <div className="space-y-4">
+
+      <FormProvider {...form}>
+
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+
+            <SupplierForm 
+
+                form={form}
+
+                handleSrNoBlur={handleSrNoBlur}
+
+                onContactChange={onContactChange}
+
+                handleNameOrSoBlur={findAndSuggestSimilarSupplier}
+
+                varietyOptions={varietyOptions}
+
+                paymentTypeOptions={paymentTypeOptions}
+
+                setLastVariety={handleSetLastVariety}
+
+                setLastPaymentType={handleSetLastPaymentType}
+
+                handleAddOption={addOption}
+
+                handleUpdateOption={updateOption}
+
+                handleDeleteOption={deleteOption}
+
+                allSuppliers={safeSuppliers}
+
+                handleCalculationFieldChange={handleCalculationFieldChange}
+            />
+
+            
+
+            <CalculatedSummary 
+
+                customer={currentSupplier}
+
+                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+
+                onSaveAndPrint={handleSaveAndPrint}
+
+                onNew={handleNew}
+
+                isEditing={isEditing}
+
+                onSearch={handleSearchChange}
+                onPrint={handlePrint}
+
+                selectedIdsCount={selectedSupplierIds.size}
+
+                onImport={handleImport}
+
+                onExport={handleExport}
+
+                onDeleteAll={handleDeleteAll}
+
+            />
+
+        </form>
+
+      </FormProvider>      
+
+
+
+      <AlertDialog open={!!suggestedSupplier} onOpenChange={() => setSuggestedSupplier(null)}>
+
+        <AlertDialogContent>
+
+            <AlertDialogHeader>
+
+                <AlertDialogTitle className="flex items-center gap-2">
+
+                    <Lightbulb className="h-5 w-5 text-yellow-500" />
+
+                    Did you mean this supplier?
+
+                </AlertDialogTitle>
+
+                <AlertDialogDescription>
+
+                    A supplier with a very similar name already exists. Is this the same person?
+
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+
+                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+
+                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+
+                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+
+                    </div>
+
+                </AlertDialogDescription>
+
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+
+                <AlertDialogAction onClick={() => {
+
+                    form.setValue('forceUnique', true);
+
+                    setSuggestedSupplier(null);
+
+                }}>No, Create New</AlertDialogAction>
+
+                <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
+
+            </AlertDialogFooter>
+
+        </AlertDialogContent>
+
+      </AlertDialog>
+
+      
+
+      <EntryTable 
+
+        entries={filteredSuppliers} 
+
+        onEdit={handleEdit} 
+
+        onDelete={handleDelete} 
+
+        onShowDetails={handleShowDetails}
+
+        selectedIds={selectedSupplierIds}
+
+        onSelectionChange={setSelectedSupplierIds}
+
+        onPrintRow={handleSinglePrint}
+
+      />
+
+      
+
+      {hasMoreSuppliers && (
+
+        <div className="text-center">
+
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+
+                {isLoadingMore ? "Loading..." : "Load More"}
+
+            </Button>
+
+        </div>
+
+       )}
+
+
+
+      <DetailsDialog
+
+        isOpen={!!detailsSupplier}
+
+        onOpenChange={() => setDetailsSupplier(null)}
+
+        customer={detailsSupplier}
+
+        paymentHistory={paymentHistory}
+
+      />
+
+      
+
+      <ReceiptPrintDialog
+
+        receipts={receiptsToPrint}
+
+        settings={receiptSettings}
+
+        onOpenChange={() => setReceiptsToPrint([])}
+
+      />
+
+      
+
+      <ConsolidatedReceiptPrintDialog
+
+        data={consolidatedReceiptData}
+
+        settings={receiptSettings}
+
+        onOpenChange={() => setConsolidatedReceiptData(null)}
+
+      />
+
+
+
+      <ReceiptSettingsDialog
+
+        settings={receiptSettings}
+
+        setSettings={setReceiptSettings}
+
+      />
+
+
+
+      <UpdateConfirmDialog
+
+        isOpen={isUpdateConfirmOpen}
+
+        onOpenChange={setIsUpdateConfirmOpen}
+
+        onConfirm={(deletePayments) => {
+
+            if(updateAction) {
+
+                updateAction(deletePayments);
+
+            }
+
+        }}
+
+      />
+
+    </div>
+
+  );
+
+}
+
+

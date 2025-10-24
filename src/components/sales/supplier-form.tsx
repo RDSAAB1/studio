@@ -28,7 +28,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers, handleCalculationFieldChange }: any) => {
+export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, handleTermBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers, handleCalculationFieldChange }: any) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -99,12 +99,12 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                 <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-8 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                                <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={() => handleNameOrSoBlur()} className="h-8 text-sm pl-10" />
-                            </InputWithIcon>
-                        </div>
+                         <div className="space-y-1">
+                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
+                                 <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={(e) => handleTermBlur(e.target.value)} className="h-8 text-sm pl-10" />
+                             </InputWithIcon>
+                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -240,3 +240,18 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
         </>
     );
 };
+
+            setIsOpen={setIsManageOptionsOpen}
+            type={managementType}
+            options={optionsToManage}
+            onAdd={handleAddOption}
+            onUpdate={handleUpdateOption}
+            onDelete={(collectionName: string, id: string, name: string) => handleDeleteOption(collectionName, id, name)}
+        />
+        </>
+    );
+};
+
+// Memoized component for better performance
+export const SupplierForm = memo(SupplierFormComponent);
+

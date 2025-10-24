@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntryWithValidation } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -63,7 +63,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
   };
 };
@@ -172,7 +172,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntryWithValidation(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -195,6 +195,15 @@ export default function SupplierEntryClient() {
       const currentValues = form.getValues();
       const updatedValues = { ...currentValues, [fieldName]: parseFloat(value) || 0 };
       performCalculations(updatedValues, false);
+    }, 0);
+  }, [form, performCalculations]);
+
+  const handleTermBlur = useCallback((value: string) => {
+    // Trigger due date calculation when term changes
+    setTimeout(() => {
+      const currentValues = form.getValues();
+      const updatedValues = { ...currentValues, term: value };
+      performCalculations(updatedValues, true); // Show warnings for term changes
     }, 0);
   }, [form, performCalculations]);
 
@@ -389,7 +398,7 @@ export default function SupplierEntryClient() {
   // This function was running expensive Levenshtein distance calculations on every keystroke
   const findAndSuggestSimilarSupplier = () => {
     // No-op function to prevent errors
-    setSuggestedSupplier(null);
+        setSuggestedSupplier(null);
   };
   
   const applySuggestion = () => {
@@ -568,7 +577,7 @@ const handleDelete = async (id: string) => {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
+            const calculated = calculateSupplierEntryWithValidation(c as FormValues, paymentHistory || [], [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -752,6 +761,7 @@ const handleDelete = async (id: string) => {
                 handleSrNoBlur={handleSrNoBlur}
                 onContactChange={onContactChange}
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
+                handleTermBlur={handleTermBlur}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
