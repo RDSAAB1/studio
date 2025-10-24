@@ -75,8 +75,8 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
   return `${prefix}${String(newNumber).padStart(padding, '0')}`;
 };
 
-// Lightweight calculation function - only essential calculations for real-time updates
-export const calculateSupplierEntry = (values: Partial<SupplierFormValues>) => {
+// Ultra-lightweight calculation function - only basic math, no heavy operations
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory?: any[], holidays?: Holiday[], dailyPaymentLimit?: number, allSuppliers?: Customer[]) => {
     // Add null/undefined check to prevent runtime errors
     if (!values) {
         return {
@@ -183,34 +183,7 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
             dailyTotal += currentEntryAmount;
         }
 
-        // Debug: Log the daily limit calculation
-        console.log('Daily Limit Debug:', {
-            dueDateString,
-            existingSuppliersTotal: dailyTotal - currentEntryAmount,
-            currentEntryAmount,
-            totalDailyAmount: dailyTotal,
-            dailyPaymentLimit,
-            isLimitExceeded: dailyTotal > dailyPaymentLimit,
-            suppliersOnThisDate: allSuppliers.filter(s => s.dueDate === dueDateString).length,
-            basicCalculationsNetAmount: basicCalculations.netAmount,
-            inputValues: {
-                grossWeight: values.grossWeight,
-                teirWeight: values.teirWeight,
-                rate: values.rate,
-                labouryRate: values.labouryRate,
-                kanta: values.kanta,
-                kartaPercentage: values.kartaPercentage
-            },
-            calculatedValues: {
-                weight: basicCalculations.weight,
-                amount: basicCalculations.amount,
-                labouryAmount: basicCalculations.labouryAmount,
-                kartaAmount: basicCalculations.kartaAmount,
-                kartaWeight: basicCalculations.kartaWeight,
-                originalNetAmount: basicCalculations.originalNetAmount,
-                netAmount: basicCalculations.netAmount
-            }
-        });
+        // Debug logging removed for performance
 
         if (dailyTotal > dailyPaymentLimit) {
             let nextAvailableDate = addDays(newDueDate, 1);
