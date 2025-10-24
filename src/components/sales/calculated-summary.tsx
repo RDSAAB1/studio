@@ -232,7 +232,7 @@ export const CalculatedSummary = ({
                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>)}
                         </Button>
                         <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
-                            <PlusCircle className="mr-2 h-4 w-4" /> New
+                            <PlusCircle className="h-4 w-4" />
                         </Button>
                     </div>
                 </div>

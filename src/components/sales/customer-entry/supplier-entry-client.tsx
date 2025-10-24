@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -23,12 +23,12 @@ import { EntryTable } from "@/components/sales/entry-table";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
+import { DetailsDialog } from "@/components/sales/details-dialog";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
 import { Dialog, DialogContent, ScrollArea } from "@/components/ui/dialog";
-import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
 const formSchema = z.object({
@@ -94,7 +94,16 @@ export default function SupplierEntryClient() {
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 10);
+  
+  // Handle search with immediate clearing
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    // If clearing search, immediately show all results
+    if (!value.trim()) {
+      setSearchTerm('');
+    }
+  };
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
@@ -105,19 +114,53 @@ export default function SupplierEntryClient() {
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   const safePaymentHistory = useMemo(() => Array.isArray(paymentHistory) ? paymentHistory : [], [paymentHistory]);
   
+  // Pre-index suppliers for faster search
+  const indexedSuppliers = useMemo(() => {
+    return safeSuppliers.map(supplier => ({
+      ...supplier,
+      searchIndex: [
+        supplier.name?.toLowerCase() || '',
+        supplier.contact || '',
+        supplier.srNo?.toLowerCase() || '',
+        supplier.so?.toLowerCase() || '',
+        supplier.address?.toLowerCase() || ''
+      ].join(' ')
+    }));
+  }, [safeSuppliers]);
+  
+  // Search result cache
+  const searchCache = useRef(new Map<string, any[]>());
+  
+  // Clear cache when suppliers change
+  useEffect(() => {
+    searchCache.current.clear();
+  }, [safeSuppliers]);
+  
   const filteredSuppliers = useMemo(() => {
-    if (!debouncedSearchTerm) {
+    // Immediate return for empty search - no processing needed
+    if (!debouncedSearchTerm || !debouncedSearchTerm.trim()) {
       return safeSuppliers;
     }
-    const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-    return safeSuppliers.filter(supplier => {
-      return (
-        supplier.name?.toLowerCase().startsWith(lowercasedFilter) ||
-        supplier.contact?.startsWith(lowercasedFilter) ||
-        supplier.srNo?.toLowerCase().startsWith(lowercasedFilter)
-      );
-    });
-  }, [safeSuppliers, debouncedSearchTerm]);
+    
+    const filter = debouncedSearchTerm.trim().toLowerCase();
+    
+    // Check cache first
+    if (searchCache.current.has(filter)) {
+      return searchCache.current.get(filter) || [];
+    }
+    
+    // Use indexed search for faster filtering
+    const results = indexedSuppliers.filter(supplier => 
+      supplier.searchIndex.includes(filter)
+    );
+    
+    // Cache the results (limit cache size to prevent memory issues)
+    if (searchCache.current.size < 50) {
+      searchCache.current.set(filter, results);
+    }
+    
+    return results;
+  }, [safeSuppliers, indexedSuppliers, debouncedSearchTerm]);
 
 
   const form = useForm<FormValues>({
@@ -145,6 +188,15 @@ export default function SupplierEntryClient() {
         toast({ title, description, variant: 'destructive', duration: 7000 });
       }
   }, [safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers, toast]);
+
+  const handleCalculationFieldChange = useCallback((fieldName: string, value: string) => {
+    // Run calculations in background to prevent UI lag
+    setTimeout(() => {
+      const currentValues = form.getValues();
+      const updatedValues = { ...currentValues, [fieldName]: parseFloat(value) || 0 };
+      performCalculations(updatedValues, false);
+    }, 0);
+  }, [form, performCalculations]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     setSuggestedSupplier(null);
@@ -274,12 +326,14 @@ export default function SupplierEntryClient() {
     }
   }
   
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>, false);
-    });
-    return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
+  // REMOVED: form.watch subscription to eliminate lag
+  // Calculations are now only triggered by specific field changes via handleCalculationFieldChange
+  // useEffect(() => {
+  //   const subscription = form.watch((value) => {
+  //       performCalculations(value as Partial<FormValues>, false);
+  //   });
+  //   return () => subscription.unsubscribe();
+  // }, [form, performCalculations]);
 
   
   const handleEdit = (id: string) => {
@@ -316,6 +370,7 @@ export default function SupplierEntryClient() {
 
   const onContactChange = (contactValue: string) => {
     form.setValue('contact', contactValue);
+    // Only search when contact is complete (10 digits) to reduce lag
     if (contactValue.length === 10 && suppliers) {
       const latestEntryForContact = suppliers
           .filter(c => c.contact === contactValue)
@@ -330,45 +385,11 @@ export default function SupplierEntryClient() {
     }
   };
 
+  // REMOVED: findAndSuggestSimilarSupplier to eliminate lag
+  // This function was running expensive Levenshtein distance calculations on every keystroke
   const findAndSuggestSimilarSupplier = () => {
-    if (form.formState.isSubmitting || isEditing) {
-        setSuggestedSupplier(null);
-        return;
-    }
-
-    const { name, so } = form.getValues();
-    if (!name) {
-        setSuggestedSupplier(null);
-        return;
-    }
-
-    const currentNameNorm = name.replace(/\s+/g, '').toLowerCase();
-    const currentSoNorm = (so || '').replace(/\s+/g, '').toLowerCase();
-    
-    if (currentNameNorm.length < 3) {
-      setSuggestedSupplier(null);
-      return;
-    }
-    
-    let bestMatch: Customer | null = null;
-    let minDistance = Infinity;
-
-    const uniqueSuppliers = Array.from(new Map(suppliers?.map(s => [s.customerId, s])).values());
-    
-    for (const supplier of uniqueSuppliers) {
-        const supNameNorm = supplier.name.replace(/\s+/g, '').toLowerCase();
-        const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
-        
-        const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
-        const totalDist = nameDist + soDist;
-        
-        if (totalDist > 0 && totalDist < 5 && totalDist < minDistance) {
-            minDistance = totalDist;
-            bestMatch = supplier;
-        }
-    }
-    setSuggestedSupplier(bestMatch);
+    // No-op function to prevent errors
+    setSuggestedSupplier(null);
   };
   
   const applySuggestion = () => {
@@ -488,12 +509,8 @@ const handleDelete = async (id: string) => {
   };
   
   const handleShowDetails = (supplier: Customer) => {
-    const fullData = {
-        ...supplier,
-        allTransactions: [supplier],
-        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
-    };
-    setDetailsSupplier(fullData);
+    // Show details using existing DetailsDialog (same as supplier profile)
+    setDetailsSupplier(supplier);
   };
   
   const handleSinglePrint = (entry: Customer) => {
@@ -743,6 +760,7 @@ const handleDelete = async (id: string) => {
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
                 allSuppliers={safeSuppliers}
+                handleCalculationFieldChange={handleCalculationFieldChange}
             />
             
             <CalculatedSummary 
@@ -751,7 +769,7 @@ const handleDelete = async (id: string) => {
                 onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
-                onSearch={setSearchTerm}
+                onSearch={handleSearchChange}
                 onPrint={handlePrint}
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
@@ -797,13 +815,12 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
         
-      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={detailsSupplier} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <DetailsDialog 
+        isOpen={!!detailsSupplier}
+        onOpenChange={() => setDetailsSupplier(null)}
+        customer={detailsSupplier}
+        paymentHistory={paymentHistory}
+      />
       
       <ReceiptPrintDialog
         receipts={receiptsToPrint}

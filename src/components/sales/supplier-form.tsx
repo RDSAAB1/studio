@@ -57,6 +57,33 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
         }
     };
 
+    // Capitalization handlers for real-time text formatting
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const capitalizedValue = e.target.value.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+        form.setValue('name', capitalizedValue);
+    };
+
+    const handleSoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const capitalizedValue = e.target.value.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+        form.setValue('so', capitalizedValue);
+    };
+
+    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const capitalizedValue = e.target.value.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+        form.setValue('address', capitalizedValue);
+    };
+
+    const handleVehicleNoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const capitalizedValue = e.target.value.toUpperCase();
+        form.setValue('vehicleNo', capitalizedValue);
+    };
+
     // REMOVED: handleNumericInput to eliminate delay
     // const handleNumericInput = (e: React.ChangeEvent<HTMLInputElement>) => { ... }
 
@@ -81,25 +108,25 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                         <div className="space-y-1">
                             <Label htmlFor="rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('rate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('rate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('grossWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('grossWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('teirWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10"/>)} />
+                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('teirWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10"/>)} />
                             </InputWithIcon>
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} className="h-8 text-sm pl-10" /> )}/>
+                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleVehicleNoChange(e); field.onChange(e); }} className="h-8 text-sm pl-10" /> )}/>
                             </InputWithIcon>
                         </div>
                     </div>
@@ -120,20 +147,20 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                 <div className="space-y-1">
                                     <Label htmlFor="name" className="text-xs">Name</Label>
                                     <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input id="name" {...form.register('name')} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" />
+                                        <Input id="name" {...form.register('name')} onChange={handleNameChange} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" />
                                     </InputWithIcon>
                                 </div>
                            </div>
                             <div className="space-y-1">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleNameOrSoBlur} className="h-8 text-sm pl-10" /> )}/>
+                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleSoChange(e); field.onChange(e); }} onBlur={handleNameOrSoBlur} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} className="h-8 text-sm pl-10" /> )}/>
+                                    <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleAddressChange(e); field.onChange(e); }} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </CardContent>
@@ -180,19 +207,19 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                             <div className="space-y-1">
                                 <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('kartaPercentage', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('kartaPercentage', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('labouryRate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('labouryRate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onChange={(e) => { field.onChange(e); handleCalculationFieldChange('kanta', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('kanta', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
                          </CardContent>
