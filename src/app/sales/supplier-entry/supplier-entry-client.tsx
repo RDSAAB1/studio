@@ -67,7 +67,21 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
+  };
+};
+
+// Function to get partially cleared form state (for New button) - keeps variety and payment type
+const getClearedFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return {
+    id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
+    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
   };
 };
 
@@ -187,26 +201,6 @@ export default function SupplierEntryClient() {
     performCalculations(formValues, false);
   }, [form, performCalculations]);
 
-  const handleNew = useCallback(() => {
-      setIsEditing(false);
-      setSuggestedSupplier(null);
-      let nextSrNum = 1;
-      if (safeSuppliers && safeSuppliers.length > 0) {
-        const highestSrNo = safeSuppliers.reduce((max, s) => {
-            return s.srNo > max ? s.srNo : max;
-        }, 'S00000');
-        nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
-      }
-      const newState = getInitialFormState(lastVariety, lastPaymentType);
-      newState.srNo = formatSrNo(nextSrNum, 'S');
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      newState.date = format(today, 'yyyy-MM-dd');
-      newState.dueDate = format(today, 'yyyy-MM-dd');
-      resetFormToState(newState);
-      form.setValue('date', new Date()); // Set today's date
-      setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -218,11 +212,10 @@ export default function SupplierEntryClient() {
     if (suppliers !== undefined) {
         setIsLoading(false);
         if (isInitialLoad.current) {
-            handleNew();
             isInitialLoad.current = false;
         }
     }
-}, [suppliers, handleNew]);
+}, [suppliers]);
 
 
   useEffect(() => {
@@ -410,7 +403,7 @@ const handleDelete = async (id: string) => {
 
         toast({ title: "Entry and associated payments deleted.", variant: "success" });
         if (currentSupplier.id === id) {
-            handleNew();
+            // Entry deleted, no need to clear form
         }
     } catch (error) {
         console.error("Error deleting supplier and payments: ", error);
@@ -450,10 +443,10 @@ const handleDelete = async (id: string) => {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
             await addSupplier(updatedEntry);
-            if (callback) callback(updatedEntry); else handleNew();
+            if (callback) callback(updatedEntry);
         } else {
             await addSupplier(completeEntry);
-            if (callback) callback(completeEntry); else handleNew();
+            if (callback) callback(completeEntry);
         }
 
         toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
@@ -484,7 +477,6 @@ const handleDelete = async (id: string) => {
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
         handleSinglePrint(savedEntry);
-        handleNew();
       });
     } else {
       toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
@@ -652,7 +644,7 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            handleNew();
+            // All entries deleted
         } catch (error) {
             console.error("Error deleting all entries:", error);
             toast({ title: "Failed to delete all entries", variant: "destructive" });
@@ -729,7 +721,7 @@ const handleDelete = async (id: string) => {
                   break;
               case 'n':
                   event.preventDefault();
-                  handleNew();
+                  // New entry shortcut disabled
                   break;
               case 'd':
                   event.preventDefault();
@@ -739,7 +731,7 @@ const handleDelete = async (id: string) => {
                   break;
           }
       }
-  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
+  }, [form, onSubmit, handleSaveAndPrint, isEditing, currentSupplier]);
 
   useEffect(() => {
       document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -784,7 +776,6 @@ const handleDelete = async (id: string) => {
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
                 onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
                 onPrint={handlePrint}

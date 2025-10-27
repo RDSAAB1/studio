@@ -18,7 +18,25 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
       <div className="flex items-end pl-2 overflow-x-auto scrollbar-hide">
         {uniqueTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;
-            const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
+            let iconElement = null;
+            
+            try {
+                if (tab.icon) {
+                    if (typeof tab.icon === 'function') {
+                        iconElement = React.createElement(tab.icon, { className: "h-4 w-4" });
+                    } else if (React.isValidElement(tab.icon)) {
+                        iconElement = tab.icon;
+                    } else if (typeof tab.icon === 'object' && tab.icon.type) {
+                        iconElement = React.createElement(tab.icon.type, { className: "h-4 w-4" });
+                    } else {
+                        // Fallback: try to render as is
+                        console.warn('Unknown icon type for tab:', tab.id, tab.icon);
+                    }
+                }
+            } catch (error) {
+                console.error('Error rendering icon for tab:', tab.id, error);
+                iconElement = null;
+            }
 
             return (
               <Tab

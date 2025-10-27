@@ -47,9 +47,10 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
   };
 };
+
 
 export const useSupplierEntry = () => {
   const { toast } = useToast();
@@ -219,32 +220,6 @@ export const useSupplierEntry = () => {
     form.reset(customerState);
   }, [form]);
 
-  // Handle new entry
-  const handleNew = useCallback(() => {
-    const nextSrNo = formatSrNo(safeSuppliers);
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = nextSrNo;
-    
-    // Set persistent date
-    let persistentDate = new Date();
-    if (typeof window !== 'undefined') {
-      const savedDate = localStorage.getItem('supplierEntryDate');
-      if (savedDate) {
-        persistentDate = new Date(savedDate);
-      }
-    }
-    persistentDate.setHours(0,0,0,0);
-    
-    newState.date = format(persistentDate, 'yyyy-MM-dd');
-    newState.dueDate = format(persistentDate, 'yyyy-MM-dd');
-    resetFormToState(newState);
-    form.setValue('date', persistentDate);
-    
-    // Clear auto-fill data for new entry
-    setAutoFillData(null);
-    
-    setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form, setAutoFillData]);
 
   // Handle serial number blur - auto-fill all fields
   const handleSrNoBlur = useCallback((srNoValue: string) => {
@@ -347,13 +322,12 @@ export const useSupplierEntry = () => {
       setLastVariety(values.variety);
       setLastPaymentType(values.paymentType);
 
-      handleNew();
       setIsEditing(false);
     } catch (error) {
       console.error('Error saving supplier:', error);
       toast({ title: "Error saving supplier", description: "Please try again", variant: "destructive" });
     }
-  }, [currentSupplier, isEditing, toast, handleNew]);
+  }, [currentSupplier, isEditing, toast]);
 
   return {
     // State
@@ -383,7 +357,6 @@ export const useSupplierEntry = () => {
     handleCalculationFieldChange,
     handleSrNoBlur,
     resetFormToState,
-    handleNew,
     handleSubmit,
     
     // Data management

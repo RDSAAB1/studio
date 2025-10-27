@@ -769,7 +769,7 @@ export default function SupplierEntryClient() {
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
                 onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
+                onClear={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
                 onPrint={handlePrint}

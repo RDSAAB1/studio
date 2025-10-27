@@ -688,7 +688,6 @@ export default function CustomerEntryClient() {
                 customer={currentCustomer}
                 onSave={() => form.handleSubmit(() => onSubmit())()}
                 onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
                 isEditing={isEditing}
                 isCustomerForm={true}
                 isBrokerageIncluded={form.watch('isBrokerageIncluded')}
