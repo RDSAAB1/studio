@@ -431,20 +431,20 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                                 <span className="font-medium">₹{data.totalAmount?.toLocaleString() || '0'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span>Total Karta (@1.00%):</span>
+                                <span>Total Karta Amt (@{data.averageKartaPercentage?.toFixed(2) || '0.00'}%):</span>
                                 <span className="font-medium text-red-600">- ₹{data.totalKartaAmount?.toLocaleString() || '0'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span>Total Laboury (@1.00%):</span>
+                                <span>Total Laboury Amt (@{data.averageLabouryRate?.toFixed(2) || '0.00'}):</span>
                                 <span className="font-medium text-red-600">- ₹{data.totalLabouryAmount?.toLocaleString() || '0'}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Total Kanta:</span>
-                                <span className="font-medium text-red-600">- ₹{data.totalKartaAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-medium text-red-600">- ₹{data.totalKanta?.toLocaleString() || '0'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span>Total Other:</span>
-                                <span className="font-medium text-red-600">- ₹{data.totalAmount?.toLocaleString() || '0'}</span>
+                                <span>Total Brokerage Amt:</span>
+                                <span className="font-medium text-red-600">- ₹{data.totalBrokerage?.toLocaleString() || '0'}</span>
                             </div>
                             <hr className="my-2" />
                             <div className="flex justify-between font-semibold">

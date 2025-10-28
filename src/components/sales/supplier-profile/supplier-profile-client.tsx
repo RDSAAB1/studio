@@ -319,57 +319,116 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Initialize map with all unique suppliers
+    // Helper function to calculate Levenshtein distance
+    const levenshteinDistance = (str1: string, str2: string): number => {
+        const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+        for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+        for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+        for (let j = 1; j <= str2.length; j++) {
+            for (let i = 1; i <= str1.length; i++) {
+                const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                matrix[j][i] = Math.min(
+                    matrix[j][i - 1] + 1,
+                    matrix[j - 1][i] + 1,
+                    matrix[j - 1][i - 1] + indicator
+                );
+            }
+        }
+        return matrix[str2.length][str1.length];
+    };
+
+    // Helper function to normalize strings for comparison
+    const normalize = (str: string) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // Helper function to find matching profile using fuzzy logic
+    const findMatchingProfile = (supplier: any): string | null => {
+        const sName = normalize(supplier.name || '');
+        const sFatherName = normalize(supplier.fatherName || '');
+        const sAddress = normalize(supplier.address || '');
+
+        for (const [key, existingData] of summary.entries()) {
+            const eName = normalize(existingData.name || '');
+            const eFatherName = normalize(existingData.fatherName || '');
+            const eAddress = normalize(existingData.address || '');
+
+            // Calculate character differences
+            const nameDiff = levenshteinDistance(sName, eName);
+            const fatherNameDiff = levenshteinDistance(sFatherName, eFatherName);
+            const addressDiff = levenshteinDistance(sAddress, eAddress);
+            const totalDiff = nameDiff + fatherNameDiff + addressDiff;
+
+            // Fuzzy matching rules:
+            // 1. Max 2 character difference per field
+            // 2. Max 4 total character difference across all fields
+            if (nameDiff <= 2 && fatherNameDiff <= 2 && addressDiff <= 2 && totalDiff <= 4) {
+                return key;
+            }
+        }
+        return null;
+    };
+
+    // Process suppliers with fuzzy matching
     filteredSuppliers.forEach(s => {
-        if (s.customerId && !summary.has(s.customerId)) {
-            summary.set(s.customerId, {
+        const matchingKey = findMatchingProfile(s);
+        
+        if (matchingKey) {
+            // Add to existing profile
+            const data = summary.get(matchingKey)!;
+            // Update data with this supplier's information
+            data.allTransactions!.push(s);
+        } else {
+            // Create new profile
+            const newKey = `${s.name || ''}_${s.fatherName || ''}_${s.address || ''}`.trim();
+            summary.set(newKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-                paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+                paymentHistory: [], outstandingEntryIds: [], allTransactions: [s], allPayments: [],
                 transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
                 totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
                 totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
                 averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
                 averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+                totalBrokerage: 0,
             });
         }
     });
 
-    let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
+    // Calculate totals for each profile group
+    summary.forEach((data, key) => {
+        const transactions = data.allTransactions || [];
+        
+        // Calculate totals from all transactions in this group
+        data.totalAmount = transactions.reduce((sum, s) => sum + (s.amount || 0), 0);
+        data.totalOriginalAmount = transactions.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
+        data.totalGrossWeight = transactions.reduce((sum, s) => sum + (s.grossWeight || 0), 0);
+        data.totalTeirWeight = transactions.reduce((sum, s) => sum + (s.teirWeight || 0), 0);
+        data.totalFinalWeight = transactions.reduce((sum, s) => sum + (s.weight || 0), 0);
+        data.totalKartaWeight = transactions.reduce((sum, s) => sum + (s.kartaWeight || 0), 0);
+        data.totalNetWeight = transactions.reduce((sum, s) => sum + (s.netWeight || 0), 0);
+        data.totalKartaAmount = transactions.reduce((sum, s) => sum + (s.kartaAmount || 0), 0);
+        data.totalLabouryAmount = transactions.reduce((sum, s) => sum + (s.labouryAmount || 0), 0);
+        data.totalKanta = transactions.reduce((sum, s) => sum + (s.kanta || 0), 0);
+        data.totalOtherCharges = transactions.reduce((sum, s) => sum + (s.otherCharges || 0), 0);
+        data.totalBrokerage = transactions.reduce((sum, s) => sum + (s.brokerage || 0), 0);
+        data.totalTransactions = transactions.length;
 
-    filteredSuppliers.forEach(s => {
-        if (!s.customerId) return;
-        const data = summary.get(s.customerId)!;
-        data.totalAmount += s.amount || 0;
-        data.totalOriginalAmount += s.originalNetAmount || 0;
-        data.totalGrossWeight! += s.grossWeight;
-        data.totalTeirWeight! += s.teirWeight;
-        data.totalFinalWeight! += s.weight;
-        data.totalKartaWeight! += s.kartaWeight;
-        data.totalNetWeight! += s.netWeight;
-        data.totalKartaAmount! += s.kartaAmount;
-        data.totalLabouryAmount! += s.labouryAmount;
-        data.totalKanta! += s.kanta;
-        data.totalOtherCharges! += s.otherCharges || 0;
-        data.totalTransactions! += 1;
-        if (!supplierRateSum[s.customerId]) {
-            supplierRateSum[s.customerId] = { rate: 0, karta: 0, laboury: 0, count: 0 };
-        }
-        if (s.rate > 0) {
-            supplierRateSum[s.customerId].rate += s.rate;
-            supplierRateSum[s.customerId].karta += s.kartaPercentage;
-            supplierRateSum[s.customerId].laboury += s.labouryRate;
-            supplierRateSum[s.customerId].count++;
-        }
-        data.allTransactions!.push(s);
-        const variety = toTitleCase(s.variety) || 'Unknown';
-        data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+        // Calculate variety distribution
+        transactions.forEach(s => {
+            const variety = toTitleCase(s.variety) || 'Unknown';
+            data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+        });
     });
 
+    // Process payments and match them to profiles using fuzzy matching
     filteredPayments.forEach(p => {
-        if (p.customerId && summary.has(p.customerId)) {
-            const data = summary.get(p.customerId)!;
+        // Find matching profile for this payment
+        const paymentSupplier = filteredSuppliers.find(s => s.srNo === p.srNo);
+        if (!paymentSupplier) return;
+
+        const matchingKey = findMatchingProfile(paymentSupplier);
+        if (matchingKey && summary.has(matchingKey)) {
+            const data = summary.get(matchingKey)!;
             data.totalPaid += p.amount;
             data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);
@@ -379,7 +438,8 @@ export default function SupplierProfileClient() {
 
     summary.forEach((data, key) => {
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
-        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
+        // CD is already deducted in individual outstandingForEntry calculations, so don't deduct again here
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
@@ -414,7 +474,8 @@ export default function SupplierProfileClient() {
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
+    // CD is already deducted in individual outstandingForEntry calculations, so don't deduct again here
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
     millSummary.totalTransactions = filteredSuppliers.length;
     millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;

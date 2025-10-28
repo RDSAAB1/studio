@@ -131,16 +131,67 @@ export const useSupplierSummary = (
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
 
-    // Group suppliers by Name, Father Name, and Address combination
+    // Helper function to calculate Levenshtein distance
+    const levenshteinDistance = (str1: string, str2: string): number => {
+        const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+        for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+        for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+        for (let j = 1; j <= str2.length; j++) {
+            for (let i = 1; i <= str1.length; i++) {
+                const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                matrix[j][i] = Math.min(
+                    matrix[j][i - 1] + 1,
+                    matrix[j - 1][i] + 1,
+                    matrix[j - 1][i - 1] + indicator
+                );
+            }
+        }
+        return matrix[str2.length][str1.length];
+    };
+
+    // Helper function to normalize strings for comparison
+    const normalize = (str: string) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // Group suppliers using fuzzy matching
     const groupedSuppliers = new Map<string, typeof processedSuppliers>();
     
     processedSuppliers.forEach((supplier) => {
-      const groupKey = `${supplier.name || ''}_${supplier.fatherName || ''}_${supplier.address || ''}`.trim();
-      
-      if (!groupedSuppliers.has(groupKey)) {
-        groupedSuppliers.set(groupKey, []);
-      }
-      groupedSuppliers.get(groupKey)!.push(supplier);
+        const sName = normalize(supplier.name || '');
+        const sFatherName = normalize(supplier.fatherName || '');
+        const sAddress = normalize(supplier.address || '');
+
+        // Find existing group that matches this supplier
+        let matchingGroupKey: string | null = null;
+        
+        for (const [groupKey, groupSuppliers] of groupedSuppliers.entries()) {
+            const firstSupplier = groupSuppliers[0];
+            const eName = normalize(firstSupplier.name || '');
+            const eFatherName = normalize(firstSupplier.fatherName || '');
+            const eAddress = normalize(firstSupplier.address || '');
+
+            // Calculate character differences
+            const nameDiff = levenshteinDistance(sName, eName);
+            const fatherNameDiff = levenshteinDistance(sFatherName, eFatherName);
+            const addressDiff = levenshteinDistance(sAddress, eAddress);
+            const totalDiff = nameDiff + fatherNameDiff + addressDiff;
+
+            // Fuzzy matching rules:
+            // 1. Max 2 character difference per field
+            // 2. Max 4 total character difference across all fields
+            if (nameDiff <= 2 && fatherNameDiff <= 2 && addressDiff <= 2 && totalDiff <= 4) {
+                matchingGroupKey = groupKey;
+                break;
+            }
+        }
+
+        if (matchingGroupKey) {
+            // Add to existing group
+            groupedSuppliers.get(matchingGroupKey)!.push(supplier);
+        } else {
+            // Create new group
+            const newGroupKey = `${supplier.name || ''}_${supplier.fatherName || ''}_${supplier.address || ''}`.trim();
+            groupedSuppliers.set(newGroupKey, [supplier]);
+        }
     });
 
     // Create summary for each unique profile group
@@ -265,7 +316,8 @@ export const useSupplierSummary = (
     // Set mill overview data properly
     millSummary.allTransactions = processedSuppliers;
     millSummary.allPayments = paymentHistory;
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - (millSummary.totalCashPaid + millSummary.totalRtgsPaid);
+    // Use totalPaid which already includes CD deduction, don't double-deduct CD
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
     
     // Ensure mill summary has all the necessary data
     millSummary.paymentHistory = millSummary.allPayments;

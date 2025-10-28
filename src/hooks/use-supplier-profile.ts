@@ -197,6 +197,7 @@ export const useSupplierData = () => {
         data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
         data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + t.kanta, 0);
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
+        data.totalBrokerage = data.allTransactions!.reduce((sum, t) => sum + (t.brokerage || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
         
             data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0), 0);
