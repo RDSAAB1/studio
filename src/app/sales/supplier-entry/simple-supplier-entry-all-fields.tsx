@@ -1,27 +1,30 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useTransition } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { addSupplier, getOptionsRealtime, addOption, updateOption, deleteOption } from "@/lib/firestore";
+import { addSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier } from "@/lib/firestore";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import SimpleSupplierFormAllFields from "@/components/sales/simple-supplier-form-all-fields";
 import { SimpleCalculatedSummary } from "@/components/sales/simple-calculated-summary";
 import { SupplierNavigationBar } from "@/components/sales/supplier-navigation-bar";
 import { SimpleSupplierTable } from "@/components/sales/simple-supplier-table";
-import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
+import { CombinedReceiptPrintDialog } from "@/components/sales/print-dialogs";
+import type { ConsolidatedReceiptData } from "@/lib/definitions";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { CompactSupplierTable } from "@/components/sales/compact-supplier-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Save, Plus, Search, Trash2, Printer } from "lucide-react";
 import type { Customer, OptionItem } from "@/lib/definitions";
+import * as XLSX from 'xlsx';
 
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, latestSupplier?: Customer): CompleteSupplierFormValues => {
     const today = new Date();
@@ -51,6 +54,9 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, lat
         rate: 0,
         kartaPercentage: 1,
         labouryRate: 2,
+        brokerage: 0,
+        brokerageRate: 0,
+        brokerageAddSubtract: true,
         kanta: 50,
         paymentType: lastPaymentType || 'Full',
         forceUnique: false,
@@ -72,14 +78,130 @@ export default function SimpleSupplierEntryAllFields() {
     const [isDataLoading, setIsDataLoading] = useState(false);
     const [entryTableLimit, setEntryTableLimit] = useState(50);
     const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
-    const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<any>(null);
+    const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
+    const [allConsolidatedGroups, setAllConsolidatedGroups] = useState<ConsolidatedReceiptData[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<any>(null);
+    
     const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
     const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
     const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
     const [documentType, setDocumentType] = useState<'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt'>('tax-invoice');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchSteps, setSearchSteps] = useState<string[]>([]);
+
+    // Import/Export refs
+    const importInputRef = useRef<HTMLInputElement | null>(null);
+
+    const handleExport = useCallback(() => {
+        const rows = (allSuppliers || []).map((s) => ({
+            'SR NO.': s.srNo,
+            'DATE': s.date,
+            'NAME': s.name,
+            'FATHER NAME': s.fatherName,
+            'ADDRESS': s.address,
+            'CONTACT': s.contact,
+            'VEHICLE NO': s.vehicleNo,
+            'VARIETY': s.variety,
+            'GROSS WT': s.grossWeight,
+            'TIER WT': s.teirWeight,
+            'NET WT': s.netWeight,
+            'RATE': s.rate,
+            'KARTA %': s.kartaPercentage,
+            'LAB RATE': s.labouryRate,
+            'BROKERAGE': s.brokerage,
+            'BROKERAGE RATE': s.brokerageRate,
+            'BROKERAGE ADD/SUB': s.brokerageAddSubtract ? 'ADD' : 'SUB',
+            'KANTA': s.kanta,
+            'AMOUNT': s.amount,
+            'KARTA AMT': s.kartaAmount,
+            'LAB AMT': s.labouryAmount,
+            'NET AMT': s.netAmount,
+            'TERM': s.term,
+            'DUE DATE': s.dueDate,
+            'SO': s.so,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers');
+        XLSX.writeFile(workbook, 'suppliers-export.xlsx');
+        toast({ title: 'Exported', description: `${rows.length} rows exported` });
+    }, [allSuppliers, toast]);
+
+    const handleImportClick = useCallback(() => {
+        importInputRef.current?.click();
+    }, []);
+
+    const handleImportChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = e.target?.result as ArrayBuffer | string;
+                    const workbook = XLSX.read(data, { type: typeof data === 'string' ? 'binary' : 'array', cellNF: true, cellText: false });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                    let nextSrNum = (allSuppliers || []).length > 0
+                        ? Math.max(...(allSuppliers || []).map(c => parseInt((c.srNo || 'S0000').substring(1)) || 0)) + 1
+                        : 1;
+
+                    let imported = 0;
+                    for (const item of json) {
+                        const supplierData: Customer = {
+                            id: item['ID'] || crypto.randomUUID(),
+                            srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+                            date: item['DATE'] || format(new Date(), 'yyyy-MM-dd'),
+                            name: toTitleCase(item['NAME'] || ''),
+                            fatherName: toTitleCase(item['FATHER NAME'] || ''),
+                            address: toTitleCase(item['ADDRESS'] || ''),
+                            contact: String(item['CONTACT'] || ''),
+                            vehicleNo: String(item['VEHICLE NO'] || '').toUpperCase(),
+                            variety: toTitleCase(item['VARIETY'] || ''),
+                            grossWeight: Number(item['GROSS WT']) || 0,
+                            teirWeight: Number(item['TIER WT']) || 0,
+                            netWeight: Number(item['NET WT']) || 0,
+                            rate: Number(item['rate'] ?? item['RATE']) || 0,
+                            kartaPercentage: Number(item['KARTA %']) || 0,
+                            labouryRate: Number(item['LAB RATE']) || 0,
+                            brokerage: Number(item['BROKERAGE']) || 0,
+                            brokerageRate: Number(item['BROKERAGE RATE']) || 0,
+                            brokerageAddSubtract: String(item['BROKERAGE ADD/SUB'] || 'ADD').toUpperCase() === 'ADD',
+                            kanta: Number(item['KANTA']) || 0,
+                            amount: Number(item['AMOUNT']) || 0,
+                            kartaAmount: Number(item['KARTA AMT']) || 0,
+                            labouryAmount: Number(item['LAB AMT']) || 0,
+                            netAmount: Number(item['NET AMT']) || 0,
+                            term: String(item['TERM'] || ''),
+                            dueDate: String(item['DUE DATE'] || ''),
+                            so: String(item['SO'] || ''),
+                            forceUnique: Boolean(item['FORCE UNIQUE'] || false),
+                            paymentType: String(item['PAYMENT TYPE'] || ''),
+                            // optional/unused columns remain default/undefined
+                        } as Customer;
+
+                        await addSupplier(supplierData);
+                        imported++;
+                    }
+
+                    toast({ title: 'Imported', description: `${imported} rows imported` });
+                } catch (err) {
+                    toast({ variant: 'destructive', title: 'Import failed', description: 'Invalid file format' });
+                } finally {
+                    event.target.value = '';
+                }
+            };
+
+            // Read file
+            reader.readAsBinaryString(file);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Import failed', description: 'Could not read file' });
+        }
+    }, [allSuppliers, toast]);
 
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
@@ -92,7 +214,7 @@ export default function SimpleSupplierEntryAllFields() {
             id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
             name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
             weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-            labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+            labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
             receiptType: 'Cash', paymentType: 'Full', customerId: '',
         };
     });
@@ -101,6 +223,39 @@ export default function SimpleSupplierEntryAllFields() {
         resolver: zodResolver(completeSupplierFormSchema),
         defaultValues: getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]),
     });
+
+    // Delete current form entry
+    const handleDeleteCurrent = useCallback(async () => {
+        if (!currentSupplier.id) {
+            toast({ variant: 'destructive', title: 'No entry to delete', description: 'Please save an entry first or select an existing entry to delete' });
+            return;
+        }
+
+        try {
+            await deleteSupplier(currentSupplier.id);
+            toast({ title: 'Deleted', description: 'Entry deleted successfully' });
+            // Clear form after deletion
+            form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            setCurrentSupplier({
+                id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
+                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
+                weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                receiptType: 'Cash', paymentType: 'Full', customerId: '',
+            });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Delete failed', description: 'Could not delete entry' });
+        }
+    }, [currentSupplier.id, toast, form, lastVariety, lastPaymentType, suppliersForSerial]);
+
+    // Print current form entry
+    const handlePrintCurrent = useCallback(() => {
+        if (!currentSupplier.id) {
+            toast({ variant: 'destructive', title: 'No entry to print', description: 'Please save an entry first or select an existing entry to print' });
+            return;
+        }
+        setReceiptsToPrint([currentSupplier]);
+    }, [currentSupplier, toast]);
 
     // Background data loading effect - non-blocking
     useEffect(() => {
@@ -297,9 +452,26 @@ export default function SimpleSupplierEntryAllFields() {
                 if (existingSupplier) {
                     // Auto-fill all fields with existing data
                     form.reset({
-                        ...existingSupplier,
+                        srNo: existingSupplier.srNo,
                         date: existingSupplier.date ? new Date(existingSupplier.date) : new Date(),
-                        dueDate: existingSupplier.dueDate ? new Date(existingSupplier.dueDate) : undefined,
+                        term: Number(existingSupplier.term) || 0,
+                        name: existingSupplier.name || '',
+                        so: existingSupplier.so || '',
+                        address: existingSupplier.address || '',
+                        contact: existingSupplier.contact || '',
+                        vehicleNo: existingSupplier.vehicleNo || '',
+                        variety: existingSupplier.variety || '',
+                        grossWeight: Number(existingSupplier.grossWeight) || 0,
+                        teirWeight: Number(existingSupplier.teirWeight) || 0,
+                        rate: Number(existingSupplier.rate) || 0,
+                        kartaPercentage: Number(existingSupplier.kartaPercentage) || 0,
+                        labouryRate: Number(existingSupplier.labouryRate) || 0,
+                        brokerage: Number(existingSupplier.brokerage) || 0,
+                        brokerageRate: Number(existingSupplier.brokerageRate) || 0,
+                        brokerageAddSubtract: existingSupplier.brokerageAddSubtract ?? true,
+                        kanta: Number(existingSupplier.kanta) || 0,
+                        paymentType: existingSupplier.paymentType || 'Full',
+                        forceUnique: existingSupplier.forceUnique || false,
                     });
                     
                     // Set editing mode
@@ -368,7 +540,7 @@ export default function SimpleSupplierEntryAllFields() {
 
     const handleAddOption = useCallback(async (collectionName: string, name: string) => {
         try {
-            await addOption(collectionName, name);
+            await addOption(collectionName, { name });
             toast({ title: "Option added successfully!" });
         } catch (error) {
             toast({ title: "Error adding option", variant: "destructive" });
@@ -377,7 +549,7 @@ export default function SimpleSupplierEntryAllFields() {
     
     const handleUpdateOption = useCallback(async (collectionName: string, id: string, name: string) => {
         try {
-            await updateOption(collectionName, id, name);
+            await updateOption(collectionName, id, { name });
             toast({ title: "Option updated successfully!" });
         } catch (error) {
             toast({ title: "Error updating option", variant: "destructive" });
@@ -420,10 +592,11 @@ export default function SimpleSupplierEntryAllFields() {
             const amount = netWeight * values.rate;
             const kartaAmount = (netWeight * values.kartaPercentage) / 100 * values.rate;
             const labouryAmount = netWeight * values.labouryRate;
-            const netAmount = amount - kartaAmount - labouryAmount - values.kanta;
+            const brokerageAmount = values.brokerage * netWeight;
+            const netAmount = amount - kartaAmount - labouryAmount - values.kanta + (values.brokerageAddSubtract ? brokerageAmount : -brokerageAmount);
 
             const supplierData: Customer = {
-                id: values.srNo,
+                id: crypto.randomUUID(),
                 srNo: values.srNo,
                 date: format(values.date, 'yyyy-MM-dd'),
                 term: String(values.term),
@@ -444,6 +617,10 @@ export default function SimpleSupplierEntryAllFields() {
                 rate: values.rate,
                 labouryRate: values.labouryRate,
                 labouryAmount: labouryAmount,
+                brokerage: values.brokerage,
+                brokerageRate: values.brokerageRate,
+                brokerageAmount: brokerageAmount,
+                brokerageAddSubtract: values.brokerageAddSubtract,
                 kanta: values.kanta,
                 amount: amount,
                 netAmount: netAmount,
@@ -460,6 +637,7 @@ export default function SimpleSupplierEntryAllFields() {
                 const existingSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
                 if (existingSupplier) {
                     await db.suppliers.update(existingSupplier.id, supplierData);
+                    setCurrentSupplier({ ...supplierData, id: existingSupplier.id });
                     toast({ 
                         title: "Entry updated successfully!", 
                         description: `Supplier ${values.name} has been updated.`,
@@ -467,7 +645,8 @@ export default function SimpleSupplierEntryAllFields() {
                     });
                 } else {
                     // If not found, add as new
-                    await addSupplier(supplierData);
+                    const savedSupplier = await addSupplier(supplierData);
+                    setCurrentSupplier({ ...supplierData, id: savedSupplier.id });
                     toast({ 
                         title: "Entry saved successfully!", 
                         description: `Supplier ${values.name} has been added.`,
@@ -477,7 +656,8 @@ export default function SimpleSupplierEntryAllFields() {
                 setIsEditing(false);
             } else {
                 // Add new supplier
-                await addSupplier(supplierData);
+                const savedSupplier = await addSupplier(supplierData);
+                setCurrentSupplier({ ...supplierData, id: savedSupplier.id });
                 toast({ 
                     title: "Entry saved successfully!", 
                     description: `Supplier ${values.name} has been added.`,
@@ -542,12 +722,27 @@ export default function SimpleSupplierEntryAllFields() {
             return [];
         }
 
-        // If no search steps, return all suppliers
-        if (searchSteps.length === 0) {
+        // If no search query or search steps, return all suppliers
+        if (!searchQuery || searchQuery.trim() === '' || searchSteps.length === 0) {
             return allSuppliers;
         }
 
-        // Apply filters step by step
+        // If only one search step, do normal search across all fields
+        if (searchSteps.length === 1) {
+            const query = searchSteps[0].toLowerCase().trim();
+            return allSuppliers.filter(supplier => {
+                return (
+                    supplier.name?.toLowerCase().includes(query) ||
+                    supplier.so?.toLowerCase().includes(query) ||
+                    supplier.address?.toLowerCase().includes(query) ||
+                    supplier.srNo?.toLowerCase().includes(query) ||
+                    supplier.contact?.toLowerCase().includes(query) ||
+                    supplier.vehicleNo?.toLowerCase().includes(query)
+                );
+            });
+        }
+
+        // Multiple search steps - apply progressive filtering
         let result = [...allSuppliers];
         
         searchSteps.forEach(step => {
@@ -567,11 +762,17 @@ export default function SimpleSupplierEntryAllFields() {
         });
 
         return result;
-    }, [allSuppliers, searchSteps]);
+    }, [allSuppliers, searchQuery, searchSteps]);
 
     // Handle search input with multi-step filtering
     const handleSearchChange = useCallback((value: string) => {
         setSearchQuery(value);
+        
+        // If empty, clear search steps
+        if (!value || value.trim() === '') {
+            setSearchSteps([]);
+            return;
+        }
         
         // Split by comma and filter out empty strings
         const steps = value.split(',').map(step => step.trim()).filter(step => step.length > 0);
@@ -586,6 +787,98 @@ export default function SimpleSupplierEntryAllFields() {
             title: "Print Format", 
             description: `Opening print format for ${supplier.name} (SR# ${supplier.srNo})` 
         });
+    }, []);
+
+    const handleMultiPrint = useCallback((suppliers: Customer[]) => {
+        if (suppliers.length === 0) return;
+
+        // Group suppliers by name, father name, and address
+        const groupedSuppliers = suppliers.reduce((groups, supplier) => {
+            // Normalize the key to handle case differences and extra spaces
+            const normalizedName = (supplier.name || '').trim().toLowerCase();
+            const normalizedFatherName = (supplier.fatherName || '').trim().toLowerCase();
+            const normalizedAddress = (supplier.address || '').trim().toLowerCase();
+            const key = `${normalizedName}-${normalizedFatherName}-${normalizedAddress}`;
+            
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(supplier);
+            return groups;
+        }, {} as Record<string, Customer[]>);
+
+        const groups = Object.values(groupedSuppliers);
+        
+        // Prepare data for combined dialog
+        const consolidatedGroups: ConsolidatedReceiptData[] = [];
+        const individualSuppliers: Customer[] = [];
+        
+        groups.forEach((group) => {
+            if (group.length > 1) {
+                // Group with multiple entries - consolidate
+                const firstSupplier = group[0];
+                const consolidatedData: ConsolidatedReceiptData = {
+                    customer: firstSupplier,
+                    receipts: group,
+                    totalAmount: group.reduce((sum, s) => sum + (Number(s.amount) || 0), 0),
+                    totalWeight: group.reduce((sum, s) => sum + (Number(s.weight) || 0), 0),
+                    totalNetWeight: group.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0),
+                    totalKartaAmount: group.reduce((sum, s) => sum + (Number(s.kartaAmount) || 0), 0),
+                    totalLabAmount: group.reduce((sum, s) => sum + (Number(s.labouryAmount) || 0), 0),
+                    totalNetAmount: group.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
+                    receiptCount: group.length
+                };
+                consolidatedGroups.push(consolidatedData);
+            } else {
+                // Single entry - add to individual
+                individualSuppliers.push(group[0]);
+            }
+        });
+        
+        // Set data for combined dialog
+        setReceiptsToPrint(individualSuppliers);
+        setAllConsolidatedGroups(consolidatedGroups);
+        setConsolidatedReceiptData(consolidatedGroups.length > 0 ? consolidatedGroups[0] : null);
+        
+        // Show appropriate message
+        const totalConsolidatedEntries = consolidatedGroups.reduce((sum, group) => sum + group.receiptCount, 0);
+        if (consolidatedGroups.length > 0 && individualSuppliers.length > 0) {
+            toast({ 
+                title: "Combined Print Preview", 
+                description: `Showing ${consolidatedGroups.length} consolidated groups (${totalConsolidatedEntries} entries) and ${individualSuppliers.length} individual receipts` 
+            });
+        } else if (consolidatedGroups.length > 0) {
+            toast({ 
+                title: "Consolidated Print Preview", 
+                description: `Showing ${consolidatedGroups.length} consolidated groups with ${totalConsolidatedEntries} total entries` 
+            });
+        } else {
+            toast({ 
+                title: "Individual Print Preview", 
+                description: `Showing individual print format for ${individualSuppliers.length} suppliers` 
+            });
+        }
+    }, []);
+
+
+    const handleMultiDelete = useCallback(async (supplierIds: string[]) => {
+        try {
+            // Delete multiple suppliers
+            for (const id of supplierIds) {
+                await db.suppliers.delete(id);
+            }
+            toast({ 
+                title: "Success", 
+                description: `${supplierIds.length} suppliers deleted successfully` 
+            });
+        } catch (error) {
+            console.error('Error deleting suppliers:', error);
+            toast({ 
+                title: "Error", 
+                description: "Failed to delete some suppliers", 
+                variant: "destructive" 
+            });
+        }
     }, []);
 
     const handleViewChange = useCallback((view: 'entry' | 'data') => {
@@ -627,6 +920,9 @@ export default function SimpleSupplierEntryAllFields() {
             forceUnique: supplier.forceUnique || false,
         });
         
+        // Set current supplier with proper ID
+        setCurrentSupplier(supplier);
+        
         // Switch to entry tab with smooth transition
         handleViewChange('entry');
         setIsEditing(true);
@@ -664,35 +960,178 @@ export default function SimpleSupplierEntryAllFields() {
                 </CardContent>
             </Card>
 
-            {/* Simple Calculated Summary */}
-            <SimpleCalculatedSummary 
-                customer={currentSupplier}
-                onSave={() => {
-                    calculateSummary(); // Calculate before saving
-                    form.handleSubmit(onSubmit)();
-                }}
-                onClearForm={handleNewEntry}
-                isEditing={isEditing}
-                isSubmitting={isSubmitting}
-            />
+            {/* Summary + Commands side-by-side with proper spacing and borders */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-lg md:col-span-2">
+                    <CardHeader className="p-3 pb-2">
+                        <CardTitle className="text-sm font-semibold">Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                        <SimpleCalculatedSummary 
+                            customer={{
+                                ...currentSupplier,
+                                grossWeight: form.watch('grossWeight') || 0,
+                                teirWeight: form.watch('teirWeight') || 0,
+                                kartaPercentage: form.watch('kartaPercentage') || 0,
+                                rate: form.watch('rate') || 0,
+                                labouryRate: form.watch('labouryRate') || 0,
+                                brokerage: form.watch('brokerage') || 0,
+                                brokerageRate: form.watch('brokerageRate') || 0,
+                                brokerageAddSubtract: form.watch('brokerageAddSubtract') ?? true,
+                                kanta: form.watch('kanta') || 0,
+                                dueDate: form.watch('date') ? format(form.watch('date'), 'yyyy-MM-dd') : currentSupplier.dueDate,
+                            }}
+                            onSave={() => {
+                                calculateSummary(); // Calculate before saving
+                                form.handleSubmit(onSubmit)();
+                            }}
+                            onClearForm={undefined}
+                            isEditing={isEditing}
+                            isSubmitting={isSubmitting}
+                        />
+                    </CardContent>
+                </Card>
 
-            {/* Latest 50 Entries Table */}
-            <SimpleSupplierTable 
+                {/* Commands Panel */}
+                <Card className="bg-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-lg">
+                    <CardHeader className="p-3 pb-2">
+                        <CardTitle className="text-sm font-semibold">Commands & Search</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0 space-y-4">
+                        {/* Search Section */}
+                        <div className="space-y-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search: name, contact, address, vehicle... (use commas for multi-step: vehicle, delhi)"
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    className="pl-10 h-9"
+                                />
+                            </div>
+                            
+                            {/* Search Steps Display */}
+                            {searchSteps.length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="text-xs text-muted-foreground font-medium">
+                                        Active Filters ({searchSteps.length}):
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {searchSteps.map((step, index) => (
+                                            <div
+                                                key={index}
+                                                className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md border"
+                                            >
+                                                <span className="font-medium">Step {index + 1}:</span>
+                                                <span>"{step}"</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action Buttons - 2 per row */}
+                        <div className="space-y-2">
+                            {/* Row 1: Clear Form & Save/Update */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    onClick={handleNewEntry} 
+                                    size="sm" 
+                                    className="h-8 rounded-md"
+                                    disabled={isSubmitting}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Clear Form
+                                </Button>
+
+                                <Button 
+                                    onClick={() => {
+                                        calculateSummary();
+                                        form.handleSubmit(onSubmit)();
+                                    }} 
+                                    size="sm" 
+                                    className="h-8 rounded-md" 
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    {isEditing ? 'Update' : 'Save'}
+                                </Button>
+                            </div>
+
+                            {/* Row 2: Import & Export */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".xlsx,.xls,.csv"
+                                    className="hidden"
+                                    onChange={handleImportChange}
+                                />
+                                <Button variant="secondary" size="sm" onClick={handleImportClick} className="h-8">
+                                    Import
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={handleExport} className="h-8">
+                                    Export
+                                </Button>
+                            </div>
+
+                            {/* Row 3: Delete & Print */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button 
+                                    variant="destructive" 
+                                    size="sm" 
+                                    onClick={handleDeleteCurrent}
+                                    className="h-8"
+                                    disabled={!currentSupplier.id}
+                                    title={currentSupplier.id ? `Delete ${currentSupplier.name || 'entry'}` : 'No entry to delete'}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={handlePrintCurrent}
+                                    className="h-8"
+                                    disabled={!currentSupplier.id}
+                                    title={currentSupplier.id ? `Print ${currentSupplier.name || 'entry'}` : 'No entry to print'}
+                                >
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Latest 50 Entries Table with proper spacing */}
+            <div className="mt-8">
+                <SimpleSupplierTable 
                 onBackToEntry={() => {}} // No back button needed in entry tab
                 onEditSupplier={handleEditSupplier}
                 onViewDetails={handleViewDetails}
                 onPrintSupplier={handlePrintSupplier}
+                onMultiPrint={handleMultiPrint}
+                onMultiDelete={handleMultiDelete}
                 suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers.slice(0, entryTableLimit) : []}
                 totalCount={filteredSuppliers.length}
                 onLoadMore={handleLoadMore}
                 showLoadMore={entryTableLimit < filteredSuppliers.length}
                 currentLimit={entryTableLimit}
-                searchQuery={searchQuery}
-                onSearchChange={handleSearchChange}
-                searchSteps={searchSteps}
-            />
+                varietyOptions={varietyOptions}
+                paymentTypeOptions={paymentTypeOptions}
+                />
+            </div>
         </div>
-    ), [form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleSetLastVariety, handleSetLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, currentSupplier, calculateSummary, handleNewEntry, isEditing, isSubmitting, filteredSuppliers, handleEditSupplier, entryTableLimit, handleLoadMore, handleViewDetails, handlePrintSupplier, searchQuery, handleSearchChange, searchSteps]);
+    ), [form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleSetLastVariety, handleSetLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, currentSupplier, calculateSummary, handleNewEntry, isEditing, isSubmitting, filteredSuppliers, handleEditSupplier, entryTableLimit, handleLoadMore, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);
 
     // Memoized data view for ultra fast rendering - always show table layout
     const dataView = useMemo(() => (
@@ -702,15 +1141,16 @@ export default function SimpleSupplierEntryAllFields() {
                 onEditSupplier={handleEditSupplier}
                 onViewDetails={handleViewDetails}
                 onPrintSupplier={handlePrintSupplier}
+                onMultiPrint={handleMultiPrint}
+                onMultiDelete={handleMultiDelete}
                 suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers : []}
                 totalCount={filteredSuppliers.length}
                 isLoading={isDataLoading}
-                searchQuery={searchQuery}
-                onSearchChange={handleSearchChange}
-                searchSteps={searchSteps}
+                varietyOptions={varietyOptions}
+                paymentTypeOptions={paymentTypeOptions}
             />
         </div>
-    ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, isDataLoading, searchQuery, handleSearchChange, searchSteps]);
+    ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, isDataLoading]);
 
     // Remove loading state completely - always show content
     // if (!isClient || isLoading) {
@@ -724,16 +1164,10 @@ export default function SimpleSupplierEntryAllFields() {
 
     return (
         <div className="space-y-6">
-            {/* Navigation Bar */}
-                <SupplierNavigationBar
-                    activeView={currentView}
-                    onEntryClick={() => handleViewChange('entry')}
-                    onDataClick={() => handleViewChange('data')}
-                    onNewEntry={handleNewEntry}
-                    entryCount={1} // Current form entry
-                    totalCount={totalSuppliersCount || 0}
-                    isDataLoading={isDataLoading}
-                />
+            {/* Top bar removed as per request */}
+                
+                {/* Import/Export Controls moved to Commands Panel */}
+                
 
             {/* View Content - Ultra Fast for Old Devices */}
             <div className="relative min-h-[400px]">
@@ -745,19 +1179,22 @@ export default function SimpleSupplierEntryAllFields() {
             </div>
 
             {/* Print Dialogs */}
-            <ReceiptPrintDialog
+            <CombinedReceiptPrintDialog
                 receipts={receiptsToPrint}
+                consolidatedData={consolidatedReceiptData}
+                allConsolidatedGroups={allConsolidatedGroups}
                 settings={receiptSettings}
-                onOpenChange={(open) => !open && setReceiptsToPrint([])}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setReceiptsToPrint([]);
+                        setConsolidatedReceiptData(null);
+                        setAllConsolidatedGroups([]);
+                    }
+                }}
                 isCustomer={false}
             />
             
-            <ConsolidatedReceiptPrintDialog
-                data={consolidatedReceiptData}
-                settings={receiptSettings}
-                onOpenChange={(open) => !open && setConsolidatedReceiptData(null)}
-                isCustomer={false}
-            />
+            {/* Removed standalone individual and consolidated dialogs; combined dialog handles all */}
 
             {/* Details and Document Preview Dialogs */}
             <DetailsDialog
@@ -773,6 +1210,8 @@ export default function SimpleSupplierEntryAllFields() {
                 setIsOpen={setIsDocumentPreviewOpen}
                 customer={documentPreviewCustomer}
                 documentType={documentType}
+                setDocumentType={setDocumentType}
+                receiptSettings={receiptSettings}
             />
         </div>
     );

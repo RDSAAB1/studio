@@ -298,12 +298,24 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
     console.error("updateSupplier requires a valid ID.");
     return false;
   }
-  const docRef = doc(suppliersCollection, id);
-  await updateDoc(docRef, supplierData);
-  if (db) {
-      await db.suppliers.update(id, supplierData); // WRITE-THROUGH
+  
+  try {
+    // Update Firestore
+    const docRef = doc(suppliersCollection, id);
+    await updateDoc(docRef, supplierData);
+    console.log('Firestore updated successfully for ID:', id);
+    
+    // Update IndexedDB
+    if (db) {
+      await db.suppliers.update(id, supplierData);
+      console.log('IndexedDB updated successfully for ID:', id);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating supplier:', error);
+    return false;
   }
-  return true;
 }
 
 export async function deleteSupplier(id: string): Promise<void> {

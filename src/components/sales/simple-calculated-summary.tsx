@@ -18,14 +18,31 @@ interface SimpleCalculatedSummaryProps {
     isSubmitting?: boolean;
 }
 
-const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
-    <div className={cn("flex items-baseline gap-2", className)}>
-        <p className="text-xs text-muted-foreground whitespace-nowrap">{label}:</p>
-        <p className={cn("font-semibold text-sm", isHighlighted && "text-base font-bold text-primary")}>
-            {value}
-        </p>
-    </div>
-);
+const SummaryItem = ({ label, value, isHighlighted, className, valueType = 'default' }: { label: string; value: string; isHighlighted?: boolean, className?: string; valueType?: 'date' | 'weight' | 'amount' | 'percentage' | 'default' }) => {
+    const getValueColor = () => {
+        switch (valueType) {
+            case 'date':
+                return 'text-blue-700 font-bold';
+            case 'weight':
+                return 'text-green-700 font-bold';
+            case 'amount':
+                return 'text-purple-700 font-bold';
+            case 'percentage':
+                return 'text-orange-700 font-bold';
+            default:
+                return 'text-foreground font-bold';
+        }
+    };
+
+    return (
+        <div className={cn("", className)}>
+            <div className="text-[10px] text-muted-foreground font-medium">{label}</div>
+            <div className={cn("text-xs", isHighlighted ? "text-primary font-bold text-sm" : getValueColor())}>
+                {value}
+            </div>
+        </div>
+    );
+};
 
 export const SimpleCalculatedSummary = ({ 
     customer, 
@@ -45,6 +62,9 @@ export const SimpleCalculatedSummary = ({
     const kartaPercentage = Number(customer.kartaPercentage) || 0;
     const rate = Number(customer.rate) || 0;
     const labouryRate = Number(customer.labouryRate) || 0;
+    const brokerageRate = Number(customer.brokerageRate) || 0;
+    const brokerage = Number(customer.brokerage) || 0;
+    const brokerageAddSubtract = customer.brokerageAddSubtract ?? true; // Default to add
     const kanta = Number(customer.kanta) || 0;
     
     // Calculate values based on current form data
@@ -54,68 +74,106 @@ export const SimpleCalculatedSummary = ({
     const amount = finalWt * rate;
     const kartaAmt = kartaWt * rate;
     const labAmt = netWt * labouryRate;
-    const netPayable = amount - kartaAmt - labAmt - kanta;
+    const brokerageAmt = brokerage * netWt;
+    const netPayable = amount - kartaAmt - labAmt - kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt);
     
     return (
-        <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
-            <CardContent className="p-3 space-y-3">
-                <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
-                    <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
-                    <SummaryItem label="Gross Wt" value={`${grossWeight.toFixed(2)} Qtl`} />
-                    <SummaryItem label="Tier Wt" value={`${teirWeight.toFixed(2)} Qtl`} />
-                    <SummaryItem label="Final Wt" value={`${finalWt.toFixed(2)} Qtl`} />
-                    <SummaryItem label="Karta Wt" value={`${kartaWt.toFixed(2)} Qtl`} />
-                    <SummaryItem label="Net Wt" value={`${netWt.toFixed(2)} Qtl`} />
-                    <SummaryItem label="Rate" value={`₹${rate.toFixed(2)}/Qtl`} />
-                    <SummaryItem label="Amount" value={formatCurrency(amount)} />
-                    <SummaryItem label="Karta Amt" value={formatCurrency(kartaAmt)} />
-                    <SummaryItem label="Lab Amt" value={formatCurrency(labAmt)} />
-                    <SummaryItem label="Kanta" value={formatCurrency(kanta)} />
-                    <SummaryItem label="Net Payable" value={formatCurrency(netPayable)} isHighlighted />
+        <div className="space-y-1">
+            {/* Compact Header */}
+            <div className="text-center">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                    <div className="w-1 h-1 bg-primary rounded-full"></div>
+                    Summary Details
+                </h4>
+            </div>
+
+            {/* Compact Grid - All in one container */}
+            <div className="bg-muted/30 border border-border rounded p-1.5">
+                <div className="grid grid-cols-6 gap-1">
+                    <SummaryItem 
+                        label="Due Date" 
+                        value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} 
+                        className="bg-blue-50/80 border border-blue-200/50 p-1 rounded"
+                        valueType="date"
+                    />
+                    <SummaryItem 
+                        label="Rate" 
+                        value={`₹${rate.toFixed(2)}/Qtl`} 
+                        className="bg-orange-50/80 border border-orange-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
+                    <SummaryItem 
+                        label="Gross Wt" 
+                        value={`${grossWeight.toFixed(2)} Qtl`} 
+                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
+                        valueType="weight"
+                    />
+                    <SummaryItem 
+                        label="Tier Wt" 
+                        value={`${teirWeight.toFixed(2)} Qtl`} 
+                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
+                        valueType="weight"
+                    />
+                    <SummaryItem 
+                        label="Final Wt" 
+                        value={`${finalWt.toFixed(2)} Qtl`} 
+                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
+                        valueType="weight"
+                    />
+                    <SummaryItem 
+                        label="Karta Wt" 
+                        value={`${kartaWt.toFixed(2)} Qtl`} 
+                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
+                        valueType="weight"
+                    />
+                    <SummaryItem 
+                        label="Net Wt" 
+                        value={`${netWt.toFixed(2)} Qtl`} 
+                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
+                        valueType="weight"
+                    />
+                    <SummaryItem 
+                        label="Kanta" 
+                        value={formatCurrency(kanta)} 
+                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
+                    <SummaryItem 
+                        label="Amount" 
+                        value={formatCurrency(amount)} 
+                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
+                    <SummaryItem 
+                        label="Karta Amt" 
+                        value={formatCurrency(kartaAmt)} 
+                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
+                    <SummaryItem 
+                        label="Lab Amt" 
+                        value={formatCurrency(labAmt)} 
+                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
+                    <SummaryItem 
+                        label="Brokerage Amt" 
+                        value={formatCurrency(brokerageAmt)} 
+                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
+                        valueType="amount"
+                    />
                 </div>
-                
-                <div className="flex justify-between">
-                    <div className="flex gap-2">
-                        {onClearForm && (
-                            <Button 
-                                variant="outline"
-                                onClick={onClearForm} 
-                                size="sm" 
-                                className="h-8 rounded-md" 
-                                disabled={isSubmitting}
-                            >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Clear Form
-                            </Button>
-                        )}
-                        {onToggleTable && (
-                            <Button 
-                                variant="outline"
-                                onClick={onToggleTable} 
-                                size="sm" 
-                                className="h-8 rounded-md" 
-                                disabled={isSubmitting}
-                            >
-                                <Table className="mr-2 h-4 w-4" />
-                                {showTable ? 'Hide Table' : 'Show Table'}
-                            </Button>
-                        )}
-                    </div>
-                    <Button 
-                        onClick={onSave} 
-                        size="sm" 
-                        className="h-8 rounded-md" 
-                        disabled={isLoading || isSubmitting}
-                    >
-                        {isSubmitting ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                        )}
-                        {isEditing ? 'Update' : 'Save'}
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+            </div>
+
+            {/* Net Payable - Compact */}
+            <div className="bg-primary/5 border border-primary/20 rounded p-1.5">
+                <SummaryItem 
+                    label="Net Payable" 
+                    value={formatCurrency(netPayable)} 
+                    isHighlighted 
+                    className="bg-primary/10 border border-primary/30 p-1.5 rounded text-center"
+                />
+            </div>
+        </div>
     );
 };

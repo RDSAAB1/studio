@@ -21,6 +21,9 @@ export type Customer = {
   rate: number;
   labouryRate: number;
   labouryAmount: number;
+  brokerageRate: number;
+  brokerageAmount: number;
+  brokerageAddSubtract?: boolean;
   kanta: number;
   amount: number;
   netAmount: number | string;
@@ -381,18 +384,18 @@ export type ReceiptSettings = {
 export type RtgsSettings = ReceiptSettings;
 
 export type ConsolidatedReceiptData = {
-    supplier: {
-        name: string;
-        so: string;
-        address: string;
-        contact: string;
-    };
-    entries: Customer[];
+    customer: Customer;
+    receipts: Customer[];
     totalAmount: number;
-    date: string;
+    totalWeight: number;
+    totalNetWeight: number;
+    totalKartaAmount: number;
+    totalLabAmount: number;
+    totalNetAmount: number;
+    receiptCount: number;
 };
 
-export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
+export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt';
 
 export type Project = {
     id: string;

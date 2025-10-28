@@ -48,6 +48,24 @@ const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: a
     );
 };
 
+// Custom input with uppercase for vehicle number
+const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: any) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const uppercaseValue = e.target.value.toUpperCase();
+        onChange(uppercaseValue);
+    };
+
+    return (
+        <Input
+            value={value}
+            onChange={handleChange}
+            onBlur={onBlur}
+            className={className}
+            {...props}
+        />
+    );
+};
+
 interface SimpleSupplierFormAllFieldsProps {
     form: any;
     handleSrNoBlur: (value: string) => void;
@@ -152,7 +170,7 @@ const SimpleSupplierFormAllFields = ({
                                     name="vehicleNo"
                                     control={form.control}
                                     render={({ field }) => (
-                                        <AutoCapitalizeInput
+                                        <AutoUppercaseInput
                                             {...field}
                                             className="h-8 text-sm pl-10"
                                         />
@@ -307,23 +325,60 @@ const SimpleSupplierFormAllFields = ({
                     <Card className="h-full">
                          <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
                             <div className="space-y-1">
-                                <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
-                                <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="kartaPercentage" 
-                                        type="number" 
-                                        {...form.register('kartaPercentage')} 
-                                        className="h-8 text-sm pl-10" 
-                                    />
-                                </InputWithIcon>
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
+                                        <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                            <Input 
+                                                id="kartaPercentage" 
+                                                type="number" 
+                                                {...form.register('kartaPercentage')} 
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        </InputWithIcon>
+                                    </div>
+                                    <div className="flex-1">
+                                        <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
+                                        <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                            <Input 
+                                                id="labouryRate" 
+                                                type="number" 
+                                                {...form.register('labouryRate')} 
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        </InputWithIcon>
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-1">
-                                <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
-                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <div className="flex items-center gap-1">
+                                    <Label htmlFor="brokerage" className="text-xs whitespace-nowrap">Brokerage</Label>
+                                    <div className="flex gap-1">
+                                        <Button
+                                            type="button"
+                                            variant={form.watch('brokerageAddSubtract') ? "default" : "outline"}
+                                            size="sm"
+                                            className="h-5 px-2 text-xs"
+                                            onClick={() => form.setValue('brokerageAddSubtract', true)}
+                                        >
+                                            +
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={!form.watch('brokerageAddSubtract') ? "default" : "outline"}
+                                            size="sm"
+                                            className="h-5 px-2 text-xs"
+                                            onClick={() => form.setValue('brokerageAddSubtract', false)}
+                                        >
+                                            -
+                                        </Button>
+                                    </div>
+                                </div>
+                                <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
                                     <Input 
-                                        id="labouryRate" 
+                                        id="brokerage" 
                                         type="number" 
-                                        {...form.register('labouryRate')} 
+                                        {...form.register('brokerage')} 
                                         className="h-8 text-sm pl-10" 
                                     />
                                 </InputWithIcon>
