@@ -123,9 +123,9 @@ export const useSupplierSummary = (
         totalRtgsPaidForEntry,
         paymentsForEntry,
         // Calculate outstanding for this specific purchase (including CD deduction)
-        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
+        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
         // Set netAmount for compatibility with payment logic (including CD deduction)
-        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
+        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
       };
     });
 

@@ -293,27 +293,41 @@ export async function addSupplier(supplierData: Customer): Promise<Customer> {
     return supplierData;
 }
 
+// Find supplier Firestore document ID by serial number
+export async function getSupplierIdBySrNo(srNo: string): Promise<string | null> {
+  try {
+    const q = query(suppliersCollection, where('srNo', '==', srNo));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs[0].id;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
   if (!id) {
-    console.error("updateSupplier requires a valid ID.");
     return false;
   }
-  
   try {
-    // Update Firestore
     const docRef = doc(suppliersCollection, id);
-    await updateDoc(docRef, supplierData);
-    console.log('Firestore updated successfully for ID:', id);
-    
-    // Update IndexedDB
-    if (db) {
-      await db.suppliers.update(id, supplierData);
-      console.log('IndexedDB updated successfully for ID:', id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await updateDoc(docRef, supplierData);
+    } else {
+      // Create the document if it does not exist
+      const dataToSet: any = { id, ...supplierData };
+      await setDoc(docRef, dataToSet, { merge: true });
     }
-    
+    if (db) {
+      // Merge update locally as well
+      const existing = await db.suppliers.get(id);
+      await db.suppliers.put({ ...(existing || { id }), ...(supplierData as any) });
+    }
     return true;
-  } catch (error) {
-    console.error('Error updating supplier:', error);
+  } catch {
     return false;
   }
 }
@@ -323,9 +337,70 @@ export async function deleteSupplier(id: string): Promise<void> {
     console.error("deleteSupplier requires a valid ID.");
     return;
   }
-  await deleteDoc(doc(suppliersCollection, id));
-  if (db) {
-      await db.suppliers.delete(id); // WRITE-THROUGH
+
+  try {
+    // Get the supplier data to find the serial number
+    const supplierDoc = await getDoc(doc(suppliersCollection, id));
+    if (!supplierDoc.exists()) {
+      console.error("Supplier not found for deletion");
+      return;
+    }
+    
+    const supplierData = supplierDoc.data();
+    const supplierSrNo = supplierData.srNo;
+    
+    // Find all payments associated with this supplier's serial number
+    const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: supplierSrNo }));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    const batch = writeBatch(firestoreDB);
+    const paymentsToDelete: string[] = [];
+    
+    // Process each payment
+    paymentsSnapshot.forEach(paymentDoc => {
+      const payment = paymentDoc.data() as Payment;
+      
+      if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === supplierSrNo) {
+        // Payment is only for this supplier, delete it completely
+        paymentsToDelete.push(paymentDoc.id);
+        batch.delete(paymentDoc.ref);
+      } else if (payment.paidFor && payment.paidFor.length > 1) {
+        // Payment is for multiple entries, remove this supplier from paidFor
+        const updatedPaidFor = payment.paidFor.filter(pf => pf.srNo !== supplierSrNo);
+        const amountToDeduct = payment.paidFor.find(pf => pf.srNo === supplierSrNo)?.amount || 0;
+        
+        if (updatedPaidFor.length > 0) {
+          batch.update(paymentDoc.ref, {
+            paidFor: updatedPaidFor,
+            amount: payment.amount - amountToDeduct
+          });
+        } else {
+          // If no more entries, delete the payment
+          paymentsToDelete.push(paymentDoc.id);
+          batch.delete(paymentDoc.ref);
+        }
+      }
+    });
+    
+    // Delete the supplier
+    batch.delete(doc(suppliersCollection, id));
+    
+    // Commit all changes
+    await batch.commit();
+    
+    // Update IndexedDB
+    if (db) {
+      await db.suppliers.delete(id);
+      if (paymentsToDelete.length > 0) {
+        await db.payments.bulkDelete(paymentsToDelete);
+      }
+    }
+    
+    console.log(`Deleted supplier ${id} and ${paymentsToDelete.length} associated payments`);
+    
+  } catch (error) {
+    console.error('Error deleting supplier and payments:', error);
+    throw error;
   }
 }
 

@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { addSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier } from "@/lib/firestore";
+import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo } from "@/lib/firestore";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import SimpleSupplierFormAllFields from "@/components/sales/simple-supplier-form-all-fields";
@@ -226,8 +226,17 @@ export default function SimpleSupplierEntryAllFields() {
 
     // Delete current form entry
     const handleDeleteCurrent = useCallback(async () => {
+        // If not saved yet, just clear the form
         if (!currentSupplier.id) {
-            toast({ variant: 'destructive', title: 'No entry to delete', description: 'Please save an entry first or select an existing entry to delete' });
+            form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            setCurrentSupplier({
+                id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
+                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
+                weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                receiptType: 'Cash', paymentType: 'Full', customerId: '',
+            });
+            toast({ title: 'Form cleared' });
             return;
         }
 
@@ -251,11 +260,54 @@ export default function SimpleSupplierEntryAllFields() {
     // Print current form entry
     const handlePrintCurrent = useCallback(() => {
         if (!currentSupplier.id) {
-            toast({ variant: 'destructive', title: 'No entry to print', description: 'Please save an entry first or select an existing entry to print' });
+            // Build a temporary customer object from current form values for preview/print
+            const v = form.getValues();
+            const netWeight = (v.grossWeight || 0) - (v.teirWeight || 0);
+            const amount = netWeight * (v.rate || 0);
+            const kartaAmount = ((netWeight * (v.kartaPercentage || 0)) / 100) * (v.rate || 0);
+            const labouryAmount = netWeight * (v.labouryRate || 0);
+            const brokerageAmount = (v.brokerage || 0) * netWeight;
+            const netAmount = amount - kartaAmount - labouryAmount - (v.kanta || 0) + ((v.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount);
+            const temp: Customer = {
+                id: 'TEMP',
+                srNo: v.srNo,
+                date: format(v.date, 'yyyy-MM-dd'),
+                term: String(v.term),
+                dueDate: format(new Date(v.date.getTime() + v.term * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                name: toTitleCase(v.name),
+                so: toTitleCase(v.so),
+                address: toTitleCase(v.address),
+                contact: v.contact,
+                vehicleNo: v.vehicleNo?.toUpperCase() || '',
+                variety: v.variety,
+                grossWeight: v.grossWeight,
+                teirWeight: v.teirWeight,
+                weight: Number(netWeight.toFixed(2)),
+                kartaPercentage: v.kartaPercentage,
+                kartaWeight: Number(((netWeight * (v.kartaPercentage || 0)) / 100).toFixed(2)),
+                kartaAmount: Number(kartaAmount.toFixed(2)),
+                netWeight: Number((netWeight - Number(((netWeight * (v.kartaPercentage || 0)) / 100).toFixed(2))).toFixed(2)),
+                rate: v.rate,
+                labouryRate: v.labouryRate,
+                labouryAmount: Number(labouryAmount.toFixed(2)),
+                brokerage: v.brokerage || 0,
+                brokerageRate: v.brokerageRate || 0,
+                brokerageAmount: Number(brokerageAmount.toFixed(2)),
+                brokerageAddSubtract: v.brokerageAddSubtract ?? true,
+                kanta: v.kanta,
+                amount: Number(amount.toFixed(2)),
+                netAmount: Number(netAmount.toFixed(2)),
+                originalNetAmount: Number(netAmount.toFixed(2)),
+                barcode: '',
+                receiptType: 'Cash',
+                paymentType: v.paymentType,
+                customerId: `${toTitleCase(v.name).toLowerCase()}|${toTitleCase(v.so).toLowerCase()}`,
+            };
+            setReceiptsToPrint([temp]);
             return;
         }
         setReceiptsToPrint([currentSupplier]);
-    }, [currentSupplier, toast]);
+    }, [currentSupplier, form]);
 
     // Background data loading effect - non-blocking
     useEffect(() => {
@@ -283,7 +335,7 @@ export default function SimpleSupplierEntryAllFields() {
             const newFormState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial[0]);
             form.reset(newFormState);
         }
-    }, [suppliersForSerial, lastVariety, lastPaymentType, form]);
+    }, [suppliersForSerial, lastPaymentType, form]);
 
     // Hide loading when data is available or after timeout
     useEffect(() => {
@@ -595,8 +647,7 @@ export default function SimpleSupplierEntryAllFields() {
             const brokerageAmount = values.brokerage * netWeight;
             const netAmount = amount - kartaAmount - labouryAmount - values.kanta + (values.brokerageAddSubtract ? brokerageAmount : -brokerageAmount);
 
-            const supplierData: Customer = {
-                id: crypto.randomUUID(),
+            const supplierBase: Omit<Customer, 'id'> = {
                 srNo: values.srNo,
                 date: format(values.date, 'yyyy-MM-dd'),
                 term: String(values.term),
@@ -617,10 +668,10 @@ export default function SimpleSupplierEntryAllFields() {
                 rate: values.rate,
                 labouryRate: values.labouryRate,
                 labouryAmount: labouryAmount,
-                brokerage: values.brokerage,
-                brokerageRate: values.brokerageRate,
+                brokerage: Number(values.brokerage || 0),
+                brokerageRate: Number(values.brokerageRate || 0),
                 brokerageAmount: brokerageAmount,
-                brokerageAddSubtract: values.brokerageAddSubtract,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
                 kanta: values.kanta,
                 amount: amount,
                 netAmount: netAmount,
@@ -636,17 +687,47 @@ export default function SimpleSupplierEntryAllFields() {
                 // Update existing supplier
                 const existingSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
                 if (existingSupplier) {
-                    await db.suppliers.update(existingSupplier.id, supplierData);
-                    setCurrentSupplier({ ...supplierData, id: existingSupplier.id });
-                    toast({ 
-                        title: "Entry updated successfully!", 
-                        description: `Supplier ${values.name} has been updated.`,
-                        variant: "success"
-                    });
+                    // Ensure we have a valid Firestore ID to update
+                    let targetId = existingSupplier.id;
+                    if (!targetId || targetId.length < 4) {
+                        // Try to find Firestore doc by SR No
+                        const foundId = await getSupplierIdBySrNo(values.srNo);
+                        if (foundId) {
+                            targetId = foundId;
+                        }
+                    }
+
+                    let success = false;
+                    if (targetId && targetId.length > 3) {
+                        success = await updateSupplier(targetId, supplierBase);
+                    } else {
+                        // Fallback: create a new doc with a fresh ID and replace local record
+                        const newId = crypto.randomUUID();
+                        const savedSupplier = await addSupplier({ id: newId, ...supplierBase });
+                        // Replace local record to ensure consistent ID
+                        if (existingSupplier.id && existingSupplier.id !== newId) {
+                            try { await db.suppliers.delete(existingSupplier.id); } catch {}
+                        }
+                        await db.suppliers.put(savedSupplier);
+                        setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
+                        toast({ title: "Entry updated successfully!", description: `Supplier ${values.name} has been updated.`, variant: "success" });
+                        setIsEditing(false);
+                        return;
+                    }
+                    if (success) {
+                        setCurrentSupplier({ ...supplierBase, id: targetId } as Customer);
+                        toast({ 
+                            title: "Entry updated successfully!", 
+                            description: `Supplier ${values.name} has been updated.`,
+                            variant: "success"
+                        });
+                    } else {
+                        throw new Error('Failed to update supplier');
+                    }
                 } else {
                     // If not found, add as new
-                    const savedSupplier = await addSupplier(supplierData);
-                    setCurrentSupplier({ ...supplierData, id: savedSupplier.id });
+                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...supplierBase });
+                    setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
                     toast({ 
                         title: "Entry saved successfully!", 
                         description: `Supplier ${values.name} has been added.`,
@@ -656,8 +737,8 @@ export default function SimpleSupplierEntryAllFields() {
                 setIsEditing(false);
             } else {
                 // Add new supplier
-                const savedSupplier = await addSupplier(supplierData);
-                setCurrentSupplier({ ...supplierData, id: savedSupplier.id });
+                const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...supplierBase });
+                setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
                 toast({ 
                     title: "Entry saved successfully!", 
                     description: `Supplier ${values.name} has been added.`,
@@ -863,20 +944,19 @@ export default function SimpleSupplierEntryAllFields() {
 
     const handleMultiDelete = useCallback(async (supplierIds: string[]) => {
         try {
-            // Delete multiple suppliers
-            for (const id of supplierIds) {
-                await db.suppliers.delete(id);
-            }
+            // Import deleteMultipleSuppliers function
+            const { deleteMultipleSuppliers } = await import("@/lib/firestore");
+            await deleteMultipleSuppliers(supplierIds);
             toast({ 
                 title: "Success", 
-                description: `${supplierIds.length} suppliers deleted successfully` 
+                description: `${supplierIds.length} suppliers and their associated payments deleted successfully` 
             });
         } catch (error) {
             console.error('Error deleting suppliers:', error);
             toast({ 
                 title: "Error", 
                 description: "Failed to delete some suppliers", 
-                variant: "destructive" 
+                variant: "destructive"
             });
         }
     }, []);
@@ -1089,8 +1169,7 @@ export default function SimpleSupplierEntryAllFields() {
                                     size="sm" 
                                     onClick={handleDeleteCurrent}
                                     className="h-8"
-                                    disabled={!currentSupplier.id}
-                                    title={currentSupplier.id ? `Delete ${currentSupplier.name || 'entry'}` : 'No entry to delete'}
+                                    title={`Delete ${currentSupplier.id ? (currentSupplier.name || 'entry') : 'form/entry'}`}
                                 >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -1100,8 +1179,7 @@ export default function SimpleSupplierEntryAllFields() {
                                     size="sm" 
                                     onClick={handlePrintCurrent}
                                     className="h-8"
-                                    disabled={!currentSupplier.id}
-                                    title={currentSupplier.id ? `Print ${currentSupplier.name || 'entry'}` : 'No entry to print'}
+                                    title={`Print ${currentSupplier.id ? (currentSupplier.name || 'entry') : 'current form'}`}
                                 >
                                     <Printer className="mr-2 h-4 w-4" />
                                     Print

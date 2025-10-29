@@ -60,8 +60,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: "Please select an account to pay from for RTGS." };
     }
     
-    // VALIDATION: Check if settlement amount exceeds total outstanding
-    if (settleAmount > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
+    // VALIDATION: Check if settlement amount exceeds total outstanding (skip for Outsider mode)
+    if (rtgsFor !== 'Outsider' && settleAmount > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
         return { success: false, message: `Settlement amount (${formatCurrency(settleAmount)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
     }
 

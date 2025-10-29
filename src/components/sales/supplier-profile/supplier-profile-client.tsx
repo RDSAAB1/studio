@@ -438,9 +438,9 @@ export default function SupplierProfileClient() {
 
     summary.forEach((data, key) => {
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
-        // CD is already deducted in individual outstandingForEntry calculations, so don't deduct again here
-        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
-        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length;
+        // Use sum of individual outstanding amounts (which already have CD deducted)
+        data.totalOutstanding = (data.allTransactions || []).reduce((sum, t) => sum + (t.outstandingForEntry || 0), 0);
+        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.outstandingForEntry || 0) > 0).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         const rates = supplierRateSum[key];
@@ -474,10 +474,10 @@ export default function SupplierProfileClient() {
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
-    // CD is already deducted in individual outstandingForEntry calculations, so don't deduct again here
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
+    // Use sum of individual outstanding amounts (which already have CD deducted)
+    millSummary.totalOutstanding = filteredSuppliers.reduce((sum, s) => sum + (s.outstandingForEntry || 0), 0);
     millSummary.totalTransactions = filteredSuppliers.length;
-    millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+    millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => (c.outstandingForEntry || 0) > 0).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
     const totalRateData = filteredSuppliers.reduce((acc, s) => {

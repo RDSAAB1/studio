@@ -35,7 +35,7 @@ export const useSupplierPayments = () => {
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState('processing');
+    const [activeTab, setActiveTab] = useState('process');
     
     const selectedEntries = useMemo(() => {
         if (!form.selectedCustomerKey || !Array.isArray(data.suppliers)) return [];
@@ -88,25 +88,12 @@ export const useSupplierPayments = () => {
             }, 0);
         }
         
-        // NEW PAYMENT MODE: Sum of the current net amounts of selected entries.
+        // NEW PAYMENT MODE (Supplier): Use current outstanding balance from entries (netAmount)
         const totalOutstanding = selectedEntries.reduce((sum, entry) => {
-            const netAmount = Number(entry.netAmount) || 0;
-            console.log('Outstanding calculation for entry:', {
-                srNo: entry.srNo,
-                originalNetAmount: entry.originalNetAmount,
-                netAmount: netAmount,
-                totalPaid: entry.totalPaid,
-                totalCd: entry.totalCd
-            });
-            return sum + netAmount;
+            const remaining = Number(entry.netAmount) || 0; // remaining outstanding per entry
+            return sum + remaining;
         }, 0);
-        
-        console.log('Total outstanding for selected entries:', {
-            selectedEntriesCount: selectedEntries.length,
-            totalOutstanding: totalOutstanding,
-            selectedEntries: selectedEntries.map(e => ({ srNo: e.srNo, netAmount: e.netAmount }))
-        });
-        
+
         return totalOutstanding;
 
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
@@ -114,17 +101,22 @@ export const useSupplierPayments = () => {
 
     // Use useMemo to derive values instead of useState to avoid infinite loops
     const settleAmountDerived = useMemo(() => {
+        // In Outsider mode, outstanding cap does not apply
+        if (form.rtgsFor === 'Outsider') {
+            return 0;
+        }
         if (form.paymentType === 'Full') {
             return totalOutstandingForSelected;
         }
         // For Partial, this will be overridden by state
         return 0;
-    }, [form.paymentType, totalOutstandingForSelected]);
+    }, [form.paymentType, form.rtgsFor, totalOutstandingForSelected]);
 
     const [settleAmountManual, setSettleAmountManual] = useState(0);
     const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
 
-    const settleAmount = form.paymentType === 'Full' ? settleAmountDerived : settleAmountManual;
+    // In Outsider mode, allow manual settle amount even in Full mode (no outstanding limit)
+    const settleAmount = (form.paymentType === 'Full' && form.rtgsFor !== 'Outsider') ? settleAmountDerived : settleAmountManual;
 
     // Debug: Log payment history and selected customer key
     console.log('useCashDiscount - Parameters being passed:', {
@@ -314,7 +306,7 @@ export const useSupplierPayments = () => {
         }
 
         form.setEditingPayment(paymentToEdit);
-        setActiveTab('processing');
+        setActiveTab('process');
         setIsProcessing(true);
         
         try {

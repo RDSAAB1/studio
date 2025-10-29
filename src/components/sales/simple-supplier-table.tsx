@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
 import { deleteSupplier, updateSupplier } from "@/lib/firestore";
@@ -51,6 +51,21 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     const [multiEditData, setMultiEditData] = useState<Partial<Customer>>({});
     const [multiEditTouched, setMultiEditTouched] = useState<Set<string>>(new Set());
 
+    // Compute due date preview from multi-edit Date + Term
+    const computedDueDate = React.useMemo(() => {
+        try {
+            const baseDateStr = multiEditData.date as string | undefined;
+            const termStr = multiEditData.term as string | undefined;
+            if (!baseDateStr || !termStr) return '';
+            const d = new Date(baseDateStr);
+            const days = parseInt(termStr || '0', 10) || 0;
+            const due = new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+            return format(due, 'yyyy-MM-dd');
+        } catch {
+            return '';
+        }
+    }, [multiEditData.date, multiEditData.term]);
+
     const handleEdit = (index: number) => {
         if (suppliers && suppliers[index]) {
             setEditingRow(index);
@@ -63,16 +78,20 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
         
         try {
             const supplier = suppliers[index];
-            await db.suppliers.update(supplier.id, editData);
+            const success = await updateSupplier(supplier.id, editData);
             
-            setEditingRow(null);
-            setEditData({});
-            
-            toast({ 
-                title: "Entry updated successfully!", 
-                description: "Supplier entry has been updated.",
-                variant: "success"
-            });
+            if (success) {
+                setEditingRow(null);
+                setEditData({});
+                
+                toast({ 
+                    title: "Entry updated successfully!", 
+                    description: "Supplier entry has been updated.",
+                    variant: "success"
+                });
+            } else {
+                throw new Error('Failed to update supplier');
+            }
         } catch (error) {
             console.error('Error updating supplier:', error);
             toast({ 
@@ -91,10 +110,10 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     const handleDelete = async (supplierId: string) => {
         try {
             setIsDeleting(true);
-            await db.suppliers.delete(supplierId);
+            await deleteSupplier(supplierId);
             toast({ 
                 title: "Entry deleted successfully!", 
-                description: "Supplier entry has been removed.",
+                description: "Supplier entry and associated payments have been removed.",
                 variant: "success"
             });
         } catch (error) {
@@ -198,11 +217,22 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     if (multiEditTouched.has('kanta')) {
                         updateData.kanta = multiEditData.kanta;
                     }
-                    if (multiEditTouched.has('term')) {
-                        updateData.term = multiEditData.term?.trim() || '';
+                    if (multiEditTouched.has('date')) {
+                        updateData.date = (multiEditData.date as string) || supplier.date;
                     }
-                    if (multiEditTouched.has('dueDate')) {
-                        updateData.dueDate = multiEditData.dueDate?.trim() || '';
+                    if (multiEditTouched.has('term')) {
+                        updateData.term = multiEditData.term?.trim() || supplier.term || '';
+                    }
+                    // Auto-compute dueDate from (date, term) - prefer multi-edit values, else supplier values
+                    if (multiEditTouched.has('date') || multiEditTouched.has('term')) {
+                        const baseDateStr = (multiEditTouched.has('date') ? (multiEditData.date as string) : supplier.date) as string;
+                        const termStr = (multiEditTouched.has('term') ? (multiEditData.term as string) : (supplier.term as string)) || '0';
+                        try {
+                            const base = new Date(baseDateStr);
+                            const days = parseInt(termStr || '0', 10) || 0;
+                            const due = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+                            updateData.dueDate = format(due, 'yyyy-MM-dd');
+                        } catch {}
                     }
                     if (multiEditTouched.has('so')) {
                         updateData.so = multiEditData.so?.trim() || '';
@@ -692,6 +722,30 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                             {/* Additional Details Row */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Date</label>
+                                    <InputWithIcon icon={<Calendar className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input
+                                            type="date"
+                                            value={(multiEditData.date as string) || ''}
+                                            onChange={(e) => {
+                                                setMultiEditData(prev => ({ ...prev, date: e.target.value }));
+                                                setMultiEditTouched(prev => new Set([...prev, 'date']));
+                                            }}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('date');
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Select date"
+                                            className="pl-10 h-9 text-sm"
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Term</label>
                                     <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
                                         <Input
@@ -715,18 +769,10 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                     <label className="text-xs font-medium text-muted-foreground">Due Date</label>
                                     <InputWithIcon icon={<Calendar className="h-4 w-4 text-muted-foreground" />}>
                                         <Input
-                                            value={multiEditData.dueDate || ''}
-                                            onChange={(e) => setMultiEditData(prev => ({ ...prev, dueDate: e.target.value }))}
-                                            onBlur={(e) => {
-                                                if (!e.target.value.trim()) {
-                                                    setMultiEditTouched(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete('dueDate');
-                                                        return newSet;
-                                                    });
-                                                }
-                                            }}
-                                            placeholder="Enter due date"
+                                            value={computedDueDate || multiEditData.dueDate || ''}
+                                            readOnly
+                                            disabled
+                                            placeholder="Auto (Date + Term)"
                                             className="pl-10 h-9 text-sm"
                                         />
                                     </InputWithIcon>
@@ -785,6 +831,8 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                             <thead className="bg-muted/50">
                                 <tr>
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-8"></th>
+                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">SR No</th>
+                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Date</th>
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-32">Name</th>
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-24">SO</th>
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-40">Address</th>
@@ -817,6 +865,12 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                     <Square className="h-3 w-3" />
                                                 )}
                                             </Button>
+                                        </td>
+                                        <td className="p-1 text-xs w-20 font-mono">
+                                            {supplier.srNo}
+                                        </td>
+                                        <td className="p-1 text-xs w-20">
+                                            {format(new Date(supplier.date), 'dd/MM/yy')}
                                         </td>
                                         <td className="p-1 text-xs w-32">
                                             {editingRow === index ? (
