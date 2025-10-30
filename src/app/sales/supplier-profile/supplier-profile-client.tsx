@@ -189,38 +189,7 @@ export default function SupplierProfileClient() {
         onGenerateStatement={() => setIsStatementOpen(true)}
       />
       
-      {/* Show data even if SupplierProfileView doesn't display it */}
-      {selectedSupplierData && selectedSupplierKey === MILL_OVERVIEW_KEY && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded">
-          <h3 className="font-bold text-green-800">Mill Overview Data Found:</h3>
-          <p>Name: {selectedSupplierData.name}</p>
-          <p>Total Transactions: {selectedSupplierData.totalTransactions}</p>
-          <p>Total Amount: ₹{selectedSupplierData.totalAmount}</p>
-          <p>Total Paid: ₹{selectedSupplierData.totalPaid}</p>
-          <p>Total Outstanding: ₹{selectedSupplierData.totalOutstanding}</p>
-          <p>Cash Paid: ₹{selectedSupplierData.totalCashPaid}</p>
-          <p>RTGS Paid: ₹{selectedSupplierData.totalRtgsPaid}</p>
-        </div>
-      )}
-      
-      {/* Debug Info for Mill Overview */}
-      {selectedSupplierKey === MILL_OVERVIEW_KEY && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
-          <h3 className="font-bold text-yellow-800">Debug Info - Mill Overview</h3>
-          <p>Selected Key: {selectedSupplierKey}</p>
-          <p>Mill Overview Key: {MILL_OVERVIEW_KEY}</p>
-          <p>Supplier Summary Map Size: {supplierSummaryMap.size}</p>
-          <p>Has Mill Overview Data: {supplierSummaryMap.has(MILL_OVERVIEW_KEY) ? 'Yes' : 'No'}</p>
-          {selectedSupplierData && (
-            <div>
-              <p>Selected Data Name: {selectedSupplierData.name}</p>
-              <p>Total Transactions: {selectedSupplierData.totalTransactions}</p>
-              <p>Total Amount: {selectedSupplierData.totalAmount}</p>
-              <p>Total Paid: {selectedSupplierData.totalPaid}</p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Removed Mill Overview debug/summary blocks as requested */}
       
       
       {/* Fuzzy Matching Information */}

@@ -79,62 +79,62 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                             <TableBody>
                                 {payments.map((p: any) => (
                                     <TableRow key={p.id}>
-                                        <TableCell className="p-1 text-[10px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
-                                            <div className="text-slate-600 font-medium text-[10px] break-words">
+                                        <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
+                                            <div className="text-slate-900 font-medium text-[11px] break-words">
                                                 {p.paymentId || p.rtgsSrNo}
                                             </div>
-                                            <div className="text-slate-500 text-[10px] break-words mt-0.5">
+                                            <div className="text-slate-700 text-[11px] break-words mt-0.5">
                                                 {p.sixRNo || ''}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-20">
+                                        <TableCell className="p-1 text-[11px] w-20">
                                             <div className="break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-20">
-                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[10px]">{p.receiptType}</Badge>
+                                        <TableCell className="p-1 text-[11px] w-20">
+                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px]">{p.receiptType}</Badge>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-40" title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)}`}>
-                                            <div className="break-words font-medium text-slate-700 text-[10px]">
+                                        <TableCell className="p-1 text-[11px] w-40" title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)}`}>
+                                            <div className="break-words font-semibold text-slate-900 text-[11px]">
                                                 {p.supplierName || ''}
                                             </div>
-                                            <div className="text-slate-600 text-[10px] mt-0.5 break-words">
+                                            <div className="text-slate-800 text-[11px] mt-0.5 break-words">
                                                 {getReceiptHolderName(p)}
                                             </div>
-                                            <div className="text-slate-500 text-[10px] mt-0.5">
+                                            <div className="text-slate-700 text-[11px] mt-0.5">
                                                 <div className="break-words">
                                                     {getReceiptNumbers(p)}
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-28" title={(p.bankName || '').toString()}>
-                                            <div className="break-words text-slate-600 font-medium text-[10px]">
+                                        <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
+                                            <div className="break-words text-slate-900 font-medium text-[11px]">
                                                 {p.bankName || ''}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
-                                            <div className="text-slate-700 text-[10px] font-medium break-words">
+                                        <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
+                                            <div className="text-slate-900 text-[11px] font-medium break-words">
                                                 {p.bankAcNo || ''}
                                             </div>
-                                            <div className="text-slate-600 text-[10px] break-words mt-0.5">
+                                            <div className="text-slate-800 text-[11px] break-words mt-0.5">
                                                 {p.bankBranch || ''}
                                             </div>
-                                            <div className="text-slate-500 text-[10px] break-words mt-0.5">
+                                            <div className="text-slate-700 text-[11px] break-words mt-0.5">
                                                 {p.bankIfsc || ''}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[10px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
-                                            <div className="text-slate-700 text-[10px] font-medium break-words">
+                                        <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
+                                            <div className="text-slate-900 text-[11px] font-medium break-words">
                                                 {p.quantity || 0}
                                             </div>
-                                            <div className="text-slate-600 text-[10px] break-words mt-0.5">
+                                            <div className="text-slate-800 text-[11px] break-words mt-0.5">
                                                 {p.rate || 0}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right p-1 text-[10px] w-24 font-mono">
-                                            <div className="break-words text-slate-700 font-medium">{formatCurrency(p.amount)}</div>
+                                        <TableCell className="text-right p-1 text-[11px] w-24 font-mono">
+                                            <div className="break-words text-slate-900 font-semibold">{formatCurrency(p.amount)}</div>
                                         </TableCell>
-                                        <TableCell className="text-right p-1 text-[10px] w-20 font-mono">
-                                            <div className="break-words text-slate-600">{formatCurrency(p.cdAmount)}</div>
+                                        <TableCell className="text-right p-1 text-[11px] w-20 font-mono">
+                                            <div className="break-words text-slate-800">{formatCurrency(p.cdAmount)}</div>
                                         </TableCell>
                                         <TableCell className="text-center p-0 w-24">
                                             <div className="flex justify-center items-center gap-0">

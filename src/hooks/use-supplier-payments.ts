@@ -30,6 +30,7 @@ export const useSupplierPayments = () => {
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict);
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [multiSupplierMode, setMultiSupplierMode] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
     const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any | null>(null);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
@@ -38,11 +39,15 @@ export const useSupplierPayments = () => {
     const [activeTab, setActiveTab] = useState('process');
     
     const selectedEntries = useMemo(() => {
-        if (!form.selectedCustomerKey || !Array.isArray(data.suppliers)) return [];
+        if (!Array.isArray(data.suppliers)) return [];
+        if (multiSupplierMode) {
+            return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+        }
+        if (!form.selectedCustomerKey) return [];
         const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
         if (!profile || !Array.isArray(profile.allTransactions)) return [];
         return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
-    }, [form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
+    }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
     const totalOutstandingForSelected = useMemo(() => {
         if (form.editingPayment) {
@@ -118,18 +123,7 @@ export const useSupplierPayments = () => {
     // In Outsider mode, allow manual settle amount even in Full mode (no outstanding limit)
     const settleAmount = (form.paymentType === 'Full' && form.rtgsFor !== 'Outsider') ? settleAmountDerived : settleAmountManual;
 
-    // Debug: Log payment history and selected customer key
-    console.log('useCashDiscount - Parameters being passed:', {
-        selectedCustomerKey: form.selectedCustomerKey,
-        paymentHistoryLength: data.paymentHistory?.length || 0,
-        paymentHistory: data.paymentHistory?.map(p => ({
-            id: p.id,
-            customerId: p.customerId,
-            amount: p.amount,
-            cdApplied: p.cdApplied,
-            cdAmount: p.cdAmount
-        })) || []
-    });
+    // Removed heavy console logs to improve typing performance
 
     const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
@@ -224,9 +218,7 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
-             if (form.rtgsFor === 'Supplier') {
-                 setIsOutstandingModalOpen(true);
-            }
+            // Popup selection removed
         }
     };
     
@@ -477,6 +469,8 @@ export const useSupplierPayments = () => {
         setIsBankSettingsOpen,
         isOutstandingModalOpen,
         setIsOutstandingModalOpen,
+        multiSupplierMode,
+        setMultiSupplierMode,
         rtgsReceiptData,
         setRtgsReceiptData,
         activeTab, setActiveTab,

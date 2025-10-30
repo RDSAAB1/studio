@@ -1,7 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime } from './firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -97,6 +97,26 @@ export async function syncAllData() {
     }, (error) => console.error("Sync Error (Payments):", error));
 
     // Add other sync functions here as needed
+}
+
+// Hard sync: replace local IndexedDB with fresh Firestore data (suppliers, payments)
+export async function hardSyncAllData() {
+    if (!db) return;
+    try {
+        const [suppliers, payments] = await Promise.all([
+            getAllSuppliers(),
+            getAllPayments(),
+        ]);
+        await db.transaction('rw', db.suppliers, db.payments, async () => {
+            await db.suppliers.clear();
+            await db.payments.clear();
+            if (suppliers?.length) await db.suppliers.bulkAdd(suppliers);
+            if (payments?.length) await db.payments.bulkAdd(payments);
+        });
+    } catch (e) {
+        console.error('Hard sync failed:', e);
+        throw e;
+    }
 }
 
 

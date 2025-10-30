@@ -17,7 +17,7 @@ import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { syncAllData } from "@/lib/database";
+import { syncAllData, hardSyncAllData } from "@/lib/database";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -228,7 +228,8 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const id = "sync-toast";
     toast({ id, title: "Syncing data...", description: "Please wait..." });
     try {
-        await syncAllData();
+        // Perform a hard sync to ensure IndexedDB mirrors Firestore exactly
+        await hardSyncAllData();
         toast({ id, title: "Sync Complete", description: "Your data is up to date.", variant: "success" });
     } catch (error) {
         console.error("Manual sync failed:", error);

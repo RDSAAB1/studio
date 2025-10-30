@@ -44,7 +44,7 @@ export const useSupplierSummary = (
       paymentsForEntry.forEach(payment => {
         const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === s.srNo);
         if (paidForThisPurchase) {
-          // Total amount paid for this purchase (including CD)
+          // Total amount paid for this purchase (actual payment EXCLUDING CD)
           totalPaidForEntry += paidForThisPurchase.amount;
           
           // Calculate CD portion for this purchase first
@@ -93,39 +93,21 @@ export const useSupplierSummary = (
         }
       });
 
-      // Debug: Log payment calculations for first few suppliers
-      if (s.srNo && (s.srNo === '1' || s.srNo === '2' || s.srNo === '3')) {
-        console.log(`Supplier ${s.srNo} - ${s.name}:`, {
-          totalPaidForEntry,
-          totalCashPaidForEntry,
-          totalRtgsPaidForEntry,
-          totalCdForEntry,
-          paymentsForEntry: paymentsForEntry.length,
-          paymentTypes: paymentsForEntry.map(p => p.type),
-          paymentDetails: paymentsForEntry.map(p => ({
-            type: p.type,
-            receiptType: p.receiptType,
-            amount: p.amount,
-            cdAmount: p.cdAmount,
-            cdApplied: p.cdApplied,
-            paidFor: p.paidFor?.map(pf => ({ srNo: pf.srNo, amount: pf.amount }))
-          }))
-        });
-      }
+      // Removed debug logging for performance
 
       return {
         ...s,
         totalPaidForEntry,
         totalCdForEntry,
         totalCd: totalCdForEntry, // Map totalCdForEntry to totalCd for compatibility
-        totalPaid: totalCashPaidForEntry + totalRtgsPaidForEntry, // Actual payment without CD (for compatibility)
+        totalPaid: totalCashPaidForEntry + totalRtgsPaidForEntry, // Actual payment without CD
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
         paymentsForEntry,
-        // Calculate outstanding for this specific purchase (including CD deduction)
-        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
-        // Set netAmount for compatibility with payment logic (including CD deduction)
-        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry),
+        // Calculate outstanding including CD once: Original - (Paid + CD)
+        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry + totalCdForEntry),
+        // netAmount mirrors outstandingForEntry for downstream logic
+        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry + totalCdForEntry),
       };
     });
 
@@ -316,8 +298,8 @@ export const useSupplierSummary = (
     // Set mill overview data properly
     millSummary.allTransactions = processedSuppliers;
     millSummary.allPayments = paymentHistory;
-    // Use totalPaid which already includes CD deduction, don't double-deduct CD
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
+    // Outstanding = Original - (Paid + CD)
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - (millSummary.totalPaid + millSummary.totalCdAmount!);
     
     // Ensure mill summary has all the necessary data
     millSummary.paymentHistory = millSummary.allPayments;

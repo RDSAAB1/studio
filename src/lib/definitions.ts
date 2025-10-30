@@ -56,7 +56,6 @@ export type Customer = {
   bags?: number;
   companyName?: string;
   brokerage?: number;
-  brokerageRate?: number;
   cd?: number;
   cdRate?: number;
   isBrokerageIncluded?: boolean;

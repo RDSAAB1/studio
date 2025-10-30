@@ -307,8 +307,10 @@ export const useSupplierEntry = () => {
       };
 
       if (isEditing) {
-          await updateSupplier(completeEntry);
-          setSuppliers(prev => prev.map(s => s.id === completeEntry.id ? completeEntry : s));
+          const { id, ...rest } = completeEntry as any;
+          const ok = await updateSupplier(id, rest);
+          if (!ok) throw new Error('Update failed');
+          setSuppliers(prev => prev.map(s => s.id === id ? completeEntry : s));
           toast({ title: "Supplier updated successfully!" });
       } else {
           await addSupplier(completeEntry);

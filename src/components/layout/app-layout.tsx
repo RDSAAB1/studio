@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useState, useRef, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, useRef, useTransition, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import { Loader2 } from 'lucide-react';
@@ -28,6 +28,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   );
   const [activeTabId, setActiveTabId] = usePersistedState<string>('app-active-tab', 'dashboard-overview');
   const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
   const lastPathnameRef = useRef<string | null>(null);
@@ -65,9 +66,30 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   }, [pathname, activeTabId]);
 
   const handleTabSelect = (tabId: string) => {
+    // Avoid redundant navigations
+    const targetPath = tabId === 'dashboard-overview' ? '/' : `/${tabId}`;
+    if (pathname === targetPath) {
+      setActiveTabId(tabId);
+      return;
+    }
+
     setActiveTabId(tabId);
-    const path = tabId === 'dashboard-overview' ? '/' : `/${tabId}`;
-    router.push(path);
+
+    // Navigate in a transition to keep UI responsive and guard against transient errors
+    startTransition(() => {
+      try {
+        router.push(targetPath);
+      } catch (err) {
+        // As a resilience fallback (e.g., dev server hiccup), force a hard navigation
+        try {
+          if (typeof window !== 'undefined') {
+            window.location.assign(targetPath);
+          }
+        } catch (_) {
+          // noop
+        }
+      }
+    });
   };
 
   const handleTabClose = (tabIdToClose: string) => {
@@ -82,7 +104,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       if (newActiveTab) {
         setActiveTabId(newActiveTab.id);
         const path = newActiveTab.id === 'dashboard-overview' ? '/' : `/${newActiveTab.id}`;
-        router.push(path);
+        startTransition(() => {
+          try {
+            router.push(path);
+          } catch {
+            try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
+          }
+        });
       } else {
         // This case should ideally not happen if dashboard is always present
         // but as a fallback, go to dashboard
@@ -90,7 +118,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         if (dashboardTab) {
             setOpenTabs([dashboardTab]);
             setActiveTabId(dashboardTab.id);
-            router.push('/');
+            startTransition(() => {
+              try {
+                router.push('/');
+              } catch {
+                try { if (typeof window !== 'undefined') window.location.assign('/'); } catch {}
+              }
+            });
         }
       }
     }
@@ -102,7 +136,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
     setActiveTabId(menuItem.id);
     const path = menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`;
-    router.push(path);
+    startTransition(() => {
+      try {
+        router.push(path);
+      } catch {
+        try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
+      }
+    });
   };
 
   const toggleSidebar = () => setIsSidebarActive(prev => !prev);

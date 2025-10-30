@@ -923,6 +923,12 @@ export async function getMoreSuppliers(startAfterDoc: QueryDocumentSnapshot<Docu
   return { data, lastVisible, hasMore: data.length === count };
 }
 
+// Fetch ALL suppliers (use cautiously for manual sync)
+export async function getAllSuppliers(): Promise<Customer[]> {
+  const snapshot = await getDocs(suppliersCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+}
+
 export async function getInitialCustomers(count = 50) {
   const q = query(customersCollection, orderBy("srNo", "desc"), limit(count));
   const snapshot = await getDocs(q);
@@ -955,6 +961,12 @@ export async function getMorePayments(startAfterDoc: QueryDocumentSnapshot<Docum
   const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
   const lastVisible = snapshot.docs[snapshot.docs.length - 1];
   return { data, lastVisible, hasMore: data.length === count };
+}
+
+// Fetch ALL supplier payments (use cautiously for manual sync)
+export async function getAllPayments(): Promise<Payment[]> {
+  const snapshot = await getDocs(supplierPaymentsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 }
 
 export async function getInitialCustomerPayments(count = 100) {

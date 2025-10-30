@@ -24,7 +24,7 @@ interface ProcessPaymentResult {
 
 export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
     const {
-        rtgsFor, selectedCustomerKey, selectedEntries, editingPayment,
+        rtgsFor, selectedCustomerKey, selectedEntries: incomingSelectedEntries, editingPayment,
         paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, settleAmount, totalOutstandingForSelected,
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
@@ -36,7 +36,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         paymentAmount,
         calculatedCdAmount,
         settleAmount,
-        selectedEntries: selectedEntries?.length || 0,
+        selectedEntriesCount: (incomingSelectedEntries && Array.isArray(incomingSelectedEntries)) ? incomingSelectedEntries.length : 0,
         totalOutstandingForSelected
     });
 
@@ -44,6 +44,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: "No supplier selected" };
     }
     
+    // Build selected entries for edit mode if not provided
+    let selectedEntries = incomingSelectedEntries || [];
+    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0) && editingPayment?.paidFor?.length) {
+        const suppliers: Customer[] = Array.isArray((context as any).suppliers) ? (context as any).suppliers : [];
+        selectedEntries = editingPayment.paidFor
+            .map((pf: any) => suppliers.find(s => s.srNo === pf.srNo))
+            .filter(Boolean) as Customer[];
+    }
+
     if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0)) {
         if (paymentMethod !== 'RTGS') {
             return { success: false, message: "Please select entries to pay" };
@@ -108,6 +117,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 amountToDistribute -= paymentForThisEntry;
             }
         }
+        // If still empty (e.g., partial edit without changing selection), fallback to previous mapping
+        if (rtgsFor === 'Supplier' && paidForDetails.length === 0 && editingPayment?.paidFor?.length) {
+            paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
+        }
         
         // For RTGS, paymentId should be rtgsSrNo
         const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
@@ -151,6 +164,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             }))
         });
     });
+    // Ensure local IndexedDB reflects the latest payment so UI updates instantly
+    try {
+        if (db && finalPaymentData) {
+            await db.payments.put(finalPaymentData);
+        }
+    } catch {}
     return { success: true, payment: finalPaymentData };
 };
 

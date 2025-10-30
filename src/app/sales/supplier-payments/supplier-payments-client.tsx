@@ -34,6 +34,7 @@ export default function SupplierPaymentsClient() {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     
   const hook = useSupplierPayments();
+  const [refreshKey, setRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
 
   // Use the same supplier summary and filtering as supplier profile
@@ -69,6 +70,11 @@ export default function SupplierPaymentsClient() {
     undefined,
     MILL_OVERVIEW_KEY
   );
+
+  // Force lightweight rerender of heavy tables when payments list changes
+  useEffect(() => {
+    setRefreshKey(Date.now());
+  }, [hook.paymentHistory?.length]);
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!hook.selectedCustomerKey) return [];
@@ -171,7 +177,7 @@ export default function SupplierPaymentsClient() {
                                     )}
                                 </div>
                             )}
-                            {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
+                            {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && (
                                 <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                             )}
                         </CardContent>
@@ -179,6 +185,7 @@ export default function SupplierPaymentsClient() {
                 </TabsContent>
                 <TabsContent value="cash" className="mt-4">
                     <PaymentHistory
+                        key={`cash-${refreshKey}`}
                         payments={hook.paymentHistory.filter((p: Payment) => p.receiptType === 'Cash')}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
@@ -190,6 +197,7 @@ export default function SupplierPaymentsClient() {
                 </TabsContent>
                 <TabsContent value="rtgs" className="mt-4">
                     <PaymentHistory
+                        key={`rtgs-${refreshKey}`}
                         payments={hook.paymentHistory.filter((p: Payment) => p.receiptType === 'RTGS')}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
@@ -226,6 +234,8 @@ export default function SupplierPaymentsClient() {
             isOpen={hook.isBankSettingsOpen}
             onOpenChange={hook.setIsBankSettingsOpen}
           />
+
+          {/* Outstanding selection dialog removed as requested */}
         </div>
     );
 }

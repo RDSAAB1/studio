@@ -241,7 +241,24 @@ export default function SimpleSupplierEntryAllFields() {
         }
 
         try {
-            await deleteSupplier(currentSupplier.id);
+            // Resolve a valid Firestore ID before delete
+            let targetId = currentSupplier.id;
+            if (!targetId || targetId.length < 4) {
+                const bySr = await getSupplierIdBySrNo(currentSupplier.srNo);
+                if (bySr) targetId = bySr;
+                // As a final fallback, try Dexie lookup by srNo
+                if ((!targetId || targetId.length < 4) && db) {
+                    const local = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
+                    if (local?.id) targetId = local.id;
+                }
+            }
+
+            if (!targetId || targetId.length < 4) {
+                toast({ variant: 'destructive', title: 'Delete failed', description: 'Could not locate this entry in database.' });
+                return;
+            }
+
+            await deleteSupplier(targetId);
             toast({ title: 'Deleted', description: 'Entry deleted successfully' });
             // Clear form after deletion
             form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
@@ -262,12 +279,15 @@ export default function SimpleSupplierEntryAllFields() {
         if (!currentSupplier.id) {
             // Build a temporary customer object from current form values for preview/print
             const v = form.getValues();
-            const netWeight = (v.grossWeight || 0) - (v.teirWeight || 0);
-            const amount = netWeight * (v.rate || 0);
-            const kartaAmount = ((netWeight * (v.kartaPercentage || 0)) / 100) * (v.rate || 0);
-            const labouryAmount = netWeight * (v.labouryRate || 0);
-            const brokerageAmount = (v.brokerage || 0) * netWeight;
-            const netAmount = amount - kartaAmount - labouryAmount - (v.kanta || 0) + ((v.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount);
+            const finalWeight = Number(v.grossWeight || 0) - Number(v.teirWeight || 0);
+            const kartaWeight = Math.round(((finalWeight * Number(v.kartaPercentage || 0)) / 100) * 100) / 100;
+            const netWeight = Math.round((finalWeight - kartaWeight) * 100) / 100;
+            const amount = finalWeight * Number(v.rate || 0);
+            const kartaAmount = kartaWeight * Number(v.rate || 0);
+            const labouryAmount = finalWeight * Number(v.labouryRate || 0);
+            const brokerageAmount = Number(v.brokerage || 0) * finalWeight;
+            const signedBrokerage = (v.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+            const netAmount = amount - kartaAmount - labouryAmount - Number(v.kanta || 0) + signedBrokerage;
             const temp: Customer = {
                 id: 'TEMP',
                 srNo: v.srNo,
@@ -278,15 +298,15 @@ export default function SimpleSupplierEntryAllFields() {
                 so: toTitleCase(v.so),
                 address: toTitleCase(v.address),
                 contact: v.contact,
-                vehicleNo: v.vehicleNo?.toUpperCase() || '',
+                vehicleNo: (v.vehicleNo || '').toUpperCase(),
                 variety: v.variety,
-                grossWeight: v.grossWeight,
-                teirWeight: v.teirWeight,
-                weight: Number(netWeight.toFixed(2)),
+                grossWeight: Number(v.grossWeight || 0),
+                teirWeight: Number(v.teirWeight || 0),
+                weight: Number(finalWeight.toFixed(2)),
                 kartaPercentage: v.kartaPercentage,
-                kartaWeight: Number(((netWeight * (v.kartaPercentage || 0)) / 100).toFixed(2)),
+                kartaWeight: Number(kartaWeight.toFixed(2)),
                 kartaAmount: Number(kartaAmount.toFixed(2)),
-                netWeight: Number((netWeight - Number(((netWeight * (v.kartaPercentage || 0)) / 100).toFixed(2))).toFixed(2)),
+                netWeight: Number(netWeight.toFixed(2)),
                 rate: v.rate,
                 labouryRate: v.labouryRate,
                 labouryAmount: Number(labouryAmount.toFixed(2)),
@@ -639,13 +659,17 @@ export default function SimpleSupplierEntryAllFields() {
         setIsSubmitting(true);
         
         try {
-            // Simple calculation - just basic amount calculation
-            const netWeight = values.grossWeight - values.teirWeight;
-            const amount = netWeight * values.rate;
-            const kartaAmount = (netWeight * values.kartaPercentage) / 100 * values.rate;
-            const labouryAmount = netWeight * values.labouryRate;
-            const brokerageAmount = values.brokerage * netWeight;
-            const netAmount = amount - kartaAmount - labouryAmount - values.kanta + (values.brokerageAddSubtract ? brokerageAmount : -brokerageAmount);
+            // Align DB save with summary calculations
+            const finalWeight = Number(values.grossWeight) - Number(values.teirWeight);
+            const rawKartaWt = (finalWeight * Number(values.kartaPercentage)) / 100;
+            const kartaWeight = Math.round(rawKartaWt * 100) / 100; // 2-dec rounding; 0.875 -> 0.88
+            const netWeight = Math.round((finalWeight - kartaWeight) * 100) / 100; // 2-dec net
+            const amount = finalWeight * Number(values.rate);
+            const kartaAmount = kartaWeight * Number(values.rate);
+            const labouryAmount = finalWeight * Number(values.labouryRate);
+            const brokerageAmount = Number(values.brokerage || 0) * finalWeight;
+            const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+            const netAmount = amount - kartaAmount - labouryAmount - Number(values.kanta) + signedBrokerage;
 
             const supplierBase: Omit<Customer, 'id'> = {
                 srNo: values.srNo,
@@ -656,26 +680,26 @@ export default function SimpleSupplierEntryAllFields() {
                 so: toTitleCase(values.so),
                 address: toTitleCase(values.address),
                 contact: values.contact,
-                vehicleNo: toTitleCase(values.vehicleNo),
+                vehicleNo: (values.vehicleNo || '').toUpperCase(),
                 variety: toTitleCase(values.variety),
-                grossWeight: values.grossWeight,
-                teirWeight: values.teirWeight,
-                weight: netWeight,
-                kartaPercentage: values.kartaPercentage,
-                kartaWeight: (netWeight * values.kartaPercentage) / 100,
-                kartaAmount: kartaAmount,
-                netWeight: netWeight,
-                rate: values.rate,
-                labouryRate: values.labouryRate,
-                labouryAmount: labouryAmount,
+                grossWeight: Number(values.grossWeight),
+                teirWeight: Number(values.teirWeight),
+                weight: Number(finalWeight.toFixed(2)),
+                kartaPercentage: Number(values.kartaPercentage),
+                kartaWeight: Number(kartaWeight.toFixed(2)),
+                kartaAmount: Number(kartaAmount.toFixed(2)),
+                netWeight: Number(netWeight.toFixed(2)),
+                rate: Number(values.rate),
+                labouryRate: Number(values.labouryRate),
+                labouryAmount: Number(labouryAmount.toFixed(2)),
                 brokerage: Number(values.brokerage || 0),
                 brokerageRate: Number(values.brokerageRate || 0),
-                brokerageAmount: brokerageAmount,
+                brokerageAmount: Number(brokerageAmount.toFixed(2)),
                 brokerageAddSubtract: values.brokerageAddSubtract ?? true,
-                kanta: values.kanta,
-                amount: amount,
-                netAmount: netAmount,
-                originalNetAmount: netAmount,
+                kanta: Number(values.kanta),
+                amount: Number(amount.toFixed(2)),
+                netAmount: Number(netAmount.toFixed(2)),
+                originalNetAmount: Number(netAmount.toFixed(2)),
                 paymentType: values.paymentType,
                 customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
                 barcode: '',
@@ -703,7 +727,7 @@ export default function SimpleSupplierEntryAllFields() {
                     } else {
                         // Fallback: create a new doc with a fresh ID and replace local record
                         const newId = crypto.randomUUID();
-                        const savedSupplier = await addSupplier({ id: newId, ...supplierBase });
+                        const savedSupplier = await addSupplier({ id: newId, ...(supplierBase as any) } as Customer);
                         // Replace local record to ensure consistent ID
                         if (existingSupplier.id && existingSupplier.id !== newId) {
                             try { await db.suppliers.delete(existingSupplier.id); } catch {}
@@ -726,7 +750,7 @@ export default function SimpleSupplierEntryAllFields() {
                     }
                 } else {
                     // If not found, add as new
-                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...supplierBase });
+                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
                     setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
                     toast({ 
                         title: "Entry saved successfully!", 
@@ -737,7 +761,7 @@ export default function SimpleSupplierEntryAllFields() {
                 setIsEditing(false);
             } else {
                 // Add new supplier
-                const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...supplierBase });
+                const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
                 setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
                 toast({ 
                     title: "Entry saved successfully!", 
