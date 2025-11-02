@@ -147,6 +147,7 @@ export type FundTransaction = {
 export type PaidFor = {
     srNo: string;
     amount: number;
+    cdAmount?: number; // CD amount allocated to this specific entry
 }
 
 export type SupplierPayment = {

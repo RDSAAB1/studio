@@ -167,10 +167,10 @@ export default function SupplierPaymentsClient() {
                 isOpen={isOutstandingModalOpen}
                 onOpenChange={setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: Set<string>) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
-                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0).map((c: any) => c.id) : []))}
+                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.map((c: any) => c.id) : []))}
                 onConfirm={() => setIsOutstandingModalOpen(false)}
                 onCancel={() => { setIsOutstandingModalOpen(false); hook.setSelectedCustomerKey(null); hook.setSelectedEntryIds(new Set()); }}
             />

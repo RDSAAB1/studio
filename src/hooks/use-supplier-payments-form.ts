@@ -117,10 +117,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const lastNum = rtgsPayments.reduce((max, p) => {
-                const numMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
-                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+                // Match both RT##### and R##### formats (for backward compatibility)
+                const rtMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
+                const rMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
+                const num = rtMatch ? parseInt(rtMatch[1], 10) : (rMatch ? parseInt(rMatch[1], 10) : 0);
                 return num > max ? num : max;
             }, 0);
+            // Always generate RT##### format (not R#####)
             return generateReadableId('RT', lastNum, 5);
         }
     

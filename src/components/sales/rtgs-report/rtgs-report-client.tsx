@@ -44,6 +44,7 @@ interface RtgsReportRow {
     sixRNo: string;
     sixRDate: string;
     parchiNo: string;
+    utrNo: string;
 }
 
 export default function RtgsReportClient() {
@@ -109,6 +110,7 @@ export default function RtgsReportClient() {
                 sixRNo: p.sixRNo || '',
                 sixRDate: p.sixRDate || '',
                 parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
+                utrNo: p.utrNo || '',
             };
         });
         return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -233,6 +235,7 @@ export default function RtgsReportClient() {
             '6R No.': p.sixRNo,
             '6R Date': p.sixRDate ? format(new Date(p.sixRDate), 'dd-MMM-yy') : '',
             'Parchi No.': p.parchiNo,
+            'UTR No.': p.utrNo,
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -341,6 +344,7 @@ export default function RtgsReportClient() {
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Check / Parchi No.</TableHead>
                                     <TableHead>6R No. / Date</TableHead>
+                                    <TableHead>UTR No.</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -376,11 +380,14 @@ export default function RtgsReportClient() {
                                                 <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
                                                 <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
                                             </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.utrNo || '-'}</div>
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">
+                                        <TableCell colSpan={8} className="h-24 text-center">
                                             No RTGS reports found.
                                         </TableCell>
                                     </TableRow>
@@ -421,6 +428,7 @@ export default function RtgsReportClient() {
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Check / Parchi No.</TableHead>
                                     <TableHead>6R No. / Date</TableHead>
+                                    <TableHead>UTR No.</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -456,11 +464,14 @@ export default function RtgsReportClient() {
                                                 <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
                                                 <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
                                             </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.utrNo || '-'}</div>
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">
+                                        <TableCell colSpan={8} className="h-24 text-center">
                                             No RTGS reports found for the selected filter.
                                         </TableCell>
                                     </TableRow>

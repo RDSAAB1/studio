@@ -435,25 +435,57 @@ const handleDelete = async (id: string) => {
 
 
     try {
-        if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          await deleteSupplier(currentSupplier.id);
-        }
-
-        if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
-            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            await addSupplier(updatedEntry);
-            if (callback) callback(updatedEntry);
+        if (isEditing && currentSupplier.id) {
+            // Update existing supplier
+            console.log('Updating supplier:', currentSupplier.id, 'with data:', completeEntry);
+            
+            // Prepare update data (exclude id from update)
+            const { id, ...updateData } = completeEntry as any;
+            
+            if (deletePayments) {
+                await deletePaymentsForSrNo(completeEntry.srNo);
+                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+                const { id: _, ...updateDataWithoutPayments } = updatedEntry as any;
+                const success = await updateSupplier(currentSupplier.id, updateDataWithoutPayments);
+                
+                if (success) {
+                    if (callback) callback(updatedEntry);
+                    toast({ title: "Entry updated and payments deleted successfully.", variant: "success" });
+                } else {
+                    throw new Error('Failed to update supplier');
+                }
+            } else {
+                const success = await updateSupplier(currentSupplier.id, updateData);
+                
+                if (success) {
+                    if (callback) callback(completeEntry);
+                    toast({ title: "Entry updated successfully.", variant: "success" });
+                } else {
+                    throw new Error('Failed to update supplier');
+                }
+            }
         } else {
-            await addSupplier(completeEntry);
-            if (callback) callback(completeEntry);
+            // Add new supplier
+            if (deletePayments) {
+                await deletePaymentsForSrNo(completeEntry.srNo);
+                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+                await addSupplier(updatedEntry);
+                if (callback) callback(updatedEntry);
+                toast({ title: "Entry saved and payments deleted successfully.", variant: "success" });
+            } else {
+                await addSupplier(completeEntry);
+                if (callback) callback(completeEntry);
+                toast({ title: "Entry saved successfully.", variant: "success" });
+            }
         }
 
-        toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error saving supplier:", error);
-        toast({ title: "Failed to save entry.", variant: "destructive" });
+        toast({ 
+            title: "Failed to save entry.", 
+            description: error?.message || "Please try again.",
+            variant: "destructive" 
+        });
     }
   };
 

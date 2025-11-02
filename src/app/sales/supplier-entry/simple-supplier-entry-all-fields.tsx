@@ -656,6 +656,10 @@ export default function SimpleSupplierEntryAllFields() {
     }, [toast]);
 
     const onSubmit = async (values: CompleteSupplierFormValues) => {
+        console.log('onSubmit called with values:', values);
+        console.log('isEditing:', isEditing);
+        console.log('currentSupplier:', currentSupplier);
+        
         setIsSubmitting(true);
         
         try {
@@ -707,60 +711,57 @@ export default function SimpleSupplierEntryAllFields() {
                 forceUnique: values.forceUnique,
             };
 
-            if (isEditing) {
-                // Update existing supplier
-                const existingSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
-                if (existingSupplier) {
-                    // Ensure we have a valid Firestore ID to update
-                    let targetId = existingSupplier.id;
-                    if (!targetId || targetId.length < 4) {
-                        // Try to find Firestore doc by SR No
-                        const foundId = await getSupplierIdBySrNo(values.srNo);
-                        if (foundId) {
-                            targetId = foundId;
-                        }
-                    }
-
-                    let success = false;
-                    if (targetId && targetId.length > 3) {
-                        success = await updateSupplier(targetId, supplierBase);
+            if (isEditing && currentSupplier.id) {
+                // Update existing supplier - use currentSupplier.id directly
+                console.log('UPDATE MODE: Updating supplier:', currentSupplier.id);
+                console.log('Supplier base data:', supplierBase);
+                
+                let targetId = currentSupplier.id;
+                
+                // If ID seems invalid, try to find proper ID
+                if (!targetId || targetId.length < 4) {
+                    const foundId = await getSupplierIdBySrNo(values.srNo);
+                    if (foundId) {
+                        targetId = foundId;
                     } else {
-                        // Fallback: create a new doc with a fresh ID and replace local record
-                        const newId = crypto.randomUUID();
-                        const savedSupplier = await addSupplier({ id: newId, ...(supplierBase as any) } as Customer);
-                        // Replace local record to ensure consistent ID
-                        if (existingSupplier.id && existingSupplier.id !== newId) {
-                            try { await db.suppliers.delete(existingSupplier.id); } catch {}
+                        // Try local DB lookup
+                        const localSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
+                        if (localSupplier?.id) {
+                            targetId = localSupplier.id;
                         }
-                        await db.suppliers.put(savedSupplier);
-                        setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
-                        toast({ title: "Entry updated successfully!", description: `Supplier ${values.name} has been updated.`, variant: "success" });
-                        setIsEditing(false);
-                        return;
                     }
+                }
+                
+                if (targetId && targetId.length > 3) {
+                    const success = await updateSupplier(targetId, supplierBase);
+                    
                     if (success) {
+                        // Update local IndexedDB as well
+                        try {
+                            const existingLocal = await db.suppliers.get(targetId);
+                            if (existingLocal) {
+                                await db.suppliers.put({ ...existingLocal, ...supplierBase });
+                            }
+                        } catch (localError) {
+                            console.warn('Failed to update local DB:', localError);
+                        }
+                        
                         setCurrentSupplier({ ...supplierBase, id: targetId } as Customer);
                         toast({ 
                             title: "Entry updated successfully!", 
                             description: `Supplier ${values.name} has been updated.`,
                             variant: "success"
                         });
+                        setIsEditing(false);
                     } else {
-                        throw new Error('Failed to update supplier');
+                        throw new Error('Failed to update supplier - updateSupplier returned false');
                     }
                 } else {
-                    // If not found, add as new
-                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
-                    setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
-                    toast({ 
-                        title: "Entry saved successfully!", 
-                        description: `Supplier ${values.name} has been added.`,
-                        variant: "success"
-                    });
+                    throw new Error(`Invalid supplier ID: ${targetId}. Cannot update.`);
                 }
-                setIsEditing(false);
             } else {
                 // Add new supplier
+                console.log('ADD MODE: Creating new supplier');
                 const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
                 setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
                 toast({ 
@@ -768,16 +769,20 @@ export default function SimpleSupplierEntryAllFields() {
                     description: `Supplier ${values.name} has been added.`,
                     variant: "success"
                 });
+                setIsEditing(false);
             }
 
-            // Reset form for new entry with next serial number
-            form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            // Reset form for new entry with next serial number (only if not editing)
+            if (!isEditing) {
+                form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            }
             
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving supplier:", error);
+            console.error("Error stack:", error?.stack);
             toast({ 
                 title: "Failed to save entry", 
-                description: "Please try again.",
+                description: error?.message || "Please try again.",
                 variant: "destructive" 
             });
         } finally {
@@ -1152,9 +1157,60 @@ export default function SimpleSupplierEntryAllFields() {
                                 </Button>
 
                                 <Button 
-                                    onClick={() => {
-                                        calculateSummary();
-                                        form.handleSubmit(onSubmit)();
+                                    onClick={async () => {
+                                        try {
+                                            // Validate form first
+                                            const isValid = await form.trigger();
+                                            if (!isValid) {
+                                                // Get form errors to show specific validation issues
+                                                const formErrors = form.formState.errors;
+                                                console.log('Form validation errors:', formErrors);
+                                                
+                                                // Helper function to extract all error messages
+                                                const extractErrors = (errors: any, prefix = ''): string[] => {
+                                                    const errorMessages: string[] = [];
+                                                    for (const key in errors) {
+                                                        const error = errors[key];
+                                                        const fieldName = prefix ? `${prefix}.${key}` : key;
+                                                        if (error?.message) {
+                                                            errorMessages.push(`${fieldName}: ${error.message}`);
+                                                        } else if (error && typeof error === 'object') {
+                                                            errorMessages.push(...extractErrors(error, fieldName));
+                                                        }
+                                                    }
+                                                    return errorMessages;
+                                                };
+                                                
+                                                const errorMessages = extractErrors(formErrors);
+                                                
+                                                toast({ 
+                                                    title: "Validation Error", 
+                                                    description: errorMessages.length > 0 
+                                                        ? errorMessages.slice(0, 3).join(', ') + (errorMessages.length > 3 ? ` and ${errorMessages.length - 3} more...` : '')
+                                                        : "Please check the form for errors.", 
+                                                    variant: "destructive",
+                                                    duration: 5000
+                                                });
+                                                return;
+                                            }
+                                            
+                                            calculateSummary();
+                                            
+                                            // Get form values and submit
+                                            const values = form.getValues();
+                                            console.log('Form values:', values);
+                                            console.log('Is editing:', isEditing);
+                                            console.log('Current supplier ID:', currentSupplier.id);
+                                            
+                                            await onSubmit(values);
+                                        } catch (error: any) {
+                                            console.error('Error in button onClick:', error);
+                                            toast({ 
+                                                title: "Error", 
+                                                description: error?.message || "Failed to save entry.", 
+                                                variant: "destructive" 
+                                            });
+                                        }
                                     }} 
                                     size="sm" 
                                     className="h-8 rounded-md" 

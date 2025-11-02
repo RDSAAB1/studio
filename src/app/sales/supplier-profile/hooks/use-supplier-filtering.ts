@@ -12,17 +12,18 @@ export const useSupplierFiltering = (
 ) => {
   const filteredSupplierOptions = useMemo(() => {
     // Create unique profiles based on Name, Father Name, and Address combination
-    const uniqueProfiles = new Map<string, any>();
+    const uniqueProfiles = new Map<string, { key: string; data: any }>();
     
     Array.from(supplierSummaryMap.entries()).forEach(([key, data]) => {
-      // Create a unique key based on Name, Father Name, and Address
-      const profileKey = `${data.name || ''}_${data.fatherName || ''}_${data.address || ''}`.trim();
+      // Create a unique key based on Name, Father Name (stored in data.so), and Address
+      const profileKey = `${data.name || ''}_${data.so || ''}_${data.address || ''}`.trim();
       
       if (!uniqueProfiles.has(profileKey)) {
-        uniqueProfiles.set(profileKey, data);
+        uniqueProfiles.set(profileKey, { key, data });
       } else {
         // If profile already exists, merge the data (combine transactions, payments, etc.)
-        const existingData = uniqueProfiles.get(profileKey);
+        const existing = uniqueProfiles.get(profileKey)!;
+        const existingData = existing.data;
         const mergedData = {
           ...existingData,
           allTransactions: [...(existingData.allTransactions || []), ...(data.allTransactions || [])],
@@ -32,11 +33,12 @@ export const useSupplierFiltering = (
           totalPaid: (existingData.totalPaid || 0) + (data.totalPaid || 0),
           totalOutstanding: (existingData.totalOutstanding || 0) + (data.totalOutstanding || 0),
         };
-        uniqueProfiles.set(profileKey, mergedData);
+        uniqueProfiles.set(profileKey, { key: existing.key, data: mergedData });
       }
     });
 
-    const allOptions = Array.from(uniqueProfiles.entries()).map(([profileKey, data]) => {
+    const allOptions = Array.from(uniqueProfiles.entries()).map(([profileKey, payload]) => {
+      const { key: originalKey, data } = payload;
       // Create a detailed label with name, father name, and address
       const name = toTitleCase(data.name || '');
       const fatherName = toTitleCase(data.fatherName || data.so || '');
@@ -49,7 +51,7 @@ export const useSupplierFiltering = (
       
       
       return { 
-        value: profileKey, 
+        value: originalKey, 
         label: label.trim(),
         data 
       };

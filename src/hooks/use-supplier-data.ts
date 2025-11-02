@@ -66,49 +66,36 @@ export const useSupplierData = () => {
         if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
 
         const summaryList: CustomerSummary[] = [];
+        const normalize = (str: string) => (str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const makeKey = (name: string, father: string, address: string) => `${normalize(name)}|${normalize(father)}|${normalize(address)}`;
+        const byKey = new Map<string, CustomerSummary>();
 
-        const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-
-    safeSuppliers.forEach(s => {
-            const sNameNorm = normalize(s.name || '');
-            const sSoNorm = normalize(s.so || '');
-
-            let bestMatch: CustomerSummary | null = null;
-            let minDistance = 3; // Levenshtein distance threshold
-
-            for (const existingSummary of summaryList) {
-                const eNameNorm = normalize(existingSummary.name || '');
-                const eSoNorm = normalize(existingSummary.so || '');
-
-                const distance = levenshteinDistance(sNameNorm + sSoNorm, eNameNorm + eSoNorm);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    bestMatch = existingSummary;
-                }
+        safeSuppliers.forEach(s => {
+            const father = (s as any).fatherName || s.so || '';
+            const key = makeKey(s.name || '', father, s.address || '');
+            const existing = byKey.get(key);
+            if (existing) {
+                existing.allTransactions!.push({ ...s });
+                return;
             }
-
-            if (bestMatch) {
-                bestMatch.allTransactions!.push({ ...s });
-            } else {
-                const newSummary: CustomerSummary = {
-                    name: s.name, so: s.so, address: s.address,
-                    contact: '', 
+            const newSummary: CustomerSummary = {
+                name: s.name, so: father, address: s.address,
+                contact: '', 
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
-                    totalOutstanding: 0, totalCdAmount: 0,
-                    paymentHistory: [], outstandingEntryIds: [],
-                    allTransactions: [{...s}], allPayments: [], transactionsByVariety: {},
-                    totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
-                    totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
-                    totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
-                    totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
-                    averageKartaPercentage: 0, averageLabouryRate: 0,
-                    totalTransactions: 0, totalOutstandingTransactions: 0,
-                    totalBrokerage: 0, totalCd: 0,
-                };
-                summaryList.push(newSummary);
-            }
+                totalOutstanding: 0, totalCdAmount: 0,
+                paymentHistory: [], outstandingEntryIds: [],
+                allTransactions: [{...s}], allPayments: [], transactionsByVariety: {},
+                totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
+                totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+                totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
+                totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0,
+                totalTransactions: 0, totalOutstandingTransactions: 0,
+                totalBrokerage: 0, totalCd: 0,
+            };
+            byKey.set(key, newSummary);
+            summaryList.push(newSummary);
         });
 
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
@@ -130,32 +117,29 @@ export const useSupplierData = () => {
                     }
                 });
             } else {
-                // OLD LOGIC: No paidFor array - match by supplier name (for backward compatibility)
-                const sNameNorm = normalize(p.supplierName || 'Outsider');
-                const sSoNorm = normalize(p.supplierFatherName || '');
+                // STRICT: Match payments by exact normalized name + father (+ address if provided)
+                const nameNorm = normalize(p.supplierName || 'Outsider');
+                const fatherNorm = normalize(p.supplierFatherName || '');
+                const addrNorm = normalize((p as any).supplierAddress || '');
 
-                let bestMatch: CustomerSummary | null = null;
-                let minDistance = 3;
-
-                for (const existingSummary of summaryList) {
-                    const eNameNorm = normalize(existingSummary.name || '');
-                    const eSoNorm = normalize(existingSummary.so || '');
-                    const distance = levenshteinDistance(sNameNorm + sSoNorm, eNameNorm + eSoNorm);
-
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        bestMatch = existingSummary;
-                    }
+                let matched: CustomerSummary | null = null;
+                if (addrNorm) {
+                    // Try composite match first (name+father+address)
+                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm && normalize(s.address || '') === addrNorm) || null;
                 }
-                
-                if (bestMatch) {
-                    bestMatch.allPayments!.push(p);
+                if (!matched) {
+                    // Fallback to name+father exact match
+                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm) || null;
+                }
+
+                if (matched) {
+                    matched.allPayments!.push(p);
                 } else if (p.rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
-                name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: p.supplierAddress || '',
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
                         contact: '', 
-                acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
-                totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
+                        totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                         totalOutstanding: 0, totalCdAmount: 0,
                         paymentHistory: [], outstandingEntryIds: [],
                         allTransactions: [], allPayments: [p], transactionsByVariety: {},
@@ -175,76 +159,44 @@ export const useSupplierData = () => {
         const finalSummaryMap = new Map<string, CustomerSummary>();
 
         summaryList.forEach((data, index) => {
-            const uniqueKey = data.name + (data.so || '') + index; // Create a unique key for the map
+            // Use the same composite key (name|father|address) for final map to ensure proper grouping
+            const uniqueKey = makeKey(data.name || '', data.so || '', data.address || '') + `_${index}`;
             const allContacts = new Set(data.allTransactions!.map(t => t.contact));
             data.contact = Array.from(allContacts).join(', ');
 
             data.allTransactions!.forEach(transaction => {
+                // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
                 const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
-                // Debug: Log all payments to see what's available
-                console.log('All payments for supplier:', {
-                    supplierName: data.name,
-                    totalPayments: data.allPayments!.length,
-                    paymentsWithRTGS: data.allPayments!.filter(p => p.receiptType === 'RTGS' || p.rtgsAmount).length,
-                    paymentsWithPaidFor: data.allPayments!.filter(p => p.paidFor && p.paidFor.length > 0).length
-                });
-                
-                // Debug: Log if we found payments for this transaction
-                if (paymentsForThisEntry.length > 0) {
-                    console.log('Found payments for transaction:', {
-                        srNo: transaction.srNo,
-                        paymentsCount: paymentsForThisEntry.length,
-                        payments: paymentsForThisEntry.map(p => ({
-                            id: p.id,
-                            receiptType: p.receiptType,
-                            amount: p.amount,
-                            rtgsAmount: p.rtgsAmount,
-                            paidFor: p.paidFor,
-                            cdApplied: p.cdApplied,
-                            cdAmount: p.cdAmount
-                        }))
-                    });
-                }
-            
-            let totalPaidForEntry = 0;
-            let totalCdForEntry = 0;
+                let totalPaidForEntry = 0;
+                let totalCdForEntry = 0;
 
-            paymentsForThisEntry.forEach(p => {
-                const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo)!;
-                // paidFor.amount is now only the actual payment amount (₹5000), not including CD
-                totalPaidForEntry += paidForThisDetail.amount;
+                // Simply sum all amounts directly from database without any calculation or normalization
+                paymentsForThisEntry.forEach(p => {
+                    const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
+                    if (!paidForThisDetail) return;
 
-                // Calculate CD portion for this entry
-                if ('cdApplied' in p && p.cdApplied && 'cdAmount' in p && p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                    const totalAmountInPayment = p.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-                    if(totalAmountInPayment > 0) {
-                        const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                        totalCdForEntry += p.cdAmount * proportion;
+                    // Direct database value - no calculation
+                    totalPaidForEntry += Number(paidForThisDetail.amount || 0);
+
+                    // Direct database value for CD - no calculation or proportion
+                    if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
+                        totalCdForEntry += Number(paidForThisDetail.cdAmount || 0);
                     }
-                }
-            });
+                });
             
-                // Store amounts for display
-                // totalPaidForEntry = actual payment amount (₹5000)
-                // totalCdForEntry = CD amount (₹50)
-                transaction.totalPaid = totalPaidForEntry; // Actual payment amount (₹5000)
-                transaction.totalCd = totalCdForEntry; // CD amount (₹50)
-                // Outstanding: Original - (Payment + CD) = Original - (totalPaidForEntry + totalCdForEntry)
-                transaction.netAmount = (transaction.originalNetAmount || 0) - (totalPaidForEntry + totalCdForEntry);
+                // Store direct values (round only for display precision)
+                transaction.totalPaid = Math.round(totalPaidForEntry * 100) / 100;
+                transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 
-                // Debug log
-                if (totalPaidForEntry > 0 || totalCdForEntry > 0) {
-                    console.log('Transaction calculation:', {
-                        srNo: transaction.srNo,
-                        totalPaidForEntry,
-                        totalCdForEntry,
-                        totalPaid: transaction.totalPaid,
-                        totalCd: transaction.totalCd,
-                        netAmount: transaction.netAmount,
-                        paymentsCount: paymentsForThisEntry.length,
-                        paymentsWithCD: paymentsForThisEntry.filter(p => p.cdApplied && p.cdAmount).length
-                    });
+                // Outstanding: Original - (Payment + CD)
+                const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+                
+                // Handle very small negative amounts due to rounding - treat as zero
+                if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
+                    transaction.netAmount = 0;
+                } else {
+                    transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
         });
         
@@ -264,24 +216,13 @@ export const useSupplierData = () => {
         data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
-        // Debug: Log the outstanding calculation
-        console.log('CustomerSummary - Outstanding calculation for:', data.name, {
-            totalOriginalAmount: data.totalOriginalAmount,
-            totalPaid: data.totalPaid,
-            totalCdAmount: data.totalCdAmount,
-            netAmountSum: data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0),
-            transactionsCount: data.allTransactions!.length,
-            firstTransaction: data.allTransactions![0] ? {
-                srNo: data.allTransactions![0].srNo,
-                originalNetAmount: data.allTransactions![0].originalNetAmount,
-                netAmount: data.allTransactions![0].netAmount,
-                totalPaid: data.allTransactions![0].totalPaid,
-                totalCd: data.allTransactions![0].totalCd
-            } : null
-        });
+        // Calculate totalOutstanding as sum of individual transaction netAmount values
+        // This ensures CD fix is properly applied (each transaction's netAmount has CD fix)
+        const netAmountSum = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
         
-        // Calculate outstanding as: Original Amount - Total Paid (excluding CD)
-        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
+        // Calculate outstanding as sum of individual transaction netAmount (with CD fix applied)
+        // This matches exactly what's shown in transaction table and negative report
+        data.totalOutstanding = netAmountSum;
         
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);

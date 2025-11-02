@@ -16,18 +16,6 @@ export const useSupplierSummary = (
       return new Map<string, CustomerSummary>();
     }
 
-    // Debug: Log all unique payment types and sample payment structure
-    const allPaymentTypes = [...new Set(paymentHistory.map(p => p.type))];
-    const allReceiptTypes = [...new Set(paymentHistory.map(p => p.receiptType))];
-    console.log('All Payment Types in Data:', allPaymentTypes);
-    console.log('All Receipt Types in Data:', allReceiptTypes);
-    
-    // Log sample payment structure
-    if (paymentHistory.length > 0) {
-      console.log('Sample Payment Structure:', paymentHistory[0]);
-      console.log('Sample Payment Type:', paymentHistory[0].type);
-      console.log('Sample Receipt Type:', paymentHistory[0].receiptType);
-    }
 
     const processedSuppliers = suppliers.map(s => {
       // Find all payments for this specific purchase (srNo)
@@ -40,74 +28,50 @@ export const useSupplierSummary = (
       let totalCashPaidForEntry = 0;
       let totalRtgsPaidForEntry = 0;
 
-      // Calculate payments for this specific purchase
+      // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
       paymentsForEntry.forEach(payment => {
         const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === s.srNo);
         if (paidForThisPurchase) {
-          // Total amount paid for this purchase (actual payment EXCLUDING CD)
-          totalPaidForEntry += paidForThisPurchase.amount;
+          // Direct database value - no calculation
+          totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
           
-          // Calculate CD portion for this purchase first
-          let cdPortionForThisPurchase = 0;
-          if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-            const totalAmountInPayment = payment.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-            cdPortionForThisPurchase = (paidForThisPurchase.amount / totalAmountInPayment) * payment.cdAmount;
-            totalCdForEntry += cdPortionForThisPurchase;
+          // Direct database value for CD - no calculation or proportion
+          if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
+            totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
           }
           
-          // Calculate the proportion of this purchase in the total payment
-          const totalPaidForAmount = payment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
-          const proportion = totalPaidForAmount > 0 ? paidForThisPurchase.amount / totalPaidForAmount : 0;
-          
-          // Calculate payment amount based on type
+          // Calculate payment amount based on type (for cash/rtgs breakdown)
           const receiptType = payment.receiptType?.toLowerCase();
-          let actualPaymentAmount;
+          const actualPaymentAmount = Number(paidForThisPurchase.amount || 0);
           
           if (receiptType === 'cash') {
-            // For cash payments, payment.amount is already the actual payment amount (₹5000)
-            actualPaymentAmount = payment.amount * proportion;
             totalCashPaidForEntry += actualPaymentAmount;
           } else if (receiptType === 'rtgs') {
-            // For RTGS payments, use rtgsAmount if available, otherwise use amount
-            const rtgsPaymentAmount = payment.rtgsAmount || payment.amount;
-            actualPaymentAmount = rtgsPaymentAmount * proportion;
             totalRtgsPaidForEntry += actualPaymentAmount;
-            // Debug: Log RTGS payment details
-            console.log('RTGS Payment:', {
-              paymentId: payment.paymentId || payment.id,
-              receiptType: payment.receiptType,
-              paymentAmount: payment.amount,
-              rtgsAmount: payment.rtgsAmount,
-              usedAmount: rtgsPaymentAmount,
-              cdAmount: payment.cdAmount,
-              paidForAmount: paidForThisPurchase.amount,
-              totalPaidForAmount: totalPaidForAmount,
-              proportion: proportion,
-              actualPaymentAmount: actualPaymentAmount,
-              totalRtgsPaidForEntry: totalRtgsPaidForEntry
-            });
-          } else {
-            // If payment type is not recognized, log it for debugging
-            console.log('Unknown receipt type:', payment.receiptType, 'for payment:', payment);
           }
         }
       });
 
       // Removed debug logging for performance
 
+      // Direct database sum - no calculation
+      const finalTotalPaid = Math.round(totalPaidForEntry * 100) / 100;
+      const finalTotalCd = Math.round(totalCdForEntry * 100) / 100;
+      const finalOutstanding = (s.originalNetAmount || 0) - finalTotalPaid - finalTotalCd;
+      
       return {
         ...s,
-        totalPaidForEntry,
-        totalCdForEntry,
-        totalCd: totalCdForEntry, // Map totalCdForEntry to totalCd for compatibility
-        totalPaid: totalCashPaidForEntry + totalRtgsPaidForEntry, // Actual payment without CD
+        totalPaidForEntry: finalTotalPaid,
+        totalCdForEntry: finalTotalCd,
+        totalCd: finalTotalCd, // Map totalCdForEntry to totalCd for compatibility
+        totalPaid: finalTotalPaid, // Direct database sum
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
         paymentsForEntry,
-        // Calculate outstanding including CD once: Original - (Paid + CD)
-        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry + totalCdForEntry),
+        // Outstanding: Original - (Paid + CD)
+        outstandingForEntry: Math.round(finalOutstanding * 100) / 100,
         // netAmount mirrors outstandingForEntry for downstream logic
-        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry + totalCdForEntry),
+        netAmount: Math.round(finalOutstanding * 100) / 100,
       };
     });
 
@@ -134,45 +98,20 @@ export const useSupplierSummary = (
     // Helper function to normalize strings for comparison
     const normalize = (str: string) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
-    // Group suppliers using fuzzy matching
+    // Group suppliers using STRICT exact matching (name + father + address must match exactly)
     const groupedSuppliers = new Map<string, typeof processedSuppliers>();
+    const makeCompositeKey = (name: string, father: string, address: string) => 
+        `${normalize(name)}|${normalize(father)}|${normalize(address)}`;
     
     processedSuppliers.forEach((supplier) => {
-        const sName = normalize(supplier.name || '');
-        const sFatherName = normalize(supplier.fatherName || '');
-        const sAddress = normalize(supplier.address || '');
-
-        // Find existing group that matches this supplier
-        let matchingGroupKey: string | null = null;
+        const father = supplier.fatherName || supplier.so || '';
+        const compositeKey = makeCompositeKey(supplier.name || '', father, supplier.address || '');
         
-        for (const [groupKey, groupSuppliers] of groupedSuppliers.entries()) {
-            const firstSupplier = groupSuppliers[0];
-            const eName = normalize(firstSupplier.name || '');
-            const eFatherName = normalize(firstSupplier.fatherName || '');
-            const eAddress = normalize(firstSupplier.address || '');
-
-            // Calculate character differences
-            const nameDiff = levenshteinDistance(sName, eName);
-            const fatherNameDiff = levenshteinDistance(sFatherName, eFatherName);
-            const addressDiff = levenshteinDistance(sAddress, eAddress);
-            const totalDiff = nameDiff + fatherNameDiff + addressDiff;
-
-            // Fuzzy matching rules:
-            // 1. Max 2 character difference per field
-            // 2. Max 4 total character difference across all fields
-            if (nameDiff <= 2 && fatherNameDiff <= 2 && addressDiff <= 2 && totalDiff <= 4) {
-                matchingGroupKey = groupKey;
-                break;
-            }
-        }
-
-        if (matchingGroupKey) {
-            // Add to existing group
-            groupedSuppliers.get(matchingGroupKey)!.push(supplier);
+        const existing = groupedSuppliers.get(compositeKey);
+        if (existing) {
+            existing.push(supplier);
         } else {
-            // Create new group
-            const newGroupKey = `${supplier.name || ''}_${supplier.fatherName || ''}_${supplier.address || ''}`.trim();
-            groupedSuppliers.set(newGroupKey, [supplier]);
+            groupedSuppliers.set(compositeKey, [supplier]);
         }
     });
 
@@ -254,11 +193,6 @@ export const useSupplierSummary = (
       acc.totalCashPaid += s.totalCashPaid;
       acc.totalRtgsPaid += s.totalRtgsPaid;
       acc.totalCdAmount! += s.totalCdAmount!;
-      
-      // Debug: Log individual supplier totals
-      if (s.name && s.totalTransactions > 0) {
-        console.log(`${s.name}: Cash=${s.totalCashPaid}, RTGS=${s.totalRtgsPaid}, Total=${s.totalPaid}`);
-      }
       acc.totalGrossWeight! += s.totalGrossWeight!;
       acc.totalTeirWeight! += s.totalTeirWeight!;
       acc.totalFinalWeight! += s.totalFinalWeight!;

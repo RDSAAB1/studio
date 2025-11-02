@@ -66,12 +66,91 @@ export async function syncAllData() {
     getSuppliersRealtime(async (suppliers) => {
         if (suppliers.length > 0) {
             try {
-                await db.suppliers.bulkPut(suppliers);
-                console.log(`Synced ${suppliers.length} suppliers.`);
+                // Handle duplicate srNo values by updating existing records instead of creating new ones
+                // Process in batches to avoid overwhelming IndexedDB
+                const BATCH_SIZE = 100;
+                let syncedCount = 0;
+                let skippedCount = 0;
+                
+                for (let i = 0; i < suppliers.length; i += BATCH_SIZE) {
+                    const batch = suppliers.slice(i, i + BATCH_SIZE);
+                    
+                    try {
+                        // First, check for existing suppliers with same srNo
+                        const existingSrNos = new Set<string>();
+                        for (const supplier of batch) {
+                            if (supplier.srNo) {
+                                const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
+                                if (existing) {
+                                    existingSrNos.add(supplier.srNo);
+                                    // Update existing record
+                                    await db.suppliers.update(existing.id, supplier);
+                                    syncedCount++;
+                                }
+                            }
+                        }
+                        
+                        // Add new suppliers (those without existing srNo)
+                        const newSuppliers = batch.filter(s => !s.srNo || !existingSrNos.has(s.srNo));
+                        if (newSuppliers.length > 0) {
+                            try {
+                                await db.suppliers.bulkPut(newSuppliers);
+                                syncedCount += newSuppliers.length;
+                            } catch (bulkError: any) {
+                                // If bulkPut fails due to duplicate srNo, process individually
+                                if (bulkError.name === 'BulkError' || bulkError.name === 'ConstraintError') {
+                                    for (const supplier of newSuppliers) {
+                                        try {
+                                            if (supplier.srNo) {
+                                                const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
+                                                if (existing) {
+                                                    await db.suppliers.update(existing.id, supplier);
+                                                    syncedCount++;
+                                                } else {
+                                                    await db.suppliers.add(supplier);
+                                                    syncedCount++;
+                                                }
+                                            } else {
+                                                await db.suppliers.add(supplier);
+                                                syncedCount++;
+                                            }
+                                        } catch (err: any) {
+                                            if (err.name === 'ConstraintError') {
+                                                // Duplicate srNo - update existing
+                                                if (supplier.srNo) {
+                                                    const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
+                                                    if (existing) {
+                                                        await db.suppliers.update(existing.id, supplier);
+                                                        syncedCount++;
+                                                    } else {
+                                                        skippedCount++;
+                                                    }
+                                                } else {
+                                                    skippedCount++;
+                                                }
+                                            } else {
+                                                console.warn('Error syncing supplier:', supplier.srNo || supplier.id, err);
+                                                skippedCount++;
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    throw bulkError;
+                                }
+                            }
+                        }
+                    } catch (batchError: any) {
+                        console.warn(`Error syncing batch ${i}-${i + BATCH_SIZE}:`, batchError);
+                    }
+                }
+                
+                if (syncedCount > 0) {
+                    console.log(`Synced ${syncedCount} suppliers${skippedCount > 0 ? `, skipped ${skippedCount} duplicates` : ''}.`);
+                }
             } catch (error: any) {
-                // Ignore ConstraintError for duplicate srNo - this is not a real error
-                if (error.name === 'ConstraintError' && error.message.includes('srNo')) {
-                    console.log(`Ignored duplicate srNo constraint error - ${suppliers.length} suppliers processed.`);
+                // Fallback: log error but don't crash
+                if (error.name === 'BulkError') {
+                    console.warn(`BulkError during supplier sync: ${error.message}. Some suppliers may not have synced.`);
                 } else {
                     console.error("Sync Error (Suppliers):", error);
                 }

@@ -63,78 +63,78 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                     <div className="min-w-[1000px]">
                         <Table className="w-full">
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead className="p-1 text-xs w-24">ID & 6R</TableHead>
-                                    <TableHead className="p-1 text-xs w-20">Date</TableHead>
-                                    <TableHead className="p-1 text-xs w-20">Method</TableHead>
-                                    <TableHead className="p-1 text-xs w-40">Payee & Receipt</TableHead>
-                                    <TableHead className="p-1 text-xs w-28">Bank</TableHead>
-                                    <TableHead className="p-1 text-xs w-36">Branch & Details</TableHead>
-                                    <TableHead className="p-1 text-xs w-28">Weight & Rate</TableHead>
-                                    <TableHead className="text-right p-1 text-xs w-24">Amount</TableHead>
-                                    <TableHead className="text-right p-1 text-xs w-20">CD</TableHead>
-                                    <TableHead className="text-center p-1 text-xs w-24">Actions</TableHead>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID & 6R</TableHead>
+                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
+                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
+                                    <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
+                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank</TableHead>
+                                    <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details</TableHead>
+                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate</TableHead>
+                                    <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
+                                    <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
+                                    <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {payments.map((p: any) => (
-                                    <TableRow key={p.id}>
+                                    <TableRow key={p.id} className="hover:bg-muted/50">
                                         <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
-                                            <div className="text-slate-900 font-medium text-[11px] break-words">
+                                            <div className="text-foreground font-semibold text-[11px] break-words">
                                                 {p.paymentId || p.rtgsSrNo}
                                             </div>
-                                            <div className="text-slate-700 text-[11px] break-words mt-0.5">
+                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
                                                 {p.sixRNo || ''}
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-20">
-                                            <div className="break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
+                                            <div className="text-foreground font-semibold break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-20">
-                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px]">{p.receiptType}</Badge>
+                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-40" title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)}`}>
-                                            <div className="break-words font-semibold text-slate-900 text-[11px]">
+                                            <div className="break-words font-bold text-foreground text-[11px]">
                                                 {p.supplierName || ''}
                                             </div>
-                                            <div className="text-slate-800 text-[11px] mt-0.5 break-words">
+                                            <div className="text-foreground/90 text-[11px] mt-0.5 break-words font-semibold">
                                                 {getReceiptHolderName(p)}
                                             </div>
-                                            <div className="text-slate-700 text-[11px] mt-0.5">
-                                                <div className="break-words">
+                                            <div className="text-muted-foreground text-[11px] mt-0.5">
+                                                <div className="break-words font-medium">
                                                     {getReceiptNumbers(p)}
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
-                                            <div className="break-words text-slate-900 font-medium text-[11px]">
+                                            <div className="break-words text-foreground font-bold text-[11px]">
                                                 {p.bankName || ''}
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
-                                            <div className="text-slate-900 text-[11px] font-medium break-words">
+                                            <div className="text-foreground text-[11px] font-bold break-words">
                                                 {p.bankAcNo || ''}
                                             </div>
-                                            <div className="text-slate-800 text-[11px] break-words mt-0.5">
+                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
                                                 {p.bankBranch || ''}
                                             </div>
-                                            <div className="text-slate-700 text-[11px] break-words mt-0.5">
+                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
                                                 {p.bankIfsc || ''}
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
-                                            <div className="text-slate-900 text-[11px] font-medium break-words">
+                                            <div className="text-foreground text-[11px] font-bold break-words">
                                                 {p.quantity || 0}
                                             </div>
-                                            <div className="text-slate-800 text-[11px] break-words mt-0.5">
+                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
                                                 {p.rate || 0}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right p-1 text-[11px] w-24 font-mono">
-                                            <div className="break-words text-slate-900 font-semibold">{formatCurrency(p.amount)}</div>
+                                            <div className="break-words text-foreground font-bold">{formatCurrency(p.amount)}</div>
                                         </TableCell>
                                         <TableCell className="text-right p-1 text-[11px] w-20 font-mono">
-                                            <div className="break-words text-slate-800">{formatCurrency(p.cdAmount)}</div>
+                                            <div className="break-words text-foreground font-semibold">{formatCurrency(p.cdAmount)}</div>
                                         </TableCell>
                                         <TableCell className="text-center p-0 w-24">
                                             <div className="flex justify-center items-center gap-0">

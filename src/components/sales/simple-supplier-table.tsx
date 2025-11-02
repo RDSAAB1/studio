@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowLeft, Edit2, Trash2, Save, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, Wheat, Banknote, Percent, Weight, Hash, Calendar, FileText } from "lucide-react";
+import { Loader2, ArrowLeft, Edit2, Trash2, Save, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, Wheat, Banknote, Percent, Weight, Hash, Calendar, FileText, PhoneCall } from "lucide-react";
 import { toTitleCase } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Customer, OptionItem } from "@/lib/definitions";
@@ -74,11 +74,43 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     };
 
     const handleSave = async (index: number) => {
-        if (!suppliers || !suppliers[index] || !editData) return;
+        if (!suppliers || !suppliers[index]) {
+            toast({ 
+                title: "Error", 
+                description: "Supplier data not found.",
+                variant: "destructive" 
+            });
+            return;
+        }
+        
+        if (!editData || Object.keys(editData).length === 0) {
+            toast({ 
+                title: "No changes", 
+                description: "Please make some changes before saving.",
+                variant: "default"
+            });
+            setEditingRow(null);
+            setEditData({});
+            return;
+        }
+        
+        const supplier = suppliers[index];
+        
+        if (!supplier.id) {
+            toast({ 
+                title: "Error", 
+                description: "Supplier ID is missing. Cannot update.",
+                variant: "destructive" 
+            });
+            return;
+        }
         
         try {
-            const supplier = suppliers[index];
-            const success = await updateSupplier(supplier.id, editData);
+            // Remove 'id' from editData if present (shouldn't be updated)
+            const { id: _, ...updateData } = editData;
+            
+            console.log('Updating supplier:', supplier.id, 'with data:', updateData);
+            const success = await updateSupplier(supplier.id, updateData);
             
             if (success) {
                 setEditingRow(null);
@@ -90,13 +122,13 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     variant: "success"
                 });
             } else {
-                throw new Error('Failed to update supplier');
+                throw new Error('Update function returned false');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error updating supplier:', error);
             toast({ 
                 title: "Error updating entry", 
-                description: "Failed to update supplier entry.",
+                description: error?.message || "Failed to update supplier entry. Please try again.",
                 variant: "destructive" 
             });
         }
@@ -184,21 +216,20 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     if (multiEditTouched.has('address')) {
                         updateData.address = multiEditData.address?.trim() || '';
                     }
+                    if (multiEditTouched.has('contact')) {
+                        updateData.contact = multiEditData.contact?.trim() || '';
+                    }
                     if (multiEditTouched.has('vehicleNo')) {
                         updateData.vehicleNo = multiEditData.vehicleNo?.trim() || '';
                     }
                     if (multiEditTouched.has('variety')) {
                         updateData.variety = multiEditData.variety?.trim() || '';
                     }
-                    if (multiEditTouched.has('grossWeight')) {
-                        updateData.grossWeight = multiEditData.grossWeight;
+                    if (multiEditTouched.has('paymentType')) {
+                        updateData.paymentType = multiEditData.paymentType?.trim() || '';
                     }
-                    if (multiEditTouched.has('teirWeight')) {
-                        updateData.teirWeight = multiEditData.teirWeight;
-                    }
-                    if (multiEditTouched.has('rate')) {
-                        updateData.rate = multiEditData.rate;
-                    }
+                    // Note: grossWeight, teirWeight, and rate are NOT editable in multi-edit mode
+                    // They remain individual to each entry
                     if (multiEditTouched.has('kartaPercentage')) {
                         updateData.kartaPercentage = multiEditData.kartaPercentage;
                     }
@@ -239,6 +270,67 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     }
                     if (multiEditTouched.has('srNo')) {
                         updateData.srNo = multiEditData.srNo?.trim() || '';
+                    }
+                    
+                    // RECALCULATE dependent fields if any calculation-affecting field was changed
+                    // Note: grossWeight, teirWeight, rate always use supplier's existing values (not editable in multi-edit)
+                    const needsRecalculation = 
+                        multiEditTouched.has('kartaPercentage') || 
+                        multiEditTouched.has('labouryRate') || 
+                        multiEditTouched.has('brokerage') || 
+                        multiEditTouched.has('brokerageRate') || 
+                        multiEditTouched.has('brokerageAddSubtract') || 
+                        multiEditTouched.has('kanta');
+                    
+                    if (needsRecalculation) {
+                        // Always use supplier's existing grossWeight, teirWeight, and rate (these are NOT editable in multi-edit)
+                        const grossWeight = supplier.grossWeight ?? 0;
+                        const teirWeight = supplier.teirWeight ?? 0;
+                        const rate = supplier.rate ?? 0;
+                        
+                        // Get calculation-affecting values (use multi-edit values if touched, else use supplier's existing values)
+                        const kartaPercentage = multiEditTouched.has('kartaPercentage') 
+                            ? (multiEditData.kartaPercentage ?? supplier.kartaPercentage ?? 0)
+                            : (supplier.kartaPercentage ?? 0);
+                        const labouryRate = multiEditTouched.has('labouryRate') 
+                            ? (multiEditData.labouryRate ?? supplier.labouryRate ?? 0)
+                            : (supplier.labouryRate ?? 0);
+                        const brokerage = multiEditTouched.has('brokerage') 
+                            ? (multiEditData.brokerage ?? supplier.brokerage ?? 0)
+                            : (supplier.brokerage ?? 0);
+                        const brokerageAddSubtract = multiEditTouched.has('brokerageAddSubtract') 
+                            ? (multiEditData.brokerageAddSubtract ?? supplier.brokerageAddSubtract ?? true)
+                            : (supplier.brokerageAddSubtract ?? true);
+                        const kanta = multiEditTouched.has('kanta') 
+                            ? (multiEditData.kanta ?? supplier.kanta ?? 0)
+                            : (supplier.kanta ?? 0);
+                        
+                        // Calculate all dependent values
+                        const finalWeight = Number(grossWeight) - Number(teirWeight);
+                        const rawKartaWt = (finalWeight * Number(kartaPercentage)) / 100;
+                        const kartaWeight = Math.round(rawKartaWt * 100) / 100;
+                        const netWeight = Math.round((finalWeight - kartaWeight) * 100) / 100;
+                        
+                        const amount = Math.round(finalWeight * Number(rate) * 100) / 100;
+                        const kartaAmount = Math.round(kartaWeight * Number(rate) * 100) / 100;
+                        const labouryAmount = Math.round(finalWeight * Number(labouryRate) * 100) / 100;
+                        
+                        // Brokerage calculation: brokerage * finalWeight (consistent with main form logic)
+                        const brokerageAmount = Math.round(Number(brokerage || 0) * finalWeight * 100) / 100;
+                        const signedBrokerage = brokerageAddSubtract ? brokerageAmount : -brokerageAmount;
+                        
+                        const netAmount = Math.round((amount - kartaAmount - labouryAmount - Number(kanta) + signedBrokerage) * 100) / 100;
+                        
+                        // Add calculated fields to updateData
+                        updateData.weight = finalWeight;
+                        updateData.kartaWeight = kartaWeight;
+                        updateData.netWeight = netWeight;
+                        updateData.amount = amount;
+                        updateData.kartaAmount = kartaAmount;
+                        updateData.labouryAmount = labouryAmount;
+                        updateData.brokerageAmount = brokerageAmount;
+                        updateData.originalNetAmount = netAmount;
+                        updateData.netAmount = netAmount;
                     }
                     
                     // Only update if there's data to update
@@ -493,6 +585,33 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                     </InputWithIcon>
                                 </div>
                                 <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Contact No</label>
+                                    <InputWithIcon icon={<PhoneCall className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input
+                                            value={multiEditData.contact || ''}
+                                            onChange={(e) => setMultiEditData(prev => ({ ...prev, contact: e.target.value }))}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('contact');
+                                                        return newSet;
+                                                    });
+                                                } else {
+                                                    setMultiEditTouched(prev => new Set([...prev, 'contact']));
+                                                }
+                                            }}
+                                            placeholder="Enter contact number"
+                                            className="pl-10 h-9 text-sm"
+                                            maxLength={10}
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                            </div>
+
+                            {/* Vehicle Row */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Vehicle No</label>
                                     <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
                                         <Input
@@ -528,81 +647,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         placeholder="Select variety"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Gross Wt</label>
-                                    <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input
-                                            type="number"
-                                            value={multiEditData.grossWeight || 0}
-                                            onChange={(e) => {
-                                                setMultiEditData(prev => ({ ...prev, grossWeight: Number(e.target.value) || 0 }));
-                                                setMultiEditTouched(prev => new Set([...prev, 'grossWeight']));
-                                            }}
-                                            onBlur={(e) => {
-                                                if (!e.target.value || e.target.value === '0') {
-                                                    setMultiEditTouched(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete('grossWeight');
-                                                        return newSet;
-                                                    });
-                                                }
-                                            }}
-                                            placeholder="Enter gross weight"
-                                            className="pl-10 h-9 text-sm"
-                                        />
-                                    </InputWithIcon>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Tier Wt</label>
-                                    <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input
-                                            type="number"
-                                            value={multiEditData.teirWeight || 0}
-                                            onChange={(e) => {
-                                                setMultiEditData(prev => ({ ...prev, teirWeight: Number(e.target.value) || 0 }));
-                                                setMultiEditTouched(prev => new Set([...prev, 'teirWeight']));
-                                            }}
-                                            onBlur={(e) => {
-                                                if (!e.target.value || e.target.value === '0') {
-                                                    setMultiEditTouched(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete('teirWeight');
-                                                        return newSet;
-                                                    });
-                                                }
-                                            }}
-                                            placeholder="Enter tier weight"
-                                            className="pl-10 h-9 text-sm"
-                                        />
-                                    </InputWithIcon>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Rate</label>
-                                    <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input
-                                            type="number"
-                                            value={multiEditData.rate || 0}
-                                            onChange={(e) => {
-                                                setMultiEditData(prev => ({ ...prev, rate: Number(e.target.value) || 0 }));
-                                                setMultiEditTouched(prev => new Set([...prev, 'rate']));
-                                            }}
-                                            onBlur={(e) => {
-                                                if (!e.target.value || e.target.value === '0') {
-                                                    setMultiEditTouched(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete('rate');
-                                                        return newSet;
-                                                    });
-                                                }
-                                            }}
-                                            placeholder="Enter rate"
-                                            className="pl-10 h-9 text-sm"
-                                        />
-                                    </InputWithIcon>
-                                </div>
                             </div>
 
-                            {/* Calculation Details Row */}
+                            {/* Calculation Details Row - Note: Gross Weight, Teir Weight, and Rate are NOT editable in multi-edit mode (they remain individual to each entry) */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Karta %</label>
@@ -877,7 +924,17 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                 <Input
                                                     value={editData.name || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
+                                                    autoFocus
                                                 />
                                             ) : (
                                                 <span className="text-xs truncate block">{supplier.name}</span>
@@ -888,6 +945,15 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                 <Input
                                                     value={editData.so || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, so: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
                                                 />
                                             ) : (
@@ -899,6 +965,15 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                 <Input
                                                     value={editData.address || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
                                                 />
                                             ) : (
@@ -916,6 +991,15 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                     type="number"
                                                     value={editData.kartaWeight || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, kartaWeight: Number(e.target.value) }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
                                                 />
                                             ) : (
@@ -935,6 +1019,15 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                     type="number"
                                                     value={editData.rate || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, rate: Number(e.target.value) }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
                                                 />
                                             ) : (
@@ -969,6 +1062,15 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                     type="number"
                                                     value={editData.kanta || ''}
                                                     onChange={(e) => setEditData(prev => ({ ...prev, kanta: Number(e.target.value) }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleSave(index);
+                                                        } else if (e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            handleCancel();
+                                                        }
+                                                    }}
                                                     className="h-6 text-xs"
                                                 />
                                             ) : (
@@ -983,32 +1085,32 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         <td className="p-1 text-xs w-24">
                                             <div className="flex items-center gap-0.5">
                                                 {editingRow === index ? (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-green-600 hover:text-green-700"
-                                                            onClick={() => handleSave(index)}
-                                                        >
-                                                            <Save className="h-2.5 w-2.5" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-red-600 hover:text-red-700"
-                                                            onClick={handleCancel}
-                                                        >
-                                                            <X className="h-2.5 w-2.5" />
-                                                        </Button>
-                                                    </>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                                        onClick={handleCancel}
+                                                    >
+                                                        <X className="h-3 w-3 mr-1" />
+                                                        Cancel
+                                                    </Button>
                                                 ) : (
                                                     <>
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
                                                             className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700"
+                                                            onClick={() => handleEdit(index)}
+                                                            title="Edit in Table"
+                                                        >
+                                                            <Edit2 className="h-2.5 w-2.5" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-5 w-5 p-0 text-purple-600 hover:text-purple-700"
                                                             onClick={() => onEditSupplier(supplier)}
-                                                            title="Edit Supplier"
+                                                            title="Edit in Form"
                                                         >
                                                             <Edit2 className="h-2.5 w-2.5" />
                                                         </Button>

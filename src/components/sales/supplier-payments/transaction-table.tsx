@@ -14,25 +14,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export const TransactionTable = React.memo(({ suppliers, onShowDetails, selectedIds, onSelectionChange }: any) => {
     
-    const outstandingSuppliers = useMemo(() => 
-        suppliers.filter((s:any) => parseFloat(String(s.netAmount)) > 0),
-        [suppliers]
-    );
-    
-    // Debug: Check what values are in the first supplier entry
-    if (suppliers.length > 0) {
-        console.log('TransactionTable - First entry:', {
-            srNo: suppliers[0].srNo,
-            totalPaid: suppliers[0].totalPaid,
-            totalCd: suppliers[0].totalCd,
-            netAmount: suppliers[0].netAmount,
-            originalNetAmount: suppliers[0].originalNetAmount,
-            allKeys: Object.keys(suppliers[0])
-        });
-    }
+    // Show all entries, including those with 0 or negative outstanding
+    const allSuppliers = useMemo(() => suppliers, [suppliers]);
 
     const handleSelectAll = (checked: boolean) => {
-        const allEntryIds = outstandingSuppliers.map((c: any) => c.id);
+        const allEntryIds = allSuppliers.map((c: any) => c.id);
         onSelectionChange(checked ? new Set(allEntryIds) : new Set());
     };
 
@@ -57,7 +43,7 @@ export const TransactionTable = React.memo(({ suppliers, onShowDetails, selected
                                 <TableRow>
                                     <TableHead className="p-2 text-xs w-10">
                                         <Checkbox
-                                            checked={(selectedIds?.size ?? 0) > 0 && selectedIds.size === outstandingSuppliers.length}
+                                            checked={(selectedIds?.size ?? 0) > 0 && selectedIds.size === allSuppliers.length}
                                             onCheckedChange={handleSelectAll}
                                         />
                                     </TableHead>
@@ -77,7 +63,6 @@ export const TransactionTable = React.memo(({ suppliers, onShowDetails, selected
                                             <Checkbox 
                                                 checked={selectedIds?.has(entry.id)} 
                                                 onCheckedChange={() => handleRowSelect(entry.id)}
-                                                disabled={Number(entry.netAmount) < 1}
                                             />
                                         </TableCell>
                                         <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
@@ -85,7 +70,9 @@ export const TransactionTable = React.memo(({ suppliers, onShowDetails, selected
                                         <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
                                         <TableCell className="text-right p-2 text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
                                         <TableCell className="text-right p-2 text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs font-semibold">{formatCurrency(Number(entry.netAmount))}</TableCell>
+                                        <TableCell className={`text-right p-2 text-xs font-semibold ${Number(entry.netAmount) < 0 ? 'text-red-600' : ''}`}>
+                                            {formatCurrency(Number(entry.netAmount))}
+                                        </TableCell>
                                         <TableCell className="text-center p-0">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                                 <Info className="h-4 w-4" />

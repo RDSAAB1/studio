@@ -309,25 +309,42 @@ export async function getSupplierIdBySrNo(srNo: string): Promise<string | null> 
 
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
   if (!id) {
+    console.error('updateSupplier: No ID provided');
     return false;
   }
+  
+  if (!supplierData || Object.keys(supplierData).length === 0) {
+    console.error('updateSupplier: No data provided to update');
+    return false;
+  }
+  
   try {
     const docRef = doc(suppliersCollection, id);
     const snap = await getDoc(docRef);
+    
     if (snap.exists()) {
-      await updateDoc(docRef, supplierData);
+      // Remove 'id' from supplierData if it exists (shouldn't be in update data)
+      const { id: _, ...updateData } = supplierData as any;
+      await updateDoc(docRef, updateData);
     } else {
       // Create the document if it does not exist
       const dataToSet: any = { id, ...supplierData };
       await setDoc(docRef, dataToSet, { merge: true });
     }
+    
     if (db) {
       // Merge update locally as well
-      const existing = await db.suppliers.get(id);
-      await db.suppliers.put({ ...(existing || { id }), ...(supplierData as any) });
+      try {
+        const existing = await db.suppliers.get(id);
+        await db.suppliers.put({ ...(existing || { id }), ...(supplierData as any) });
+      } catch (localError) {
+        console.warn('Failed to update local IndexedDB:', localError);
+        // Don't fail the whole operation if local update fails
+      }
     }
     return true;
-  } catch {
+  } catch (error) {
+    console.error('updateSupplier error:', error);
     return false;
   }
 }

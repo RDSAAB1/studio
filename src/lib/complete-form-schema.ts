@@ -8,19 +8,56 @@ export const completeSupplierFormSchema = z.object({
     so: z.string(),
     address: z.string(),
     contact: z.string()
-        .length(10, "Contact number must be exactly 10 digits.")
-        .regex(/^\d+$/, "Contact number must only contain digits."),
+        .refine((val) => {
+            // Allow empty string or exactly 10 digits
+            if (!val || val.trim().length === 0) return true;
+            return val.length === 10 && /^\d+$/.test(val);
+        }, {
+            message: "Contact number must be exactly 10 digits or empty."
+        }),
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
-    grossWeight: z.coerce.number().min(0),
-    teirWeight: z.coerce.number().min(0),
-    rate: z.coerce.number().min(0),
-    kartaPercentage: z.coerce.number().min(0),
-    labouryRate: z.coerce.number().min(0),
-    brokerage: z.coerce.number().min(0),
-    brokerageRate: z.coerce.number().min(0),
+    grossWeight: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    teirWeight: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    rate: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    kartaPercentage: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    labouryRate: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    brokerage: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    brokerageRate: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
     brokerageAddSubtract: z.boolean().optional(),
-    kanta: z.coerce.number().min(0),
+    kanta: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
     paymentType: z.string().min(1, "Payment type is required"),
     forceUnique: z.boolean().optional(),
 });

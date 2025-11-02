@@ -16,6 +16,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from 'next/link';
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -109,7 +110,11 @@ export default function SupplierPaymentsClient() {
                                     <Button onClick={() => { hook.setPaymentMethod('Online'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Online' ? 'default' : 'outline'} size="sm">Online</Button>
                                     <Button onClick={() => { hook.setPaymentMethod('RTGS'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'RTGS' ? 'default' : 'outline'} size="sm">RTGS</Button>
                                 </div>
-                                {hook.paymentMethod === 'RTGS' && (
+                                <div className="flex items-center gap-2">
+                                  <Link href="/sales/supplier-payments/negative-outstanding">
+                                    <Button size="sm" variant="secondary">Negative Outstanding</Button>
+                                  </Link>
+                                  {hook.paymentMethod === 'RTGS' && (
                                     <div className="flex items-center space-x-2">
                                         <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
                                             <span className={`absolute right-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground'}`}>Outsider</span>
@@ -121,7 +126,8 @@ export default function SupplierPaymentsClient() {
                                             </div>
                                         </button>
                                     </div>
-                                )}
+                                  )}
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-3">
@@ -158,14 +164,19 @@ export default function SupplierPaymentsClient() {
                                                 placeholder="Search by Name, Father, Address..."
                                             />
                                         </div>
-                                        {hook.selectedCustomerKey && (
-                                            <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
-                                                <div className="flex items-baseline gap-2 text-sm">
-                                                    <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                    <p className="font-bold text-base text-destructive">{formatCurrency(supplierSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                        {hook.selectedCustomerKey && (() => {
+                                            const totalOutstanding = supplierSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0;
+                                            return (
+                                                <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                                    <div className="flex items-baseline gap-2 text-sm">
+                                                        <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                                        <p className={`font-bold text-base ${totalOutstanding < 0 ? 'text-red-600' : 'text-destructive'}`}>
+                                                            {formatCurrency(totalOutstanding)}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                      {hook.selectedCustomerKey && (
                                         <TransactionTable

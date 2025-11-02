@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { Loader2, Printer, Download } from 'lucide-react';
+import { Loader2, Printer, Download, Edit2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
+import { firestoreDB } from '@/lib/firebase';
+import { db } from '@/lib/database';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
@@ -21,8 +24,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface SixRReportRow {
+    paymentId: string; // Payment ID for updating
     sixRNo: string;
     sixRDate: string;
+    transactionDate: string;
     supplierName: string;
     fatherName: string;
     supplierAddress: string;
@@ -33,6 +38,7 @@ interface SixRReportRow {
     bankName: string;
     bankAcNo: string;
     ifscCode: string;
+    utrNo: string;
 }
 
 export default function SixRReportPage() {
@@ -46,6 +52,11 @@ export default function SixRReportPage() {
     const [searchName, setSearchName] = useState('');
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
+    
+    // State for inline editing 6R No.
+    const [editing6RNo, setEditing6RNo] = useState<string | null>(null);
+    const [edited6RNo, setEdited6RNo] = useState<string>('');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         getRtgsSettings().then(setSettings);
@@ -59,10 +70,12 @@ export default function SixRReportPage() {
     const reportRows = useMemo((): SixRReportRow[] => {
         if (!payments) return [];
         return payments
-            .filter(p => p.sixRNo) // Only include payments with a 6R number
+            .filter(p => p.receiptType === 'RTGS') // Include all RTGS payments (with or without 6R number)
             .map(p => ({
-                sixRNo: p.sixRNo!,
+                paymentId: p.id || p.paymentId || '',
+                sixRNo: p.sixRNo || 'N/A',
                 sixRDate: p.sixRDate ? format(new Date(p.sixRDate), 'dd-MMM-yy') : 'N/A',
+                transactionDate: p.date ? format(new Date(p.date), 'dd-MMM-yy') : 'N/A',
                 supplierName: toTitleCase(p.supplierName || ''),
                 fatherName: toTitleCase(p.supplierFatherName || ''),
                 supplierAddress: toTitleCase(p.supplierAddress || ''),
@@ -73,6 +86,7 @@ export default function SixRReportPage() {
                 bankName: p.bankName || '',
                 bankAcNo: p.bankAcNo || '',
                 ifscCode: p.bankIfsc || '',
+                utrNo: p.utrNo || '',
             }));
     }, [payments]);
 
@@ -80,7 +94,7 @@ export default function SixRReportPage() {
         let filtered = reportRows;
 
         if (search6RNo) {
-            filtered = filtered.filter(row => row.sixRNo.toLowerCase().includes(search6RNo.toLowerCase()));
+            filtered = filtered.filter(row => (row.sixRNo || '').toLowerCase().includes(search6RNo.toLowerCase()));
         }
         if (searchName) {
             filtered = filtered.filter(row => row.supplierName.toLowerCase().startsWith(searchName.toLowerCase()));
@@ -91,11 +105,19 @@ export default function SixRReportPage() {
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
             filtered = filtered.filter(row => {
-                const rowDate = new Date(row.sixRDate);
+                // Use transaction date for filtering, fallback to 6R date if transaction date is N/A
+                const rowDateStr = row.transactionDate !== 'N/A' ? row.transactionDate : row.sixRDate;
+                if (rowDateStr === 'N/A') return true; // Include entries with no date in filter range
+                const rowDate = new Date(rowDateStr);
                 return rowDate >= start && rowDate <= end;
             });
         }
-        return filtered.sort((a, b) => new Date(b.sixRDate).getTime() - new Date(a.sixRDate).getTime());
+        return filtered.sort((a, b) => {
+            // Sort by transaction date if available, else by 6R date
+            const aDate = a.transactionDate !== 'N/A' ? new Date(a.transactionDate).getTime() : (a.sixRDate !== 'N/A' ? new Date(a.sixRDate).getTime() : 0);
+            const bDate = b.transactionDate !== 'N/A' ? new Date(b.transactionDate).getTime() : (b.sixRDate !== 'N/A' ? new Date(b.sixRDate).getTime() : 0);
+            return bDate - aDate;
+        });
     }, [reportRows, search6RNo, searchName, startDate, endDate]);
 
     const handlePrint = () => {
@@ -151,20 +173,81 @@ export default function SixRReportPage() {
         const dataToExport = filteredReportRows.map(p => ({
             '6R No.': p.sixRNo,
             '6R Date': p.sixRDate,
+            'Transaction Date': p.transactionDate,
             'Payee': `${p.supplierName}, S/O: ${p.fatherName}, ${p.supplierAddress}`,
             'Contact': p.supplierContact,
             'Bank Name': p.bankName,
             'Account No.': p.bankAcNo,
             'IFSC': p.ifscCode,
-            'Amount': p.amount,
+            'Amount': Number(p.amount.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             'Check No.': p.checkNo,
             'Parchi No.': p.parchiNo,
+            'UTR No.': p.utrNo,
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "6R Report");
         XLSX.writeFile(workbook, `6R_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    };
+
+    const handleEdit6RNo = (paymentId: string, current6RNo: string) => {
+        setEditing6RNo(paymentId);
+        setEdited6RNo(current6RNo === 'N/A' ? '' : current6RNo);
+    };
+
+    const handleCancelEdit = () => {
+        setEditing6RNo(null);
+        setEdited6RNo('');
+    };
+
+    const handleSave6RNo = async (paymentId: string) => {
+        if (!paymentId) {
+            toast({ title: "Error", description: "Payment ID not found", variant: "destructive" });
+            return;
+        }
+
+        const trimmed6RNo = edited6RNo.trim();
+        setIsUpdating(true);
+
+        try {
+            const paymentRef = doc(firestoreDB, 'payments', paymentId);
+            const updateData: Partial<Payment> = {
+                sixRNo: trimmed6RNo || undefined, // Remove field if empty
+            };
+            
+            await updateDoc(paymentRef, updateData);
+            
+            // Also update local IndexedDB if available
+            if (typeof window !== 'undefined' && db) {
+                try {
+                    const existing = await db.payments.get(paymentId);
+                    if (existing) {
+                        await db.payments.put({ ...existing, sixRNo: trimmed6RNo || undefined });
+                    }
+                } catch (localError) {
+                    console.warn('Failed to update local IndexedDB:', localError);
+                }
+            }
+
+            toast({ 
+                title: "Success", 
+                description: `6R No. ${trimmed6RNo ? 'updated' : 'removed'} successfully`, 
+                variant: "default" 
+            });
+            
+            setEditing6RNo(null);
+            setEdited6RNo('');
+        } catch (error: any) {
+            console.error('Error updating 6R No:', error);
+            toast({ 
+                title: "Error", 
+                description: error?.message || "Failed to update 6R No.", 
+                variant: "destructive" 
+            });
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
     if (loading) {
@@ -219,6 +302,7 @@ export default function SixRReportPage() {
                                     <TableRow>
                                         <TableHead className="py-1 px-2">6R No.</TableHead>
                                         <TableHead className="py-1 px-2">6R Date</TableHead>
+                                        <TableHead className="py-1 px-2">Transaction Date</TableHead>
                                         <TableHead className="py-1 px-2">Payee</TableHead>
                                         <TableHead className="py-1 px-2">Contact</TableHead>
                                         <TableHead className="py-1 px-2">Bank Name</TableHead>
@@ -227,14 +311,68 @@ export default function SixRReportPage() {
                                         <TableHead className="py-1 px-2">Amount</TableHead>
                                         <TableHead className="py-1 px-2">Check No.</TableHead>
                                         <TableHead className="py-1 px-2">Parchi No.</TableHead>
+                                        <TableHead className="py-1 px-2">UTR No.</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredReportRows.length > 0 ? (
                                         filteredReportRows.map((row, index) => (
-                                            <TableRow key={`${row.sixRNo}-${index}`}>
-                                                <TableCell className="font-bold py-1 px-2">{row.sixRNo}</TableCell>
+                                            <TableRow key={`${row.paymentId}-${index}`}>
+                                                <TableCell className="font-bold py-1 px-2">
+                                                    {editing6RNo === row.paymentId ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                value={edited6RNo}
+                                                                onChange={(e) => setEdited6RNo(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleSave6RNo(row.paymentId);
+                                                                    } else if (e.key === 'Escape') {
+                                                                        e.preventDefault();
+                                                                        handleCancelEdit();
+                                                                    }
+                                                                }}
+                                                                className="h-7 text-xs font-bold w-24"
+                                                                placeholder="Enter 6R No."
+                                                                autoFocus
+                                                            />
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-xs text-green-600 hover:text-green-700"
+                                                                onClick={() => handleSave6RNo(row.paymentId)}
+                                                                disabled={isUpdating}
+                                                            >
+                                                                <Save className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
+                                                                onClick={handleCancelEdit}
+                                                                disabled={isUpdating}
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1">
+                                                            <span>{row.sixRNo}</span>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700"
+                                                                onClick={() => handleEdit6RNo(row.paymentId, row.sixRNo)}
+                                                                title={row.sixRNo === 'N/A' ? "Add 6R No." : "Edit 6R No."}
+                                                            >
+                                                                <Edit2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="py-1 px-2">{row.sixRDate}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.transactionDate}</TableCell>
                                                 <TableCell className="py-1 px-2">
                                                     <div className="font-medium">{row.supplierName}</div>
                                                     <div className="text-xs text-muted-foreground">S/O: {row.fatherName}</div>
@@ -244,14 +382,15 @@ export default function SixRReportPage() {
                                                 <TableCell className="py-1 px-2">{row.bankName}</TableCell>
                                                 <TableCell className="font-mono py-1 px-2">{row.bankAcNo}</TableCell>
                                                 <TableCell className="font-mono py-1 px-2">{row.ifscCode}</TableCell>
-                                                <TableCell className="font-bold py-1 px-2">{formatCurrency(row.amount)}</TableCell>
+                                                <TableCell className="font-bold py-1 px-2">{Number(row.amount.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                 <TableCell className="py-1 px-2">{row.checkNo}</TableCell>
                                                 <TableCell className="max-w-24 truncate py-1 px-2" title={row.parchiNo}>{row.parchiNo}</TableCell>
+                                                <TableCell className="py-1 px-2">{row.utrNo || '-'}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
+                                            <TableCell colSpan={12} className="h-24 text-center">No 6R reports found for the selected criteria.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>

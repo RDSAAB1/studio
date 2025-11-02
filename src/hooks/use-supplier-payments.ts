@@ -78,16 +78,6 @@ export const useSupplierPayments = () => {
                 
                 // Add back the payment amount and CD temporarily
                 const temporaryReversalAmount = editingPaymentAmount + editingPaymentCDForThisEntry;
-                
-                console.log('Temporary Reversal for Entry:', {
-                    srNo: entry.srNo,
-                    originalAmount,
-                    otherPaymentsTotal,
-                    editingPaymentAmount,
-                    editingPaymentCDForThisEntry,
-                    temporaryReversalAmount,
-                    finalOutstanding: originalAmount - otherPaymentsTotal + temporaryReversalAmount
-                });
 
                 return sum + (originalAmount - otherPaymentsTotal + temporaryReversalAmount);
             }, 0);
@@ -125,11 +115,15 @@ export const useSupplierPayments = () => {
 
     // Removed heavy console logs to improve typing performance
 
+    // For Partial payments, use toBePaidAmountManual as base for CD calculation
+    // For Full payments, use settleAmount
+    const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountManual : settleAmount;
+
     const { calculatedCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
-        toBePaidAmount: settleAmount, // Use settle amount as base
+        toBePaidAmount: baseAmountForCd, // Use toBePaidAmountManual for Partial, settleAmount for Full
         selectedEntries: selectedEntries,
         paymentDate: form.paymentDate,
         paymentHistory: data.paymentHistory,
@@ -138,10 +132,14 @@ export const useSupplierPayments = () => {
     });
     
     // Derive toBePaid from settle - CD
+    // For 'partial_on_paid' mode: CD is calculated on toBePaidAmount, but NOT deducted from it
+    // CD is added to toBePaidAmount to get settle amount (done in useEffect at line 175)
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
             return Math.max(0, settleAmount - calculatedCdAmount);
         }
+        // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)
+        // Settle Amount = toBePaidAmount + CD (handled separately in useEffect)
         return toBePaidAmountManual;
     }, [form.paymentType, settleAmount, calculatedCdAmount, toBePaidAmountManual]);
     
@@ -181,16 +179,15 @@ export const useSupplierPayments = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [finalToBePaid, form.paymentType]);
 
-    // Auto-fill logic for parchi number
+    // Auto-fill logic for parchi number (works in both new and edit mode)
     useEffect(() => {
-        if (!form.isBeingEdited) {
+        if (selectedEntries.length > 0) {
+            // Always update parchiNo based on selected entries, even in edit mode
             const srNos = selectedEntries.map(e => e.srNo).join(', ');
-            console.log('Auto-filling Parchi No with serial numbers:', {
-                selectedEntriesCount: selectedEntries.length,
-                srNos: srNos,
-                isBeingEdited: form.isBeingEdited
-            });
             form.setParchiNo(srNos);
+        } else if (!form.isBeingEdited) {
+            // Only clear parchiNo for new payments if no entries selected
+            form.setParchiNo('');
         }
     }, [selectedEntries, form.setParchiNo, form.isBeingEdited]);
 
@@ -273,9 +270,19 @@ export const useSupplierPayments = () => {
             setRtgsRate(paymentData.rate || 0);
             setRtgsAmount(paymentData.rtgsAmount || 0);
             
+            // Preserve contact number from payment data or find from supplier entry
+            let contactNumber = (paymentData as any).supplierContact || '';
+            if (!contactNumber && paymentData.paidFor && paymentData.paidFor.length > 0) {
+                const firstSrNo = paymentData.paidFor[0].srNo;
+                const supplierEntry = data.suppliers.find(s => s.srNo === firstSrNo);
+                if (supplierEntry && supplierEntry.contact) {
+                    contactNumber = supplierEntry.contact;
+                }
+            }
+            
             setSupplierDetails({
                 name: paymentData.supplierName || '', fatherName: paymentData.supplierFatherName || '',
-                address: paymentData.supplierAddress || '', contact: ''
+                address: paymentData.supplierAddress || '', contact: contactNumber
             });
             setBankDetails({
                 acNo: paymentData.bankAcNo || '', ifscCode: paymentData.bankIfsc || '',
