@@ -165,14 +165,38 @@ export default function SupplierPaymentsClient() {
                                             />
                                         </div>
                                         {hook.selectedCustomerKey && (() => {
-                                            const totalOutstanding = supplierSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0;
+                                            const summary = supplierSummaryMap.get(hook.selectedCustomerKey);
+                                            const totalOutstanding = summary?.totalOutstanding || 0;
+                                            const totalOriginal = summary?.totalOriginalAmount || 0;
+                                            const totalPaid = summary?.totalPaid || 0;
+                                            const totalCd = summary?.totalCdAmount || 0;
+                                            const totalSettlement = totalPaid + totalCd;
+                                            
                                             return (
-                                                <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
-                                                    <div className="flex items-baseline gap-2 text-sm">
-                                                        <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                        <p className={`font-bold text-base ${totalOutstanding < 0 ? 'text-red-600' : 'text-destructive'}`}>
-                                                            {formatCurrency(totalOutstanding)}
-                                                        </p>
+                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                                                        <div className="flex items-baseline gap-2">
+                                                            <Label className="font-medium text-muted-foreground">Original:</Label>
+                                                            <p className="font-semibold text-base">{formatCurrency(totalOriginal)}</p>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <Label className="font-medium text-muted-foreground">Paid:</Label>
+                                                            <p className="font-semibold text-base text-green-600">{formatCurrency(totalPaid)}</p>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <Label className="font-medium text-muted-foreground">CD:</Label>
+                                                            <p className="font-semibold text-base text-blue-600">{formatCurrency(totalCd)}</p>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <Label className="font-medium text-muted-foreground">Settlement:</Label>
+                                                            <p className="font-semibold text-base text-purple-600">{formatCurrency(totalSettlement)}</p>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <Label className="font-medium text-muted-foreground">Outstanding:</Label>
+                                                            <p className={`font-bold text-base ${totalOutstanding < 0 ? 'text-red-600' : totalOutstanding > 0 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                                                                {formatCurrency(totalOutstanding)}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );

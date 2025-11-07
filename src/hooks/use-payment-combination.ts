@@ -40,17 +40,21 @@ export const usePaymentCombination = ({
         }
 
         const rawOptions: PaymentOption[] = [];
-        const step = roundFigureToggle ? 100 : 5;
+        const step = roundFigureToggle ? 100 : 1; // finer granularity for better minimal remaining
 
-        for (let q = 0.10; q <= 2000; q = parseFloat((q + 0.10).toFixed(2))) { // Increased limit to 2000 quintals
-            for (let currentRate = minRate; currentRate <= maxRate; currentRate += 5) {
-                if (currentRate % 5 !== 0) continue;
+        // Generate more combinations with finer quantity increments
+        // Use smaller quantity steps to generate more combinations
+        const qtyStep = 0.05; // Reduced from 0.10 to 0.05 for more combinations
+        const maxQty = Math.min(2000, calcTargetAmount / minRate * 1.5); // Dynamic max based on target
+        
+        for (let q = 0.05; q <= maxQty; q = parseFloat((q + qtyStep).toFixed(2))) {
+            for (let currentRate = Math.ceil(minRate); currentRate <= Math.floor(maxRate); currentRate += 1) { // Rate divisible by 1
 
                 const rawAmount = q * currentRate;
-                const calculatedAmount = Math.round(rawAmount / step) * step;
-                
-                if (Math.abs(rawAmount - calculatedAmount) > 0.01) continue;
+                // Round to step for round figure toggle
+                const calculatedAmount = roundFigureToggle ? Math.round(rawAmount / step) * step : Math.round(rawAmount * 100) / 100;
 
+                // Allow combinations up to target (no strict filtering)
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
@@ -65,8 +69,29 @@ export const usePaymentCombination = ({
             }
         }
         
-        const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
-        const limitedOptions = sortedOptions.slice(0, 200);
+        // Ensure combinations are unique by (rate, quantity); allow duplicate remaining amounts
+        const pairToOption = new Map<string, PaymentOption>();
+        for (const opt of rawOptions) {
+            const key = `${opt.rate}-${opt.quantity}`;
+            if (!pairToOption.has(key)) pairToOption.set(key, opt);
+        }
+        const uniqueOptions = Array.from(pairToOption.values());
+        // Sort by: minimal remaining, then lower rate (kam rate), then higher quantity (zyada qty), then higher calculated amount
+        const sortedOptions = uniqueOptions.sort((a, b) => {
+            if (a.amountRemaining !== b.amountRemaining) return a.amountRemaining - b.amountRemaining;
+            if (a.rate !== b.rate) return a.rate - b.rate; // prefer lower rate
+            if (a.quantity !== b.quantity) return b.quantity - a.quantity; // prefer higher quantity
+            return b.calculatedAmount - a.calculatedAmount;
+        });
+
+        // Take top 500 combinations sorted by priority
+        const targetTotal = 500;
+        
+        // If we have enough options, take top 500
+        // If less than 500, take all available
+        const limitedOptions = sortedOptions.length >= targetTotal 
+            ? sortedOptions.slice(0, targetTotal)
+            : sortedOptions;
 
         setPaymentOptions(limitedOptions);
         setSortConfig(null);

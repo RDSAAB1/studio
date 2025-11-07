@@ -154,6 +154,11 @@ export const SupplierProfileView = ({
         )
     }
 
+    const formatRate = (value: number | null | undefined) => {
+        const numericValue = Number(value) || 0;
+        return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
     return (
         <div className="space-y-6">
             <Card>
@@ -180,7 +185,7 @@ export const SupplierProfileView = ({
                              <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
                              <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatRate(selectedSupplierData.averageRate)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Min Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.minRate || 0)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Max Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.maxRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -194,7 +199,7 @@ export const SupplierProfileView = ({
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatRate(selectedSupplierData.averageRate)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total Karta Amt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury Amt <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>

@@ -197,15 +197,31 @@ export const useSupplierData = () => {
         data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
         data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + t.kanta, 0);
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
-        data.totalBrokerage = data.allTransactions!.reduce((sum, t) => sum + (t.brokerage || 0), 0);
+        data.totalBrokerage = data.allTransactions!.reduce((sum, t) => {
+            const brokerageAmount = t.brokerageAmount || 0;
+            const signedBrokerage = (t.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+            return sum + signedBrokerage;
+        }, 0);
         data.totalTransactions = data.allTransactions!.length;
         
             data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0), 0);
             data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (('cdAmount' in p ? p.cdAmount : null) || 0), 0);
         data.totalOutstanding = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount), 0);
         
-            data.totalCashPaid = data.allPayments!.filter(p => 'receiptType' in p && p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-            data.totalRtgsPaid = data.allPayments!.filter(p => !('receiptType' in p) || ('receiptType' in p && p.receiptType !== 'Cash')).reduce((sum, p) => sum + (('rtgsAmount' in p ? p.rtgsAmount : null) || p.amount || 0), 0);
+            data.totalCashPaid = data.allPayments!.filter(p => {
+                const receiptType = ('receiptType' in p ? p.receiptType : '')?.toLowerCase() || ('type' in p ? (p as any).type : '')?.toLowerCase();
+                return receiptType === 'cash';
+            }).reduce((sum, p) => sum + p.amount, 0);
+            data.totalRtgsPaid = data.allPayments!.reduce((sum, p) => {
+                const receiptType = ('receiptType' in p ? p.receiptType : '')?.toLowerCase() || ('type' in p ? (p as any).type : '')?.toLowerCase();
+                // Only count RTGS payments
+                if (receiptType === 'rtgs') {
+                    // Use rtgsAmount if available (same logic as statement), otherwise use amount
+                    const rtgsAmount = ('rtgsAmount' in p ? (p as any).rtgsAmount : null);
+                    return sum + (rtgsAmount !== undefined && rtgsAmount !== null ? rtgsAmount : p.amount);
+                }
+                return sum;
+            }, 0);
         
             data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => Number(t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;

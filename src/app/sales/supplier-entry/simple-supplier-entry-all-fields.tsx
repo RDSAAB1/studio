@@ -285,7 +285,7 @@ export default function SimpleSupplierEntryAllFields() {
             const amount = finalWeight * Number(v.rate || 0);
             const kartaAmount = kartaWeight * Number(v.rate || 0);
             const labouryAmount = finalWeight * Number(v.labouryRate || 0);
-            const brokerageAmount = Number(v.brokerage || 0) * finalWeight;
+            const brokerageAmount = Math.round(Number(v.brokerageRate || 0) * netWeight * 100) / 100;
             const signedBrokerage = (v.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
             const netAmount = amount - kartaAmount - labouryAmount - Number(v.kanta || 0) + signedBrokerage;
             const temp: Customer = {
@@ -671,7 +671,7 @@ export default function SimpleSupplierEntryAllFields() {
             const amount = finalWeight * Number(values.rate);
             const kartaAmount = kartaWeight * Number(values.rate);
             const labouryAmount = finalWeight * Number(values.labouryRate);
-            const brokerageAmount = Number(values.brokerage || 0) * finalWeight;
+            const brokerageAmount = Math.round(Number(values.brokerageRate || 0) * netWeight * 100) / 100;
             const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
             const netAmount = amount - kartaAmount - labouryAmount - Number(values.kanta) + signedBrokerage;
 

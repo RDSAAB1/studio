@@ -46,8 +46,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
             
             if (!paidForThis) return sum;
 
-            // paidForThis.amount is already the actual payment amount (to be paid, WITHOUT CD)
-            // No need to subtract CD as it's already excluded
+            // paidForThis.amount IS the actual paid amount (To Be Paid amount)
+            // This is the actual payment amount, NOT (To Be Paid - CD)
             return sum + paidForThis.amount;
         }, 0),
         [paymentsForDetailsEntry, customer.srNo]
@@ -55,23 +55,20 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
 
     const totalCdForThisEntry = useMemo(() =>
         paymentsForDetailsEntry.reduce((sum, p) => {
-            if (!p.cdApplied || !p.paidFor || p.paidFor.length === 0) {
-                return sum;
-            }
-            const paidForThisDetail = p.paidFor.find(pf => pf.srNo === customer.srNo);
+            const paidForThisDetail = p.paidFor?.find(pf => pf.srNo === customer.srNo);
             if (!paidForThisDetail) return sum;
 
             // First check if CD amount is directly stored in paidFor (new format - more accurate)
-            if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined) {
+            if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
                 return sum + Number(paidForThisDetail.cdAmount || 0);
             }
             
-            // Fallback to proportional calculation for old payments (backward compatibility)
-            if (p.cdAmount && p.paidFor.length > 0) {
-                const totalAmountInPayment = p.paidFor.reduce((s, i) => s + i.amount, 0);
+            // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
+            if ((p as any).cdAmount && p.paidFor && p.paidFor.length > 0) {
+                const totalAmountInPayment = p.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
                 if (totalAmountInPayment > 0) {
-                    const proportion = paidForThisDetail.amount / totalAmountInPayment;
-                    return sum + (p.cdAmount * proportion);
+                    const proportion = Number(paidForThisDetail.amount || 0) / totalAmountInPayment;
+                    return sum + Math.round((p as any).cdAmount * proportion * 100) / 100;
                 }
             }
             return sum;
@@ -189,9 +186,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs">Type</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Settled Amt</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Paid Amount</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Actual Paid</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Total Settled</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -200,33 +197,31 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     if (!paidForThis) return null;
 
                                                     let cdForThisEntry = 0;
-                                                    if (payment.cdApplied && payment.paidFor && payment.paidFor.length > 0) {
-                                                        // First check if CD amount is directly stored in paidFor (new format - more accurate)
-                                                        if ('cdAmount' in paidForThis && paidForThis.cdAmount !== undefined) {
-                                                            cdForThisEntry = Number(paidForThis.cdAmount || 0);
-                                                        } else if (payment.cdAmount) {
-                                                            // Fallback to proportional calculation for old payments
-                                                            const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + i.amount, 0);
-                                                            if (totalAmountInPayment > 0) {
-                                                                const proportion = paidForThis.amount / totalAmountInPayment;
-                                                                cdForThisEntry = payment.cdAmount * proportion;
-                                                            }
+                                                    // First check if CD amount is directly stored in paidFor (new format - more accurate)
+                                                    if ('cdAmount' in paidForThis && paidForThis.cdAmount !== undefined && paidForThis.cdAmount !== null) {
+                                                        cdForThisEntry = Number(paidForThis.cdAmount || 0);
+                                                    } else if ((payment as any).cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+                                                        // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
+                                                        const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+                                                        if (totalAmountInPayment > 0) {
+                                                            const proportion = Number(paidForThis.amount || 0) / totalAmountInPayment;
+                                                            cdForThisEntry = Math.round((payment as any).cdAmount * proportion * 100) / 100;
                                                         }
                                                     }
 
-                                                    // paidForThis.amount is already the actual payment amount (to be paid, WITHOUT CD)
-                                                    // Settled Amount = Actual Paid + CD
-                                                    const actualPaidForEntry = paidForThis.amount;
-                                                    const settledAmountForEntry = actualPaidForEntry + cdForThisEntry;
+                                                    // paidForThis.amount IS the actual paid amount (To Be Paid amount)
+                                                    // It's NOT (To Be Paid - CD), it's the actual payment amount
+                                                    const actualPaidForEntry = paidForThis.amount; // This is the To Be Paid / Actual Paid amount
+                                                    const settledAmountForEntry = actualPaidForEntry + cdForThisEntry; // Total settled = Paid + CD
 
                                                     return (
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.type}</TableCell>
-                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(settledAmountForEntry)}</TableCell>
-                                                            <TableCell className="p-2 text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
+                                                            <TableCell className="p-2 text-right text-blue-600">{formatCurrency(cdForThisEntry)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(settledAmountForEntry)}</TableCell>
                                                         </TableRow>
                                                     );
                                                 })}

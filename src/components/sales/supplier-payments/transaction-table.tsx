@@ -1,21 +1,31 @@
 
 "use client";
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Info, CheckSquare } from "lucide-react";
+import { Info } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Checkbox } from '@/components/ui/checkbox';
 
 export const TransactionTable = React.memo(({ suppliers, onShowDetails, selectedIds, onSelectionChange }: any) => {
     
+    // Sort suppliers by outstanding amount (descending - highest outstanding first)
+    // This ensures purchases with remaining outstanding are shown at the top
+    const sortedSuppliers = useMemo(() => {
+        return [...suppliers].sort((a: any, b: any) => {
+            const outstandingA = Number((a as any).outstandingForEntry || a.netAmount || 0);
+            const outstandingB = Number((b as any).outstandingForEntry || b.netAmount || 0);
+            return outstandingB - outstandingA; // Descending order
+        });
+    }, [suppliers]);
+
     // Show all entries, including those with 0 or negative outstanding
-    const allSuppliers = useMemo(() => suppliers, [suppliers]);
+    const allSuppliers = useMemo(() => sortedSuppliers, [sortedSuppliers]);
 
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = allSuppliers.map((c: any) => c.id);
@@ -57,30 +67,51 @@ export const TransactionTable = React.memo(({ suppliers, onShowDetails, selected
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {suppliers.map((entry: any) => (
-                                    <TableRow key={entry.id} data-state={selectedIds?.has(entry.id) ? 'selected' : ''}>
-                                        <TableCell className="p-2">
-                                            <Checkbox 
-                                                checked={selectedIds?.has(entry.id)} 
-                                                onCheckedChange={() => handleRowSelect(entry.id)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
-                                        <TableCell className="p-2 text-xs">{entry.date && isValid(new Date(entry.date)) ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs text-green-600">{formatCurrency(entry.totalPaid || 0)}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs text-blue-600">{formatCurrency(entry.totalCd || 0)}</TableCell>
-                                        <TableCell className={`text-right p-2 text-xs font-semibold ${Number(entry.netAmount) < 0 ? 'text-red-600' : ''}`}>
-                                            {formatCurrency(Number(entry.netAmount))}
-                                        </TableCell>
-                                        <TableCell className="text-center p-0">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
-                                                <Info className="h-4 w-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {suppliers.length === 0 && (
+                                {sortedSuppliers.map((entry: any) => {
+                                    const outstanding = Number((entry as any).outstandingForEntry || entry.netAmount || 0);
+                                    const hasOutstanding = outstanding > 0.01; // Has remaining outstanding
+                                    const isNegative = outstanding < -0.01; // Negative outstanding (overpaid)
+                                    
+                                    return (
+                                        <TableRow 
+                                            key={entry.id} 
+                                            data-state={selectedIds?.has(entry.id) ? 'selected' : ''}
+                                            className={hasOutstanding ? 'bg-orange-50/50 hover:bg-orange-100/50' : ''}
+                                        >
+                                            <TableCell className="p-2">
+                                                <Checkbox 
+                                                    checked={selectedIds?.has(entry.id)} 
+                                                    onCheckedChange={() => handleRowSelect(entry.id)}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
+                                            <TableCell className="p-2 text-xs">{entry.date && isValid(new Date(entry.date)) ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                            <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
+                                            <TableCell className="text-right p-2 text-xs text-green-600">{formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}</TableCell>
+                                            <TableCell className="text-right p-2 text-xs text-blue-600">{formatCurrency((entry as any).totalCdForEntry || entry.totalCd || 0)}</TableCell>
+                                            <TableCell className={`text-right p-2 text-xs font-bold ${
+                                                isNegative 
+                                                    ? 'text-red-600' 
+                                                    : hasOutstanding 
+                                                        ? 'text-orange-600' 
+                                                        : 'text-muted-foreground'
+                                            }`}>
+                                                {formatCurrency(outstanding)}
+                                                {hasOutstanding && (
+                                                    <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 border-orange-300 text-orange-600">
+                                                        Due
+                                                    </Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-center p-0">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
+                                                    <Info className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {sortedSuppliers.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} className="text-center text-muted-foreground h-24">No transactions found for this supplier.</TableCell>
                                     </TableRow>

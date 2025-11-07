@@ -74,7 +74,7 @@ export const SimpleCalculatedSummary = ({
     const amount = finalWt * rate;
     const kartaAmt = kartaWt * rate;
     const labAmt = netWt * labouryRate;
-    const brokerageAmt = brokerage * netWt;
+    const brokerageAmt = brokerageRate * netWt;
     const netPayable = amount - kartaAmt - labAmt - kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt);
     
     return (

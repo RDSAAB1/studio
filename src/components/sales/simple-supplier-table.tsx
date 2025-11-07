@@ -48,6 +48,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
     const [isMultiDeleting, setIsMultiDeleting] = useState(false);
     const [isMultiEditing, setIsMultiEditing] = useState(false);
+    const [isMultiSaving, setIsMultiSaving] = useState(false);
     const [multiEditData, setMultiEditData] = useState<Partial<Customer>>({});
     const [multiEditTouched, setMultiEditTouched] = useState<Set<string>>(new Set());
 
@@ -185,7 +186,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
         
         setIsMultiEditing(true);
         setMultiEditData({
-            brokerage: 0,
             brokerageRate: 0,
             brokerageAddSubtract: true,
         });
@@ -198,6 +198,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     const handleMultiEditSave = async () => {
         if (selectedSuppliers.size === 0) return;
         
+        setIsMultiSaving(true);
         try {
             const selectedSuppliersList = suppliers.filter(s => selectedSuppliers.has(s.id));
             let successCount = 0;
@@ -235,9 +236,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     }
                     if (multiEditTouched.has('labouryRate')) {
                         updateData.labouryRate = multiEditData.labouryRate;
-                    }
-                    if (multiEditTouched.has('brokerage')) {
-                        updateData.brokerage = multiEditData.brokerage;
                     }
                     if (multiEditTouched.has('brokerageRate')) {
                         updateData.brokerageRate = multiEditData.brokerageRate;
@@ -277,7 +275,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     const needsRecalculation = 
                         multiEditTouched.has('kartaPercentage') || 
                         multiEditTouched.has('labouryRate') || 
-                        multiEditTouched.has('brokerage') || 
                         multiEditTouched.has('brokerageRate') || 
                         multiEditTouched.has('brokerageAddSubtract') || 
                         multiEditTouched.has('kanta');
@@ -295,9 +292,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                         const labouryRate = multiEditTouched.has('labouryRate') 
                             ? (multiEditData.labouryRate ?? supplier.labouryRate ?? 0)
                             : (supplier.labouryRate ?? 0);
-                        const brokerage = multiEditTouched.has('brokerage') 
-                            ? (multiEditData.brokerage ?? supplier.brokerage ?? 0)
-                            : (supplier.brokerage ?? 0);
+                        const brokerageRate = multiEditTouched.has('brokerageRate') 
+                            ? (multiEditData.brokerageRate ?? supplier.brokerageRate ?? 0)
+                            : (supplier.brokerageRate ?? 0);
                         const brokerageAddSubtract = multiEditTouched.has('brokerageAddSubtract') 
                             ? (multiEditData.brokerageAddSubtract ?? supplier.brokerageAddSubtract ?? true)
                             : (supplier.brokerageAddSubtract ?? true);
@@ -315,8 +312,8 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                         const kartaAmount = Math.round(kartaWeight * Number(rate) * 100) / 100;
                         const labouryAmount = Math.round(finalWeight * Number(labouryRate) * 100) / 100;
                         
-                        // Brokerage calculation: brokerage * finalWeight (consistent with main form logic)
-                        const brokerageAmount = Math.round(Number(brokerage || 0) * finalWeight * 100) / 100;
+                        // Brokerage calculation: brokerageRate * netWeight
+                        const brokerageAmount = Math.round(Number(brokerageRate || 0) * netWeight * 100) / 100;
                         const signedBrokerage = brokerageAddSubtract ? brokerageAmount : -brokerageAmount;
                         
                         const netAmount = Math.round((amount - kartaAmount - labouryAmount - Number(kanta) + signedBrokerage) * 100) / 100;
@@ -329,6 +326,10 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                         updateData.kartaAmount = kartaAmount;
                         updateData.labouryAmount = labouryAmount;
                         updateData.brokerageAmount = brokerageAmount;
+                        // Also save brokerageRate if it was used in calculation
+                        if (multiEditTouched.has('brokerageRate') || needsRecalculation) {
+                            updateData.brokerageRate = brokerageRate;
+                        }
                         updateData.originalNetAmount = netAmount;
                         updateData.netAmount = netAmount;
                     }
@@ -375,6 +376,8 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                 description: "Failed to update entries",
                 variant: "destructive",
             });
+        } finally {
+            setIsMultiSaving(false);
         }
     };
 
@@ -504,9 +507,19 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                     size="sm"
                                     onClick={handleMultiEditSave}
                                     className="h-8 rounded-md"
+                                    disabled={isMultiSaving}
                                 >
-                                    <Save className="h-4 w-4 mr-1" />
-                                    Save All
+                                    {isMultiSaving ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4 mr-1" />
+                                            Save All
+                                        </>
+                                    )}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -690,26 +703,26 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                 </div>
                                 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Brokerage</label>
+                                    <label className="text-xs font-medium text-muted-foreground">Brokerage Rate</label>
                                     <div className="flex gap-1">
                                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
                                             <Input
                                                 type="number"
-                                                value={multiEditData.brokerage || 0}
+                                                value={multiEditData.brokerageRate || 0}
                                                 onChange={(e) => {
-                                                    setMultiEditData(prev => ({ ...prev, brokerage: Number(e.target.value) || 0 }));
-                                                    setMultiEditTouched(prev => new Set([...prev, 'brokerage']));
+                                                    setMultiEditData(prev => ({ ...prev, brokerageRate: Number(e.target.value) || 0 }));
+                                                    setMultiEditTouched(prev => new Set([...prev, 'brokerageRate']));
                                                 }}
                                                 onBlur={(e) => {
                                                     if (!e.target.value || e.target.value === '0') {
                                                         setMultiEditTouched(prev => {
                                                             const newSet = new Set(prev);
-                                                            newSet.delete('brokerage');
+                                                            newSet.delete('brokerageRate');
                                                             return newSet;
                                                         });
                                                     }
                                                 }}
-                                                placeholder="Enter brokerage"
+                                                placeholder="Enter brokerage rate"
                                                 className="pl-10 h-9 text-sm flex-1"
                                             />
                                         </InputWithIcon>

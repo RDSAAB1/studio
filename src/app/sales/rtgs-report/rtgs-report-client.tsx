@@ -154,10 +154,9 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
-        const node = printRef.current;
-        if (!node || !settings) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
+    const handlePrint = (_printRef: React.RefObject<HTMLDivElement>) => {
+        if (!settings) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Missing settings for print.' });
             return;
         }
 
@@ -175,43 +174,88 @@ export default function RtgsReportClient() {
             return;
         }
 
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>RTGS Payment Report</title>');
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode(`
-                    @page { size: landscape; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .print-header { margin-bottom: 1rem; text-align: center; }
-                    thead { background-color: #f2f2f2 !important; }
-                    th { color: #111827 !important; font-weight: 600 !important; }
-                    td { color: #111827 !important; }
-                    td div { color: #111827 !important; }
-                    .text-gray-900 { color: #111827 !important; }
-                    .text-gray-700 { color: #374151 !important; }
-                    .text-muted-foreground { color: #374151 !important; }
-                `));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
-            }
-        });
-        
-        iframeDoc.write('</head><body></body></html>');
-        
-        const printContent = `
-            <div class="print-header">
-                <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
-                <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-            </div>
-            ${node.outerHTML}
+        const printTableHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">6R No. / 6R Date</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Transaction</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Chk-No / UTR-No</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Payee</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">A/C No. / Mobile</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Bank / IFSC / Branch</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Amount / Rate / Quantity</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Mandi Charge</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Cess Charge</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Total Charges</th>
+                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Parchi No.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredReportRows.map(row => {
+                        const bankDetails = `${row.bank || 'N/A'}<br/>${row.ifscCode || 'N/A'}<br/>${row.branch || 'N/A'}`;
+                        const accountMobileDetails = `${row.acNo || 'N/A'}<br/>${row.contact || 'N/A'}`;
+                        const payeeDetails = `${row.supplierName}<br/>S/O: ${row.fatherName}<br/>${row.supplierAddress || ''}`;
+                        const sixRDetails = `${row.sixRNo || 'N/A'}<br/>${row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : 'N/A'}`;
+                        const checkUtrDetails = `${row.checkNo || 'N/A'}<br/>${row.utrNo || 'N/A'}`;
+                        const mandiCharge = row.amount * 0.01;
+                        const cessCharge = row.amount * 0.005;
+                        const totalCharges = mandiCharge + cessCharge;
+                        const formatNumber = (num: number) => Number(num.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        const parchiLines = (() => {
+                            const items = (row.parchiNo || '')
+                                .split(',')
+                                .map(s => s.trim())
+                                .filter(Boolean);
+                            if (items.length === 0) return '-';
+                            const chunkSize = 4;
+                            const lines: string[] = [];
+                            for (let i = 0; i < items.length; i += chunkSize) {
+                                lines.push(items.slice(i, i + chunkSize).join(', '));
+                            }
+                            return lines.join('<br/>' );
+                        })();
+                        return `
+                            <tr>
+                                <td style="border: 1px solid #ccc; padding: 4px; white-space: nowrap;">${sixRDetails}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px; white-space: nowrap;">${format(new Date(row.date), 'dd-MMM-yy')}<br/>${row.srNo}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${checkUtrDetails}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${payeeDetails}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${accountMobileDetails}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${bankDetails}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${formatNumber(row.amount)}<br/>${row.rate ? formatNumber(row.rate) : 'N/A'}<br/>${row.weight || 'N/A'}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(mandiCharge)}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(cessCharge)}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(totalCharges)}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">${parchiLines}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
         `;
-        
-        iframeDoc.body.innerHTML = printContent;
+
+        iframeDoc.open();
+        iframeDoc.write(`
+            <html><head><title>RTGS Payment Report</title>
+                <style>
+                    @page { size: portrait; margin: 10mm; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; font-family: sans-serif; }
+                    .print-header { text-align: center; margin-bottom: 1rem; }
+                    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                    th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
+                    thead { background-color: #f2f2f2 !important; }
+                    th { background-color: #f2f2f2 !important; }
+                    td { vertical-align: top; }
+                </style>
+            </head><body>
+                <div class="print-header">
+                    <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
+                    <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                </div>
+                ${printTableHTML}
+            </body></html>
+        `);
         iframeDoc.close();
         
         setTimeout(() => {
