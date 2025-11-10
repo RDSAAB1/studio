@@ -170,24 +170,42 @@ export const useSupplierData = () => {
             
                 let totalPaidForEntry = 0;
                 let totalCdForEntry = 0;
+                const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string }> = [];
 
                 // Simply sum all amounts directly from database without any calculation or normalization
                 paymentsForThisEntry.forEach(p => {
                     const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
                     if (!paidForThisDetail) return;
-
+                
                     // Direct database value - no calculation
-                    totalPaidForEntry += Number(paidForThisDetail.amount || 0);
+                    const paidAmount = Number(paidForThisDetail.amount || 0);
+                    totalPaidForEntry += paidAmount;
 
-                    // Direct database value for CD - no calculation or proportion
+                    let cdForThisDetail = 0;
                     if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
-                        totalCdForEntry += Number(paidForThisDetail.cdAmount || 0);
+                        cdForThisDetail = Number(paidForThisDetail.cdAmount || 0);
+                    } else if (p.cdAmount && p.paidFor && p.paidFor.length > 0) {
+                        const totalPaidInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                        if (totalPaidInPayment > 0) {
+                            const proportion = paidAmount / totalPaidInPayment;
+                            cdForThisDetail = Math.round((p.cdAmount || 0) * proportion * 100) / 100;
+                        }
                     }
+                    totalCdForEntry += cdForThisDetail;
+
+                    paymentBreakdown.push({
+                        paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
+                        amount: Math.round(paidAmount * 100) / 100,
+                        cdAmount: Math.round(cdForThisDetail * 100) / 100,
+                        receiptType: p.receiptType,
+                        date: p.date,
+                    });
                 });
             
                 // Store direct values (round only for display precision)
                 transaction.totalPaid = Math.round(totalPaidForEntry * 100) / 100;
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
+                (transaction as any).paymentBreakdown = paymentBreakdown;
                 
                 // Outstanding: Original - (Payment + CD)
                 const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;

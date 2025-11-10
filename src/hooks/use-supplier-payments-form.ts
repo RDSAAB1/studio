@@ -92,11 +92,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setPaymentMethod(method);
         if (method === 'Cash') {
             handleSetSelectedAccountId('CashInHand');
+            setSelectedEntryIds(new Set());
+            setSerialNoSearch('');
         } else {
             const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
             const accountExists = safeBankAccounts.some(ba => ba.id === defaultBankId);
             const firstBankId = safeBankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
-            
+
             if (selectedAccountId === 'CashInHand' || method !== paymentMethod) { // Change only if switching or coming from cash
                 if (defaultBankId && defaultBankId !== 'CashInHand' && accountExists) {
                     handleSetSelectedAccountId(defaultBankId);

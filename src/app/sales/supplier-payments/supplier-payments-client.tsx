@@ -130,9 +130,22 @@ export default function SupplierPaymentsClient() {
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-3">
+                        <CardContent className="p-3 space-y-4">
                             {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
-                                <div className="mb-4">
+                                <div className="space-y-4">
+                                    <div className="flex flex-col gap-2">
+                                        <Label className="text-sm font-medium text-muted-foreground">Select Supplier</Label>
+                                        <CustomDropdown
+                                            options={filteredSupplierOptions.map(({ value, data }) => ({
+                                                value,
+                                                label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim()
+                                            }))}
+                                            value={hook.selectedCustomerKey}
+                                            onChange={onSelectSupplierKey}
+                                            placeholder="Search by Name, Father, Address..."
+                                        />
+                                    </div>
+
                                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                                         {/* Serial Number Search */}
                                         <div className="w-full md:w-[200px] relative">
@@ -152,18 +165,7 @@ export default function SupplierPaymentsClient() {
                                                 className="pl-8 h-9"
                                             />
                                         </div>
-                                        
-                                        <div className="flex-1">
-                                            <CustomDropdown
-                                                options={filteredSupplierOptions.map(({ value, data }) => ({
-                                                    value,
-                                                    label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim()
-                                                }))}
-                                                value={hook.selectedCustomerKey}
-                                                onChange={onSelectSupplierKey}
-                                                placeholder="Search by Name, Father, Address..."
-                                            />
-                                        </div>
+
                                         {hook.selectedCustomerKey && (() => {
                                             const summary = supplierSummaryMap.get(hook.selectedCustomerKey);
                                             const totalOutstanding = summary?.totalOutstanding || 0;
@@ -171,9 +173,9 @@ export default function SupplierPaymentsClient() {
                                             const totalPaid = summary?.totalPaid || 0;
                                             const totalCd = summary?.totalCdAmount || 0;
                                             const totalSettlement = totalPaid + totalCd;
-                                            
+
                                             return (
-                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:border-l md:pl-4 w-full md:w-auto">
                                                     <div className="flex flex-wrap items-center gap-4 text-sm">
                                                         <div className="flex items-baseline gap-2">
                                                             <Label className="font-medium text-muted-foreground">Original:</Label>
@@ -202,7 +204,8 @@ export default function SupplierPaymentsClient() {
                                             );
                                         })()}
                                     </div>
-                                     {hook.selectedCustomerKey && (
+
+                                    {hook.selectedCustomerKey && (
                                         <TransactionTable
                                             suppliers={transactionsForSelectedSupplier}
                                             onShowDetails={hook.setDetailsSupplierEntry}

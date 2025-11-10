@@ -24,46 +24,55 @@ import {
   PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database,
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Mail,
   LineChart, ClipboardCheck, Users2, UserPlus, Landmark, Truck,
-  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings
+  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings, BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
   {
-    id: "Main0",
+    id: "MainDashboard",
     name: "Dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
     href: "/sales/dashboard-overview",
   },
   {
-    id: "Main1",
-    name: "Sales",
-    icon: <TrendingUp className="h-5 w-5" />,
-    subMenus: [
-      { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
-      { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
-      { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
-      { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
-    ],
-  },
-  {
-    id: "Main8",
+    id: "MainSupplier",
     name: "Supplier",
     icon: <Truck className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub8-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Sub8-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub8-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
+      { id: "Supplier-Entry", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
+      { id: "Supplier-Payments", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
+      { id: "Supplier-Profile", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
     ],
   },
   {
-    id: "Main9",
+    id: "MainCustomer",
     name: "Customer",
     icon: <Users className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub9-1", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Sub9-2", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub9-3", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
+      { id: "Customer-Entry", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
+      { id: "Customer-Payments", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
+      { id: "Customer-Profile", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
+    ],
+  },
+  {
+    id: "MainReports",
+    name: "Reports",
+    icon: <BarChart3 className="h-5 w-5" />,
+    subMenus: [
+      { id: "Reports-Sales", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
+      { id: "Reports-OrderTracking", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
+      { id: "Reports-ProductCatalog", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
+    ],
+  },
+  {
+    id: "MainCashBank",
+    name: "Cash & Bank",
+    icon: <Landmark className="h-5 w-5" />,
+    subMenus: [
+      { id: "CashBank-Management", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
+      { id: "CashBank-Ledger", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
+      { id: "CashBank-RTGS", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
     ],
   },
   {
@@ -80,6 +89,7 @@ const menuItems = [
     icon: <Landmark className="h-5 w-5" />,
     subMenus: [
       { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
+      { id: "Sub7-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {

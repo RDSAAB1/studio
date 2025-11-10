@@ -760,16 +760,46 @@ export default function SimpleSupplierEntryAllFields() {
                     throw new Error(`Invalid supplier ID: ${targetId}. Cannot update.`);
                 }
             } else {
-                // Add new supplier
-                console.log('ADD MODE: Creating new supplier');
-                const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
-                setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
-                toast({ 
-                    title: "Entry saved successfully!", 
-                    description: `Supplier ${values.name} has been added.`,
-                    variant: "success"
-                });
-                setIsEditing(false);
+                // Determine if supplier already exists by SR No
+                let existingId = await getSupplierIdBySrNo(values.srNo);
+                if (!existingId) {
+                    const existingLocal = await db.suppliers.where('srNo').equals(values.srNo).first();
+                    existingId = existingLocal?.id;
+                }
+
+                if (existingId) {
+                    console.log('ADD MODE detected existing supplier. Updating instead:', existingId);
+                    const success = await updateSupplier(existingId, supplierBase);
+                    if (!success) {
+                        throw new Error('Failed to update existing supplier with matching SR number.');
+                    }
+                    try {
+                        const existingLocal = await db.suppliers.get(existingId);
+                        if (existingLocal) {
+                            await db.suppliers.put({ ...existingLocal, ...supplierBase });
+                        }
+                    } catch (localError) {
+                        console.warn('Failed to update local DB:', localError);
+                    }
+                    setCurrentSupplier({ ...supplierBase, id: existingId } as Customer);
+                    toast({
+                        title: "Entry updated successfully!",
+                        description: `Supplier ${values.name} has been updated.`,
+                        variant: "success"
+                    });
+                    setIsEditing(false);
+                } else {
+                    // Add new supplier
+                    console.log('ADD MODE: Creating new supplier');
+                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
+                    setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
+                    toast({ 
+                        title: "Entry saved successfully!", 
+                        description: `Supplier ${values.name} has been added.`,
+                        variant: "success"
+                    });
+                    setIsEditing(false);
+                }
             }
 
             // Reset form for new entry with next serial number (only if not editing)

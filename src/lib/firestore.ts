@@ -23,7 +23,7 @@ import {
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
 
@@ -47,6 +47,17 @@ const employeesCollection = collection(firestoreDB, "employees");
 const payrollCollection = collection(firestoreDB, 'payroll');
 const inventoryItemsCollection = collection(firestoreDB, 'inventoryItems');
 const expenseTemplatesCollection = collection(firestoreDB, 'expenseTemplates');
+const ledgerAccountsCollection = collection(firestoreDB, 'ledgerAccounts');
+const ledgerEntriesCollection = collection(firestoreDB, 'ledgerEntries');
+const ledgerCashAccountsCollection = collection(firestoreDB, 'ledgerCashAccounts');
+const mandiReportsCollection = collection(firestoreDB, 'mandiReports');
+
+function stripUndefined<T extends Record<string, any>>(data: T): T {
+    const cleanedEntries = Object.entries(data).filter(
+        ([, value]) => value !== undefined
+    );
+    return Object.fromEntries(cleanedEntries) as T;
+}
 
 
 // --- User Refresh Token Functions ---
@@ -1205,4 +1216,249 @@ export async function updateExpenseTemplate(id: string, template: Partial<Expens
 export async function deleteExpenseTemplate(id: string): Promise<void> {
   await deleteDoc(doc(expenseTemplatesCollection, id));
 }
+
+// --- Ledger Accounting Functions ---
+
+export async function fetchLedgerAccounts(): Promise<LedgerAccount[]> {
+    const snapshot = await getDocs(query(ledgerAccountsCollection, orderBy('name')));
+    return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as Record<string, any>;
+        return {
+            id: docSnap.id,
+            name: data.name || '',
+            address: data.address || '',
+            contact: data.contact || '',
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || data.createdAt || '',
+        } as LedgerAccount;
+    });
+}
+
+export async function createLedgerAccount(account: LedgerAccountInput): Promise<LedgerAccount> {
+    const timestamp = new Date().toISOString();
+    const docRef = await addDoc(ledgerAccountsCollection, {
+        name: account.name,
+        address: account.address || '',
+        contact: account.contact || '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    });
+
+    return {
+        id: docRef.id,
+        name: account.name,
+        address: account.address || '',
+        contact: account.contact || '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    };
+}
+
+export async function updateLedgerAccount(id: string, updates: Partial<LedgerAccountInput>): Promise<void> {
+    const docRef = doc(ledgerAccountsCollection, id);
+    await updateDoc(docRef, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+    });
+}
+
+export async function deleteLedgerAccount(id: string): Promise<void> {
+    const batch = writeBatch(firestoreDB);
+    batch.delete(doc(ledgerAccountsCollection, id));
+
+    const entriesSnapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', id)));
+    entriesSnapshot.forEach((entryDoc) => {
+        batch.delete(entryDoc.ref);
+    });
+
+    await batch.commit();
+}
+
+export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
+    const snapshot = await getDocs(query(ledgerCashAccountsCollection, orderBy('name')));
+    return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as Record<string, any>;
+        const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
+        const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
+            acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
+            return acc;
+        }, {});
+
+        return {
+            id: docSnap.id,
+            name: data.name || '',
+            noteGroups: normalizedNoteGroups,
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || data.createdAt || '',
+        };
+    });
+}
+
+export async function createLedgerCashAccount(account: LedgerCashAccountInput): Promise<LedgerCashAccount> {
+    const timestamp = new Date().toISOString();
+    const payload = {
+        name: account.name,
+        noteGroups: account.noteGroups,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    };
+    const docRef = await addDoc(ledgerCashAccountsCollection, payload);
+
+    return {
+        id: docRef.id,
+        ...payload,
+    };
+}
+
+export async function updateLedgerCashAccount(id: string, updates: Partial<LedgerCashAccountInput>): Promise<void> {
+    const docRef = doc(ledgerCashAccountsCollection, id);
+    const payload = stripUndefined({
+        ...updates,
+        updatedAt: new Date().toISOString(),
+    });
+    await updateDoc(docRef, payload);
+}
+
+export async function deleteLedgerCashAccount(id: string): Promise<void> {
+    await deleteDoc(doc(ledgerCashAccountsCollection, id));
+}
+
+export async function fetchLedgerEntries(accountId: string): Promise<LedgerEntry[]> {
+    const snapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', accountId), orderBy('createdAt')));
+    return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as Record<string, any>;
+        return {
+            id: docSnap.id,
+            accountId: data.accountId,
+            date: data.date,
+            particulars: data.particulars,
+            debit: Number(data.debit) || 0,
+            credit: Number(data.credit) || 0,
+            balance: Number(data.balance) || 0,
+            remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || data.createdAt || '',
+            linkGroupId: data.linkGroupId || undefined,
+            linkStrategy: data.linkStrategy || undefined,
+        } as LedgerEntry;
+    });
+}
+
+export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {
+    const timestamp = new Date().toISOString();
+    const normalizedRemarks = typeof entry.remarks === 'string' ? entry.remarks : '';
+    const docRef = await addDoc(ledgerEntriesCollection, {
+        accountId: entry.accountId,
+        date: entry.date,
+        particulars: entry.particulars,
+        debit: entry.debit,
+        credit: entry.credit,
+        balance: entry.balance,
+        remarks: normalizedRemarks,
+        linkGroupId: entry.linkGroupId || null,
+        linkStrategy: entry.linkStrategy || null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    });
+
+    return {
+        id: docRef.id,
+        accountId: entry.accountId,
+        date: entry.date,
+        particulars: entry.particulars,
+        debit: entry.debit,
+        credit: entry.credit,
+        balance: entry.balance,
+        remarks: normalizedRemarks || undefined,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        linkGroupId: entry.linkGroupId,
+        linkStrategy: entry.linkStrategy || undefined,
+    };
+}
+
+export async function updateLedgerEntriesBatch(entries: LedgerEntry[]): Promise<void> {
+    if (!entries.length) return;
+    const batch = writeBatch(firestoreDB);
+    const timestamp = new Date().toISOString();
+
+    entries.forEach((entry) => {
+        const entryRef = doc(ledgerEntriesCollection, entry.id);
+        batch.set(
+            entryRef,
+            {
+                ...entry,
+                updatedAt: timestamp,
+                linkGroupId: entry.linkGroupId || null,
+                linkStrategy: entry.linkStrategy || null,
+                remarks: typeof entry.remarks === 'string' ? entry.remarks : '',
+            },
+            { merge: true }
+        );
+    });
+
+    await batch.commit();
+}
+
+export async function deleteLedgerEntry(id: string): Promise<void> {
+    const entryRef = doc(ledgerEntriesCollection, id);
+    await deleteDoc(entryRef);
+}
     
+
+// --- Mandi Report Functions ---
+
+export async function addMandiReport(report: MandiReport): Promise<MandiReport> {
+    if (!report.id) {
+        throw new Error("MandiReport requires a valid id");
+    }
+    const timestamp = new Date().toISOString();
+    const payload = stripUndefined<MandiReport>({
+        ...report,
+        createdAt: report.createdAt || timestamp,
+        updatedAt: timestamp,
+    });
+    const docRef = doc(mandiReportsCollection, payload.id);
+    await setDoc(docRef, payload, { merge: true });
+    if (db) {
+        await db.mandiReports.put(payload);
+    }
+    return payload;
+}
+
+export async function updateMandiReport(id: string, updates: Partial<MandiReport>): Promise<void> {
+    if (!id) {
+        throw new Error("updateMandiReport requires an id");
+    }
+    const docRef = doc(mandiReportsCollection, id);
+    const updatePayload = stripUndefined<Partial<MandiReport>>({
+        ...updates,
+        updatedAt: new Date().toISOString(),
+    });
+    await setDoc(docRef, updatePayload, { merge: true });
+    if (db) {
+        const existing = await db.mandiReports.get(id);
+        await db.mandiReports.put({ ...(existing || { id }), ...updates, updatedAt: updatePayload.updatedAt });
+    }
+}
+
+export async function deleteMandiReport(id: string): Promise<void> {
+    if (!id) return;
+    const docRef = doc(mandiReportsCollection, id);
+    await deleteDoc(docRef);
+    if (db) {
+        await db.mandiReports.delete(id);
+    }
+}
+
+export async function fetchMandiReports(): Promise<MandiReport[]> {
+    const snapshot = await getDocs(query(mandiReportsCollection, orderBy("purchaseDate", "desc")));
+    const reports = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as MandiReport;
+        return { ...data, id: data.id || docSnap.id };
+    });
+    if (db && reports.length) {
+        await db.mandiReports.bulkPut(reports);
+    }
+    return reports;
+}

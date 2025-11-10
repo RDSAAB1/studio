@@ -13,6 +13,7 @@ import { useSupplierData } from './use-supplier-data';
 import { toTitleCase } from "@/lib/utils";
 import { addBank } from '@/lib/firestore';
 import type { Customer } from "@/lib/definitions";
+import { levenshteinDistance } from '@/lib/utils';
 
 
 export const useSupplierPayments = () => {
@@ -86,31 +87,10 @@ export const useSupplierPayments = () => {
                     }
                 });
 
-                // TEMPORARY REVERSAL: Add back the payment being edited to allow higher payment
-                const editingPaymentForThisEntry = editingPayment.paidFor?.find(pf => pf.srNo === entry.srNo);
-                const editingPaymentAmount = editingPaymentForThisEntry ? editingPaymentForThisEntry.amount : 0;
-                
-                // Get CD amount for this entry from editing payment
-                let editingPaymentCDForThisEntry = 0;
-                if (editingPaymentForThisEntry && 'cdAmount' in editingPaymentForThisEntry && editingPaymentForThisEntry.cdAmount !== undefined && editingPaymentForThisEntry.cdAmount !== null) {
-                    // New format: CD amount directly stored in paidFor
-                    editingPaymentCDForThisEntry = Number(editingPaymentForThisEntry.cdAmount || 0);
-                } else if (editingPayment.cdAmount && editingPayment.paidFor && editingPayment.paidFor.length > 0) {
-                    // Old format: Calculate proportionally
-                    const totalEditingPaymentAmount = editingPayment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                    if (totalEditingPaymentAmount > 0) {
-                        const proportion = editingPaymentAmount / totalEditingPaymentAmount;
-                        editingPaymentCDForThisEntry = Math.round(editingPayment.cdAmount * proportion * 100) / 100;
-                    }
-                }
-
                 // Calculate outstanding using SAME formula as use-supplier-summary
                 // Outstanding = Original - (Total Paid + Total CD)
-                // Add back editing payment temporarily
                 const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-                const outstandingWithReversal = currentOutstanding + editingPaymentAmount + editingPaymentCDForThisEntry;
-
-                return sum + Math.max(0, outstandingWithReversal);
+                return sum + Math.max(0, currentOutstanding);
             }, 0);
         }
         
@@ -158,6 +138,56 @@ export const useSupplierPayments = () => {
 
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
+    const supplierIdToProfileKey = useMemo(() => {
+        const map = new Map<string, string>();
+        data.customerSummaryMap.forEach((summary: any, key: string) => {
+            const supplierIds: string[] = Array.isArray(summary?.supplierIds) ? summary.supplierIds : [];
+            if (supplierIds.length) {
+                supplierIds.forEach((id) => {
+                    if (id) {
+                        map.set(id, key);
+                    }
+                });
+            }
+        });
+        return map;
+    }, [data.customerSummaryMap]);
+
+    const fuzzyProfileMatcher = useCallback(
+        (targetName: string, targetFatherName: string) => {
+            const target = toTitleCase(targetName || "").trim();
+            const targetFather = toTitleCase(targetFatherName || "").trim();
+
+            let bestKey: string | null = null;
+            let bestScore = Infinity;
+
+            data.customerSummaryMap.forEach((summary: any, key: string) => {
+                const summaryName = toTitleCase(summary?.name || "").trim();
+                if (!summaryName) return;
+
+                const summaryFather = toTitleCase(summary?.so || "").trim();
+
+                const nameDistance = levenshteinDistance(target.toLowerCase(), summaryName.toLowerCase());
+                const fatherDistance = targetFather && summaryFather
+                    ? levenshteinDistance(targetFather.toLowerCase(), summaryFather.toLowerCase())
+                    : 0;
+
+                const score = nameDistance + fatherDistance;
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestKey = key;
+                }
+            });
+
+            // Accept result only if reasonably close (allow minor typos)
+            if (bestKey === null) return null;
+            if (bestScore === 0) return bestKey;
+            if (target.length <= 3 && bestScore <= 1) return bestKey;
+            if (bestScore <= Math.max(2, Math.floor(target.length * 0.25))) return bestKey;
+            return null;
+        },
+        [data.customerSummaryMap]
+    );
 
     // Use useMemo to derive values instead of useState to avoid infinite loops
     const settleAmountDerived = useMemo(() => {
@@ -196,20 +226,20 @@ export const useSupplierPayments = () => {
         editingPayment: form.editingPayment, // Pass editing payment to exclude from CD calculations
     });
     
-    // To Be Paid amount is the actual payment amount (CD is NOT deducted from it)
-    // For Full payment: To Be Paid = settleAmount (outstanding amount)
+    // To Be Paid amount is the actual payment amount that will be transferred
+    // For Full payment: To Be Paid = settleAmount - CD (cash matches settlement minus discount)
     // For Partial payment: To Be Paid = toBePaidAmountManual (user entered amount)
-    // CD is separate and added to To Be Paid to get Total Settled amount
+    // Total settlement = To Be Paid + CD
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-            // For Full payment: To Be Paid = settleAmount (outstanding amount)
-            // CD is NOT deducted from To Be Paid - it's separate
-            return Math.max(0, settleAmount);
+            // For Full payment: actual cash paid = settle amount - CD
+            const adjustedToBePaid = settleAmount - calculatedCdAmount;
+            return Math.max(0, Math.round(adjustedToBePaid * 100) / 100);
         }
         // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)
         // Settle Amount = toBePaidAmount + CD (handled separately in useEffect)
-        return toBePaidAmountManual;
-    }, [form.paymentType, settleAmount, toBePaidAmountManual]);
+        return Math.max(0, Math.round(toBePaidAmountManual * 100) / 100);
+    }, [form.paymentType, settleAmount, calculatedCdAmount, toBePaidAmountManual]);
     
     // Use finalToBePaid as the actual toBePaidAmount
     const toBePaidAmount = finalToBePaid;
@@ -398,16 +428,18 @@ export const useSupplierPayments = () => {
             if (!originalEntry) {
                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
             }
-    
-            const profileKey = Array.from(data.customerSummaryMap.keys()).find(key => {
-                const summary = data.customerSummaryMap.get(key);
-                return toTitleCase(summary?.name || '') === toTitleCase(originalEntry.name) && toTitleCase(summary?.so || '') === toTitleCase(originalEntry.so);
-            });
-    
+
+            const profileKeyFromId = originalEntry.id ? supplierIdToProfileKey.get(originalEntry.id) : null;
+            let profileKey = profileKeyFromId;
+
+            if (!profileKey) {
+                profileKey = fuzzyProfileMatcher(originalEntry.name, originalEntry.so || "");
+            }
+
             if (!profileKey) {
                 throw new Error(`Could not find a matching supplier profile for ${originalEntry.name}.`);
             }
-            
+
             form.setSelectedCustomerKey(profileKey);
     
             const paidForIds = data.suppliers

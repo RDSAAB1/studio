@@ -32,6 +32,7 @@ import {
   FileText,
   Settings,
   Upload,
+  FileSpreadsheet,
   List,
   Printer,
   AreaChart,
@@ -44,6 +45,7 @@ import {
   UserCheck,
   Wrench,
   Search,
+  BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -69,6 +71,7 @@ export const allMenuItems: MenuItem[] = [
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
       { id: "sales/supplier-profile", name: "Supplier Profile", icon: UserCircle },
+      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen },
     ],
   },
     {
@@ -105,6 +108,7 @@ export const allMenuItems: MenuItem[] = [
         { id: "sales/rtgs-report/negative-balance", name: "RTGS Negative", icon: Banknote },
         { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
         { id: "sales/6r-report", name: "6R Report", icon: FileText },
+        { id: "tools/voucher-import", name: "Mandi Report Import", icon: FileSpreadsheet },
     ]
   },
   {

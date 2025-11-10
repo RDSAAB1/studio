@@ -433,6 +433,40 @@ const handleDelete = async (id: string) => {
         forceUnique: isForcedUnique,
     };
 
+    const dirtyFields = form.formState.dirtyFields as Partial<Record<keyof FormValues, any>>;
+    const isFieldDirty = (field: keyof FormValues) => {
+        const dirty = dirtyFields?.[field];
+        if (!dirty) return false;
+        if (typeof dirty === 'boolean') return dirty;
+        if (typeof dirty === 'object') return Object.values(dirty as any).some(Boolean);
+        return false;
+    };
+
+    const bulkPatch: Partial<Customer> = {};
+    if (isFieldDirty('name')) bulkPatch.name = completeEntry.name;
+    if (isFieldDirty('so')) bulkPatch.so = completeEntry.so;
+    if (isFieldDirty('address')) bulkPatch.address = completeEntry.address;
+    if (isFieldDirty('contact')) bulkPatch.contact = completeEntry.contact;
+    if (isFieldDirty('vehicleNo')) bulkPatch.vehicleNo = completeEntry.vehicleNo;
+    if (isFieldDirty('variety')) bulkPatch.variety = completeEntry.variety;
+    if (isFieldDirty('paymentType')) bulkPatch.paymentType = completeEntry.paymentType;
+    if (isFieldDirty('term')) {
+        bulkPatch.term = completeEntry.term;
+        bulkPatch.dueDate = completeEntry.dueDate;
+    }
+    if (isFieldDirty('date')) {
+        bulkPatch.date = completeEntry.date;
+        if (!isFieldDirty('term')) {
+            const termDays = Number(values.term || currentSupplier.term || 0) || 0;
+            const baseDate = new Date(values.date);
+            const dueDate = new Date(baseDate.getTime() + termDays * 24 * 60 * 60 * 1000);
+            bulkPatch.dueDate = format(dueDate, 'yyyy-MM-dd');
+        }
+    }
+    if (bulkPatch.name || bulkPatch.so || bulkPatch.address || bulkPatch.contact) {
+        bulkPatch.customerId = completeEntry.customerId;
+    }
+
 
     try {
         if (isEditing && currentSupplier.id) {
@@ -451,6 +485,9 @@ const handleDelete = async (id: string) => {
                 if (success) {
                     if (callback) callback(updatedEntry);
                     toast({ title: "Entry updated and payments deleted successfully.", variant: "success" });
+                    if (selectedSupplierIds.size > 0 && Object.keys(bulkPatch).length > 0) {
+                        await applyBulkUpdates(bulkPatch, currentSupplier.id);
+                    }
                 } else {
                     throw new Error('Failed to update supplier');
                 }
@@ -460,6 +497,9 @@ const handleDelete = async (id: string) => {
                 if (success) {
                     if (callback) callback(completeEntry);
                     toast({ title: "Entry updated successfully.", variant: "success" });
+                    if (selectedSupplierIds.size > 0 && Object.keys(bulkPatch).length > 0) {
+                        await applyBulkUpdates(bulkPatch, currentSupplier.id);
+                    }
                 } else {
                     throw new Error('Failed to update supplier');
                 }
@@ -771,6 +811,39 @@ const handleDelete = async (id: string) => {
           document.removeEventListener('keydown', handleKeyboardShortcuts);
       };
   }, [handleKeyboardShortcuts]);
+
+  const applyBulkUpdates = useCallback(
+    async (patch: Partial<Customer>, skipId?: string) => {
+      if (!patch || Object.keys(patch).length === 0) return;
+      const idsToUpdate = Array.from(selectedSupplierIds).filter((id) => id && id !== skipId);
+      if (!idsToUpdate.length) return;
+
+      let updatedCount = 0;
+      for (const id of idsToUpdate) {
+        try {
+          const existing = safeSuppliers.find((supplier) => supplier.id === id) || (await db.suppliers.get(id));
+          if (!existing) continue;
+          const payload: Customer = { ...existing, ...patch } as Customer;
+          const success = await updateSupplier(id, payload);
+          if (success) {
+            await db.suppliers.put(payload);
+            updatedCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to bulk update supplier ${id}:`, error);
+        }
+      }
+
+      if (updatedCount) {
+        toast({
+          title: "Bulk update applied",
+          description: `${updatedCount} selected entries updated successfully.`,
+          variant: "success",
+        });
+      }
+    },
+    [selectedSupplierIds, safeSuppliers, toast]
+  );
 
 
   if (!isClient) {

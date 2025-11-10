@@ -201,6 +201,47 @@ export type CustomerPayment = {
 
 export type Payment = SupplierPayment;
 
+export type MandiReport = {
+    id: string;
+    voucherNo: string;
+    bookNo?: string;
+    purchaseDate?: string;
+    sellerName: string;
+    fatherName?: string;
+    district?: string;
+    tehsil?: string;
+    village?: string;
+    khasraNo?: string;
+    khasraArea?: string;
+    mobile?: string;
+    commodity?: string;
+    quantityQtl?: number;
+    ratePerQtl?: number;
+    grossAmount?: number;
+    netAmount?: number;
+    mandiFee?: number;
+    developmentCess?: number;
+    totalCharges?: number;
+    paymentAmount?: number;
+    paymentDate?: string;
+    paymentMode?: string;
+    bankAccount?: string;
+    ifsc?: string;
+    bankName?: string;
+    bankBranch?: string;
+    transactionNumber?: string;
+    traderReceiptNo?: string;
+    traderName?: string;
+    buyerFirm?: string;
+    buyerLicense?: string;
+    mandiName?: string;
+    mandiSiteType?: string;
+    mandiSiteName?: string;
+    narration?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
 export type CustomerSummary = {
     name: string;
     contact: string;
@@ -287,16 +328,56 @@ export type Order = {
 };
 
 export type InventoryItem = {
-    id?: string;
-    name: string;
+    id: string;
     sku: string;
-    stock: number;
-    unit: string;
-    purchasePrice: number;
-    sellingPrice: number;
-    createdAt?: string;
-    isDeleted?: boolean;
+    name: string;
+    description?: string;
+    quantity: number;
+    unit?: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    supplierId?: string;
+    category?: string;
 };
+
+export type LedgerAccount = {
+  id: string;
+  name: string;
+  address?: string;
+  contact?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LedgerEntry = {
+  id: string;
+  accountId: string;
+  date: string;
+  particulars: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+  linkGroupId?: string;
+  linkStrategy?: "mirror" | "same";
+};
+
+export type LedgerAccountInput = Omit<LedgerAccount, "id" | "createdAt" | "updatedAt">;
+export type LedgerEntryInput = Omit<LedgerEntry, "id" | "createdAt" | "updatedAt" | "balance"> & {
+  balance?: number;
+};
+
+export type LedgerCashAccount = {
+  id: string;
+  name: string;
+  noteGroups: Record<string, number[]>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LedgerCashAccountInput = Omit<LedgerCashAccount, "id" | "createdAt" | "updatedAt">;
 
 export type PurchaseOrder = {
   id: string;

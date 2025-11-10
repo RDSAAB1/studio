@@ -1,4 +1,3 @@
-
 'use client';
 
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference, WriteBatch } from 'firebase/firestore';
@@ -161,6 +160,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 // Calculate total paid and CD using SAME logic as use-supplier-summary
                 let totalPaidForEntry = 0;
                 let totalCdForEntry = 0;
+                let totalPaidWithoutCdForEntry = 0;
                 
                 allPaymentsForEntry.forEach((payment, idx) => {
                     const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === entry.srNo);
@@ -184,6 +184,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             }
                         }
                         
+                        // Track amount paid without CD for this entry
+                        if (cdAmount <= 0.01) {
+                            totalPaidWithoutCdForEntry += paidAmount;
+                        }
+                        
                         console.log(`STEP 1 - Payment ${idx + 1} for ${entry.srNo}:`, {
                             paymentId: payment.paymentId,
                             paidAmount,
@@ -205,7 +210,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         
                         // Get CD amount for this entry from editing payment
                         if ('cdAmount' in previousPaidFor && previousPaidFor.cdAmount !== undefined && previousPaidFor.cdAmount !== null) {
-                            previousCdAmount = Number(previousPaidFor.cdAmount || 0);
+                    previousCdAmount = Number(previousPaidFor.cdAmount || 0);
                         } else if (editingPayment.cdAmount && editingPayment.paidFor && editingPayment.paidFor.length > 0) {
                             // Old format: Calculate proportionally
                             const totalEditingPaymentAmount = editingPayment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
@@ -213,6 +218,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 const proportion = previousPaidAmount / totalEditingPaymentAmount;
                                 previousCdAmount = Math.round(editingPayment.cdAmount * proportion * 100) / 100;
                             }
+                        }
+                        
+                        if (previousCdAmount <= 0.01) {
+                            totalPaidWithoutCdForEntry += previousPaidAmount;
                         }
                         
                         console.log(`STEP 1 - Editing payment for ${entry.srNo}:`, {
@@ -263,6 +272,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     originalAmount: originalAmount,
                     totalPaidForEntry: totalPaidForEntry,
                     totalCdForEntry: totalCdForEntry,
+                    totalPaidWithoutCd: Math.max(0, Math.round(totalPaidWithoutCdForEntry * 100) / 100),
                     currentOutstanding: currentOutstanding,
                     previousPaidAmount: previousPaidAmount,
                     previousCdAmount: previousCdAmount,
@@ -280,7 +290,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     entry, 
                     outstanding: originalOutstanding, // Current outstanding (will be updated after CD allocation)
                     originalOutstanding: originalOutstanding, // Keep original for reference (this is the capacity)
-                    originalAmount: originalAmount // Original net amount from database
+                    originalAmount: originalAmount, // Original net amount from database
+                    totalPaidForEntry,
+                    totalCdForEntry,
+                    totalPaidWithoutCd: Math.max(0, Math.round(totalPaidWithoutCdForEntry * 100) / 100)
                 };
             });
             
@@ -371,8 +384,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 if (entriesToUse.length > 0) {
                     // Determine CD distribution method based on cdAt mode
                     const useOriginalAmountForDistribution = cdAt === 'on_full_amount' || cdAt === 'proportional_cd';
-                    
-                    if (useOriginalAmountForDistribution) {
+                
+                if (useOriginalAmountForDistribution) {
                         // Mode: on_full_amount or proportional_cd
                         // CD distributed proportionally based on ORIGINAL AMOUNT (not current outstanding)
                         // IMPORTANT: CD is calculated on original amount, but cannot exceed current outstanding
@@ -447,7 +460,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 // Sort entries by outstanding (descending) to fill purchases with most capacity first
                                 const sortedEntriesForRedistribution = [...entriesToUse]
                                     .filter(eo => {
-                                        const previousCd = totalCdReceivedByEntry[eo.entry.srNo] || 0;
+                        const previousCd = totalCdReceivedByEntry[eo.entry.srNo] || 0;
                                         if (eligibleEntries.length > 0 && previousCd > 0) {
                                             return false; // Skip entries with previous CD
                                         }
@@ -490,11 +503,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             
                             // Final check: Handle any remaining rounding difference
                             let roundingDiff = cdToDistribute - totalAllocated;
-                            if (Math.abs(roundingDiff) >= 0.01) {
+                    if (Math.abs(roundingDiff) >= 0.01) {
                                 // Sort by outstanding (descending) to adjust rounding
                                 const sortedEntries = [...entriesToUse].sort((a, b) => b.outstanding - a.outstanding);
                                 for (const eo of sortedEntries) {
-                                    if (Math.abs(roundingDiff) < 0.01) break;
+                            if (Math.abs(roundingDiff) < 0.01) break;
                                     const currentCd = cdAllocations[eo.entry.srNo] || 0;
                                     // CRITICAL: Max allowed = Outstanding - Current CD (to prevent negative outstanding)
                                     const maxAllowed = Math.max(0, eo.outstanding - currentCd);
@@ -506,7 +519,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         const outstandingAfterAdjustment = eo.outstanding - newCd;
                                         if (outstandingAfterAdjustment >= -0.01) {
                                             cdAllocations[eo.entry.srNo] = newCd;
-                                            roundingDiff -= adjustment;
+                                    roundingDiff -= adjustment;
                                         } else {
                                             // Adjust to maximum allowed (outstanding)
                                             cdAllocations[eo.entry.srNo] = Math.max(0, eo.outstanding);
@@ -527,8 +540,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                     outstanding: entriesToUse.find(eo => eo.entry.srNo === srNo)?.outstanding || 0
                                 }))
                             });
-                        }
-                    } else {
+                    }
+                } else {
                         // Mode: partial_on_paid or on_unpaid_amount
                         // CD distributed based on outstanding or paid amount
                         let totalBaseAmount = 0;
@@ -554,6 +567,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 }
                                 return sum + eo.outstanding;
                             }, 0);
+                        } else if (cdAt === 'on_previously_paid_no_cd') {
+                            totalBaseAmount = entriesToUse.reduce((sum, eo) => {
+                                const previousCd = totalCdReceivedByEntry[eo.entry.srNo] || 0;
+                                if (eligibleEntries.length > 0 && previousCd > 0) {
+                                    return sum;
+                                }
+                                const paidWithoutCd = eo.totalPaidWithoutCd || 0;
+                                return paidWithoutCd > 0 ? sum + paidWithoutCd : sum;
+                            }, 0);
                         }
                         
                         if (totalBaseAmount > 0) {
@@ -573,6 +595,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 } else if (cdAt === 'partial_on_paid') {
                                     // Will recalculate after payment distribution
                                     baseAmount = eo.outstanding; // Temporary
+                                } else if (cdAt === 'on_previously_paid_no_cd') {
+                                    baseAmount = eo.totalPaidWithoutCd || 0;
                                 }
                                 
                                 if (baseAmount > 0 && eo.outstanding > 0) {
@@ -872,7 +896,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     // Get eligible entries (those without previous CD)
                     // IMPORTANT: Use actual paid amount (pf.amount), not settle amount
                     const eligiblePaidFor = paidForDetails.filter(pf => {
-                        const previousCd = totalCdReceivedByEntry[pf.srNo] || 0;
+                    const previousCd = totalCdReceivedByEntry[pf.srNo] || 0;
                         // Only entries with actual payment amount > 0 (not settle amount)
                         return previousCd === 0 && pf.amount > 0;
                     });
@@ -1093,8 +1117,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         if (remainingToRedistribute > 0.01) {
                                             console.warn(`Finalize - Iteration ${iteration}: Could not redistribute all amount from ${paidFor.srNo}. Remaining: ${remainingToRedistribute}. This means total paid amount will be less than intended.`);
                                         }
-                                    }
-                                } else {
+                            }
+                        } else {
                                     // This purchase is valid (won't go negative)
                                     recalculatedCd[paidFor.srNo] = proposedCd;
                                 }
