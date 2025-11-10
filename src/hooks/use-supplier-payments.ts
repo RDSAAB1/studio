@@ -214,7 +214,7 @@ export const useSupplierPayments = () => {
     // For Full payments, use settleAmount
     const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountManual : settleAmount;
 
-    const { calculatedCdAmount, ...cdProps } = useCashDiscount({
+    const { calculatedCdAmount, setCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
         settleAmount: settleAmount,
@@ -334,18 +334,12 @@ export const useSupplierPayments = () => {
             
             setPaymentType(paymentData.type);
             
-            const isCdApplied = !!paymentData.cdApplied;
+            const isCdApplied = !!paymentData.cdApplied && Number(paymentData.cdAmount) > 0;
             cdProps.setCdEnabled(isCdApplied);
-            if (isCdApplied && paymentData.cdAmount) {
-                const totalPaidAmount = paymentData.amount + paymentData.cdAmount;
-                if(totalPaidAmount > 0) {
-                     cdProps.setCdPercent(Number(((paymentData.cdAmount / totalPaidAmount) * 100).toFixed(2)));
-                } else {
-                    cdProps.setCdPercent(0);
-                }
+            if (isCdApplied) {
+                setCdAmount(Number(paymentData.cdAmount) || 0);
             } else {
-                 cdProps.setCdEnabled(false);
-                 cdProps.setCdPercent(0);
+                setCdAmount(0);
             }
 
             handleToBePaidChange(paymentData.amount);
@@ -561,6 +555,7 @@ export const useSupplierPayments = () => {
         ...form,
         ...cdProps,
         calculatedCdAmount,
+        setCdAmount,
         finalAmountToBePaid: finalToBePaid,
         settleAmount, handleSettleAmountChange,
         handleToBePaidChange,

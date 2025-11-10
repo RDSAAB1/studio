@@ -4,6 +4,14 @@ import { toTitleCase } from "@/lib/utils";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
+const toNumber = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const useSupplierSummary = (
   suppliers: Supplier[],
   paymentHistory: Payment[],
@@ -166,17 +174,17 @@ export const useSupplierSummary = (
       }, 0);
       
       // Merge all suppliers in the group with proper payment calculations
-      const totalOriginalAmount = groupSuppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
-      const totalCdAmount = groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0);
+      const totalOriginalAmount = groupSuppliers.reduce((sum, s) => sum + toNumber(s.originalNetAmount), 0);
+      const totalCdAmount = groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalCdForEntry), 0);
       
       // IMPORTANT: Use totalPaid (from paidFor.amount) for outstanding calculation, not totalCashPaid + totalRtgsPaid
       // totalPaid is calculated from totalPaidForEntry which uses paidFor.amount (correct)
       // totalCashPaid and totalRtgsPaid are for display/tracking only
-      const totalPaid = groupSuppliers.reduce((sum, s) => sum + s.totalPaidForEntry, 0);
+      const totalPaid = groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalPaidForEntry), 0);
       
       const mergedData: CustomerSummary = {
         ...firstSupplier,
-        totalAmount: groupSuppliers.reduce((sum, s) => sum + (s.amount || 0), 0),
+        totalAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.amount), 0),
         totalOriginalAmount,
         // Use totalPaidForEntry which includes all payment types (cash, rtgs, etc.)
         totalPaid: totalPaid,
@@ -195,16 +203,16 @@ export const useSupplierSummary = (
           acc[variety] = (acc[variety] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
-        totalGrossWeight: groupSuppliers.reduce((sum, s) => sum + (s.grossWeight || 0), 0),
-        totalTeirWeight: groupSuppliers.reduce((sum, s) => sum + (s.teirWeight || 0), 0),
-        totalFinalWeight: groupSuppliers.reduce((sum, s) => sum + (s.weight || 0), 0),
-        totalKartaWeight: groupSuppliers.reduce((sum, s) => sum + (s.kartaWeight || 0), 0),
-        totalNetWeight: groupSuppliers.reduce((sum, s) => sum + (s.netWeight || 0), 0),
-        totalKartaAmount: groupSuppliers.reduce((sum, s) => sum + (s.kartaAmount || 0), 0),
-        totalLabouryAmount: groupSuppliers.reduce((sum, s) => sum + (s.labouryAmount || 0), 0),
-        totalKanta: groupSuppliers.reduce((sum, s) => sum + (s.kanta || 0), 0),
-        totalOtherCharges: groupSuppliers.reduce((sum, s) => sum + (s.otherCharges || 0), 0),
-        totalDeductions: groupSuppliers.reduce((sum, s) => sum + (s.deductions || 0), 0),
+        totalGrossWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.grossWeight), 0),
+        totalTeirWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.teirWeight), 0),
+        totalFinalWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.weight), 0),
+        totalKartaWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kartaWeight), 0),
+        totalNetWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.netWeight), 0),
+        totalKartaAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kartaAmount), 0),
+        totalLabouryAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.labouryAmount), 0),
+        totalKanta: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kanta), 0),
+        totalOtherCharges: groupSuppliers.reduce((sum, s) => sum + toNumber(s.otherCharges), 0),
+        totalDeductions: groupSuppliers.reduce((sum, s) => sum + toNumber(s.deductions), 0),
         averageRate: 0, // Will be calculated below
         minRate: 0, // Will be calculated below
         maxRate: 0, // Will be calculated below
@@ -215,20 +223,20 @@ export const useSupplierSummary = (
         totalOutstandingTransactions: groupSuppliers.filter(s => s.outstandingForEntry > 0).length,
         totalBrokerage: groupSuppliers.reduce((sum, s) => {
             // Use brokerageAmount if available, otherwise calculate from brokerageRate * netWeight
-            let brokerageAmount = s.brokerageAmount || 0;
+            let brokerageAmount = toNumber(s.brokerageAmount);
             if (!brokerageAmount && s.brokerageRate && s.netWeight) {
-                brokerageAmount = Math.round(Number(s.brokerageRate || 0) * Number(s.netWeight || 0) * 100) / 100;
+                brokerageAmount = Math.round(toNumber(s.brokerageRate) * toNumber(s.netWeight) * 100) / 100;
             }
             const signedBrokerage = (s.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
             return sum + signedBrokerage;
         }, 0),
-        totalCd: groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0),
+        totalCd: groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalCdForEntry), 0),
       };
 
       // Calculate averages and rates
       const totalWeightedRate = groupSuppliers.reduce((sum, s) => {
-        const rate = Number(s.rate) || 0;
-        const netWeight = Number(s.netWeight) || 0;
+        const rate = toNumber(s.rate);
+        const netWeight = toNumber(s.netWeight);
         return sum + rate * netWeight;
       }, 0);
 
@@ -236,14 +244,15 @@ export const useSupplierSummary = (
       mergedData.averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
       mergedData.averageOriginalPrice = safeNetWeight > 0 ? mergedData.totalOriginalAmount / safeNetWeight : 0;
       
-      const allValidRates = groupSuppliers.map(s => s.rate).filter(rate => rate > 0);
+      const allValidRates = groupSuppliers.map(s => toNumber(s.rate)).filter(rate => rate > 0);
       mergedData.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
       mergedData.maxRate = allValidRates.length > 0 ? Math.max(...allValidRates) : 0;
 
       const totalRateData = groupSuppliers.reduce((acc, s) => {
-        if(s.rate > 0) {
-          acc.karta += s.kartaPercentage;
-          acc.laboury += s.labouryRate;
+        const rate = toNumber(s.rate);
+        if(rate > 0) {
+          acc.karta += toNumber(s.kartaPercentage);
+          acc.laboury += toNumber(s.labouryRate);
           acc.count++;
         }
         return acc;
@@ -316,8 +325,8 @@ export const useSupplierSummary = (
 
     // Calculate averages and min/max for mill overview
     const millWeightedRate = millSummary.allTransactions.reduce((sum, s) => {
-      const rate = Number(s.rate) || 0;
-      const netWeight = Number(s.netWeight) || 0;
+      const rate = toNumber(s.rate);
+      const netWeight = toNumber(s.netWeight);
       return sum + rate * netWeight;
     }, 0);
 
@@ -325,14 +334,15 @@ export const useSupplierSummary = (
     millSummary.averageRate = millNetWeight > 0 ? millWeightedRate / millNetWeight : 0;
     millSummary.averageOriginalPrice = millNetWeight > 0 ? millSummary.totalOriginalAmount / millNetWeight : 0;
     
-    const allValidRates = millSummary.allTransactions.map(s => s.rate).filter(rate => rate > 0);
+    const allValidRates = millSummary.allTransactions.map(s => toNumber(s.rate)).filter(rate => rate > 0);
     millSummary.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
     millSummary.maxRate = allValidRates.length > 0 ? Math.max(...allValidRates) : 0;
 
     const totalRateData = millSummary.allTransactions.reduce((acc, s) => {
-      if(s.rate > 0) {
-        acc.karta += s.kartaPercentage;
-        acc.laboury += s.labouryRate;
+      const rate = toNumber(s.rate);
+      if(rate > 0) {
+        acc.karta += toNumber(s.kartaPercentage);
+        acc.laboury += toNumber(s.labouryRate);
         acc.count++;
       }
       return acc;

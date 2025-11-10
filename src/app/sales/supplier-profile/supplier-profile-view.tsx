@@ -49,6 +49,14 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
+const SummaryTile = ({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) => (
+    <div className="rounded-md border border-muted-foreground/10 bg-background p-3 shadow-sm">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className={cn("mt-2 text-lg font-bold text-foreground", tone)}>{value}</p>
+        {hint && <p className="mt-1 text-[11px] text-muted-foreground/80">{hint}</p>}
+    </div>
+);
+
 const TransactionTable = ({ transactions, onShowDetails }: { transactions: Supplier[], onShowDetails: (supplier: Supplier) => void }) => (
     <ScrollArea className="h-[14rem]">
         <div className="overflow-x-auto">
@@ -154,8 +162,25 @@ export const SupplierProfileView = ({
         )
     }
 
-    const formatRate = (value: number | null | undefined) => {
-        const numericValue = Number(value) || 0;
+    const toNumber = (value: number | string | null | undefined) => {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? numericValue : 0;
+    };
+
+    const formatDecimal = (value: number | string | null | undefined) => {
+        return toNumber(value).toFixed(2);
+    };
+
+    const formatWeight = (value: number | string | null | undefined) => {
+        return `${formatDecimal(value)} kg`;
+    };
+
+    const formatPercentage = (value: number | string | null | undefined) => {
+        return `${formatDecimal(value)}%`;
+    };
+
+    const formatRate = (value: number | string | null | undefined) => {
+        const numericValue = toNumber(value);
         return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
@@ -173,63 +198,48 @@ export const SupplierProfileView = ({
                         <Button onClick={onGenerateStatement} size="sm">Generate Statement</Button>
                     </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card>
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatRate(selectedSupplierData.averageRate)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Min Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.minRate || 0)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Max Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.maxRate || 0)}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Transactions</span><span className="font-semibold">{`${selectedSupplierData.totalTransactions} Entries`}</span></div>
-                             <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries</span><span>{`${selectedSupplierData.totalOutstandingTransactions} Entries`}</span></div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                             <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatRate(selectedSupplierData.averageRate)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Karta Amt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury Amt <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Brokerage Amt</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                            <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Total Original Amount</p>
-                                <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
+                <CardContent className="space-y-6">
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Scale size={16}/>
+                            <h4 className="text-sm font-semibold uppercase tracking-wide">Operational Snapshot</h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <SummaryTile label="Gross Weight" value={formatWeight(selectedSupplierData.totalGrossWeight)} hint="Aggregate arrival weight"/>
+                            <SummaryTile label="Teir Weight" value={formatWeight(selectedSupplierData.totalTeirWeight)} hint="Packaging / tare deduction"/>
+                            <SummaryTile label="Net Weight" value={formatWeight(selectedSupplierData.totalNetWeight)} hint="Payable weight after adjustments" tone="text-primary"/>
+                            <SummaryTile label="Final Weight" value={formatWeight(selectedSupplierData.totalFinalWeight)} hint="Recorded closing weight"/>
+                            <SummaryTile label="Karta Weight" value={formatWeight(selectedSupplierData.totalKartaWeight)} hint={`Applied at ${formatPercentage(selectedSupplierData.averageKartaPercentage)}`}/>
+                            <SummaryTile label="Average Rate" value={formatRate(selectedSupplierData.averageRate)} hint={`Range ${formatCurrency(selectedSupplierData.minRate || 0)} - ${formatCurrency(selectedSupplierData.maxRate || 0)}`}/>
+                            <SummaryTile label="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} hint="Entries captured for this supplier"/>
+                            <SummaryTile label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions}`} hint="Pending against this profile" tone="text-destructive"/>
+                        </div>
+                    </section>
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <FileText size={16}/>
+                            <h4 className="text-sm font-semibold uppercase tracking-wide">Deduction Overview</h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <SummaryTile label="Gross Amount" value={formatCurrency(selectedSupplierData.totalAmount || 0)} hint={`Computed @ ${formatRate(selectedSupplierData.averageRate)} per kg`}/>
+                            <SummaryTile label="Karta Charges" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} hint={`Applied at ${formatPercentage(selectedSupplierData.averageKartaPercentage)}`}/>
+                            <SummaryTile label="Laboury Charges" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} hint={`Average ${formatDecimal(selectedSupplierData.averageLabouryRate)} per kg`}/>
+                            <SummaryTile label="Kanta & Others" value={`- ${formatCurrency((selectedSupplierData.totalKanta || 0) + (selectedSupplierData.totalBrokerage || 0))}`} hint="Includes weighing & brokerage adjustments"/>
+                        </div>
+                    </section>
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Banknote size={16}/>
+                            <h4 className="text-sm font-semibold uppercase tracking-wide">Financial Highlights</h4>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable</span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Cash Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalCashPaid || 0)}`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total RTGS Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Outstanding</p>
-                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <SummaryTile label="Net Payable" value={formatCurrency(selectedSupplierData.totalOriginalAmount || 0)} hint="After all deductions" tone="text-primary"/>
+                            <SummaryTile label="Cash Settled" value={formatCurrency(selectedSupplierData.totalCashPaid || 0)} hint="Direct cash disbursements"/>
+                            <SummaryTile label="RTGS Settled" value={formatCurrency(selectedSupplierData.totalRtgsPaid || 0)} hint="Bank transfers completed"/>
+                            <SummaryTile label="Cash Discount Granted" value={formatCurrency(selectedSupplierData.totalCdAmount || 0)} hint="Approved CD for this profile"/>
+                            <SummaryTile label="Outstanding Balance" value={formatCurrency(selectedSupplierData.totalOutstanding)} hint="Yet to be cleared" tone="text-destructive"/>
                             </div>
-                        </CardContent>
-                    </Card>
+                    </section>
                 </CardContent>
             </Card>
 

@@ -49,7 +49,7 @@ export const PaymentForm = (props: any) => {
         paymentType, setPaymentType, paymentDate, setPaymentDate,
         settleAmount, handleSettleAmountChange,
         cdEnabled, setCdEnabled,
-        cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount,
+        cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, setCdAmount,
         processPayment, isProcessing, resetPaymentForm, editingPayment,
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
@@ -191,7 +191,19 @@ export const PaymentForm = (props: any) => {
                                 </div>
                                 <div className="flex items-center gap-2 flex-1 min-w-[150px]">
                                     <Label className="text-xs">CD Amt</Label>
-                                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                                    <div className="flex items-center gap-2 w-full">
+                                        <Input
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="0.01"
+                                            value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
+                                            onChange={e => setCdAmount(parseFloat(e.target.value) || 0)}
+                                            className="h-8 text-xs font-bold text-primary"
+                                        />
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {formatCurrency(calculatedCdAmount)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}

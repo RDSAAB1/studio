@@ -16,6 +16,23 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const { toast } = useToast();
     const statementRef = React.useRef<HTMLDivElement>(null);
 
+    const toNumber = (value: number | string | null | undefined) => {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? numericValue : 0;
+    };
+
+    const formatDecimal = (value: number | string | null | undefined) => {
+        return toNumber(value).toFixed(2);
+    };
+
+    const formatWeight = (value: number | string | null | undefined) => {
+        return `${formatDecimal(value)} kg`;
+    };
+
+    const formatPercentage = (value: number | string | null | undefined) => {
+        return `${formatDecimal(value)}%`;
+    };
+
     const transactions = useMemo(() => {
         if (!data) return [];
         const allTransactions = data.allTransactions || [];
@@ -175,11 +192,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="text-sm">
                             <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Operational</h3>
                              <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr className="font-bold border-t border-gray-200"><td className="py-1 text-black">Final Wt</td><td className="py-1 text-right font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalGrossWeight)}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalTeirWeight)}</td></tr>
+                                <tr className="font-bold border-t border-gray-200"><td className="py-1 text-black">Final Wt</td><td className="py-1 text-right font-semibold text-black">{formatWeight(data.totalFinalWeight)}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalKartaWeight)}</td></tr>
+                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Net Wt</td><td className="py-1 text-right">{formatWeight(data.totalNetWeight)}</td></tr>
                             </tbody></table>
                         </div>
                         {/* Deduction Summary */}

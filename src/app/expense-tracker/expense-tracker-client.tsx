@@ -3,10 +3,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment, PayeeProfile } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency, generateReadableId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -18,25 +18,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { QuickExpenseEntry } from "@/components/expense/quick-expense-entry";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; 
 
 
-import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins, Zap } from "lucide-react";
+import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Zod Schema for form validation
 const transactionFormSchema = z.object({
@@ -44,9 +38,11 @@ const transactionFormSchema = z.object({
   transactionId: z.string().optional(),
   date: z.date(),
   transactionType: z.enum(["Income", "Expense"]),
-  category: z.string().min(1, "Category is required."),
-  subCategory: z.string().min(1, "Sub-category is required."),
+  category: z.string().optional(),
+  subCategory: z.string().optional(),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
+  incomeAmount: z.coerce.number().optional(),
+  expenseAmount: z.coerce.number().optional(),
   payee: z.string().min(1, "Payee/Payer is required."),
   paymentMethod: z.string().min(1, "Payment method is required."),
   bankAccountId: z.string().optional(),
@@ -58,7 +54,7 @@ const transactionFormSchema = z.object({
   recurringFrequency: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
   nextDueDate: z.date().optional(),
   mill: z.string().optional(), 
-  expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
+  expenseNature: z.string().optional(),
   isCalculated: z.boolean(),
   quantity: z.coerce.number().optional(),
   rate: z.coerce.number().optional(),
@@ -87,6 +83,8 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
     category: '',
     subCategory: '',
     amount: 0,
+    incomeAmount: 0,
+    expenseAmount: 0,
     payee: '',
     description: '',
     paymentMethod: 'Cash',
@@ -113,15 +111,34 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+const SummaryMetricsCard = ({
+  metrics,
+}: {
+  metrics: Array<{ label: string; value: string; tone?: string; subtext?: string }>;
+}) => (
   <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-3">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <div className="text-muted-foreground">{icon}</div>
-    </CardHeader>
-    <CardContent className="px-3 pb-3">
-      <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    <CardContent className="p-2 sm:p-3">
+      <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
+        {metrics.map((metric, index) => (
+          <div
+            key={metric.label}
+            className={cn(
+              "flex-1 min-w-[140px] sm:pl-0",
+              index !== 0 && "sm:border-l sm:border-border/40 sm:pl-4"
+            )}
+          >
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+              {metric.label}
+            </div>
+            <div className={cn("mt-0.5 text-base font-semibold text-foreground", metric.tone)}>
+              {metric.value}
+            </div>
+            {metric.subtext && (
+              <div className="text-[11px] text-muted-foreground mt-0.5">{metric.subtext}</div>
+            )}
+          </div>
+        ))}
+      </div>
     </CardContent>
   </Card>
 );
@@ -129,6 +146,7 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [income, setIncome] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -141,7 +159,6 @@ export default function IncomeExpenseClient() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
-  const [activeTab, setActiveTab] = useState("form");
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
@@ -150,8 +167,10 @@ export default function IncomeExpenseClient() {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   
-  const [isPayeePopoverOpen, setIsPayeePopoverOpen] = useState(false);
+  const [payeeProfiles, setPayeeProfiles] = useState<Map<string, PayeeProfile>>(new Map());
+  const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
 
     useEffect(() => {
         const unsubIncome = getIncomeRealtime(setIncome, console.error);
@@ -183,6 +202,43 @@ export default function IncomeExpenseClient() {
       const payees = new Set((allTransactions || []).map(t => toTitleCase(t.payee)));
       return Array.from(payees).sort();
   }, [allTransactions]);
+
+  const filteredTransactions = useMemo(() => {
+      if (!selectedAccount) return allTransactions;
+      return allTransactions.filter(
+          (transaction) => toTitleCase(transaction.payee) === selectedAccount
+      );
+  }, [allTransactions, selectedAccount]);
+
+  const accountOptions = useMemo(() => {
+      const names = new Set<string>();
+      payeeProfiles.forEach((_profile, name) => names.add(toTitleCase(name)));
+      uniquePayees.forEach(name => names.add(toTitleCase(name)));
+
+      return Array.from(names)
+          .sort((a, b) => a.localeCompare(b))
+          .map(name => {
+              const profile = payeeProfiles.get(name) || payeeProfiles.get(toTitleCase(name));
+              const labelParts = [name];
+              if (profile?.category) {
+                  labelParts.push(profile.subCategory ? `${profile.category} › ${profile.subCategory}` : profile.category);
+              }
+              if (profile?.contact) {
+                  labelParts.push(profile.contact);
+              }
+              return {
+                  value: name,
+                  label: labelParts.join(' | '),
+                  data: {
+                      name,
+                      category: profile?.category,
+                      subCategory: profile?.subCategory,
+                      contact: profile?.contact,
+                      address: profile?.address,
+                  },
+              };
+          });
+  }, [payeeProfiles, uniquePayees]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -239,6 +295,99 @@ export default function IncomeExpenseClient() {
   const selectedSubCategory = watch('subCategory');
   const quantity = watch('quantity');
   const rate = watch('rate');
+  const incomeAmountValue = watch('incomeAmount');
+  const expenseAmountValue = watch('expenseAmount');
+  const payeeValue = watch('payee');
+
+  const selectedAccountProfile = useMemo(() => {
+      if (!payeeValue) return undefined;
+      return payeeProfiles.get(toTitleCase(payeeValue));
+  }, [payeeValue, payeeProfiles]);
+
+  const summaryDetails = useMemo(() => {
+      const displayName = selectedAccountProfile?.name || selectedAccount || 'Select an account';
+      const fallbackNature = filteredTransactions.find(tx => (tx as any).expenseNature)?.expenseNature;
+      const fallbackCategory = filteredTransactions.find(tx => tx.category)?.category;
+      const fallbackSubCategory = filteredTransactions.find(tx => tx.subCategory)?.subCategory;
+
+      const normalize = (value: string | undefined | null) => {
+          if (!value) return '—';
+          return toTitleCase(value);
+      };
+
+      return {
+          name: displayName,
+          contact: selectedAccountProfile?.contact || '—',
+          address: selectedAccountProfile?.address || '—',
+          nature: normalize(selectedAccountProfile?.nature || fallbackNature || undefined),
+          category: normalize(selectedAccountProfile?.category || fallbackCategory || undefined),
+          subCategory: normalize(selectedAccountProfile?.subCategory || fallbackSubCategory || undefined),
+      };
+  }, [selectedAccountProfile, selectedAccount, filteredTransactions]);
+
+  const applyAccountProfile = useCallback((accountName: string | null) => {
+      const normalized = accountName ? toTitleCase(accountName) : '';
+      const profile = normalized ? payeeProfiles.get(normalized) : undefined;
+
+      setValue('expenseNature', profile?.nature || '', { shouldValidate: false });
+      setValue('category', profile?.category || '', { shouldValidate: false });
+      setValue('subCategory', profile?.subCategory || '', { shouldValidate: false });
+  }, [payeeProfiles, setValue]);
+
+  useEffect(() => {
+      if (payeeValue) {
+          applyAccountProfile(payeeValue);
+      } else {
+          applyAccountProfile(null);
+      }
+  }, [payeeValue, applyAccountProfile]);
+
+  useEffect(() => {
+      const incomeValue = Number(incomeAmountValue || 0);
+      const expenseValue = Number(expenseAmountValue || 0);
+
+      if (lastAmountSource === 'income') {
+          if (incomeValue > 0) {
+              if (expenseValue !== 0) {
+                  setValue('expenseAmount', 0, { shouldValidate: false });
+              }
+              setValue('transactionType', 'Income', { shouldValidate: false });
+              setValue('amount', incomeValue, { shouldValidate: false });
+          } else if (expenseValue > 0) {
+              setLastAmountSource('expense');
+          } else {
+              setValue('amount', 0, { shouldValidate: false });
+          }
+          return;
+      }
+
+      if (lastAmountSource === 'expense') {
+          if (expenseValue > 0) {
+              if (incomeValue !== 0) {
+                  setValue('incomeAmount', 0, { shouldValidate: false });
+              }
+              setValue('transactionType', 'Expense', { shouldValidate: false });
+              setValue('amount', expenseValue, { shouldValidate: false });
+          } else if (incomeValue > 0) {
+              setLastAmountSource('income');
+          } else {
+              setValue('amount', 0, { shouldValidate: false });
+          }
+          return;
+      }
+
+      if (incomeValue > 0 && expenseValue <= 0) {
+          setLastAmountSource('income');
+          setValue('transactionType', 'Income', { shouldValidate: false });
+          setValue('amount', incomeValue, { shouldValidate: false });
+      } else if (expenseValue > 0 && incomeValue <= 0) {
+          setLastAmountSource('expense');
+          setValue('transactionType', 'Expense', { shouldValidate: false });
+          setValue('amount', expenseValue, { shouldValidate: false });
+      } else if (incomeValue <= 0 && expenseValue <= 0) {
+          setValue('amount', 0, { shouldValidate: false });
+      }
+  }, [incomeAmountValue, expenseAmountValue, lastAmountSource, setValue]);
 
   // Save date to localStorage when it changes
   useEffect(() => {
@@ -279,21 +428,9 @@ export default function IncomeExpenseClient() {
   };
 
 
-  const handleNew = useCallback(() => {
-    setEditingTransaction(null);
-    const nextId = getNextTransactionId('Expense');
-    reset(getInitialFormState(nextId));
-    setIsAdvanced(false);
-    setIsCalculated(false);
-    setIsRecurring(false);
-    setActiveTab("form");
-  }, [reset, getNextTransactionId]);
-
-  const handleEdit = useCallback((transaction: DisplayTransaction) => {
-      setEditingTransaction(transaction);
-  }, []);
-
   const handleAutoFill = useCallback((payeeName: string) => {
+    applyAccountProfile(payeeName);
+
     if (!uniquePayees.includes(payeeName)) return;
 
     const trimmedPayeeName = toTitleCase(payeeName.trim());
@@ -305,23 +442,57 @@ export default function IncomeExpenseClient() {
     
     if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
         setTimeout(() => {
-            setValue('expenseNature', latestTransaction.expenseNature);
+            setValue('expenseNature', latestTransaction.expenseNature, { shouldValidate: false });
             setTimeout(() => {
-                setValue('category', latestTransaction.category);
+                setValue('category', latestTransaction.category, { shouldValidate: false });
                 setTimeout(() => {
-                     setValue('subCategory', latestTransaction.subCategory);
+                     setValue('subCategory', latestTransaction.subCategory, { shouldValidate: false });
                 }, 50);
             }, 50);
         }, 0);
         toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
     }
-  }, [allTransactions, setValue, toast, uniquePayees]);
+  }, [allTransactions, applyAccountProfile, setValue, toast, uniquePayees]);
+
+  const handleNew = useCallback(() => {
+    setEditingTransaction(null);
+    const nextId = getNextTransactionId('Expense');
+    reset(getInitialFormState(nextId));
+    setIsAdvanced(false);
+    setIsCalculated(false);
+    setIsRecurring(false);
+    setLastAmountSource(null);
+    if (selectedAccount) {
+        setValue('payee', selectedAccount, { shouldValidate: true });
+        handleAutoFill(selectedAccount);
+    } else {
+        setValue('payee', '', { shouldValidate: true });
+    }
+  }, [reset, getNextTransactionId, selectedAccount, setValue, handleAutoFill]);
+
+  const handleEdit = useCallback((transaction: DisplayTransaction) => {
+      setEditingTransaction(transaction);
+  }, []);
+
+  const handleAddNewAccount = useCallback(() => {
+      router.push('/expense-tracker/payee-profile?create=1');
+  }, [router]);
+
+  useEffect(() => {
+      if (selectedAccount) {
+          setValue('payee', selectedAccount, { shouldValidate: true });
+          handleAutoFill(selectedAccount);
+      } else {
+          setValue('payee', '', { shouldValidate: true });
+      }
+  }, [selectedAccount, handleAutoFill, setValue]);
 
 
   useEffect(() => {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
+    setSelectedAccount(toTitleCase(transaction.payee));
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -330,7 +501,10 @@ export default function IncomeExpenseClient() {
         rate: transaction.rate || 0,
         isCalculated: transaction.isCalculated || false,
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+        incomeAmount: transaction.transactionType === 'Income' ? transaction.amount : 0,
+        expenseAmount: transaction.transactionType === 'Expense' ? transaction.amount : 0,
     });
+    setLastAmountSource(transaction.transactionType === 'Income' ? 'income' : 'expense');
     
     setTimeout(() => {
         if (transaction.expenseNature) {
@@ -352,15 +526,12 @@ export default function IncomeExpenseClient() {
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
-    
-    setActiveTab("form");
   }, [editingTransaction, loans, setValue, reset]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
     if (loanId && loans.length > 0) {
       handleNew(); // Reset the form first
-      setActiveTab("form");
 
       const loan = loans.find(l => l.id === loanId);
       if (loan) {
@@ -413,7 +584,10 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     if (isCalculated) {
       const calculatedAmount = (quantity || 0) * (rate || 0);
-      setValue('amount', calculatedAmount);
+      setValue('amount', calculatedAmount, { shouldValidate: false });
+      setValue('expenseAmount', calculatedAmount, { shouldValidate: false });
+      setValue('incomeAmount', 0, { shouldValidate: false });
+      setLastAmountSource(calculatedAmount > 0 ? 'expense' : null);
     }
   }, [quantity, rate, isCalculated, setValue]);
 
@@ -434,6 +608,19 @@ export default function IncomeExpenseClient() {
       unsubIncomeCats();
       unsubExpenseCats();
     };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = getPayeeProfilesRealtime((profiles) => {
+        const mappedProfiles = new Map<string, PayeeProfile>();
+        profiles.forEach(profile => {
+            if (!profile?.name) return;
+            mappedProfiles.set(toTitleCase(profile.name), profile);
+        });
+        setPayeeProfiles(mappedProfiles);
+    }, console.error);
+
+    return () => unsubscribe();
   }, []);
   
     const financialState = useMemo(() => {
@@ -465,16 +652,6 @@ export default function IncomeExpenseClient() {
     }, [fundTransactions, allTransactions, bankAccounts]);
 
 
-  useEffect(() => {
-    setValue('category', '');
-    setValue('subCategory', '');
-  }, [selectedTransactionType, selectedExpenseNature, setValue]);
-
-  useEffect(() => {
-    setValue('subCategory', '');
-  }, [selectedCategory, setValue]);
-
-
   const handleDelete = async (transaction: DisplayTransaction) => {
     try {
       if (transaction.transactionType === 'Income') {
@@ -491,15 +668,36 @@ export default function IncomeExpenseClient() {
   };
 
   const onSubmit = async (values: TransactionFormValues) => {
-    if (values.transactionType === 'Expense') {
+    const incomeValue = Number(values.incomeAmount || 0);
+    const expenseValue = Number(values.expenseAmount || 0);
+
+    if (incomeValue > 0 && expenseValue > 0) {
+        toast({ title: "Invalid Amounts", description: "Please enter either income or expense amount, not both.", variant: "destructive" });
+        return;
+    }
+
+    if (incomeValue <= 0 && expenseValue <= 0) {
+        toast({ title: "Amount Required", description: "Please enter an amount for income or expense.", variant: "destructive" });
+        return;
+    }
+
+    const activeType: "Income" | "Expense" = incomeValue > 0 ? "Income" : "Expense";
+    const activeAmount = incomeValue > 0 ? incomeValue : expenseValue;
+
+    if (activeAmount <= 0) {
+        toast({ title: "Amount Required", description: "Amount must be greater than zero.", variant: "destructive" });
+        return;
+    }
+
+    if (activeType === 'Expense') {
         const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
         const availableBalance = financialState.balances.get(balanceKey) || 0;
         
-        let amountToCheck = values.amount;
+        let amountToCheck = activeAmount;
         if (editingTransaction) {
             const originalTx = allTransactions.find(tx => tx.id === editingTransaction.id);
             if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
-                 amountToCheck = values.amount - originalTx.amount;
+                 amountToCheck = activeAmount - originalTx.amount;
             }
         }
         
@@ -517,7 +715,7 @@ export default function IncomeExpenseClient() {
     // Validate transaction ID is unique (not editing)
     if (!editingTransaction && values.transactionId) {
         const idExists = allTransactions.some(t => t.transactionId === values.transactionId);
-        const paymentIdExists = values.transactionType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
+        const paymentIdExists = activeType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
         
         if (idExists) {
             toast({
@@ -540,8 +738,11 @@ export default function IncomeExpenseClient() {
   
     setIsSubmitting(true);
     try {
+      const { incomeAmount, expenseAmount, ...baseValues } = values;
       const transactionData: Partial<TransactionFormValues> = {
-        ...values,
+        ...baseValues,
+        transactionType: activeType,
+        amount: activeAmount,
         date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
@@ -559,14 +760,14 @@ export default function IncomeExpenseClient() {
       }
 
       if (editingTransaction) {
-        if (values.transactionType === 'Income') {
+        if (activeType === 'Income') {
             await updateIncome(editingTransaction.id, transactionData as Omit<Income, 'id'>);
         } else {
             await updateExpense(editingTransaction.id, transactionData as Omit<Expense, 'id'>);
         }
         toast({ title: "Transaction updated.", variant: "success" });
       } else {
-        if (values.transactionType === 'Income') {
+        if (activeType === 'Income') {
             await addIncome(transactionData as Omit<Income, 'id'>);
         } else {
             await addExpense(transactionData as Omit<Expense, 'id'>);
@@ -607,9 +808,6 @@ export default function IncomeExpenseClient() {
                         if (tx) handleDelete(tx);
                     }
                     break;
-                case 't':
-                    setActiveTab(prev => prev === 'form' ? 'history' : 'form');
-                    break;
             }
         }
     }, [handleSubmit, onSubmit, handleNew, editingTransaction, allTransactions, handleDelete]);
@@ -631,8 +829,7 @@ export default function IncomeExpenseClient() {
   };
 
   const sortedTransactions = useMemo(() => {
-    if (!allTransactions) return [];
-    let sortableItems = [...allTransactions];
+    let sortableItems = [...filteredTransactions];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
             const valA = a[sortConfig.key] || '';
@@ -645,21 +842,24 @@ export default function IncomeExpenseClient() {
             }
             return 0;
         });
+    } else {
+        sortableItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     return sortableItems;
-  }, [allTransactions, sortConfig]);
-  
-  const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
-    const incomeTotal = (income || []).reduce((sum, t) => sum + t.amount, 0);
-    const expenseTotal = (expenses || []).reduce((sum, t) => sum + t.amount, 0);
-    return {
-      totalIncome: incomeTotal,
-      totalExpense: expenseTotal,
-      netProfitLoss: incomeTotal - expenseTotal,
-      totalTransactions: allTransactions.length,
-    };
-  }, [income, expenses, allTransactions]);
-    
+  }, [filteredTransactions, sortConfig]);
+
+  const runningLedger = useMemo(() => {
+    let balance = 0;
+    return sortedTransactions.map(transaction => {
+      const delta = transaction.transactionType === 'Income' ? transaction.amount : -transaction.amount;
+      balance += delta;
+      return {
+        ...transaction,
+        runningBalance: balance,
+      };
+    });
+  }, [sortedTransactions]);
+
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
         const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
@@ -672,455 +872,622 @@ export default function IncomeExpenseClient() {
     return transaction.transactionId || 'N/A';
   };
 
+  const handlePrintStatement = useCallback((accountName: string | null, ledger: Array<DisplayTransaction & { runningBalance: number }>) => {
+    if (typeof window === 'undefined') return;
+    if (!ledger.length) {
+      toast({ title: 'No transactions to print', description: 'Please add a transaction before printing the statement.' });
+      return;
+    }
+
+    const title = accountName ? `${accountName} Account Statement` : 'Account Statement';
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const rows = ledger.map(tx => {
+      const isIncome = tx.transactionType === 'Income';
+      const credit = isIncome ? tx.amount : 0;
+      const debit = isIncome ? 0 : tx.amount;
+      totalCredit += credit;
+      totalDebit += debit;
+      return `
+        <tr>
+          <td>${format(new Date(tx.date), 'dd-MMM-yyyy')}</td>
+          <td>${getDisplayId(tx)}</td>
+          <td>${toTitleCase(tx.description || tx.payee || '')}</td>
+          <td class="debit">${debit ? formatCurrency(debit) : '-'}</td>
+          <td class="credit">${credit ? formatCurrency(credit) : '-'}</td>
+          <td class="balance">${formatCurrency(tx.runningBalance)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 32px; color: #111827; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .meta { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 13px; }
+    th { background: #f3f4f6; text-transform: uppercase; letter-spacing: 0.04em; font-size: 12px; }
+    td.debit { color: #dc2626; text-align: right; }
+    td.credit { color: #16a34a; text-align: right; }
+    td.balance { font-weight: 600; text-align: right; }
+    tfoot td { font-weight: 600; background: #f9fafb; }
+    .footer { margin-top: 24px; font-size: 12px; color: #6b7280; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <div class="meta">
+    Generated on ${format(new Date(), 'dd MMMM yyyy, hh:mm a')}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>ID</th>
+        <th>Description</th>
+        <th style="text-align:right">Debit</th>
+        <th style="text-align:right">Credit</th>
+        <th style="text-align:right">Running Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Totals</td>
+        <td style="text-align:right">${formatCurrency(totalDebit)}</td>
+        <td style="text-align:right">${formatCurrency(totalCredit)}</td>
+        <td style="text-align:right">${formatCurrency(ledger[ledger.length - 1].runningBalance)}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <div class="footer">Generated by Income & Expense Tracker</div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      toast({ title: 'Popup blocked', description: 'Allow popups to print the statement.' });
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }, [toast]);
+  
+  const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
+    const incomeTotal = filteredTransactions
+      .filter((t) => t.transactionType === 'Income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expenseTotal = filteredTransactions
+      .filter((t) => t.transactionType === 'Expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    return {
+      totalIncome: incomeTotal,
+      totalExpense: expenseTotal,
+      netProfitLoss: incomeTotal - expenseTotal,
+      totalTransactions: filteredTransactions.length,
+    };
+  }, [filteredTransactions]);
+    
   if(isPageLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin" /></div>
   }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<CircleDollarSign />} colorClass="text-green-500"/>
-              <StatCard title="Total Expense" value={formatCurrency(totalExpense)} icon={<CircleDollarSign />} colorClass="text-red-500"/>
-              <StatCard title="Net Profit/Loss" value={formatCurrency(netProfitLoss)} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
-              <StatCard title="Total Transactions" value={String(totalTransactions)} icon={<Hash />} />
-      </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</TabsTrigger>
-            <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
-          </TabsList>
-          <div className="w-full sm:w-auto flex items-center gap-2">
-            <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button>
-          </div>
-        </div>
-        
-        <TabsContent value="history" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-                <ScrollArea className="h-[calc(100vh-350px)]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                        <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                        <TableHead>Sub-Category</TableHead>
-                        <TableHead>Payee/Payer</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                         <TableHead>Mill</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedTransactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
-                          <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
-                          <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
-                          <TableCell>{transaction.category}</TableCell>
-                          <TableCell>{transaction.subCategory}</TableCell>
-                          <TableCell>{transaction.payee}</TableCell>
-                          <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
-                          <TableCell>{transaction.mill}</TableCell>
-                          <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="form" className="mt-4">
-           {/* Side-by-Side Layout: Templates Left (40%), Form Right (60%) */}
-           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-             
-             {/* Left Side - Quick Templates (40% = 2 out of 5 columns) */}
-             <div className="lg:col-span-2">
-               <QuickExpenseEntry 
-                isAdvanced={isAdvanced}
-                onTemplateSelect={(template) => {
-                  // Fill detailed form with template data
-                  setValue('transactionType', 'Expense');
-                  setValue('amount', template.amount);
-                  setValue('payee', template.payee);
-                  setValue('description', template.name);
-                  setValue('paymentMethod', template.paymentMethod);
-                  setValue('expenseNature', template.expenseNature);
-                  setValue('status', 'Paid');
-                  
-                  // Set category and subcategory with delays for proper loading
-                  setTimeout(() => {
-                    setValue('category', template.category);
-                    setTimeout(() => {
-                      setValue('subCategory', template.subCategory);
-                    }, 100);
-                  }, 50);
-                  
-                  toast({
-                    title: "Template Loaded",
-                    description: `"${template.name}" loaded into form`,
-                  });
+      <Card>
+        <CardContent className="p-3 sm:p-4 space-y-2">
+          <div className="grid gap-3 sm:grid-cols-[minmax(220px,320px)_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                Account / Payee
+              </p>
+              <CustomDropdown
+                options={accountOptions}
+                value={selectedAccount}
+                onChange={(value) => {
+                    const normalized = value ? toTitleCase(value) : null;
+                    setSelectedAccount(normalized);
                 }}
+                onAdd={(newValue) => {
+                    const normalized = toTitleCase(newValue);
+                    setSelectedAccount(normalized);
+                    setValue('payee', normalized, { shouldValidate: true });
+                }}
+                placeholder="Search or select an account..."
               />
-             </div>
-             
-             {/* Right Side - Detailed Form (60% = 3 out of 5 columns) */}
-             <div className="lg:col-span-3">
-               <Card className={isAdvanced ? "h-auto" : "h-[calc(100vh-150px)]"}>
-              <CardContent className="p-6">
-                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      
-                      <Controller name="transactionType" control={control} render={({ field }) => (
-                          <div className="space-y-2">
-                            <Label className="text-xs">Transaction Type</Label>
-                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="Income" id="type-income" />
-                                <Label htmlFor="type-income" className="font-normal text-sm flex items-center gap-2">Income</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="Expense" id="type-expense" />
-                                <Label htmlFor="type-expense" className="font-normal text-sm flex items-center gap-2">Expense</Label>
-                              </div>
-                            </RadioGroup>
-                          </div>
-                      )} />
-                      
-                      <Controller name="date" control={control} render={({ field }) => (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Date</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 z-[51]">
-                                    <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                          </div>
-                      )} />
-                      
-                      <div className="space-y-1">
-                          <Label htmlFor="transactionId" className="text-xs">Transaction ID</Label>
-                          <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                              <Input id="transactionId" {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-8 text-sm pl-10" />
-                          </InputWithIcon>
-                      </div>
-                      
-                      <div className="space-y-1">
-                          <Label htmlFor="amount" className="text-xs">Amount</Label>
-                          <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
-                          </InputWithIcon>
-                          {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
-                      </div>
-                      
-                       <div className="space-y-1">
-                            <Label htmlFor="payee" className="text-xs">
-                                {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
-                            </Label>
-                           <Controller name="payee" control={control} render={({ field }) => (
-                                <CustomDropdown
-                                    options={uniquePayees.map(p => ({ value: p, label: p }))}
-                                    value={field.value}
-                                    onChange={(value) => {
-                                        const capitalizedValue = value ? toTitleCase(value) : '';
-                                        field.onChange(capitalizedValue);
-                                        if (value && uniquePayees.includes(value)) {
-                                            handleAutoFill(value);
-                                        }
-                                    }}
-                                    onAdd={(newValue) => {
-                                        const capitalizedValue = toTitleCase(newValue);
-                                        setValue('payee', capitalizedValue);
-                                    }}
-                                    placeholder="Search or add payee..."
-                                />
-                            )} />
-                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
-                       </div>
+            </div>
+            <div className="space-y-1 sm:text-right">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                New Account
+              </p>
+              <Button onClick={handleAddNewAccount} size="sm" variant="outline" className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add New Account
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-                       
-                        {selectedTransactionType === 'Expense' && (
-                            <Controller name="expenseNature" control={control} render={({ field }) => (
-                              <div className="space-y-1">
-                                <Label className="text-xs">Expense Nature</Label>
-                                <CustomDropdown options={[{value: "Permanent", label: "Permanent"}, {value: "Seasonal", label: "Seasonal"}]} {...field} placeholder="Select Nature" />
-                              </div>
-                            )} />
+      <div className="grid gap-6 lg:grid-cols-[minmax(260px,300px)_1fr]">
+        <Card className="h-full">
+          <CardContent className="space-y-5 pt-4">
+            <div className="space-y-3">
+              <h2 className="text-base font-semibold text-foreground">{summaryDetails.name}</h2>
+              <dl className="space-y-2 text-xs text-muted-foreground">
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <dt className="font-medium text-foreground/70">Contact</dt>
+                  <dd>{summaryDetails.contact}</dd>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <dt className="font-medium text-foreground/70">Address</dt>
+                  <dd>{summaryDetails.address}</dd>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <dt className="font-medium text-foreground/70">Nature</dt>
+                  <dd>{summaryDetails.nature}</dd>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <dt className="font-medium text-foreground/70">Category</dt>
+                  <dd>{summaryDetails.category}</dd>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <dt className="font-medium text-foreground/70">Sub Cat.</dt>
+                  <dd>{summaryDetails.subCategory}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-muted-foreground/20 bg-muted/40 px-3 py-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Total Income</span>
+                <span className="text-sm font-semibold text-emerald-600">{formatCurrency(totalIncome)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Total Expense</span>
+                <span className="text-sm font-semibold text-rose-600">{formatCurrency(totalExpense)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Net Balance</span>
+                <span className={cn("text-sm font-semibold", netProfitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                  {formatCurrency(netProfitLoss)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Transactions</span>
+                <span className="text-sm font-semibold text-indigo-600">{totalTransactions}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-auto">
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <input type="hidden" {...register('payee')} />
+              {errors.payee && <p className="text-xs text-destructive">{errors.payee.message}</p>}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Controller
+                  name="date"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full justify-start text-left font-normal h-9 text-sm',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-[51]">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={(date) => field.onChange(date || new Date())}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                />
+
+                <div className="space-y-1">
+                  <Label htmlFor="transactionId" className="text-xs">
+                    Transaction ID
+                  </Label>
+                  <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                    <Input
+                      id="transactionId"
+                      {...register("transactionId")}
+                      onBlur={handleTransactionIdBlur}
+                      className="h-8 text-sm pl-10"
+                    />
+                  </InputWithIcon>
+                </div>
+
+                {selectedAccountProfile && (
+                  <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap gap-2 rounded-md border border-muted-foreground/10 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground/70">Nature:</span>
+                      {selectedAccountProfile.nature || '—'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground/70">Category:</span>
+                      {selectedAccountProfile.category || '—'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground/70">Sub Category:</span>
+                      {selectedAccountProfile.subCategory || '—'}
+                    </span>
+                    {selectedAccountProfile.contact && (
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium text-foreground/70">Contact:</span>
+                        {selectedAccountProfile.contact}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <Controller
+                  name="incomeAmount"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-emerald-700">Credit Amount (Income)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
+                        onChange={(e) => {
+                          setLastAmountSource('income');
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
+                        className="h-9 text-sm border-emerald-200 focus-visible:ring-emerald-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                />
+
+                <Controller
+                  name="expenseAmount"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-rose-700">Debit Amount (Expense)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
+                        onChange={(e) => {
+                          setLastAmountSource('expense');
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
+                        className="h-9 text-sm border-rose-200 focus-visible:ring-rose-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                />
+
+                <Controller
+                  name="paymentMethod"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Payment Method</Label>
+                      <CustomDropdown
+                        options={[
+                          { value: 'Cash', label: 'Cash' },
+                          ...bankAccounts.map((acc) => ({
+                            value: acc.id,
+                            label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})`,
+                          })),
+                        ]}
+                        value={field.value === 'Cash' ? 'Cash' : bankAccounts.find((acc) => acc.id === watch('bankAccountId'))?.id}
+                        onChange={(value) => {
+                          if (value === 'Cash') {
+                            setValue('paymentMethod', 'Cash');
+                            setValue('bankAccountId', undefined);
+                          } else {
+                            const account = bankAccounts.find((acc) => acc.id === value);
+                            setValue('paymentMethod', account?.bankName || '');
+                            setValue('bankAccountId', value);
+                          }
+                          field.onChange(value);
+                        }}
+                        placeholder="Select Payment Method"
+                      />
+                    </div>
+                  )}
+                />
+
+                {errors.amount && (
+                  <div className="sm:col-span-2 lg:col-span-3 text-xs text-destructive">
+                    {errors.amount.message}
+                  </div>
+                )}
+              </div>
+
+              <input type="hidden" {...register('amount', { valueAsNumber: true })} />
+
+              {isAdvanced && (
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold mb-2">Advanced Options</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="status" className="text-xs">Status</Label>
+                      <Controller
+                        name="status"
+                        control={control}
+                        render={({ field }) => (
+                          <CustomDropdown
+                            options={[
+                              { value: "Paid", label: "Paid" },
+                              { value: "Pending", label: "Pending" },
+                              { value: "Overdue", label: "Overdue" }
+                            ]}
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select Status"
+                          />
                         )}
+                      />
+                    </div>
 
-                        <Controller name="category" control={control} render={({ field }) => (
+                    <div className="space-y-1">
+                      <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
+                      <Controller
+                        name="taxAmount"
+                        control={control}
+                        render={({ field }) => (
+                          <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                            <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />
+                          </InputWithIcon>
+                        )}
+                      />
+                    </div>
+
+                    {selectedTransactionType === 'Expense' && (
+                      <Controller
+                        name="expenseType"
+                        control={control}
+                        render={({ field }) => (
                           <div className="space-y-1">
-                            <Label className="text-xs">Category</Label>
-                            <CustomDropdown 
-                                key={`category-${selectedExpenseNature}`}
-                                options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} 
-                                {...field} 
-                                placeholder="Select Category" 
+                            <Label className="text-xs">Expense Type</Label>
+                            <CustomDropdown
+                              options={[
+                                { value: "Personal", label: "Personal" },
+                                { value: "Business", label: "Business" }
+                              ]}
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select Expense Type"
                             />
-                            {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
                           </div>
-                        )} />
-
-                        <Controller name="subCategory" control={control} render={({ field }) => (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Sub-Category</Label>
-                            <CustomDropdown 
-                                key={`subcategory-${selectedCategory}`}
-                                options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} 
-                                {...field} 
-                                placeholder="Select Sub-Category" 
-                            />
-                            {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
-                          </div>
-                        )} />
-                      
-                        <Controller name="paymentMethod" control={control} render={({ field }) => (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Payment Method</Label>
-                              <CustomDropdown
-                                  options={[
-                                      { value: "Cash", label: "Cash" },
-                                      ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
-                                  ]}
-                                  value={field.value === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
-                                  onChange={(value) => {
-                                      if (value === 'Cash') {
-                                          setValue('paymentMethod', 'Cash');
-                                          setValue('bankAccountId', undefined);
-                                      } else {
-                                          const account = bankAccounts.find(acc => acc.id === value);
-                                          setValue('paymentMethod', account?.bankName || '');
-                                          setValue('bankAccountId', value);
-                                      }
-                                      field.onChange(value);
-                                  }}
-                                  placeholder="Select Payment Method"
-                              />
-                          </div>
-                        )} />
-
-                    </div>
-
-                    {isAdvanced && (
-                        <div className="border-t pt-4 mt-4">
-                            <h3 className="text-sm font-semibold mb-2">Advanced Options</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                
-                                <div className="space-y-1">
-                                    <Label htmlFor="status" className="text-xs">Status</Label>
-                                    <Controller
-                                        name="status"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <CustomDropdown
-                                                options={[
-                                                    { value: "Paid", label: "Paid" },
-                                                    { value: "Pending", label: "Pending" },
-                                                    { value: "Overdue", label: "Overdue" }
-                                                ]}
-                                                value={field.value}
-                                                onChange={field.onChange}
-                                                placeholder="Select Status"
-                                            />
-                                        )}
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                                    <Controller
-                                        name="taxAmount"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />
-                                            </InputWithIcon>
-                                        )}
-                                    />
-                                </div>
-
-                                {selectedTransactionType === 'Expense' && (
-                                    <Controller
-                                        name="expenseType"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Expense Type</Label>
-                                                <CustomDropdown
-                                                    options={[
-                                                        { value: "Personal", label: "Personal" },
-                                                        { value: "Business", label: "Business" }
-                                                    ]}
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                    placeholder="Select Expense Type"
-                                                />
-                                            </div>
-                                        )}
-                                    />
-                                )}
-
-                                <div className="space-y-1">
-                                    <Label htmlFor="mill" className="text-xs">Mill</Label>
-                                    <Controller
-                                        name="mill"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="mill" {...field} className="h-8 text-sm pl-10" />
-                                            </InputWithIcon>
-                                        )}
-                                    />
-                                </div>
-                                
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Project</Label>
-                                    <Controller
-                                        name="projectId"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <CustomDropdown
-                                                options={[
-                                                    { value: 'none', label: 'None' },
-                                                    ...projects.map(project => ({ value: project.id, label: project.name }))
-                                                ]}
-                                                value={field.value || 'none'}
-                                                onChange={field.onChange}
-                                                placeholder="Select Project"
-                                            />
-                                        )}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        )}
+                      />
                     )}
+
+                    <div className="space-y-1">
+                      <Label htmlFor="mill" className="text-xs">Mill</Label>
+                      <Controller
+                        name="mill"
+                        control={control}
+                        render={({ field }) => (
+                          <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
+                            <Input id="mill" {...field} className="h-8 text-sm pl-10" />
+                          </InputWithIcon>
+                        )}
+                      />
+                    </div>
                     
-                    {isCalculated && (
-                      <div className="border-t pt-4 mt-4">
-                        <h3 className="text-sm font-semibold mb-2">Calculation</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="quantity" className="text-xs">Quantity</Label>
-                                <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
-                            </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Project</Label>
+                      <Controller
+                        name="projectId"
+                        control={control}
+                        render={({ field }) => (
+                          <CustomDropdown
+                            options={[
+                              { value: 'none', label: 'None' },
+                              ...projects.map(project => ({ value: project.id, label: project.name }))
+                            ]}
+                            value={field.value || 'none'}
+                            onChange={field.onChange}
+                            placeholder="Select Project"
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                            <div className="space-y-1">
-                                <Label htmlFor="rate" className="text-xs">Rate</Label>
-                                <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
-                            </div>
-                          </div>
-                      </div>
-                    )}
-
-                    {isRecurring && (
-                      <div className="border-t pt-4 mt-4">
-                        <h3 className="text-sm font-semibold mb-2">Recurring Details</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              <Controller name="recurringFrequency" control={control} render={({ field }) => (
-                                  <div className="space-y-1">
-                                      <Label className="text-xs">Frequency</Label>
-                                      <CustomDropdown
-                                          options={[
-                                              { value: "daily", label: "Daily" },
-                                              { value: "weekly", label: "Weekly" },
-                                              { value: "monthly", label: "Monthly" },
-                                              { value: "yearly", label: "Yearly" }
-                                          ]}
-                                          value={field.value}
-                                          onChange={field.onChange}
-                                          placeholder="Select Frequency"
-                                      />
-                                  </div>
-                              )} />
-
-                              <Controller name="nextDueDate" control={control} render={({ field }) => (
-                                  <div className="space-y-1">
-                                      <Label className="text-xs">Next Due Date</Label>
-                                      <Popover>
-                                          <PopoverTrigger asChild>
-                                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                                  {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                              </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0 z-[51]">
-                                              <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
-                                          </PopoverContent>
-                                      </Popover>
-                                  </div>
-                              )} />
-                          </div>
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="description" className="text-xs">Description</Label>
-                      <Controller name="description" control={control} render={({ field }) => <Textarea id="description" placeholder="Brief description of the transaction..." className="h-16 text-sm" {...field} />} />
+              {isCalculated && (
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold mb-2">Calculation</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="quantity" className="text-xs">Quantity</Label>
+                      <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
                     </div>
 
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                          <Switch id="isAdvanced" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
-                          <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                              Advanced
-                          </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                          <Switch id="isCalculated" checked={isCalculated} onCheckedChange={setIsCalculated} />
-                          <Label htmlFor="isCalculated" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                              Calculate
-                          </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                          <Switch id="isRecurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
-                          <Label htmlFor="isRecurring" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                              Recurring
-                          </Label>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            {editingTransaction ? 'Update' : 'Save'}
-                        </Button>
-                      </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="rate" className="text-xs">Rate</Label>
+                      <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
                     </div>
-                 </form>
-              </CardContent>
-           </Card>
-         </div>
-       </div>
-        </TabsContent>
-      </Tabs>
+                  </div>
+                </div>
+              )}
+
+              {isRecurring && (
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold mb-2">Recurring Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Controller name="recurringFrequency" control={control} render={({ field }) => (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Frequency</Label>
+                        <CustomDropdown
+                          options={[
+                            { value: "daily", label: "Daily" },
+                            { value: "weekly", label: "Weekly" },
+                            { value: "monthly", label: "Monthly" },
+                            { value: "yearly", label: "Yearly" }
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Frequency"
+                        />
+                      </div>
+                    )} />
+
+                    <Controller name="nextDueDate" control={control} render={({ field }) => (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Next Due Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-[51]">
+                            <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )} />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-xs">Description</Label>
+                <Controller name="description" control={control} render={({ field }) => <Textarea id="description" placeholder="Brief description of the transaction..." className="h-16 text-sm" {...field} />} />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch id="isAdvanced" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
+                  <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                      Advanced
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="isCalculated" checked={isCalculated} onCheckedChange={setIsCalculated} />
+                  <Label htmlFor="isCalculated" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                      Calculate
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="isRecurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
+                  <Label htmlFor="isRecurring" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                      Recurring
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {editingTransaction ? 'Update' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
+            <CardDescription>Debit, credit, and running balance for the selected account.</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => handlePrintStatement(selectedAccount, runningLedger)}
+          >
+            <Printer className="mr-2 h-4 w-4" /> Print Statement
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-[520px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Debit</TableHead>
+                  <TableHead className="text-right">Credit</TableHead>
+                  <TableHead className="text-right">Running Balance</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {runningLedger.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
+                    <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
+                    <TableCell>{transaction.description || toTitleCase(transaction.payee)}</TableCell>
+                    <TableCell className="text-right text-rose-600 font-medium">{transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}</TableCell>
+                    <TableCell className="text-right text-emerald-600 font-medium">{transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}</TableCell>
+                    <TableCell className={cn("text-right font-semibold", transaction.runningBalance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                      {formatCurrency(transaction.runningBalance)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <CategoryManagerDialog
         isOpen={isCategoryManagerOpen}

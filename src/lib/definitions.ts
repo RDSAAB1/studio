@@ -120,6 +120,16 @@ export type Transaction = {
 export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
 export type Expense = Omit<Transaction, 'transactionType'> & { transactionType: 'Expense' };
 
+export type PayeeProfile = {
+    name: string;
+    contact?: string;
+    address?: string;
+    nature?: string;
+    category?: string;
+    subCategory?: string;
+    updatedAt?: string;
+};
+
 
 export type IncomeCategory = {
     id: string;

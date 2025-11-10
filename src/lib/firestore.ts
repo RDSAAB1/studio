@@ -33,6 +33,7 @@ const supplierPaymentsCollection = collection(firestoreDB, "payments");
 const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
 const incomesCollection = collection(firestoreDB, "incomes");
 const expensesCollection = collection(firestoreDB, "expenses");
+const payeeProfilesCollection = collection(firestoreDB, "payeeProfiles");
 const loansCollection = collection(firestoreDB, "loans");
 const fundTransactionsCollection = collection(firestoreDB, "fund_transactions");
 const banksCollection = collection(firestoreDB, "banks");
@@ -825,6 +826,16 @@ export async function updateExpensePayee(oldPayee: string, newPayee: string): Pr
     await batch.commit();
 }
 
+export async function updateIncomePayee(oldPayee: string, newPayee: string): Promise<void> {
+    const q = query(incomesCollection, where('payee', '==', oldPayee));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.forEach(doc => {
+        batch.update(doc.ref, { payee: toTitleCase(newPayee) });
+    });
+    await batch.commit();
+}
+
 export async function deleteExpensesForPayee(payee: string): Promise<void> {
     const q = query(expensesCollection, where('payee', '==', payee));
     const snapshot = await getDocs(q);
@@ -833,6 +844,72 @@ export async function deleteExpensesForPayee(payee: string): Promise<void> {
         batch.delete(doc.ref);
     });
     await batch.commit();
+}
+
+export async function deleteIncomesForPayee(payee: string): Promise<void> {
+    const q = query(incomesCollection, where('payee', '==', payee));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
+export type PayeeProfile = {
+    name: string;
+    contact?: string;
+    address?: string;
+    nature?: string;
+    category?: string;
+    subCategory?: string;
+    updatedAt?: string;
+};
+
+const buildPayeeProfileDocId = (name: string) =>
+    toTitleCase(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+
+export function getPayeeProfilesRealtime(
+    callback: (data: PayeeProfile[]) => void,
+    onError: (error: Error) => void,
+) {
+    return onSnapshot(payeeProfilesCollection, (snapshot) => {
+        const profiles = snapshot.docs.map(doc => ({
+            ...(doc.data() as PayeeProfile)
+        }));
+        callback(profiles);
+    }, onError);
+}
+
+export async function upsertPayeeProfile(profile: PayeeProfile, previousName?: string): Promise<void> {
+    const normalizedName = toTitleCase(profile.name || '').trim();
+    if (!normalizedName) return;
+
+    if (previousName && toTitleCase(previousName).trim() !== normalizedName) {
+        const prevDocId = buildPayeeProfileDocId(previousName);
+        await deleteDoc(doc(payeeProfilesCollection, prevDocId)).catch(() => {});
+    }
+
+    const docRef = doc(payeeProfilesCollection, buildPayeeProfileDocId(normalizedName));
+    const payload: PayeeProfile = {
+        name: normalizedName,
+        updatedAt: new Date().toISOString(),
+    };
+
+    if (profile.contact !== undefined) payload.contact = profile.contact;
+    if (profile.address !== undefined) payload.address = profile.address;
+    if (profile.nature !== undefined) payload.nature = profile.nature;
+    if (profile.category !== undefined) payload.category = profile.category;
+    if (profile.subCategory !== undefined) payload.subCategory = profile.subCategory;
+
+    await setDoc(docRef, payload, { merge: true });
+}
+
+export async function deletePayeeProfile(name: string): Promise<void> {
+    const normalizedName = toTitleCase(name || '').trim();
+    if (!normalizedName) return;
+    const docId = buildPayeeProfileDocId(normalizedName);
+    await deleteDoc(doc(payeeProfilesCollection, docId)).catch(() => {});
 }
 
 

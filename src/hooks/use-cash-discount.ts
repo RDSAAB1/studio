@@ -1,10 +1,8 @@
-
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Payment } from '@/lib/definitions';
 
-// --- Interface for Hook Props ---
 interface UseCashDiscountProps {
     paymentType: string;
     settleAmount: number;
@@ -12,250 +10,314 @@ interface UseCashDiscountProps {
     paymentDate: Date | undefined;
     selectedEntries: Array<{
         srNo: string;
-        dueDate?: string;  // For eligibility
-        totalCd?: number;  // CD already applied from previous payments
-        originalNetAmount?: number; // Original amount of the entry
+        dueDate?: string;
+        totalCd?: number;
+        originalNetAmount?: number;
         [key: string]: any;
     }>;
     toBePaidAmount: number;
-    paymentHistory: Payment[]; // Pass full payment history for calculations
-    selectedCustomerKey?: string | null; // Pass the key/ID of the currently selected supplier
-    editingPayment?: Payment | null; // Pass the payment being edited to exclude it from calculations
+    paymentHistory: Payment[];
+    selectedCustomerKey?: string | null;
+    editingPayment?: Payment | null;
 }
 
-// --- The Custom Hook: useCashDiscount ---
+type CdMode =
+    | 'partial_on_paid'
+    | 'on_unpaid_amount'
+    | 'on_full_amount'
+    | 'proportional_cd'
+    | 'on_previously_paid_no_cd';
+
+interface CdComputationContext {
+    amount: number;
+    baseAmount: number;
+    offset: number;
+    maxAvailable: number;
+}
+
+const clampNumber = (value: number, min: number, max: number) => {
+    if (Number.isNaN(value)) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+};
+
 export const useCashDiscount = ({
-    // Destructure all required props
-    paymentType, // Not used in calculation logic, but part of context
-    settleAmount, // Not used in calculation logic
-    totalOutstanding, // Current unpaid amount
-    paymentDate, // Date of current payment
-    selectedEntries = [], // List of items being paid
-    toBePaidAmount, // Amount user is paying now
+    paymentType,
+    settleAmount,
+    totalOutstanding,
+    paymentDate,
+    selectedEntries = [],
+    toBePaidAmount,
     paymentHistory = [],
     selectedCustomerKey,
-    editingPayment, // Payment being edited to exclude from calculations
+    editingPayment,
 }: UseCashDiscountProps) => {
-    
-    // 1. State Management with Persistence
     const [cdEnabled, setCdEnabled] = useState(false);
-    
-    // CD Percent with localStorage persistence
-    const [cdPercent, setCdPercent] = useState(() => {
+    const [cdPercentState, setCdPercentState] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('cdPercent');
-            return saved ? parseFloat(saved) : 2; // Default 2%
+            if (saved !== null) {
+                const parsed = parseFloat(saved);
+                return Number.isFinite(parsed) ? parsed : 2;
+            }
         }
         return 2;
     });
-    
-    const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_unpaid_amount' | 'on_full_amount' | 'proportional_cd' | 'on_previously_paid_no_cd'>('proportional_cd'); // Default to proportional_cd for exact distribution
+    const [cdAt, setCdAt] = useState<CdMode>('proportional_cd');
+    const [manualCdAmount, setManualCdAmount] = useState<number | null>(null);
 
-    // Save CD percent to localStorage when it changes
+    const updateCdPercentState = useCallback((value: number) => {
+        const sanitized = Number.isFinite(value) ? value : 0;
+        setCdPercentState(sanitized);
+    }, []);
+
+    const setCdPercent = useCallback(
+        (value: number) => {
+            setManualCdAmount(null);
+            updateCdPercentState(value);
+        },
+        [updateCdPercentState]
+    );
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            localStorage.setItem('cdPercent', cdPercent.toString());
+            localStorage.setItem('cdPercent', cdPercentState.toString());
         }
-    }, [cdPercent]);
+    }, [cdPercentState]);
 
-    // 2. Eligibility Check (Memoized)
     const eligibleForCd = useMemo(() => {
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
         effectivePaymentDate.setHours(0, 0, 0, 0);
 
-        return selectedEntries.some(e => {
-            if (!e.dueDate) return false;
-            const dueDate = new Date(e.dueDate);
+        return selectedEntries.some(entry => {
+            if (!entry.dueDate) return false;
+            const dueDate = new Date(entry.dueDate);
             dueDate.setHours(0, 0, 0, 0);
             return effectivePaymentDate <= dueDate;
         });
     }, [selectedEntries, paymentDate]);
 
-    // 3. Effect to Auto-Enable CD based on eligibility
     useEffect(() => {
-        // Only update if different to prevent infinite loop
-        setCdEnabled(prev => {
-            if (prev !== eligibleForCd) {
-                return eligibleForCd;
-            }
-            return prev;
-        });
+        setCdEnabled(prev => (prev !== eligibleForCd ? eligibleForCd : prev));
     }, [eligibleForCd]);
-    
-    // 4. Total CD Already Applied (Memoized) - Exclude editing payment
+
+    const selectedEntriesKey = useMemo(
+        () => selectedEntries.map(entry => entry.srNo).sort().join('|'),
+        [selectedEntries]
+    );
+
+    useEffect(() => {
+        setManualCdAmount(null);
+    }, [selectedEntriesKey, editingPayment?.id, cdAt, paymentType]);
+
+    useEffect(() => {
+        if (!cdEnabled) {
+            setManualCdAmount(null);
+        }
+    }, [cdEnabled]);
+
     const totalCdOnSelectedEntries = useMemo(() => {
         if (editingPayment) {
-            // During editing, calculate CD excluding the payment being edited
-            // This ensures fresh CD calculation based on total invoice value
             const selectedSrNos = selectedEntries.map(e => e.srNo);
-            
-            // Find all payments for these entries except the one being edited
-            const otherPaymentsForEntries = paymentHistory.filter(p => 
-                p.id !== editingPayment.id && 
-                p.paidFor && 
-                p.paidFor.some(pf => selectedSrNos.includes(pf.srNo))
+            const otherPaymentsForEntries = paymentHistory.filter(
+                payment =>
+                    payment.id !== editingPayment.id &&
+                    payment.paidFor &&
+                    payment.paidFor.some(pf => selectedSrNos.includes(pf.srNo))
             );
-            
-            // Calculate total CD from other payments
-            let totalCdFromOtherPayments = 0;
+
+            let totalCdFromOthers = 0;
             otherPaymentsForEntries.forEach(payment => {
                 if (payment.cdApplied && payment.cdAmount) {
-                    // Calculate proportion of this payment that applies to selected entries
-                    const totalPaymentAmount = payment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
-                    const amountForSelectedEntries = payment.paidFor?.reduce((sum, pf) => {
-                        return selectedSrNos.includes(pf.srNo) ? sum + pf.amount : sum;
-                    }, 0) || 0;
-                    
-                    if (totalPaymentAmount > 0) {
-                        const proportion = amountForSelectedEntries / totalPaymentAmount;
-                        totalCdFromOtherPayments += payment.cdAmount * proportion;
+                    const totalPaymentAmount =
+                        payment.paidFor?.reduce((sum, pf) => sum + (Number(pf.amount) || 0), 0) || 0;
+                    if (totalPaymentAmount <= 0) {
+                        return;
                     }
+                    const amountForSelected =
+                        payment.paidFor?.reduce((sum, pf) => {
+                            return selectedSrNos.includes(pf.srNo) ? sum + (Number(pf.amount) || 0) : sum;
+                        }, 0) || 0;
+                    const proportion = amountForSelected / totalPaymentAmount;
+                    totalCdFromOthers += payment.cdAmount * proportion;
                 }
             });
-            
-            return totalCdFromOtherPayments;
+            return totalCdFromOthers;
         }
-        
-        // Normal mode: use the total CD from selected entries
-        return selectedEntries.reduce((sum, entry) => sum + (entry.totalCd || 0), 0);
+
+        return selectedEntries.reduce((sum, entry) => sum + (Number(entry.totalCd) || 0), 0);
     }, [selectedEntries, editingPayment, paymentHistory]);
 
+    const cdContext: CdComputationContext = useMemo(() => {
+        const percent = Number.isFinite(cdPercentState) ? Math.max(cdPercentState, 0) : 0;
+        const outstanding = Math.max(totalOutstanding, 0);
 
-    // 5. Final Calculated CD Amount (Memoized)
-    const calculatedCdAmount = useMemo(() => {
-        if (!cdEnabled || cdPercent <= 0) {
-            return 0;
-        }
+        let baseAmount = 0;
+        let offset = 0;
+        let computedAmount = 0;
+        let maxAvailable = outstanding;
 
-        let baseAmountForCd = 0;
-        
         switch (cdAt) {
-            case 'partial_on_paid':
-                // IMPORTANT: If payment fully settles the outstanding, CD should be on FULL OUTSTANDING
-                // Otherwise, CD is on "to be paid" amount
-                
-                // Check: Calculate what settle amount would be if CD is on toBePaidAmount
-                // Settle Amount = toBePaidAmount + (toBePaidAmount × CD%)
-                // If this settle amount >= totalOutstanding, then payment fully settles
-                // In that case, CD should be on totalOutstanding instead
-                
-                const estimatedCdOnToBePaid = (toBePaidAmount * cdPercent) / 100;
-                const estimatedSettleAmount = toBePaidAmount + estimatedCdOnToBePaid;
-                
-                // If estimated settle amount fully covers or exceeds outstanding, it's a full settlement
-                // Also check: if the remaining outstanding (totalOutstanding - toBePaidAmount) is less than or equal to
-                // the maximum possible CD (totalOutstanding × cdPercent), then it will fully settle
-                const remainingOutstanding = totalOutstanding - toBePaidAmount;
-                const maxPossibleCd = (totalOutstanding * cdPercent) / 100;
-                
-                // Full settlement if:
-                // 1. Estimated settle amount >= totalOutstanding (with tolerance for rounding)
-                // 2. OR remaining outstanding <= max possible CD (meaning CD will cover the remainder)
-                const wouldFullySettle = (
-                    (estimatedSettleAmount >= (totalOutstanding - 1)) || // Allow ₹1 tolerance for rounding
-                    (remainingOutstanding <= maxPossibleCd + 1) // Remaining can be covered by CD
-                ) && totalOutstanding > 0;
-                
-                // Also check using actual settleAmount if available (for cases where settleAmount is already known)
-                const willFullySettleUsingSettleAmount = settleAmount > 0 && settleAmount >= (totalOutstanding - 0.01) && totalOutstanding > 0;
-                
-                if ((wouldFullySettle || willFullySettleUsingSettleAmount) && totalOutstanding > 0) {
-                    // Payment fully settles: CD should be on FULL OUTSTANDING amount
-                    baseAmountForCd = totalOutstanding;
-                } else {
-                    // Partial payment: CD on "to be paid" amount
-                    baseAmountForCd = toBePaidAmount;
-                }
+            case 'partial_on_paid': {
+                const isFullSettlement =
+                    outstanding > 0 &&
+                    (paymentType === 'Full' || settleAmount >= outstanding - 0.01);
+                const baseCandidate = isFullSettlement ? outstanding : Math.max(toBePaidAmount, 0);
+                baseAmount = baseCandidate;
+                maxAvailable = Math.min(maxAvailable, baseCandidate);
+                computedAmount = (baseCandidate * percent) / 100;
                 break;
-            case 'on_unpaid_amount':
-                baseAmountForCd = totalOutstanding;
-                break;
-            case 'on_full_amount': {
-                const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
-                const totalPotentialCD = (totalOriginalAmount * cdPercent) / 100;
-                
-                // During editing, ignore previous CD to allow fresh calculation
-                // This ensures CD is calculated based on total invoice value, not remaining CD
-                const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
-                
-                return Math.max(0, remainingCD);
             }
+            case 'on_unpaid_amount': {
+                baseAmount = outstanding;
+                maxAvailable = Math.min(maxAvailable, outstanding);
+                computedAmount = (baseAmount * percent) / 100;
+                break;
+            }
+            case 'on_full_amount':
             case 'proportional_cd': {
-                // Proportional CD: Exact distribution based on original amount proportion
-                // This ensures perfect proportional distribution without rounding issues
-                // Works for both full and partial payments
-                
-                const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
-                
-                if (totalOriginalAmount <= 0) {
-                    return 0;
-                }
-                
-                // Calculate total potential CD based on original amounts
-                const totalPotentialCD = (totalOriginalAmount * cdPercent) / 100;
-                
-                // Subtract already applied CD to get remaining CD
-                const remainingCD = totalPotentialCD - totalCdOnSelectedEntries;
-                
-                // Return the remaining CD that needs to be distributed
-                // Distribution will be done proportionally in payment-logic.ts
-                return Math.max(0, remainingCD);
-            }
-             case 'on_previously_paid_no_cd': {
-                if (!selectedCustomerKey || selectedEntries.length === 0) {
-                    return 0;
-                }
-                
-                // Get all serial numbers from selected entries
-                const selectedSrNos = selectedEntries.map(e => e.srNo);
-                
-                // Find all payments that were made for these specific serial numbers
-                const paymentsForSelectedEntries = paymentHistory.filter(p => 
-                    p.paidFor && p.paidFor.some(pf => selectedSrNos.includes(pf.srNo))
+                const totalOriginalAmount = selectedEntries.reduce(
+                    (sum, entry) => sum + (Number(entry.originalNetAmount) || 0),
+                    0
                 );
-                
-                // Filter those payments to find ones where no CD was applied
-                const previousPaymentsWithoutCD = paymentsForSelectedEntries.filter(p => 
-                    !p.cdApplied || p.cdAmount === 0
-                );
-                
-                // Calculate the total amount paid for selected entries without CD
-                let totalPaidWithoutCD = 0;
-                previousPaymentsWithoutCD.forEach(payment => {
-                    payment.paidFor?.forEach(pf => {
-                        if (selectedSrNos.includes(pf.srNo)) {
-                            totalPaidWithoutCD += pf.amount;
-                        }
-                    });
-                });
-                
-                baseAmountForCd = totalPaidWithoutCD;
+                baseAmount = totalOriginalAmount;
+                offset = totalCdOnSelectedEntries;
+                const totalPotential = (totalOriginalAmount * percent) / 100;
+                const remaining = Math.max(0, totalPotential - offset);
+                computedAmount = remaining;
+                maxAvailable = Math.min(maxAvailable, Math.max(0, totalOriginalAmount - offset));
                 break;
             }
-            default:
-                baseAmountForCd = 0;
-        }
-        
-        if (isNaN(baseAmountForCd) || baseAmountForCd <= 0) {
-            return 0;
+            case 'on_previously_paid_no_cd': {
+                const selectedSrNos = selectedEntries.map(e => e.srNo);
+                let totalPaidWithoutCD = 0;
+                paymentHistory.forEach(payment => {
+                    if (
+                        payment.paidFor &&
+                        payment.paidFor.some(pf => selectedSrNos.includes(pf.srNo)) &&
+                        (!payment.cdApplied || !payment.cdAmount)
+                    ) {
+                        payment.paidFor.forEach(pf => {
+                            if (selectedSrNos.includes(pf.srNo)) {
+                                totalPaidWithoutCD += Number(pf.amount) || 0;
+                            }
+                        });
+                    }
+                });
+                baseAmount = totalPaidWithoutCD;
+                maxAvailable = Math.min(maxAvailable, totalPaidWithoutCD);
+                computedAmount = (baseAmount * percent) / 100;
+                break;
+            }
+            default: {
+                baseAmount = 0;
+                computedAmount = 0;
+                maxAvailable = outstanding;
+                break;
+            }
         }
 
-        let calculatedCd = (baseAmountForCd * cdPercent) / 100;
-        
-        const finalCd = Math.max(0, calculatedCd);
-        
-        return Math.min(finalCd, totalOutstanding);
+        const cappedAmount = clampNumber(computedAmount, 0, outstanding);
+        const cappedMaxAvailable = clampNumber(
+            maxAvailable,
+            0,
+            outstanding || Number.MAX_SAFE_INTEGER
+        );
 
-    }, [cdEnabled, cdPercent, cdAt, toBePaidAmount, totalOutstanding, selectedEntries, totalCdOnSelectedEntries, paymentHistory, selectedCustomerKey]);
-    
+        return {
+            amount: Math.round(cappedAmount * 100) / 100,
+            baseAmount,
+            offset,
+            maxAvailable: cappedMaxAvailable,
+        };
+    }, [
+        cdAt,
+        cdPercentState,
+        paymentType,
+        settleAmount,
+        totalOutstanding,
+        toBePaidAmount,
+        selectedEntries,
+        totalCdOnSelectedEntries,
+        paymentHistory,
+    ]);
+
+    useEffect(() => {
+        if (manualCdAmount === null) {
+            return;
+        }
+        const maxAvailable = cdContext.maxAvailable;
+        const clamped = clampNumber(manualCdAmount, 0, maxAvailable);
+        if (clamped !== manualCdAmount) {
+            setManualCdAmount(clamped);
+            return;
+        }
+
+        const base = cdContext.baseAmount;
+        const offset = cdContext.offset;
+        let derivedPercent = 0;
+
+        if (['on_full_amount', 'proportional_cd'].includes(cdAt)) {
+            derivedPercent = base > 0 ? ((clamped + offset) / base) * 100 : 0;
+        } else {
+            derivedPercent = base > 0 ? (clamped / base) * 100 : 0;
+        }
+
+        derivedPercent = Number.isFinite(derivedPercent)
+            ? parseFloat(derivedPercent.toFixed(2))
+            : 0;
+
+        if (derivedPercent !== cdPercentState) {
+            updateCdPercentState(derivedPercent);
+        }
+    }, [manualCdAmount, cdContext, cdAt, cdPercentState, updateCdPercentState]);
+
+    const setCdAmount = useCallback(
+        (value: number) => {
+            const numeric = Number(value);
+            const sanitized = clampNumber(
+                Number.isFinite(numeric) ? numeric : 0,
+                0,
+                cdContext.maxAvailable
+            );
+            setManualCdAmount(sanitized);
+
+            const base = cdContext.baseAmount;
+            const offset = cdContext.offset;
+
+            let derivedPercent = 0;
+            if (['on_full_amount', 'proportional_cd'].includes(cdAt)) {
+                derivedPercent = base > 0 ? ((sanitized + offset) / base) * 100 : 0;
+            } else {
+                derivedPercent = base > 0 ? (sanitized / base) * 100 : 0;
+            }
+
+            derivedPercent = Number.isFinite(derivedPercent)
+                ? parseFloat(derivedPercent.toFixed(2))
+                : 0;
+            updateCdPercentState(derivedPercent);
+        },
+        [cdAt, cdContext, updateCdPercentState]
+    );
+
+    const cdPercent = cdPercentState;
+
+    const calculatedCdAmount = useMemo(() => {
+        const amount = manualCdAmount !== null ? manualCdAmount : cdContext.amount;
+        return Math.round(clampNumber(amount, 0, cdContext.maxAvailable) * 100) / 100;
+    }, [manualCdAmount, cdContext]);
+
     return {
         cdEnabled,
         setCdEnabled,
         cdPercent,
         setCdPercent,
-        cdAt, 
+        cdAt,
         setCdAt,
         calculatedCdAmount,
         eligibleForCd,
+        setCdAmount,
     };
 };
+
