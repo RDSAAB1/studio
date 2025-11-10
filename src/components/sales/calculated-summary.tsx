@@ -20,7 +20,6 @@ interface CalculatedSummaryProps {
     customer: Customer;
     onSave: () => void;
     onSaveAndPrint?: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan' | 'receipt') => void;
-    onNew: () => void;
     isEditing: boolean;
     onSearch?: (term: string) => void;
     onPrint?: () => void;
@@ -59,7 +58,6 @@ export const CalculatedSummary = ({
     customer, 
     onSave, 
     onSaveAndPrint, 
-    onNew, 
     isEditing, 
     onSearch, 
     onPrint, 
@@ -230,9 +228,6 @@ export const CalculatedSummary = ({
 
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>)}
-                        </Button>
-                        <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
-                            <PlusCircle className="h-4 w-4" />
                         </Button>
                     </div>
                 </div>

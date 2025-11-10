@@ -24,6 +24,7 @@ const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
     { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
     { value: 'on_full_amount', label: 'Full CD on Full Amount' },
+    { value: 'proportional_cd', label: 'Proportional CD (Exact Distribution)' },
     { value: 'on_previously_paid_no_cd', label: 'On Paid Amount (No CD)' },
 ];
 
@@ -142,12 +143,12 @@ export const PaymentForm = (props: any) => {
                             
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label htmlFor="settle-amount" className="text-xs">Settle Amount</Label>
-                                <Input id="settle-amount" type="number" value={Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-xs", paymentType === 'Partial' && 'bg-muted/50')} />
+                                <Input id="settle-amount" type="number" value={Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial' && rtgsFor !== 'Outsider'} className={cn("h-8 text-xs", paymentType === 'Partial' && rtgsFor !== 'Outsider' && 'bg-muted/50')} />
                             </div>
 
                              <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label className="text-xs font-bold text-green-600">To Be Paid</Label>
-                                <Input type="number" value={Math.round(finalAmountToBePaid)} onChange={(e) => handleToBePaidChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className={cn("h-8 text-xs font-bold text-green-600 border-green-500 bg-green-500/10", paymentType === 'Full' && 'bg-muted/50 border-input')} />
+                                <Input type="number" value={Math.round(finalAmountToBePaid)} onChange={(e) => handleToBePaidChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && rtgsFor !== 'Outsider'} className={cn("h-8 text-xs font-bold text-green-600 border-green-500 bg-green-500/10", paymentType === 'Full' && rtgsFor !== 'Outsider' && 'bg-muted/50 border-input')} />
                             </div>
                             
                             <div className="space-y-1 flex-grow min-w-[200px]">

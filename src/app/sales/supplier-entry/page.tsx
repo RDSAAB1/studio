@@ -1,5 +1,5 @@
-import SupplierEntryClient from "./supplier-entry-client";
+import SimpleSupplierEntryAllFields from "./simple-supplier-entry-all-fields";
 
 export default function SupplierEntryPage() {
-  return <SupplierEntryClient />;
+  return <SimpleSupplierEntryAllFields />;
 }

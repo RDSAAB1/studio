@@ -11,11 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Info, Pen, Printer, Trash } from "lucide-react";
+import { Info, Pen, Printer, Trash, Loader2 } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 
 
-export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier' }: any) {
+export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier', isDeleting = false }: any) {
     
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = entries.map((c: Customer) => c.id);
@@ -89,8 +89,12 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isDeleting}>
+                                                    {isDeleting ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                                    ) : (
                                                     <Trash className="h-4 w-4 text-destructive" />
+                                                    )}
                                                 </Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
@@ -101,8 +105,17 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => onDelete(entry.id)}>Continue</AlertDialogAction>
+                                                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onDelete(entry.id)} disabled={isDeleting}>
+                                                        {isDeleting ? (
+                                                            <>
+                                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                                Deleting...
+                                                            </>
+                                                        ) : (
+                                                            'Continue'
+                                                        )}
+                                                    </AlertDialogAction>
                                                 </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>

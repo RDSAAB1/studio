@@ -41,7 +41,6 @@ export default function SupplierEntryRefactored() {
     handleCalculationFieldChange,
     handleSrNoBlur,
     resetFormToState,
-    handleNew,
     handleSubmit,
     setSuppliers,
     setPaymentHistory,
@@ -152,17 +151,23 @@ export default function SupplierEntryRefactored() {
 
   // Handle edit action
   const handleEdit = useCallback((supplier: Customer) => {
-    resetFormToState(supplier);
+    // Clear any existing auto-fill data first
+    setAutoFillData(null);
+    
+    // Set editing state
     setIsEditing(true);
     
-    // Auto-fill all fields with supplier data (same as serial number blur)
+    // Reset form to supplier state immediately
+    resetFormToState(supplier);
+    
+    // Auto-fill all fields with supplier data
     const allFields = [
         'date', 'term', 'name', 'so', 'address', 'contact', 'vehicleNo', 
         'variety', 'grossWeight', 'teirWeight', 'rate', 'kartaPercentage', 
         'labouryRate', 'kanta', 'paymentType'
     ];
     
-    // Create auto-fill data object
+    // Create auto-fill data object for UI consistency
     const autoFillData: Record<string, any> = {};
     allFields.forEach(field => {
         const value = supplier[field as keyof Customer];
@@ -171,28 +176,32 @@ export default function SupplierEntryRefactored() {
         }
     });
     
-    // Set auto-fill data for immediate UI update FIRST
+    // Set auto-fill data for UI update
     console.log('Edit Auto-Fill Data:', autoFillData);
     setAutoFillData(autoFillData);
     
-    // Then set form values after a small delay to ensure auto-fill data is processed
-    setTimeout(() => {
-        allFields.forEach(field => {
-            const value = supplier[field as keyof Customer];
-            if (value !== undefined && value !== null) {
-                form.setValue(field as any, value);
-            }
-        });
-        
-        // Run calculations with the filled data
-        performHeavyCalculations(supplier, true);
-    }, 10);
+    // Force set all form values to override any existing values
+    allFields.forEach(field => {
+        const value = supplier[field as keyof Customer];
+        if (value !== undefined && value !== null) {
+            form.setValue(field as any, value, { shouldDirty: true, shouldTouch: true });
+        }
+    });
+    
+    // Handle date field specially
+    if (supplier.date) {
+        const dateValue = typeof supplier.date === 'string' ? new Date(supplier.date) : supplier.date;
+        form.setValue('date', dateValue, { shouldDirty: true, shouldTouch: true });
+    }
+    
+    // Run calculations with the filled data
+    performHeavyCalculations(supplier, true);
     
     toast({ 
         title: "Supplier loaded for editing!", 
         description: `All fields filled for ${supplier.name} (SR# ${supplier.srNo})` 
     });
-  }, [resetFormToState, setIsEditing, form, setAutoFillData, performHeavyCalculations, toast]);
+  }, [setIsEditing, resetFormToState, form, setAutoFillData, performHeavyCalculations, toast]);
 
   // Handle delete action
   const handleDelete = useCallback((supplier: Customer) => {
@@ -254,7 +263,7 @@ export default function SupplierEntryRefactored() {
         isLoading={isLoading}
         currentSupplier={currentSupplier}
         receiptSettings={receiptSettings}
-        onNew={handleNew}
+        onClear={handleNew}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onPrintReceipt={handlePrintReceipt}

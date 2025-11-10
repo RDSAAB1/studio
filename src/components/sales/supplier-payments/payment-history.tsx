@@ -13,40 +13,130 @@ import { formatCurrency } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
-export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit }: any) => {
+export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers }: any) => {
+    // Helper function to get receipt holder name from supplier data
+    const getReceiptHolderName = React.useCallback((payment: any) => {
+        // First try parchiName field
+        if (payment.parchiName) return payment.parchiName;
+        
+        // If no parchiName, try to get from paidFor array
+        if (payment.paidFor && payment.paidFor.length > 0) {
+            const firstPaidFor = payment.paidFor[0];
+            if (firstPaidFor.supplierName) return firstPaidFor.supplierName;
+            
+            // If no supplierName in paidFor, try to find from suppliers data
+            if (suppliers && firstPaidFor.srNo) {
+                const supplier = suppliers.find((s: any) => s.srNo === firstPaidFor.srNo);
+                if (supplier) return supplier.name;
+            }
+        }
+        
+        // Fallback to parchiNo
+        return payment.parchiNo || '';
+    }, [suppliers]);
+
+    // Helper function to get receipt numbers from paidFor array
+    const getReceiptNumbers = React.useCallback((payment: any) => {
+        if (payment.paidFor && payment.paidFor.length > 0) {
+            return payment.paidFor.map((pf: any) => pf.srNo).join(', ');
+        }
+        return payment.parchiNo || '';
+    }, []);
+
+    // Helper function to check if receipt numbers should be on new line
+    const shouldReceiptNumbersBeOnNewLine = React.useCallback((payment: any) => {
+        const receiptNumbers = getReceiptNumbers(payment);
+        return receiptNumbers.split(',').length > 3;
+    }, [getReceiptNumbers]);
+    
     return (
         <Card>
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Payment History</CardTitle>
+                <CardTitle className="text-base">
+                    {title || 'Payment History'} 
+                    <span className="ml-2 text-sm text-muted-foreground">({payments.length})</span>
+                </CardTitle>
                 {onExport && <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>}
             </CardHeader>
             <CardContent className="p-0">
-                <ScrollArea className="h-96">
-                    <div className="overflow-x-auto">
-                        <Table>
+                <div className="overflow-x-auto overflow-y-auto max-h-96">
+                    <div className="min-w-[1000px]">
+                        <Table className="w-full">
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead className="p-2 text-xs">ID</TableHead>
-                                    <TableHead className="p-2 text-xs">Date</TableHead>
-                                    <TableHead className="p-2 text-xs">Method</TableHead>
-                                    <TableHead className="p-2 text-xs">Ref (SR#)</TableHead>
-                                    <TableHead className="text-right p-2 text-xs">Amount</TableHead>
-                                    <TableHead className="text-right p-2 text-xs">CD</TableHead>
-                                    <TableHead className="text-center p-2 text-xs">Actions</TableHead>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID & 6R</TableHead>
+                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
+                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
+                                    <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
+                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank</TableHead>
+                                    <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details</TableHead>
+                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate</TableHead>
+                                    <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
+                                    <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
+                                    <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {payments.map((p: any) => (
-                                    <TableRow key={p.id}>
-                                        <TableCell className="font-mono text-xs p-2">{p.paymentId || p.rtgsSrNo}</TableCell>
-                                        <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
-                                        <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
-                                        <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}>
-                                            {(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}
+                                    <TableRow key={p.id} className="hover:bg-muted/50">
+                                        <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
+                                            <div className="text-foreground font-semibold text-[11px] break-words">
+                                                {p.paymentId || p.rtgsSrNo}
+                                            </div>
+                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
+                                                {p.sixRNo || ''}
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(p.amount)}</TableCell>
-                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(p.cdAmount)}</TableCell>
-                                        <TableCell className="text-center p-0">
+                                        <TableCell className="p-1 text-[11px] w-20">
+                                            <div className="text-foreground font-semibold break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
+                                        </TableCell>
+                                        <TableCell className="p-1 text-[11px] w-20">
+                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
+                                        </TableCell>
+                                        <TableCell className="p-1 text-[11px] w-40" title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)}`}>
+                                            <div className="break-words font-bold text-foreground text-[11px]">
+                                                {p.supplierName || ''}
+                                            </div>
+                                            <div className="text-foreground/90 text-[11px] mt-0.5 break-words font-semibold">
+                                                {getReceiptHolderName(p)}
+                                            </div>
+                                            <div className="text-muted-foreground text-[11px] mt-0.5">
+                                                <div className="break-words font-medium">
+                                                    {getReceiptNumbers(p)}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
+                                            <div className="break-words text-foreground font-bold text-[11px]">
+                                                {p.bankName || ''}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
+                                            <div className="text-foreground text-[11px] font-bold break-words">
+                                                {p.bankAcNo || ''}
+                                            </div>
+                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
+                                                {p.bankBranch || ''}
+                                            </div>
+                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
+                                                {p.bankIfsc || ''}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
+                                            <div className="text-foreground text-[11px] font-bold break-words">
+                                                {p.quantity || 0}
+                                            </div>
+                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
+                                                {p.rate || 0}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right p-1 text-[11px] w-24 font-mono">
+                                            <div className="break-words text-foreground font-bold">{formatCurrency(p.amount)}</div>
+                                        </TableCell>
+                                        <TableCell className="text-right p-1 text-[11px] w-20 font-mono">
+                                            <div className="break-words text-foreground font-semibold">{formatCurrency(p.cdAmount)}</div>
+                                        </TableCell>
+                                        <TableCell className="text-center p-0 w-24">
                                             <div className="flex justify-center items-center gap-0">
                                                 {p.receiptType === 'RTGS' && (
                                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRtgs(p)}>
@@ -81,13 +171,13 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                 ))}
                                 {payments.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                        <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </div>
-                </ScrollArea>
+                </div>
             </CardContent>
         </Card>
     );

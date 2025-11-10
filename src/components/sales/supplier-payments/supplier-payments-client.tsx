@@ -53,11 +53,12 @@ export default function SupplierPaymentsClient() {
     return (
         <div className="space-y-3">
              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                    <TabsTrigger value="history">Full History</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="process">Payment Process</TabsTrigger>
+                    <TabsTrigger value="cash">Cash History</TabsTrigger>
+                    <TabsTrigger value="rtgs">RTGS History</TabsTrigger>
                 </TabsList>
-                <TabsContent value="processing" className="space-y-3 mt-4">
+                <TabsContent value="process" className="mt-4">
                      <Card>
                         <CardHeader className="p-0">
                             <div className="flex items-center justify-between p-3 border-b">
@@ -114,13 +115,24 @@ export default function SupplierPaymentsClient() {
                         </CardContent>
                     </Card>
                 </TabsContent>
-                <TabsContent value="history" className="mt-4">
+                <TabsContent value="cash" className="mt-4">
                     <PaymentHistory
-                        payments={hook.paymentHistory}
+                        payments={hook.paymentHistory.filter((p: Payment) => p.receiptType === 'Cash')}
                         onShowDetails={hook.setSelectedPaymentForDetails}
                         onPrintRtgs={hook.setRtgsReceiptData}
                         onEdit={hook.handleEditPayment}
                         onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
+                        title="Cash Payment History"
+                    />
+                </TabsContent>
+                <TabsContent value="rtgs" className="mt-4">
+                    <PaymentHistory
+                        payments={hook.paymentHistory.filter((p: Payment) => p.receiptType === 'RTGS')}
+                        onShowDetails={hook.setSelectedPaymentForDetails}
+                        onPrintRtgs={hook.setRtgsReceiptData}
+                        onEdit={hook.handleEditPayment}
+                        onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
+                        title="RTGS Payment History"
                     />
                 </TabsContent>
             </Tabs>
@@ -155,10 +167,10 @@ export default function SupplierPaymentsClient() {
                 isOpen={isOutstandingModalOpen}
                 onOpenChange={setIsOutstandingModalOpen}
                 customerName={toTitleCase(hook.customerSummaryMap.get(hook.selectedCustomerKey || '')?.name || '')}
-                entries={transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0)}
+                entries={transactionsForSelectedSupplier}
                 selectedIds={hook.selectedEntryIds}
                 onSelect={(id: string) => hook.setSelectedEntryIds((prev: Set<string>) => { const newSet = new Set(prev); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } return newSet; })}
-                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.filter((s:any) => parseFloat(String(s.netAmount)) > 0).map((c: any) => c.id) : []))}
+                onSelectAll={(checked: boolean) => hook.setSelectedEntryIds(new Set(checked ? transactionsForSelectedSupplier.map((c: any) => c.id) : []))}
                 onConfirm={() => setIsOutstandingModalOpen(false)}
                 onCancel={() => { setIsOutstandingModalOpen(false); hook.setSelectedCustomerKey(null); hook.setSelectedEntryIds(new Set()); }}
             />

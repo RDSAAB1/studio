@@ -14,7 +14,6 @@ interface SupplierEntryActionsProps {
   receiptSettings: ReceiptSettings | null;
   
   // Actions
-  onNew: () => void;
   onEdit: (supplier: Customer) => void;
   onDelete: (supplier: Customer) => void;
   onPrintReceipt: (suppliers: Customer[]) => void;
@@ -35,7 +34,6 @@ export const SupplierEntryActions = ({
   isLoading,
   currentSupplier,
   receiptSettings,
-  onNew,
   onEdit,
   onDelete,
   onPrintReceipt,
@@ -93,14 +91,6 @@ export const SupplierEntryActions = ({
 
   return (
     <div className="flex flex-wrap gap-2 mb-4">
-      {/* Primary Actions */}
-      <Button
-        onClick={onNew}
-        disabled={isLoading}
-        className="bg-blue-600 hover:bg-blue-700"
-      >
-        New Entry
-      </Button>
 
       {isEditing && (
         <Button

@@ -11,7 +11,7 @@ import { fixSupplierSerialDuplicates } from '@/scripts/fix-supplier-serial-dupli
 
 export default function MigrationsPage() {
     const [isRunning1, setIsRunning1] = useState(false);
-    const [result1, setResult1] = useState<{ success: boolean; count?: number; skipped?: number; error?: any } | null>(null);
+    const [result1, setResult1] = useState<{ success: boolean; count?: number; renamed?: number; duplicatesFixed?: number; skipped?: number; error?: any } | null>(null);
     
     const [isRunning2, setIsRunning2] = useState(false);
     const [result2, setResult2] = useState<{ success: boolean; count?: number; error?: any } | null>(null);
@@ -122,8 +122,14 @@ export default function MigrationsPage() {
                                             ) : (
                                                 <>
                                                     <p>✅ Updated {result1.count} RTGS payment{result1.count > 1 ? 's' : ''}</p>
+                                                    {result1.renamed && result1.renamed > 0 && (
+                                                        <p className="text-green-700 mt-1">✅ Renamed {result1.renamed} document{result1.renamed > 1 ? 's' : ''} (R##### → RT#####)</p>
+                                                    )}
+                                                    {result1.duplicatesFixed && result1.duplicatesFixed > 0 && (
+                                                        <p className="text-green-700 mt-1">✅ Fixed {result1.duplicatesFixed} duplicate ID{result1.duplicatesFixed > 1 ? 's' : ''}</p>
+                                                    )}
                                                     {result1.skipped && result1.skipped > 0 && (
-                                                        <p className="text-amber-700 mt-1">⚠️ Skipped {result1.skipped} payment{result1.skipped > 1 ? 's' : ''} (missing rtgsSrNo)</p>
+                                                        <p className="text-amber-700 mt-1">⚠️ Skipped {result1.skipped} payment{result1.skipped > 1 ? 's' : ''} (invalid format)</p>
                                                     )}
                                                 </>
                                             )}
@@ -143,7 +149,9 @@ export default function MigrationsPage() {
                         <p className="text-sm text-amber-900 font-medium">⚠️ Important Notes:</p>
                         <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
                             <li>This migration is safe to run multiple times</li>
-                            <li>It only updates RTGS payments where paymentId doesn't match rtgsSrNo</li>
+                            <li>Fixes IDs starting with "R" to "RT" format (e.g., R00001 → RT00001)</li>
+                            <li>Detects and fixes duplicate RTGS IDs by assigning unique sequential IDs</li>
+                            <li>Renames document IDs to match corrected paymentId and rtgsSrNo</li>
                             <li>Check the browser console for detailed logs</li>
                             <li>Refresh the payments page after running to see updated data</li>
                         </ul>

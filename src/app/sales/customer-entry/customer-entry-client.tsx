@@ -669,96 +669,56 @@ export default function CustomerEntryClient() {
   }
 
   return (
-    <div className="space-y-4">
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(() => onSubmit())} className="space-y-4">
-            <CustomerForm 
-                form={form}
-                handleSrNoBlur={handleSrNoBlur}
-                handleContactBlur={handleContactBlur}
-                varietyOptions={varietyOptions}
-                paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
-                handleAddOption={addOption}
-                handleUpdateOption={updateOption}
-                handleDeleteOption={deleteOption}
-                allCustomers={safeCustomers}
-            />
-            
-            <CalculatedSummary
-                customer={currentCustomer}
-                onSave={() => form.handleSubmit(() => onSubmit())()}
-                onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
-                isEditing={isEditing}
-                isCustomerForm={true}
-                isBrokerageIncluded={form.watch('isBrokerageIncluded')}
-                onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
-                onImport={handleImport}
-                onExport={handleExport}
-            />
-        </form>
-      </FormProvider>      
-      
-      <EntryTable
-        entries={filteredCustomers} 
-        onEdit={handleEdit} 
-        onDelete={handleDelete} 
-        onShowDetails={handleShowDetails}
-        onPrint={handlePrint}
-        selectedIds={selectedCustomerIds}
-        onSelectionChange={setSelectedCustomerIds}
-        entryType="Customer"
-        onPrintRow={(entry: Customer) => handlePrint([entry])}
+    <div className="flex flex-col gap-4">
+      <CustomerEntryToolbar
+        form={form}
+        onAddEntry={handleAddEntry}
+        onUpdateEntry={handleUpdateEntry}
+        onToggleFilters={() => setIsFilterPanelOpen(prev => !prev)}
+        isLoading={isLoading}
       />
-      {hasMoreCustomers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
-
+      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+        <CustomerEntryFilters
+          form={form}
+          isOpen={isFilterPanelOpen}
+          customers={customers}
+          onSelectCustomer={setSelectedCustomer}
+        />
+        <CustomerEntryMainPanel
+          form={form}
+          customers={filteredCustomers}
+          onShowDetails={handleShowDetails}
+          onPrint={handlePrint}
+        />
+      </div>
       <CustomerDetailsDialog
         customer={detailsCustomer}
-        onOpenChange={() => setDetailsCustomer(null)}
-        onPrint={handleOpenPrintPreview}
-        paymentHistory={paymentHistory}
+        open={!!detailsCustomer}
+        onOpenChange={(open) => !open && setDetailsCustomer(null)}
       />
-        
-      <DocumentPreviewDialog
-        isOpen={isDocumentPreviewOpen}
-        setIsOpen={setIsDocumentPreviewOpen}
-        customer={documentPreviewCustomer}
-        documentType={documentType}
-        setDocumentType={setDocumentType}
-        receiptSettings={receiptSettings}
-      />
-      
-       <ReceiptPrintDialog
+      <ReceiptPrintDialog
         receipts={receiptsToPrint}
         settings={receiptSettings}
         onOpenChange={() => setReceiptsToPrint([])}
         isCustomer={true}
       />
-      
       <ConsolidatedReceiptPrintDialog
         data={consolidatedReceiptData}
         settings={receiptSettings}
         onOpenChange={() => setConsolidatedReceiptData(null)}
         isCustomer={true}
       />
-
       <UpdateConfirmDialog
         isOpen={isUpdateConfirmOpen}
         onOpenChange={setIsUpdateConfirmOpen}
         onConfirm={(deletePayments) => {
-            if(updateAction) {
-                updateAction(deletePayments);
-            }
+          if (updateAction) {
+            updateAction(deletePayments);
+          }
         }}
       />
     </div>
   );
 }
+
+

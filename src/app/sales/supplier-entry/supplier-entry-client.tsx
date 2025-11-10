@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntryWithValidation } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { StatementPreview } from "@/components/print-formats/statement-preview";
 
 
 const formSchema = z.object({
@@ -65,8 +66,22 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
+  };
+};
+
+// Function to get partially cleared form state (for New button) - keeps variety and payment type
+const getClearedFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return {
+    id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
+    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
   };
 };
 
@@ -96,18 +111,7 @@ export default function SupplierEntryClient() {
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = usePersistedState('supplier-entry-search', '');
-  const debouncedSearchTerm = useDebounce(searchTerm, 10);
-  
-  // Handle search with immediate clearing and performance optimization
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    // If clearing search, immediately show all results
-    if (!value.trim()) {
-      setSearchTerm('');
-      // Clear cache for fresh start
-      searchCache.current.clear();
-    }
-  };
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
@@ -118,60 +122,19 @@ export default function SupplierEntryClient() {
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   const safePaymentHistory = useMemo(() => Array.isArray(paymentHistory) ? paymentHistory : [], [paymentHistory]);
   
-  // Pre-index suppliers for faster search
-  const indexedSuppliers = useMemo(() => {
-    return safeSuppliers.map(supplier => ({
-      ...supplier,
-      searchIndex: [
-        supplier.name?.toLowerCase() || '',
-        supplier.contact || '',
-        supplier.srNo?.toLowerCase() || '',
-        supplier.so?.toLowerCase() || '',
-        supplier.address?.toLowerCase() || ''
-      ].join(' ')
-    }));
-  }, [safeSuppliers]);
-  
-  // Search result cache
-  const searchCache = useRef(new Map<string, any[]>());
-  
-  // Clear cache when suppliers change
-  useEffect(() => {
-    searchCache.current.clear();
-  }, [safeSuppliers]);
-  
   const filteredSuppliers = useMemo(() => {
-    // Immediate return for empty search - no processing needed
-    if (!debouncedSearchTerm || !debouncedSearchTerm.trim()) {
+    if (!debouncedSearchTerm) {
       return safeSuppliers;
     }
-    
-    const filter = debouncedSearchTerm.trim().toLowerCase();
-    
-    // Check cache first
-    if (searchCache.current.has(filter)) {
-      return searchCache.current.get(filter) || [];
-    }
-    
-    // Use indexed search for faster filtering
-    const results = indexedSuppliers.filter(supplier => 
-      supplier.searchIndex.includes(filter)
-    );
-    
-    // Cache the results (limit cache size to prevent memory issues)
-    if (searchCache.current.size < 50) {
-      searchCache.current.set(filter, results);
-    }
-    
-    return results;
-  }, [safeSuppliers, indexedSuppliers, debouncedSearchTerm]);
-  
-  // Search performance stats
-  const searchStats = useMemo(() => ({
-    total: safeSuppliers.length,
-    filtered: filteredSuppliers.length,
-    isSearching: debouncedSearchTerm && debouncedSearchTerm.trim().length > 0
-  }), [safeSuppliers.length, filteredSuppliers.length, debouncedSearchTerm]);
+    const lowercasedFilter = debouncedSearchTerm.toLowerCase();
+    return safeSuppliers.filter(supplier => {
+      return (
+        supplier.name?.toLowerCase().startsWith(lowercasedFilter) ||
+        supplier.contact?.startsWith(lowercasedFilter) ||
+        supplier.srNo?.toLowerCase().startsWith(lowercasedFilter)
+      );
+    });
+  }, [safeSuppliers, debouncedSearchTerm]);
 
 
   const form = useForm<FormValues>({
@@ -183,7 +146,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntryWithValidation(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -199,24 +162,6 @@ export default function SupplierEntryClient() {
         toast({ title, description, variant: 'destructive', duration: 7000 });
       }
   }, [safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers, toast]);
-
-  const handleCalculationFieldChange = useCallback((fieldName: string, value: string) => {
-    // Run calculations in background to prevent UI lag
-    setTimeout(() => {
-      const currentValues = form.getValues();
-      const updatedValues = { ...currentValues, [fieldName]: parseFloat(value) || 0 };
-      performCalculations(updatedValues, false);
-    }, 0);
-  }, [form, performCalculations]);
-
-  const handleTermBlur = useCallback((value: string) => {
-    // Trigger due date calculation when term changes
-    setTimeout(() => {
-      const currentValues = form.getValues();
-      const updatedValues = { ...currentValues, term: value };
-      performCalculations(updatedValues, true); // Show warnings for term changes
-    }, 0);
-  }, [form, performCalculations]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     setSuggestedSupplier(null);
@@ -256,26 +201,6 @@ export default function SupplierEntryClient() {
     performCalculations(formValues, false);
   }, [form, performCalculations]);
 
-  const handleNew = useCallback(() => {
-      setIsEditing(false);
-      setSuggestedSupplier(null);
-      let nextSrNum = 1;
-      if (safeSuppliers && safeSuppliers.length > 0) {
-        const highestSrNo = safeSuppliers.reduce((max, s) => {
-            return s.srNo > max ? s.srNo : max;
-        }, 'S00000');
-        nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
-      }
-      const newState = getInitialFormState(lastVariety, lastPaymentType);
-      newState.srNo = formatSrNo(nextSrNum, 'S');
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      newState.date = format(today, 'yyyy-MM-dd');
-      newState.dueDate = format(today, 'yyyy-MM-dd');
-      resetFormToState(newState);
-      form.setValue('date', new Date()); // Set today's date
-      setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -287,11 +212,10 @@ export default function SupplierEntryClient() {
     if (suppliers !== undefined) {
         setIsLoading(false);
         if (isInitialLoad.current) {
-            handleNew();
             isInitialLoad.current = false;
         }
     }
-}, [suppliers, handleNew]);
+}, [suppliers]);
 
 
   useEffect(() => {
@@ -346,14 +270,12 @@ export default function SupplierEntryClient() {
     }
   }
   
-  // REMOVED: form.watch subscription to eliminate lag
-  // Calculations are now only triggered by specific field changes via handleCalculationFieldChange
-  // useEffect(() => {
-  //   const subscription = form.watch((value) => {
-  //       performCalculations(value as Partial<FormValues>, false);
-  //   });
-  //   return () => subscription.unsubscribe();
-  // }, [form, performCalculations]);
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+        performCalculations(value as Partial<FormValues>, false);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, performCalculations]);
 
   
   const handleEdit = (id: string) => {
@@ -390,7 +312,6 @@ export default function SupplierEntryClient() {
 
   const onContactChange = (contactValue: string) => {
     form.setValue('contact', contactValue);
-    // Only search when contact is complete (10 digits) to reduce lag
     if (contactValue.length === 10 && suppliers) {
       const latestEntryForContact = suppliers
           .filter(c => c.contact === contactValue)
@@ -405,11 +326,45 @@ export default function SupplierEntryClient() {
     }
   };
 
-  // REMOVED: findAndSuggestSimilarSupplier to eliminate lag
-  // This function was running expensive Levenshtein distance calculations on every keystroke
   const findAndSuggestSimilarSupplier = () => {
-    // No-op function to prevent errors
+    if (form.formState.isSubmitting || isEditing) {
         setSuggestedSupplier(null);
+        return;
+    }
+
+    const { name, so } = form.getValues();
+    if (!name) {
+        setSuggestedSupplier(null);
+        return;
+    }
+
+    const currentNameNorm = name.replace(/\s+/g, '').toLowerCase();
+    const currentSoNorm = (so || '').replace(/\s+/g, '').toLowerCase();
+    
+    if (currentNameNorm.length < 3) {
+      setSuggestedSupplier(null);
+      return;
+    }
+    
+    let bestMatch: Customer | null = null;
+    let minDistance = Infinity;
+
+    const uniqueSuppliers = Array.from(new Map(suppliers?.map(s => [s.customerId, s])).values());
+    
+    for (const supplier of uniqueSuppliers) {
+        const supNameNorm = supplier.name.replace(/\s+/g, '').toLowerCase();
+        const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
+        
+        const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
+        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
+        const totalDist = nameDist + soDist;
+        
+        if (totalDist > 0 && totalDist < 5 && totalDist < minDistance) {
+            minDistance = totalDist;
+            bestMatch = supplier;
+        }
+    }
+    setSuggestedSupplier(bestMatch);
   };
   
   const applySuggestion = () => {
@@ -448,7 +403,7 @@ const handleDelete = async (id: string) => {
 
         toast({ title: "Entry and associated payments deleted.", variant: "success" });
         if (currentSupplier.id === id) {
-            handleNew();
+            // Entry deleted, no need to clear form
         }
     } catch (error) {
         console.error("Error deleting supplier and payments: ", error);
@@ -478,1235 +433,538 @@ const handleDelete = async (id: string) => {
         forceUnique: isForcedUnique,
     };
 
+    const dirtyFields = form.formState.dirtyFields as Partial<Record<keyof FormValues, any>>;
+    const isFieldDirty = (field: keyof FormValues) => {
+        const dirty = dirtyFields?.[field];
+        if (!dirty) return false;
+        if (typeof dirty === 'boolean') return dirty;
+        if (typeof dirty === 'object') return Object.values(dirty as any).some(Boolean);
+        return false;
+    };
+
+    const bulkPatch: Partial<Customer> = {};
+    if (isFieldDirty('name')) bulkPatch.name = completeEntry.name;
+    if (isFieldDirty('so')) bulkPatch.so = completeEntry.so;
+    if (isFieldDirty('address')) bulkPatch.address = completeEntry.address;
+    if (isFieldDirty('contact')) bulkPatch.contact = completeEntry.contact;
+    if (isFieldDirty('vehicleNo')) bulkPatch.vehicleNo = completeEntry.vehicleNo;
+    if (isFieldDirty('variety')) bulkPatch.variety = completeEntry.variety;
+    if (isFieldDirty('paymentType')) bulkPatch.paymentType = completeEntry.paymentType;
+    if (isFieldDirty('term')) {
+        bulkPatch.term = completeEntry.term;
+        bulkPatch.dueDate = completeEntry.dueDate;
+    }
+    if (isFieldDirty('date')) {
+        bulkPatch.date = completeEntry.date;
+        if (!isFieldDirty('term')) {
+            const termDays = Number(values.term || currentSupplier.term || 0) || 0;
+            const baseDate = new Date(values.date);
+            const dueDate = new Date(baseDate.getTime() + termDays * 24 * 60 * 60 * 1000);
+            bulkPatch.dueDate = format(dueDate, 'yyyy-MM-dd');
+        }
+    }
+    if (bulkPatch.name || bulkPatch.so || bulkPatch.address || bulkPatch.contact) {
+        bulkPatch.customerId = completeEntry.customerId;
+    }
+
 
     try {
-        if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          await deleteSupplier(currentSupplier.id);
-        }
-
-        if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
-            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            await addSupplier(updatedEntry);
-            if (callback) callback(updatedEntry); else handleNew();
+        if (isEditing && currentSupplier.id) {
+            // Update existing supplier
+            console.log('Updating supplier:', currentSupplier.id, 'with data:', completeEntry);
+            
+            // Prepare update data (exclude id from update)
+            const { id, ...updateData } = completeEntry as any;
+            
+            if (deletePayments) {
+                await deletePaymentsForSrNo(completeEntry.srNo);
+                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+                const { id: _, ...updateDataWithoutPayments } = updatedEntry as any;
+                const success = await updateSupplier(currentSupplier.id, updateDataWithoutPayments);
+                
+                if (success) {
+                    if (callback) callback(updatedEntry);
+                    toast({ title: "Entry updated and payments deleted successfully.", variant: "success" });
+                    if (selectedSupplierIds.size > 0 && Object.keys(bulkPatch).length > 0) {
+                        await applyBulkUpdates(bulkPatch, currentSupplier.id);
+                    }
+                } else {
+                    throw new Error('Failed to update supplier');
+                }
+            } else {
+                const success = await updateSupplier(currentSupplier.id, updateData);
+                
+                if (success) {
+                    if (callback) callback(completeEntry);
+                    toast({ title: "Entry updated successfully.", variant: "success" });
+                    if (selectedSupplierIds.size > 0 && Object.keys(bulkPatch).length > 0) {
+                        await applyBulkUpdates(bulkPatch, currentSupplier.id);
+                    }
+                } else {
+                    throw new Error('Failed to update supplier');
+                }
+            }
         } else {
-            await addSupplier(completeEntry);
-            if (callback) callback(completeEntry); else handleNew();
+            // Add new supplier
+            if (deletePayments) {
+                await deletePaymentsForSrNo(completeEntry.srNo);
+                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+                await addSupplier(updatedEntry);
+                if (callback) callback(updatedEntry);
+                toast({ title: "Entry saved and payments deleted successfully.", variant: "success" });
+            } else {
+                await addSupplier(completeEntry);
+                if (callback) callback(completeEntry);
+                toast({ title: "Entry saved successfully.", variant: "success" });
+            }
         }
 
-        toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error saving supplier:", error);
-        toast({ title: "Failed to save entry.", variant: "destructive" });
-    }
-  };
-
-  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
-    if (suggestedSupplier && !values.forceUnique) {
-      return; // Do not submit if a suggestion is active and user hasn't chosen an action
-    }
-    if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
-        if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
-            setIsUpdateConfirmOpen(true);
-            return;
-        }
-    }
-    executeSubmit(values, false, callback);
-  };
-
-  const handleSaveAndPrint = async () => {
-    const isValid = await form.trigger();
-    if (isValid) {
-      onSubmit(form.getValues(), (savedEntry) => {
-        handleSinglePrint(savedEntry);
-        handleNew();
-      });
-    } else {
-      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
-    }
-  };
-  
-  const handleShowDetails = (supplier: Customer) => {
-    // Show details using existing DetailsDialog (same as supplier profile)
-    setDetailsSupplier(supplier);
-  };
-  
-  const handleSinglePrint = (entry: Customer) => {
-    setReceiptsToPrint([entry]);
-    setConsolidatedReceiptData(null);
-  };
-  
-  const handlePrint = () => {
-    if (selectedSupplierIds.size > 0) {
-        const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
-        if (entriesToPrint.length === 0) {
-            toast({ title: "No selected entries found.", variant: "destructive" });
-            return;
-        }
-
-        if (entriesToPrint.length === 1) {
-            setReceiptsToPrint(entriesToPrint);
-            setConsolidatedReceiptData(null);
-        } else {
-            const firstCustomerId = entriesToPrint[0].customerId;
-            const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-    
-            if (!allSameCustomer) {
-                toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
-                return;
-            }
-            
-            const supplier = entriesToPrint[0];
-            const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-            
-            setConsolidatedReceiptData({
-                supplier: {
-                    name: supplier.name,
-                    so: supplier.so,
-                    address: supplier.address,
-                    contact: supplier.contact,
-                },
-                entries: entriesToPrint,
-                totalAmount: totalAmount,
-                date: format(new Date(), "dd-MMM-yy"),
-            });
-            setReceiptsToPrint([]);
-        }
-    } else {
-      const formValues = form.getValues();
-      const isValid = form.trigger();
-      if(isValid && formValues.name && formValues.contact){
-        handleSaveAndPrint();
-      } else {
-         toast({ title: "Please fill form or select entries to print.", variant: "destructive" });
-      }
-    }
-  };
-
-    const handleExport = () => {
-        if (!suppliers) return;
-        const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntryWithValidation(c as FormValues, paymentHistory || [], [], 800000, []);
-            return {
-                'SR NO.': c.srNo,
-                'DATE': c.date,
-                'TERM': c.term,
-                'DUE DATE': calculated.dueDate,
-                'NAME': c.name,
-                'S/O': c.so,
-                'ADDRESS': c.address,
-                'CONTACT': c.contact,
-                'VEHICLE NO': c.vehicleNo,
-                'VARIETY': c.variety,
-                'GROSS WT': c.grossWeight,
-                'TEIR WT': c.teirWeight,
-                'FINAL WT': calculated.weight,
-                'KARTA %': c.kartaPercentage,
-                'KARTA WT': calculated.kartaWeight,
-                'NET WT': calculated.netWeight,
-                'RATE': c.rate,
-                'LABOURY RATE': c.labouryRate,
-                'LABOURY AMT': calculated.labouryAmount,
-                'KANTA': c.kanta,
-                'AMOUNT': calculated.amount,
-                'NET AMOUNT': calculated.originalNetAmount,
-                'PAYMENT TYPE': c.paymentType,
-            };
+        toast({ 
+            title: "Failed to save entry.", 
+            description: error?.message || "Please try again.",
+            variant: "destructive" 
         });
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
-        XLSX.writeFile(workbook, "SupplierEntries.xlsx");
-        toast({title: "Exported", description: "Supplier data has been exported."});
-    };
-
-    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-                
-                let nextSrNum = (suppliers || []).length > 0 ? Math.max(...(suppliers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-
-                for (const item of json) {
-                     const supplierData: Customer = {
-                        id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                        term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                        name: toTitleCase(item['NAME']),
-                        so: toTitleCase(item['S/O'] || ''),
-                        address: toTitleCase(item['ADDRESS'] || ''),
-                        contact: String(item['CONTACT'] || ''),
-                        vehicleNo: toTitleCase(item['VEHICLE NO'] || ''),
-                        variety: toTitleCase(item['VARIETY'] || ''),
-                        grossWeight: parseFloat(item['GROSS WT']) || 0,
-                        teirWeight: parseFloat(item['TEIR WT']) || 0,
-                        weight: parseFloat(item['FINAL WT']) || 0,
-                        kartaPercentage: parseFloat(item['KARTA %']) || 0,
-                        kartaWeight: parseFloat(item['KARTA WT']) || 0,
-                        kartaAmount: parseFloat(item['KARTA AMT']) || 0,
-                        netWeight: parseFloat(item['NET WT']) || 0,
-                        rate: parseFloat(item['RATE']) || 0,
-                        labouryRate: parseFloat(item['LABOURY RATE']) || 0,
-                        labouryAmount: parseFloat(item['LABOURY AMT']) || 0,
-                        kanta: parseFloat(item['KANTA']) || 0,
-                        amount: parseFloat(item['AMOUNT']) || 0,
-                        originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
-                        netAmount: parseFloat(item['NET AMOUNT']) || 0,
-                        paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
-                        barcode: '',
-                        receiptType: 'Cash',
-                    };
-
-                    await addSupplier(supplierData);
-                }
-                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
-            } catch (error) {
-                console.error("Import failed:", error);
-                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
-            }
-        };
-        reader.readAsBinaryString(file);
-    };
-  
-    const handleDeleteAll = async () => {
-        try {
-            await deleteAllSuppliers();
-            await deleteAllPayments();
-            handleNew();
-        } catch (error) {
-            console.error("Error deleting all entries:", error);
-            toast({ title: "Failed to delete all entries", variant: "destructive" });
-        }
-    };
-
-    const handleUpdateSelected = async () => {
-        if (selectedSupplierIds.size === 0) {
-            toast({ title: "No entries selected", variant: "destructive" });
-            return;
-        }
-        toast({ title: "Updating selected entries...", description: `Updating ${selectedSupplierIds.size} entries.` });
-        try {
-            const updatedCount = await recalculateAndUpdateSuppliers(Array.from(selectedSupplierIds));
-            toast({ title: "Update Complete", description: `${updatedCount} entries were re-calculated and saved.`, variant: "success" });
-            setSelectedSupplierIds(new Set()); // Clear selection after update
-        } catch (error) {
-            console.error("Error updating selected entries:", error);
-            toast({ title: "Update Failed", variant: "destructive" });
-        }
-    };
-    
-    const handleDeleteSelected = async () => {
-      if (selectedSupplierIds.size === 0) {
-        toast({ title: "No entries selected", variant: "destructive" });
-        return;
-      }
-      toast({ title: "Deleting selected entries...", description: `Deleting ${selectedSupplierIds.size} entries.` });
-      try {
-        await deleteMultipleSuppliers(Array.from(selectedSupplierIds));
-        toast({ title: "Delete Complete", description: `${selectedSupplierIds.size} entries and their associated payments have been deleted.`, variant: "success" });
-        setSelectedSupplierIds(new Set()); // Clear selection after delete
-      } catch (error) {
-        console.error("Error deleting selected entries:", error);
-        toast({ title: "Delete Failed", variant: "destructive" });
-      }
-    };
-    
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-        if (e.key === 'Enter') {
-            const activeElement = document.activeElement as HTMLElement;
-            if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-                return;
-            }
-            e.preventDefault(); // Prevent form submission
-            const formEl = e.currentTarget;
-            const formElements = Array.from(formEl.elements).filter(el => 
-                (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
-                !el.hasAttribute('disabled') && 
-                (el as HTMLElement).offsetParent !== null
-            ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-
-            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-            
-            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-                formElements[currentElementIndex + 1].focus();
-            } else if (currentElementIndex === formElements.length - 1) {
-                // Optional: loop back to the first element or submit
-                // formElements[0].focus();
-            }
-        }
-    };
-    
-  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
-      if (event.ctrlKey) {
-          switch (event.key.toLowerCase()) {
-              case 's':
-                  event.preventDefault();
-                  form.handleSubmit((values) => onSubmit(values))();
-                  break;
-              case 'p':
-                  event.preventDefault();
-                  handleSaveAndPrint();
-                  break;
-              case 'n':
-                  event.preventDefault();
-                  handleNew();
-                  break;
-              case 'd':
-                  event.preventDefault();
-                  if (isEditing && currentSupplier.id) {
-                      handleDelete(currentSupplier.id);
-                  }
-                  break;
-          }
-      }
-  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
-
-  useEffect(() => {
-      document.addEventListener('keydown', handleKeyboardShortcuts);
-      return () => {
-          document.removeEventListener('keydown', handleKeyboardShortcuts);
-      };
-  }, [handleKeyboardShortcuts]);
-
-
-  if (!isClient) {
-    return null;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
-        <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
-            <SupplierForm 
-                form={form}
-                handleSrNoBlur={handleSrNoBlur}
-                onContactChange={onContactChange}
-                handleNameOrSoBlur={findAndSuggestSimilarSupplier}
-                handleTermBlur={handleTermBlur}
-                varietyOptions={varietyOptions}
-                paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
-                handleAddOption={addOption}
-                handleUpdateOption={updateOption}
-                handleDeleteOption={deleteOption}
-                allSuppliers={safeSuppliers}
-                handleCalculationFieldChange={handleCalculationFieldChange}
-            />
-            
-            <CalculatedSummary 
-                customer={currentSupplier}
-                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
-                onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
-                isEditing={isEditing}
-                onSearch={handleSearchChange}
-                onPrint={handlePrint}
-                selectedIdsCount={selectedSupplierIds.size}
-                onImport={handleImport}
-                onExport={handleExport}
-                onUpdateSelected={handleUpdateSelected}
-                onDeleteSelected={handleDeleteSelected}
-                onDeleteAll={handleDeleteAll}
-            />
-        </form>
-      </FormProvider>      
-
-      <AlertDialog open={!!suggestedSupplier} onOpenChange={() => setSuggestedSupplier(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-yellow-500" />
-                    Did you mean this supplier?
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                    A supplier with a very similar name already exists. Is this the same person?
-                </AlertDialogDescription>
-                <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                    <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-                    <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-                    <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-                </div>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogAction onClick={() => {
-                    form.setValue('forceUnique', true);
-                    setSuggestedSupplier(null);
-                }}>No, Create New</AlertDialogAction>
-                <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <EntryTable 
-        entries={filteredSuppliers} 
-        onEdit={handleEdit} 
-        onDelete={handleDelete} 
-        onShowDetails={handleShowDetails}
-        selectedIds={selectedSupplierIds}
-        onSelectionChange={setSelectedSupplierIds}
-        onPrintRow={handleSinglePrint}
-      />
-        
-      <DetailsDialog 
-        isOpen={!!detailsSupplier}
-        onOpenChange={() => setDetailsSupplier(null)}
-        customer={detailsSupplier}
-        paymentHistory={paymentHistory}
-      />
-      
-      <ReceiptPrintDialog
-        receipts={receiptsToPrint}
-        settings={receiptSettings}
-        onOpenChange={() => setReceiptsToPrint([])}
-      />
-      
-      <ConsolidatedReceiptPrintDialog
-        data={consolidatedReceiptData}
-        settings={receiptSettings}
-        onOpenChange={() => setConsolidatedReceiptData(null)}
-      />
-
-      <ReceiptSettingsDialog
-        settings={receiptSettings}
-        setSettings={setReceiptSettings}
-      />
-
-      <UpdateConfirmDialog
-        isOpen={isUpdateConfirmOpen}
-        onOpenChange={setIsUpdateConfirmOpen}
-        onConfirm={(deletePayments) => {
-            if(updateAction) {
-                updateAction(deletePayments);
-            }
-        }}
-      />
-    </div>
-  );
-}
-    
-
+    }
   };
-
-
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
-
     if (suggestedSupplier && !values.forceUnique) {
-
       return; // Do not submit if a suggestion is active and user hasn't chosen an action
-
     }
-
     if (isEditing) {
-
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
-
         if (hasPayments) {
-
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
-
             setIsUpdateConfirmOpen(true);
-
             return;
-
         }
-
     }
-
     executeSubmit(values, false, callback);
-
   };
-
-
 
   const handleSaveAndPrint = async () => {
-
     const isValid = await form.trigger();
-
     if (isValid) {
-
       onSubmit(form.getValues(), (savedEntry) => {
-
         handleSinglePrint(savedEntry);
-
-        handleNew();
-
       });
-
     } else {
-
       toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
-
     }
-
   };
-
   
-
   const handleShowDetails = (supplier: Customer) => {
-
-    // Show details using existing DetailsDialog (same as supplier profile)
-    setDetailsSupplier(supplier);
+    const fullData = {
+        ...supplier,
+        allTransactions: [supplier],
+        allPayments: paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === supplier.srNo)),
+    };
+    setDetailsSupplier(fullData);
   };
-
-  
   
   const handleSinglePrint = (entry: Customer) => {
-
     setReceiptsToPrint([entry]);
-
     setConsolidatedReceiptData(null);
-
   };
-
-  
   
   const handlePrint = () => {
-
     if (selectedSupplierIds.size > 0) {
-
         const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
-
         if (entriesToPrint.length === 0) {
-
             toast({ title: "No selected entries found.", variant: "destructive" });
-
             return;
-
         }
-
-
 
         if (entriesToPrint.length === 1) {
-
             setReceiptsToPrint(entriesToPrint);
-
             setConsolidatedReceiptData(null);
-
         } else {
-
             const firstCustomerId = entriesToPrint[0].customerId;
-
             const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-
-    
     
             if (!allSameCustomer) {
-
                 toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
-
                 return;
-
             }
-
-            
             
             const supplier = entriesToPrint[0];
-
             const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-
-            
             
             setConsolidatedReceiptData({
-
                 supplier: {
-
                     name: supplier.name,
-
                     so: supplier.so,
-
                     address: supplier.address,
-
                     contact: supplier.contact,
-
                 },
-
                 entries: entriesToPrint,
-
                 totalAmount: totalAmount,
-
                 date: format(new Date(), "dd-MMM-yy"),
-
             });
-
             setReceiptsToPrint([]);
-
         }
-
     } else {
-
       const formValues = form.getValues();
-
       const isValid = form.trigger();
-
       if(isValid && formValues.name && formValues.contact){
-
         handleSaveAndPrint();
-
       } else {
-
          toast({ title: "Please fill form or select entries to print.", variant: "destructive" });
-
       }
-
     }
-
   };
 
-
-
     const handleExport = () => {
-
         if (!suppliers) return;
-
         const dataToExport = suppliers.map(c => {
-
             const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
-
             return {
-
                 'SR NO.': c.srNo,
-
                 'DATE': c.date,
-
                 'TERM': c.term,
-
                 'DUE DATE': calculated.dueDate,
-
                 'NAME': c.name,
-
                 'S/O': c.so,
-
                 'ADDRESS': c.address,
-
                 'CONTACT': c.contact,
-
                 'VEHICLE NO': c.vehicleNo,
-
                 'VARIETY': c.variety,
-
                 'GROSS WT': c.grossWeight,
-
                 'TEIR WT': c.teirWeight,
-
                 'FINAL WT': calculated.weight,
-
                 'KARTA %': c.kartaPercentage,
-
                 'KARTA WT': calculated.kartaWeight,
-
                 'NET WT': calculated.netWeight,
-
                 'RATE': c.rate,
-
                 'LABOURY RATE': c.labouryRate,
-
                 'LABOURY AMT': calculated.labouryAmount,
-
                 'KANTA': c.kanta,
-
                 'AMOUNT': calculated.amount,
-
                 'NET AMOUNT': calculated.originalNetAmount,
-
                 'PAYMENT TYPE': c.paymentType,
-
             };
-
         });
-
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-
         const workbook = XLSX.utils.book_new();
-
         XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
-
         XLSX.writeFile(workbook, "SupplierEntries.xlsx");
-
         toast({title: "Exported", description: "Supplier data has been exported."});
-
     };
 
-
-
     const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-
         const file = event.target.files?.[0];
-
         if (!file) return;
 
-
-
         const reader = new FileReader();
-
         reader.onload = async (e) => {
-
             try {
-
                 const data = e.target?.result;
-
                 const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
-
                 const sheetName = workbook.SheetNames[0];
-
                 const worksheet = workbook.Sheets[sheetName];
-
                 const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-
-                
                 
                 let nextSrNum = (suppliers || []).length > 0 ? Math.max(...(suppliers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
-
-
                 for (const item of json) {
-
                      const supplierData: Customer = {
-
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-
                         date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-
                         term: String(item['TERM'] || '20'),
-
                         dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-
                         name: toTitleCase(item['NAME']),
-
                         so: toTitleCase(item['S/O'] || ''),
-
                         address: toTitleCase(item['ADDRESS'] || ''),
-
                         contact: String(item['CONTACT'] || ''),
-
                         vehicleNo: toTitleCase(item['VEHICLE NO'] || ''),
-
                         variety: toTitleCase(item['VARIETY'] || ''),
-
                         grossWeight: parseFloat(item['GROSS WT']) || 0,
-
                         teirWeight: parseFloat(item['TEIR WT']) || 0,
-
                         weight: parseFloat(item['FINAL WT']) || 0,
-
                         kartaPercentage: parseFloat(item['KARTA %']) || 0,
-
                         kartaWeight: parseFloat(item['KARTA WT']) || 0,
-
                         kartaAmount: parseFloat(item['KARTA AMT']) || 0,
-
                         netWeight: parseFloat(item['NET WT']) || 0,
-
                         rate: parseFloat(item['RATE']) || 0,
-
                         labouryRate: parseFloat(item['LABOURY RATE']) || 0,
-
                         labouryAmount: parseFloat(item['LABOURY AMT']) || 0,
-
                         kanta: parseFloat(item['KANTA']) || 0,
-
                         amount: parseFloat(item['AMOUNT']) || 0,
-
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
-
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
-
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-
                         customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
-
                         barcode: '',
-
                         receiptType: 'Cash',
-
                     };
 
-
-
                     await addSupplier(supplierData);
-
                 }
-
                 toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
-
             } catch (error) {
-
                 console.error("Import failed:", error);
-
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
-
             }
-
         };
-
         reader.readAsBinaryString(file);
-
     };
-
-  
   
     const handleDeleteAll = async () => {
-
         try {
-
             await deleteAllSuppliers();
-
             await deleteAllPayments();
-
-            handleNew();
-
+            // All entries deleted
         } catch (error) {
-
             console.error("Error deleting all entries:", error);
-
             toast({ title: "Failed to delete all entries", variant: "destructive" });
-
         }
-
     };
-
-
 
     const handleUpdateSelected = async () => {
-
         if (selectedSupplierIds.size === 0) {
-
             toast({ title: "No entries selected", variant: "destructive" });
-
             return;
-
         }
-
         toast({ title: "Updating selected entries...", description: `Updating ${selectedSupplierIds.size} entries.` });
-
         try {
-
             const updatedCount = await recalculateAndUpdateSuppliers(Array.from(selectedSupplierIds));
-
             toast({ title: "Update Complete", description: `${updatedCount} entries were re-calculated and saved.`, variant: "success" });
-
             setSelectedSupplierIds(new Set()); // Clear selection after update
-
         } catch (error) {
-
             console.error("Error updating selected entries:", error);
-
             toast({ title: "Update Failed", variant: "destructive" });
-
         }
-
     };
-
-    
     
     const handleDeleteSelected = async () => {
-
       if (selectedSupplierIds.size === 0) {
-
         toast({ title: "No entries selected", variant: "destructive" });
-
         return;
-
       }
-
       toast({ title: "Deleting selected entries...", description: `Deleting ${selectedSupplierIds.size} entries.` });
-
       try {
-
         await deleteMultipleSuppliers(Array.from(selectedSupplierIds));
-
         toast({ title: "Delete Complete", description: `${selectedSupplierIds.size} entries and their associated payments have been deleted.`, variant: "success" });
-
         setSelectedSupplierIds(new Set()); // Clear selection after delete
-
       } catch (error) {
-
         console.error("Error deleting selected entries:", error);
-
         toast({ title: "Delete Failed", variant: "destructive" });
-
       }
-
     };
-
-    
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-
         if (e.key === 'Enter') {
-
             const activeElement = document.activeElement as HTMLElement;
-
             if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-
                 return;
-
             }
-
             e.preventDefault(); // Prevent form submission
-
             const formEl = e.currentTarget;
-
             const formElements = Array.from(formEl.elements).filter(el => 
-
                 (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
-
                 !el.hasAttribute('disabled') && 
-
                 (el as HTMLElement).offsetParent !== null
-
             ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
 
-
-
             const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-
-            
             
             if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-
                 formElements[currentElementIndex + 1].focus();
-
             } else if (currentElementIndex === formElements.length - 1) {
-
                 // Optional: loop back to the first element or submit
-
                 // formElements[0].focus();
-
             }
-
         }
-
     };
     
-    
-
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
-
       if (event.ctrlKey) {
-
           switch (event.key.toLowerCase()) {
-
               case 's':
-
                   event.preventDefault();
-
                   form.handleSubmit((values) => onSubmit(values))();
-
                   break;
-
               case 'p':
-
                   event.preventDefault();
-
                   handleSaveAndPrint();
-
                   break;
-
               case 'n':
-
                   event.preventDefault();
-
-                  handleNew();
-
+                  // New entry shortcut disabled
                   break;
-
               case 'd':
-
                   event.preventDefault();
-
                   if (isEditing && currentSupplier.id) {
-
                       handleDelete(currentSupplier.id);
-
                   }
-
                   break;
-
           }
-
       }
-
-  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
-
-
+  }, [form, onSubmit, handleSaveAndPrint, isEditing, currentSupplier]);
 
   useEffect(() => {
-
       document.addEventListener('keydown', handleKeyboardShortcuts);
-
       return () => {
-
           document.removeEventListener('keydown', handleKeyboardShortcuts);
-
       };
-
   }, [handleKeyboardShortcuts]);
 
+  const applyBulkUpdates = useCallback(
+    async (patch: Partial<Customer>, skipId?: string) => {
+      if (!patch || Object.keys(patch).length === 0) return;
+      const idsToUpdate = Array.from(selectedSupplierIds).filter((id) => id && id !== skipId);
+      if (!idsToUpdate.length) return;
 
+      let updatedCount = 0;
+      for (const id of idsToUpdate) {
+        try {
+          const existing = safeSuppliers.find((supplier) => supplier.id === id) || (await db.suppliers.get(id));
+          if (!existing) continue;
+          const payload: Customer = { ...existing, ...patch } as Customer;
+          const success = await updateSupplier(id, payload);
+          if (success) {
+            await db.suppliers.put(payload);
+            updatedCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to bulk update supplier ${id}:`, error);
+        }
+      }
 
+      if (updatedCount) {
+        toast({
+          title: "Bulk update applied",
+          description: `${updatedCount} selected entries updated successfully.`,
+          variant: "success",
+        });
+      }
+    },
+    [selectedSupplierIds, safeSuppliers, toast]
+  );
 
 
   if (!isClient) {
-
     return null;
-
   }
-
-
 
   if (isLoading) {
-
     return (
-
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
-
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
-
       </div>
-
     );
-
   }
 
-
-
   return (
-
     <div className="space-y-4">
-
       <FormProvider {...form}>
-
         <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
-
             <SupplierForm 
-
                 form={form}
-
                 handleSrNoBlur={handleSrNoBlur}
-
                 onContactChange={onContactChange}
-
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
-
                 varietyOptions={varietyOptions}
-
                 paymentTypeOptions={paymentTypeOptions}
-
                 setLastVariety={handleSetLastVariety}
-
                 setLastPaymentType={handleSetLastPaymentType}
-
                 handleAddOption={addOption}
-
                 handleUpdateOption={updateOption}
-
                 handleDeleteOption={deleteOption}
-
                 allSuppliers={safeSuppliers}
-
-                handleCalculationFieldChange={handleCalculationFieldChange}
             />
-
-            
             
             <CalculatedSummary 
-
                 customer={currentSupplier}
-
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
-
                 onSaveAndPrint={handleSaveAndPrint}
-
-                onNew={handleNew}
-
                 isEditing={isEditing}
-
-                onSearch={handleSearchChange}
+                onSearch={setSearchTerm}
                 onPrint={handlePrint}
-
                 selectedIdsCount={selectedSupplierIds.size}
-
                 onImport={handleImport}
-
                 onExport={handleExport}
-
                 onUpdateSelected={handleUpdateSelected}
-
                 onDeleteSelected={handleDeleteSelected}
-
                 onDeleteAll={handleDeleteAll}
-
             />
-
         </form>
-
       </FormProvider>      
 
-
-
       <AlertDialog open={!!suggestedSupplier} onOpenChange={() => setSuggestedSupplier(null)}>
-
         <AlertDialogContent>
-
             <AlertDialogHeader>
-
                 <AlertDialogTitle className="flex items-center gap-2">
-
                     <Lightbulb className="h-5 w-5 text-yellow-500" />
-
                     Did you mean this supplier?
-
                 </AlertDialogTitle>
-
                 <AlertDialogDescription>
-
                     A supplier with a very similar name already exists. Is this the same person?
-
                 </AlertDialogDescription>
-
                 <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-
                     <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-
                     <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-
                     <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-
                 </div>
-
             </AlertDialogHeader>
-
             <AlertDialogFooter>
-
                 <AlertDialogAction onClick={() => {
-
                     form.setValue('forceUnique', true);
-
                     setSuggestedSupplier(null);
-
                 }}>No, Create New</AlertDialogAction>
-
                 <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
-
             </AlertDialogFooter>
-
         </AlertDialogContent>
-
       </AlertDialog>
-
-      
       
       <EntryTable 
-
         entries={filteredSuppliers} 
-
         onEdit={handleEdit} 
-
         onDelete={handleDelete} 
-
         onShowDetails={handleShowDetails}
-
         selectedIds={selectedSupplierIds}
-
         onSelectionChange={setSelectedSupplierIds}
-
         onPrintRow={handleSinglePrint}
-
       />
-
         
-
-      <DetailsDialog 
-        isOpen={!!detailsSupplier}
-        onOpenChange={() => setDetailsSupplier(null)}
-        customer={detailsSupplier}
-        paymentHistory={paymentHistory}
-      />
-      
+      <Dialog open={!!detailsSupplier} onOpenChange={() => setDetailsSupplier(null)}>
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                <StatementPreview data={detailsSupplier} />
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       <ReceiptPrintDialog
-
         receipts={receiptsToPrint}
-
         settings={receiptSettings}
-
         onOpenChange={() => setReceiptsToPrint([])}
-
       />
-
-      
       
       <ConsolidatedReceiptPrintDialog
-
         data={consolidatedReceiptData}
-
         settings={receiptSettings}
-
         onOpenChange={() => setConsolidatedReceiptData(null)}
-
       />
-
-
 
       <ReceiptSettingsDialog
-
         settings={receiptSettings}
-
         setSettings={setReceiptSettings}
-
       />
-
-
 
       <UpdateConfirmDialog
-
         isOpen={isUpdateConfirmOpen}
-
         onOpenChange={setIsUpdateConfirmOpen}
-
         onConfirm={(deletePayments) => {
-
             if(updateAction) {
-
                 updateAction(deletePayments);
-
             }
-
         }}
-
       />
-
     </div>
-
   );
-
 }
-
-    
     

@@ -777,7 +777,6 @@ const handleDelete = async (id: string) => {
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
                 onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={handleSearchChange}
                 onPrint={handlePrint}

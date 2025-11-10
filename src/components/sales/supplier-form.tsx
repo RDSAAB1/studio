@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import React, { useState, memo, useCallback, useRef, useEffect } from "react";
 import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import { cn, toTitleCase } from "@/lib/utils";
@@ -28,7 +28,11 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, handleTermBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers, handleCalculationFieldChange }: any) => {
+const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers, handleCalculationFieldChange, onAutoFill }: any) => {
+    
+    // Debug logging for options
+    console.log('SupplierForm - Variety Options:', varietyOptions);
+    console.log('SupplierForm - Payment Type Options:', paymentTypeOptions);
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -43,6 +47,90 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
 
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
+    // Immediate display state - completely separate from form
+    const [immediateValues, setImmediateValues] = useState<Record<string, string>>({});
+    
+    // Auto-capitalization function
+    const capitalizeText = useCallback((text: string) => {
+        return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    }, []);
+
+    // Ultra-fast onChange - immediate display, no calculations
+    const createImmediateOnChange = useCallback((fieldName: string, shouldCapitalize: boolean = false) => {
+        return (e: React.ChangeEvent<HTMLInputElement>) => {
+            let value = e.target.value;
+            
+            // Apply auto-capitalization for text fields
+            if (shouldCapitalize) {
+                value = capitalizeText(value);
+            }
+            
+            // Update immediate display state instantly
+            setImmediateValues(prev => ({ ...prev, [fieldName]: value }));
+            
+            // Update form value in background (no UI impact)
+            setTimeout(() => {
+                form.setValue(fieldName, value);
+            }, 0);
+        };
+    }, [form, capitalizeText]);
+    
+    // Background calculation on blur
+    const createBackgroundOnBlur = useCallback((fieldName: string) => {
+        return (e: React.FocusEvent<HTMLInputElement>) => {
+            const value = e.target.value;
+            
+            // Trigger calculations in background
+            const calculationFields = ['rate', 'grossWeight', 'teirWeight', 'kartaPercentage', 'labouryRate', 'kanta'];
+            if (calculationFields.includes(fieldName)) {
+                // Use setTimeout to ensure it runs after UI updates
+                setTimeout(() => {
+                    handleCalculationFieldChange(fieldName, value);
+                }, 0);
+            }
+        };
+    }, [handleCalculationFieldChange]);
+    
+    // Get display value - immediate state takes priority
+    const getDisplayValue = useCallback((fieldName: string, formValue: any) => {
+        return immediateValues[fieldName] !== undefined ? immediateValues[fieldName] : (formValue || '');
+    }, [immediateValues]);
+    
+    // Clear immediate values when form is reset (for new entries)
+    const clearImmediateValues = useCallback(() => {
+        setImmediateValues({});
+    }, []);
+    
+    // Set immediate values for auto-fill (when serial number is found)
+    const setImmediateValuesForAutoFill = useCallback((values: Record<string, any>) => {
+        const newImmediateValues: Record<string, string> = {};
+        const textFields = ['name', 'so', 'address', 'vehicleNo']; // Fields that need capitalization
+        const numericFields = ['term', 'rate', 'grossWeight', 'teirWeight', 'kartaPercentage', 'labouryRate', 'kanta']; // Numeric fields that also get capitalization
+        
+        Object.entries(values).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                let stringValue = String(value);
+                
+                // Apply capitalization for text fields and numeric fields
+                if (textFields.includes(key) || numericFields.includes(key)) {
+                    stringValue = capitalizeText(stringValue);
+                }
+                
+                newImmediateValues[key] = stringValue;
+            }
+        });
+        setImmediateValues(newImmediateValues);
+    }, [capitalizeText]);
+    
+    // Handle auto-fill from parent component
+    useEffect(() => {
+        if (onAutoFill && typeof onAutoFill === 'object') {
+            setImmediateValuesForAutoFill(onAutoFill);
+        }
+    }, [onAutoFill, setImmediateValuesForAutoFill]);
+    
+    // Functions are exposed through props and useEffect
+    
     // REMOVED: All name suggestion handlers to prevent lag
     // const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => { ... };
     // const handleNameSelect = (supplier: Customer) => { ... };
@@ -55,33 +143,6 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
         if (e.target.value === '0' || e.target.value === '0.00') {
             e.target.select();
         }
-    };
-
-    // Capitalization handlers for real-time text formatting
-    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const capitalizedValue = e.target.value.split(' ').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
-        form.setValue('name', capitalizedValue);
-    };
-
-    const handleSoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const capitalizedValue = e.target.value.split(' ').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
-        form.setValue('so', capitalizedValue);
-    };
-
-    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const capitalizedValue = e.target.value.split(' ').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
-        form.setValue('address', capitalizedValue);
-    };
-
-    const handleVehicleNoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const capitalizedValue = e.target.value.toUpperCase();
-        form.setValue('vehicleNo', capitalizedValue);
     };
 
     // REMOVED: handleNumericInput to eliminate delay
@@ -99,34 +160,71 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                 <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-8 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
-                         <div className="space-y-1">
-                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                 <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={(e) => handleTermBlur(e.target.value)} className="h-8 text-sm pl-10" />
-                             </InputWithIcon>
-                         </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                                <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
+                                <Input 
+                                    id="term" 
+                                    type="number" 
+                                    value={getDisplayValue('term', form.watch('term'))}
+                                    onChange={createImmediateOnChange('term', true)}
+                                    onFocus={handleFocus} 
+                                    onBlur={() => handleNameOrSoBlur()} 
+                                    className="h-8 text-sm pl-10" 
+                                />
+                            </InputWithIcon>
+                        </div>
                         <div className="space-y-1">
                             <Label htmlFor="rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('rate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                <Input 
+                                    id="rate" 
+                                    type="number" 
+                                    value={getDisplayValue('rate', form.watch('rate'))}
+                                    onChange={createImmediateOnChange('rate', true)}
+                                    onBlur={createBackgroundOnBlur('rate')} 
+                                    onFocus={handleFocus} 
+                                    className="h-8 text-sm pl-10" 
+                                />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('grossWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                <Input 
+                                    id="grossWeight" 
+                                    type="number" 
+                                    value={getDisplayValue('grossWeight', form.watch('grossWeight'))}
+                                    onChange={createImmediateOnChange('grossWeight', true)}
+                                    onBlur={createBackgroundOnBlur('grossWeight')} 
+                                    onFocus={handleFocus} 
+                                    className="h-8 text-sm pl-10" 
+                                />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('teirWeight', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10"/>)} />
+                                <Input 
+                                    id="teirWeight" 
+                                    type="number" 
+                                    value={getDisplayValue('teirWeight', form.watch('teirWeight'))}
+                                    onChange={createImmediateOnChange('teirWeight', true)}
+                                    onBlur={createBackgroundOnBlur('teirWeight')} 
+                                    onFocus={handleFocus} 
+                                    className="h-8 text-sm pl-10" 
+                                />
                             </InputWithIcon>
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleVehicleNoChange(e); field.onChange(e); }} className="h-8 text-sm pl-10" /> )}/>
+                                <Input 
+                                    id="vehicleNo" 
+                                    value={getDisplayValue('vehicleNo', form.watch('vehicleNo'))}
+                                    onChange={createImmediateOnChange('vehicleNo', true)}
+                                    className="h-8 text-sm pl-10" 
+                                />
                             </InputWithIcon>
                         </div>
                     </div>
@@ -147,20 +245,37 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                 <div className="space-y-1">
                                     <Label htmlFor="name" className="text-xs">Name</Label>
                                     <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input id="name" {...form.register('name')} onChange={handleNameChange} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" />
+                                        <Input 
+                                            id="name" 
+                                            value={getDisplayValue('name', form.watch('name'))}
+                                            onChange={createImmediateOnChange('name', true)}
+                                            autoComplete="off" 
+                                            className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} 
+                                        />
                                     </InputWithIcon>
                                 </div>
                            </div>
                             <div className="space-y-1">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleSoChange(e); field.onChange(e); }} onBlur={handleNameOrSoBlur} className="h-8 text-sm pl-10" /> )}/>
+                                    <Input 
+                                        id="so" 
+                                        value={getDisplayValue('so', form.watch('so'))}
+                                        onChange={createImmediateOnChange('so', true)}
+                                        onBlur={handleNameOrSoBlur} 
+                                        className="h-8 text-sm pl-10" 
+                                    />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onChange={(e) => { handleAddressChange(e); field.onChange(e); }} className="h-8 text-sm pl-10" /> )}/>
+                                    <Input 
+                                        id="address" 
+                                        value={getDisplayValue('address', form.watch('address'))}
+                                        onChange={createImmediateOnChange('address', true)}
+                                        className="h-8 text-sm pl-10" 
+                                    />
                                 </InputWithIcon>
                             </div>
                         </CardContent>
@@ -172,15 +287,43 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                          <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." />
-                                )} />
+                                <CustomDropdown 
+                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    value={getDisplayValue('paymentType', form.watch('paymentType'))} 
+                                    onChange={(val) => {
+                                        console.log('Payment type selected:', val);
+                                        setImmediateValues(prev => ({ ...prev, paymentType: val || '' }));
+                                        setTimeout(() => {
+                                            form.setValue("paymentType", val || '');
+                                            setLastPaymentType(val || '');
+                                        }, 0);
+                                    }} 
+                                    onAdd={(newItem) => {
+                                        console.log('Adding new payment type:', newItem);
+                                        handleAddOption('paymentTypes', newItem);
+                                    }}
+                                    placeholder="Select type..." 
+                                />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                <Controller name="variety" control={form.control} render={({ field }) => (
-                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." />
-                                )} />
+                                <CustomDropdown 
+                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    value={getDisplayValue('variety', form.watch('variety'))} 
+                                    onChange={(val) => {
+                                        console.log('Variety selected:', val);
+                                        setImmediateValues(prev => ({ ...prev, variety: val || '' }));
+                                        setTimeout(() => {
+                                            form.setValue("variety", val || '');
+                                            setLastVariety(val || '');
+                                        }, 0);
+                                    }} 
+                                    onAdd={(newItem) => {
+                                        console.log('Adding new variety:', newItem);
+                                        handleAddOption('varieties', newItem);
+                                    }}
+                                    placeholder="Select variety..." 
+                                />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
                                 <div className="space-y-1">
@@ -207,19 +350,43 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                             <div className="space-y-1">
                                 <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('kartaPercentage', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Input 
+                                        id="kartaPercentage" 
+                                        type="number" 
+                                        value={getDisplayValue('kartaPercentage', form.watch('kartaPercentage'))}
+                                        onChange={createImmediateOnChange('kartaPercentage')}
+                                        onBlur={createBackgroundOnBlur('kartaPercentage')} 
+                                        onFocus={handleFocus} 
+                                        className="h-8 text-sm pl-10" 
+                                    />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('labouryRate', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Input 
+                                        id="labouryRate" 
+                                        type="number" 
+                                        value={getDisplayValue('labouryRate', form.watch('labouryRate'))}
+                                        onChange={createImmediateOnChange('labouryRate')}
+                                        onBlur={createBackgroundOnBlur('labouryRate')} 
+                                        onFocus={handleFocus} 
+                                        className="h-8 text-sm pl-10" 
+                                    />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onBlur={(e) => { field.onBlur(); handleCalculationFieldChange('kanta', e.target.value); }} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                                    <Input 
+                                        id="kanta" 
+                                        type="number" 
+                                        value={getDisplayValue('kanta', form.watch('kanta'))}
+                                        onChange={createImmediateOnChange('kanta')}
+                                        onBlur={createBackgroundOnBlur('kanta')} 
+                                        onFocus={handleFocus} 
+                                        className="h-8 text-sm pl-10" 
+                                    />
                                 </InputWithIcon>
                             </div>
                          </CardContent>
@@ -241,17 +408,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
     );
 };
 
-            setIsOpen={setIsManageOptionsOpen}
-            type={managementType}
-            options={optionsToManage}
-            onAdd={handleAddOption}
-            onUpdate={handleUpdateOption}
-            onDelete={(collectionName: string, id: string, name: string) => handleDeleteOption(collectionName, id, name)}
-        />
-        </>
-    );
-};
-
 // Memoized component for better performance
 export const SupplierForm = memo(SupplierFormComponent);
+
 

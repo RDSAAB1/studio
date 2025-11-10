@@ -98,21 +98,94 @@ export default function SupplierProfileClient() {
     filteredData.totalKanta = filteredTransactions.reduce((sum, t) => sum + (t.kanta || 0), 0);
     filteredData.totalOtherCharges = filteredTransactions.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
     filteredData.totalDeductions = filteredTransactions.reduce((sum, t) => sum + ((t as any).deductions || 0), 0);
-    filteredData.totalPaid = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
-    filteredData.totalCashPaid = filteredPayments.filter(p => p.type === 'cash').reduce((sum, p) => sum + p.amount, 0);
-    filteredData.totalRtgsPaid = filteredPayments.filter(p => p.type === 'rtgs').reduce((sum, p) => sum + p.amount, 0);
-    filteredData.totalCdAmount = filteredPayments.reduce((sum, p) => sum + ((p as any).cdAmount || 0), 0);
-    filteredData.totalOutstanding = filteredData.totalOriginalAmount - filteredData.totalPaid;
+    
+    // Calculate total paid from individual entry allocations (paidFor amounts) for filtered transactions
+    let totalPaidForFiltered = 0;
+    let totalCdForFiltered = 0;
+    let totalCashPaidForFiltered = 0;
+    let totalRtgsPaidForFiltered = 0;
+    
+    filteredTransactions.forEach(t => {
+      const paymentsForEntry = filteredPayments.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
+      paymentsForEntry.forEach(p => {
+        const paidForThisEntry = p.paidFor!.find(pf => pf.srNo === t.srNo);
+        if (paidForThisEntry) {
+          totalPaidForFiltered += Number(paidForThisEntry.amount || 0);
+          
+          // CD amount calculation: First check if directly stored in paidFor (new format), else calculate proportionally
+          if ('cdAmount' in paidForThisEntry && (paidForThisEntry as any).cdAmount !== undefined && (paidForThisEntry as any).cdAmount !== null) {
+            // New format: CD amount directly stored in paidFor
+            totalCdForFiltered += Number((paidForThisEntry as any).cdAmount || 0);
+          } else if ((p as any).cdAmount && p.paidFor && p.paidFor.length > 0) {
+            // Old format: Calculate proportionally from payment.cdAmount
+            // Check cdAmount even if cdApplied is not explicitly set (for cash payments)
+            const totalPaidForInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+            if (totalPaidForInPayment > 0) {
+              const proportion = Number(paidForThisEntry.amount || 0) / totalPaidForInPayment;
+              totalCdForFiltered += Math.round((p as any).cdAmount * proportion * 100) / 100;
+            }
+          }
+          
+          const receiptType = (p as any).receiptType?.toLowerCase() || p.type?.toLowerCase();
+          // IMPORTANT: For outstanding calculation, always use paidFor.amount, not rtgsAmount
+          // rtgsAmount is for display/tracking only, but financial calculations should use paidFor.amount
+          if (receiptType === 'cash') {
+            totalCashPaidForFiltered += Number(paidForThisEntry.amount || 0);
+          } else if (receiptType === 'rtgs') {
+            // Use actual paidFor.amount for RTGS, not rtgsAmount
+            // This ensures consistency with outstanding calculation
+            totalRtgsPaidForFiltered += Number(paidForThisEntry.amount || 0);
+          }
+        }
+      });
+    });
+    
+    filteredData.totalPaid = totalPaidForFiltered;
+    filteredData.totalCashPaid = totalCashPaidForFiltered;
+    filteredData.totalRtgsPaid = totalRtgsPaidForFiltered;
+    filteredData.totalCdAmount = totalCdForFiltered;
+    
+    // Outstanding = Net Payable - Total Paid - CD
+    // Use totalPaid (calculated from paidFor.amount) instead of totalCashPaid + totalRtgsPaid
+    // because totalPaid uses the actual paid amount, not rtgsAmount
+    filteredData.totalOutstanding = filteredData.totalOriginalAmount - filteredData.totalPaid - filteredData.totalCdAmount;
     filteredData.totalTransactions = filteredTransactions.length;
     filteredData.totalOutstandingTransactions = filteredTransactions.filter(t => {
       const paymentsForEntry = filteredPayments.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));
       const totalPaidForEntry = paymentsForEntry.reduce((sum, p) => {
         const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo);
         return sum + (paidForThisDetail?.amount || 0);
-        }, 0);
-      return totalPaidForEntry < (t.amount || 0);
+      }, 0);
+      const totalCdForEntry = paymentsForEntry.reduce((sum, p) => {
+        const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === t.srNo);
+        if (!paidForThisDetail) return sum;
+        
+        // CD amount calculation: First check if directly stored in paidFor (new format), else calculate proportionally
+        if ('cdAmount' in paidForThisDetail && (paidForThisDetail as any).cdAmount !== undefined && (paidForThisDetail as any).cdAmount !== null) {
+          return sum + Number((paidForThisDetail as any).cdAmount || 0);
+        } else if ((p as any).cdAmount && p.paidFor && p.paidFor.length > 0) {
+          // Old format: Calculate proportionally from payment.cdAmount
+          // Check cdAmount even if cdApplied is not explicitly set (for cash payments)
+          const totalPaidForInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+          if (totalPaidForInPayment > 0) {
+            const proportion = Number(paidForThisDetail.amount || 0) / totalPaidForInPayment;
+            return sum + Math.round((p as any).cdAmount * proportion * 100) / 100;
+          }
+        }
+        return sum;
+      }, 0);
+      // Outstanding if: (Paid + CD) < Original Amount
+      return (totalPaidForEntry + totalCdForEntry) < (t.originalNetAmount || 0);
     }).length;
-    filteredData.totalBrokerage = filteredTransactions.reduce((sum, t) => sum + (t.brokerage || 0), 0);
+    filteredData.totalBrokerage = filteredTransactions.reduce((sum, t) => {
+      // Use brokerageAmount if available, otherwise calculate from brokerageRate * netWeight
+      let brokerageAmount = t.brokerageAmount || 0;
+      if (!brokerageAmount && t.brokerageRate && t.netWeight) {
+        brokerageAmount = Math.round(Number(t.brokerageRate || 0) * Number(t.netWeight || 0) * 100) / 100;
+      }
+      const signedBrokerage = (t.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+      return sum + signedBrokerage;
+    }, 0);
     filteredData.totalCd = filteredPayments.reduce((sum, p) => sum + ((p as any).cdAmount || 0), 0);
 
     // Group transactions by variety
@@ -123,9 +196,16 @@ export default function SupplierProfileClient() {
     }, {} as Record<string, number>);
 
     // Calculate averages and rates
-    filteredData.totalOutstandingTransactions = filteredTransactions.filter(t => Number(t.netAmount || 0) >= 1).length;
-    filteredData.averageRate = filteredData.totalFinalWeight > 0 ? filteredData.totalAmount / filteredData.totalFinalWeight : 0;
-    filteredData.averageOriginalPrice = filteredData.totalNetWeight > 0 ? filteredData.totalOriginalAmount / filteredData.totalNetWeight : 0;
+    // Note: totalOutstandingTransactions is already calculated above with proper CD calculation
+    const totalWeightedRate = filteredTransactions.reduce((sum, t) => {
+      const rate = Number(t.rate) || 0;
+      const netWeight = Number(t.netWeight) || 0;
+      return sum + rate * netWeight;
+    }, 0);
+
+    const safeNetWeight = filteredData.totalNetWeight || 0;
+    filteredData.averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
+    filteredData.averageOriginalPrice = safeNetWeight > 0 ? filteredData.totalOriginalAmount / safeNetWeight : 0;
         
         // Calculate min/max rate
     const validRates = filteredTransactions.map(t => t.rate).filter(rate => rate > 0);
@@ -189,38 +269,7 @@ export default function SupplierProfileClient() {
         onGenerateStatement={() => setIsStatementOpen(true)}
       />
       
-      {/* Show data even if SupplierProfileView doesn't display it */}
-      {selectedSupplierData && selectedSupplierKey === MILL_OVERVIEW_KEY && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded">
-          <h3 className="font-bold text-green-800">Mill Overview Data Found:</h3>
-          <p>Name: {selectedSupplierData.name}</p>
-          <p>Total Transactions: {selectedSupplierData.totalTransactions}</p>
-          <p>Total Amount: ₹{selectedSupplierData.totalAmount}</p>
-          <p>Total Paid: ₹{selectedSupplierData.totalPaid}</p>
-          <p>Total Outstanding: ₹{selectedSupplierData.totalOutstanding}</p>
-          <p>Cash Paid: ₹{selectedSupplierData.totalCashPaid}</p>
-          <p>RTGS Paid: ₹{selectedSupplierData.totalRtgsPaid}</p>
-        </div>
-      )}
-      
-      {/* Debug Info for Mill Overview */}
-      {selectedSupplierKey === MILL_OVERVIEW_KEY && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
-          <h3 className="font-bold text-yellow-800">Debug Info - Mill Overview</h3>
-          <p>Selected Key: {selectedSupplierKey}</p>
-          <p>Mill Overview Key: {MILL_OVERVIEW_KEY}</p>
-          <p>Supplier Summary Map Size: {supplierSummaryMap.size}</p>
-          <p>Has Mill Overview Data: {supplierSummaryMap.has(MILL_OVERVIEW_KEY) ? 'Yes' : 'No'}</p>
-          {selectedSupplierData && (
-            <div>
-              <p>Selected Data Name: {selectedSupplierData.name}</p>
-              <p>Total Transactions: {selectedSupplierData.totalTransactions}</p>
-              <p>Total Amount: {selectedSupplierData.totalAmount}</p>
-              <p>Total Paid: {selectedSupplierData.totalPaid}</p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Removed Mill Overview debug/summary blocks as requested */}
       
       
       {/* Fuzzy Matching Information */}

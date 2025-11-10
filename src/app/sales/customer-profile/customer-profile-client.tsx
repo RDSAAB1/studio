@@ -331,7 +331,6 @@ export default function CustomerProfileClient() {
         onOpenChange={() => setSelectedPaymentForDetails(null)}
         onShowEntryDetails={setDetailsCustomer}
       />
-      
     </div>
   );
 }

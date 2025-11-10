@@ -16,18 +16,6 @@ export const useSupplierSummary = (
       return new Map<string, CustomerSummary>();
     }
 
-    // Debug: Log all unique payment types and sample payment structure
-    const allPaymentTypes = [...new Set(paymentHistory.map(p => p.type))];
-    const allReceiptTypes = [...new Set(paymentHistory.map(p => p.receiptType))];
-    console.log('All Payment Types in Data:', allPaymentTypes);
-    console.log('All Receipt Types in Data:', allReceiptTypes);
-    
-    // Log sample payment structure
-    if (paymentHistory.length > 0) {
-      console.log('Sample Payment Structure:', paymentHistory[0]);
-      console.log('Sample Payment Type:', paymentHistory[0].type);
-      console.log('Sample Receipt Type:', paymentHistory[0].receiptType);
-    }
 
     const processedSuppliers = suppliers.map(s => {
       // Find all payments for this specific purchase (srNo)
@@ -40,124 +28,164 @@ export const useSupplierSummary = (
       let totalCashPaidForEntry = 0;
       let totalRtgsPaidForEntry = 0;
 
-      // Calculate payments for this specific purchase
+      // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
       paymentsForEntry.forEach(payment => {
         const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === s.srNo);
         if (paidForThisPurchase) {
-          // Total amount paid for this purchase (including CD)
-          totalPaidForEntry += paidForThisPurchase.amount;
+          // Direct database value - no calculation
+          totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
           
-          // Calculate CD portion for this purchase first
-          let cdPortionForThisPurchase = 0;
-          if (payment.cdApplied && payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-            const totalAmountInPayment = payment.paidFor.reduce((sum, pf) => sum + pf.amount, 0);
-            cdPortionForThisPurchase = (paidForThisPurchase.amount / totalAmountInPayment) * payment.cdAmount;
-            totalCdForEntry += cdPortionForThisPurchase;
+          // CD amount calculation: First check if directly stored in paidFor (new format), else calculate proportionally
+          if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
+            // New format: CD amount directly stored in paidFor
+            totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
+          } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+            // Old format: Calculate proportionally from payment.cdAmount
+            // Check cdAmount even if cdApplied is not explicitly set (for cash payments)
+            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+            if (totalPaidForInPayment > 0) {
+              const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidForInPayment;
+              totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
+            }
           }
           
-          // Calculate the proportion of this purchase in the total payment
-          const totalPaidForAmount = payment.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
-          const proportion = totalPaidForAmount > 0 ? paidForThisPurchase.amount / totalPaidForAmount : 0;
-          
-          // Calculate payment amount based on type
+          // Calculate payment amount based on type (for cash/rtgs breakdown)
+          // IMPORTANT: Always use paidFor.amount for outstanding calculation
+          // RTGS amount is only for display/tracking, not for outstanding calculation
           const receiptType = payment.receiptType?.toLowerCase();
-          let actualPaymentAmount;
+          const actualPaidAmount = Number(paidForThisPurchase.amount || 0);
           
           if (receiptType === 'cash') {
-            // For cash payments, payment.amount is already the actual payment amount (₹5000)
-            actualPaymentAmount = payment.amount * proportion;
-            totalCashPaidForEntry += actualPaymentAmount;
+            // For cash, use actual paid amount
+            totalCashPaidForEntry += actualPaidAmount;
           } else if (receiptType === 'rtgs') {
-            // For RTGS payments, use rtgsAmount if available, otherwise use amount
-            const rtgsPaymentAmount = payment.rtgsAmount || payment.amount;
-            actualPaymentAmount = rtgsPaymentAmount * proportion;
-            totalRtgsPaidForEntry += actualPaymentAmount;
-            // Debug: Log RTGS payment details
-            console.log('RTGS Payment:', {
-              paymentId: payment.paymentId || payment.id,
-              receiptType: payment.receiptType,
-              paymentAmount: payment.amount,
-              rtgsAmount: payment.rtgsAmount,
-              usedAmount: rtgsPaymentAmount,
-              cdAmount: payment.cdAmount,
-              paidForAmount: paidForThisPurchase.amount,
-              totalPaidForAmount: totalPaidForAmount,
-              proportion: proportion,
-              actualPaymentAmount: actualPaymentAmount,
-              totalRtgsPaidForEntry: totalRtgsPaidForEntry
-            });
-          } else {
-            // If payment type is not recognized, log it for debugging
-            console.log('Unknown receipt type:', payment.receiptType, 'for payment:', payment);
+            // IMPORTANT: For RTGS, use actual paid amount (paidFor.amount), NOT rtgsAmount
+            // rtgsAmount is only for display/tracking purposes (cash vs RTGS breakdown)
+            // Outstanding calculation should always use paidFor.amount
+            totalRtgsPaidForEntry += actualPaidAmount;
           }
         }
       });
 
-      // Debug: Log payment calculations for first few suppliers
-      if (s.srNo && (s.srNo === '1' || s.srNo === '2' || s.srNo === '3')) {
-        console.log(`Supplier ${s.srNo} - ${s.name}:`, {
-          totalPaidForEntry,
-          totalCashPaidForEntry,
-          totalRtgsPaidForEntry,
-          totalCdForEntry,
-          paymentsForEntry: paymentsForEntry.length,
-          paymentTypes: paymentsForEntry.map(p => p.type),
-          paymentDetails: paymentsForEntry.map(p => ({
-            type: p.type,
-            receiptType: p.receiptType,
-            amount: p.amount,
-            cdAmount: p.cdAmount,
-            cdApplied: p.cdApplied,
-            paidFor: p.paidFor?.map(pf => ({ srNo: pf.srNo, amount: pf.amount }))
-          }))
-        });
-      }
+      // Removed debug logging for performance
 
+      // Direct database sum - no calculation
+      const finalTotalPaid = Math.round(totalPaidForEntry * 100) / 100;
+      const finalTotalCd = Math.round(totalCdForEntry * 100) / 100;
+      const finalOutstanding = (s.originalNetAmount || 0) - finalTotalPaid - finalTotalCd;
+      
       return {
         ...s,
-        totalPaidForEntry,
-        totalCdForEntry,
-        totalCd: totalCdForEntry, // Map totalCdForEntry to totalCd for compatibility
-        totalPaid: totalCashPaidForEntry + totalRtgsPaidForEntry, // Actual payment without CD (for compatibility)
+        totalPaidForEntry: finalTotalPaid,
+        totalCdForEntry: finalTotalCd,
+        totalCd: finalTotalCd, // Map totalCdForEntry to totalCd for compatibility
+        totalPaid: finalTotalPaid, // Direct database sum
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
         paymentsForEntry,
-        // Calculate outstanding for this specific purchase (including CD deduction)
-        outstandingForEntry: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
-        // Set netAmount for compatibility with payment logic (including CD deduction)
-        netAmount: (s.originalNetAmount || 0) - (totalCashPaidForEntry + totalRtgsPaidForEntry) - totalCdForEntry,
+        // Outstanding: Original - (Paid + CD)
+        outstandingForEntry: Math.round(finalOutstanding * 100) / 100,
+        // netAmount mirrors outstandingForEntry for downstream logic
+        netAmount: Math.round(finalOutstanding * 100) / 100,
       };
     });
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
 
-    // Group suppliers by Name, Father Name, and Address combination
+    // Helper function to calculate Levenshtein distance
+    const levenshteinDistance = (str1: string, str2: string): number => {
+        const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+        for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+        for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+        for (let j = 1; j <= str2.length; j++) {
+            for (let i = 1; i <= str1.length; i++) {
+                const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                matrix[j][i] = Math.min(
+                    matrix[j][i - 1] + 1,
+                    matrix[j - 1][i] + 1,
+                    matrix[j - 1][i - 1] + indicator
+                );
+            }
+        }
+        return matrix[str2.length][str1.length];
+    };
+
+    // Helper function to normalize strings for comparison
+    const normalize = (str: string) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // Group suppliers using STRICT exact matching (name + father + address must match exactly)
     const groupedSuppliers = new Map<string, typeof processedSuppliers>();
+    const makeCompositeKey = (name: string, father: string, address: string) => 
+        `${normalize(name)}|${normalize(father)}|${normalize(address)}`;
     
     processedSuppliers.forEach((supplier) => {
-      const groupKey = `${supplier.name || ''}_${supplier.fatherName || ''}_${supplier.address || ''}`.trim();
-      
-      if (!groupedSuppliers.has(groupKey)) {
-        groupedSuppliers.set(groupKey, []);
-      }
-      groupedSuppliers.get(groupKey)!.push(supplier);
+        const father = supplier.fatherName || supplier.so || '';
+        const compositeKey = makeCompositeKey(supplier.name || '', father, supplier.address || '');
+        
+        const existing = groupedSuppliers.get(compositeKey);
+        if (existing) {
+            existing.push(supplier);
+        } else {
+            groupedSuppliers.set(compositeKey, [supplier]);
+        }
     });
 
     // Create summary for each unique profile group
     Array.from(groupedSuppliers.entries()).forEach(([groupKey, groupSuppliers]) => {
       const firstSupplier = groupSuppliers[0];
       
+      // Get all unique payments for this group
+      const allPayments = groupSuppliers.flatMap(s => s.paymentsForEntry);
+      const uniquePayments = Array.from(
+        new Map(allPayments.map(p => [p.id || p.paymentId || `${p.date}_${p.amount}`, p])).values()
+      );
+      
+      // Calculate total RTGS paid from actual RTGS payments
+      // IMPORTANT: Use sum of paidFor.amount, not rtgsAmount
+      // rtgsAmount is for display/tracking only, but financial calculations should use paidFor.amount
+      const totalRtgsPaidFromPayments = uniquePayments.reduce((sum, p) => {
+        const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
+        if (receiptType === 'rtgs') {
+          // Sum of paidFor.amount for RTGS payments (not rtgsAmount)
+          const rtgsPaidAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
+          return sum + rtgsPaidAmount;
+        }
+        return sum;
+      }, 0);
+      
+      // Calculate total Cash paid from actual Cash payments
+      // IMPORTANT: Use sum of paidFor.amount for consistency
+      const totalCashPaidFromPayments = uniquePayments.reduce((sum, p) => {
+        const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
+        if (receiptType === 'cash') {
+          // Sum of paidFor.amount for cash payments
+          const cashPaidAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
+          return sum + cashPaidAmount;
+        }
+        return sum;
+      }, 0);
+      
       // Merge all suppliers in the group with proper payment calculations
+      const totalOriginalAmount = groupSuppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
+      const totalCdAmount = groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0);
+      
+      // IMPORTANT: Use totalPaid (from paidFor.amount) for outstanding calculation, not totalCashPaid + totalRtgsPaid
+      // totalPaid is calculated from totalPaidForEntry which uses paidFor.amount (correct)
+      // totalCashPaid and totalRtgsPaid are for display/tracking only
+      const totalPaid = groupSuppliers.reduce((sum, s) => sum + s.totalPaidForEntry, 0);
+      
       const mergedData: CustomerSummary = {
         ...firstSupplier,
         totalAmount: groupSuppliers.reduce((sum, s) => sum + (s.amount || 0), 0),
-        totalOriginalAmount: groupSuppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0),
-        // Use the calculated payment amounts for each purchase (excluding CD)
-        totalPaid: groupSuppliers.reduce((sum, s) => sum + s.totalCashPaidForEntry + s.totalRtgsPaidForEntry, 0),
-        totalCashPaid: groupSuppliers.reduce((sum, s) => sum + s.totalCashPaidForEntry, 0),
-        totalRtgsPaid: groupSuppliers.reduce((sum, s) => sum + s.totalRtgsPaidForEntry, 0),
-        totalCdAmount: groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0),
-        totalOutstanding: groupSuppliers.filter(s => s.outstandingForEntry > 0).reduce((sum, s) => sum + s.outstandingForEntry, 0),
+        totalOriginalAmount,
+        // Use totalPaidForEntry which includes all payment types (cash, rtgs, etc.)
+        totalPaid: totalPaid,
+        totalCashPaid: totalCashPaidFromPayments,
+        totalRtgsPaid: totalRtgsPaidFromPayments,
+        totalCdAmount,
+        // IMPORTANT: Outstanding = Original - Paid - CD (use totalPaid, not totalCashPaid + totalRtgsPaid)
+        // totalPaid is calculated from paidFor.amount which is the correct amount
+        totalOutstanding: totalOriginalAmount - totalPaid - totalCdAmount,
         paymentHistory: groupSuppliers.flatMap(s => s.paymentsForEntry),
         outstandingEntryIds: groupSuppliers.filter(s => s.outstandingForEntry > 0).map(s => s.srNo),
         allTransactions: groupSuppliers,
@@ -185,13 +213,28 @@ export const useSupplierSummary = (
         averageLabouryRate: 0, // Will be calculated below
         totalTransactions: groupSuppliers.length,
         totalOutstandingTransactions: groupSuppliers.filter(s => s.outstandingForEntry > 0).length,
-        totalBrokerage: groupSuppliers.reduce((sum, s) => sum + (s.brokerage || 0), 0),
+        totalBrokerage: groupSuppliers.reduce((sum, s) => {
+            // Use brokerageAmount if available, otherwise calculate from brokerageRate * netWeight
+            let brokerageAmount = s.brokerageAmount || 0;
+            if (!brokerageAmount && s.brokerageRate && s.netWeight) {
+                brokerageAmount = Math.round(Number(s.brokerageRate || 0) * Number(s.netWeight || 0) * 100) / 100;
+            }
+            const signedBrokerage = (s.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+            return sum + signedBrokerage;
+        }, 0),
         totalCd: groupSuppliers.reduce((sum, s) => sum + s.totalCdForEntry, 0),
       };
 
       // Calculate averages and rates
-      mergedData.averageRate = mergedData.totalFinalWeight > 0 ? mergedData.totalAmount / mergedData.totalFinalWeight : 0;
-      mergedData.averageOriginalPrice = mergedData.totalNetWeight > 0 ? mergedData.totalOriginalAmount / mergedData.totalNetWeight : 0;
+      const totalWeightedRate = groupSuppliers.reduce((sum, s) => {
+        const rate = Number(s.rate) || 0;
+        const netWeight = Number(s.netWeight) || 0;
+        return sum + rate * netWeight;
+      }, 0);
+
+      const safeNetWeight = mergedData.totalNetWeight || 0;
+      mergedData.averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
+      mergedData.averageOriginalPrice = safeNetWeight > 0 ? mergedData.totalOriginalAmount / safeNetWeight : 0;
       
       const allValidRates = groupSuppliers.map(s => s.rate).filter(rate => rate > 0);
       mergedData.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;
@@ -221,11 +264,6 @@ export const useSupplierSummary = (
       acc.totalCashPaid += s.totalCashPaid;
       acc.totalRtgsPaid += s.totalRtgsPaid;
       acc.totalCdAmount! += s.totalCdAmount!;
-      
-      // Debug: Log individual supplier totals
-      if (s.name && s.totalTransactions > 0) {
-        console.log(`${s.name}: Cash=${s.totalCashPaid}, RTGS=${s.totalRtgsPaid}, Total=${s.totalPaid}`);
-      }
       acc.totalGrossWeight! += s.totalGrossWeight!;
       acc.totalTeirWeight! += s.totalTeirWeight!;
       acc.totalFinalWeight! += s.totalFinalWeight!;
@@ -238,6 +276,7 @@ export const useSupplierSummary = (
       acc.totalTransactions! += s.totalTransactions!;
       acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
       acc.totalAmount += s.totalAmount;
+      acc.totalBrokerage! += s.totalBrokerage!;
 
       // Aggregate all payment history and outstanding entries
       acc.paymentHistory = [...acc.paymentHistory, ...s.paymentHistory];
@@ -265,7 +304,9 @@ export const useSupplierSummary = (
     // Set mill overview data properly
     millSummary.allTransactions = processedSuppliers;
     millSummary.allPayments = paymentHistory;
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - (millSummary.totalCashPaid + millSummary.totalRtgsPaid);
+    // IMPORTANT: Outstanding = Original - Paid - CD (use totalPaid, not totalCashPaid + totalRtgsPaid)
+    // totalPaid is calculated from paidFor.amount which is the correct amount
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
     
     // Ensure mill summary has all the necessary data
     millSummary.paymentHistory = millSummary.allPayments;
@@ -274,8 +315,15 @@ export const useSupplierSummary = (
       .map(s => s.srNo);
 
     // Calculate averages and min/max for mill overview
-    millSummary.averageRate = millSummary.totalFinalWeight > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight : 0;
-    millSummary.averageOriginalPrice = millSummary.totalNetWeight > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight : 0;
+    const millWeightedRate = millSummary.allTransactions.reduce((sum, s) => {
+      const rate = Number(s.rate) || 0;
+      const netWeight = Number(s.netWeight) || 0;
+      return sum + rate * netWeight;
+    }, 0);
+
+    const millNetWeight = millSummary.totalNetWeight || 0;
+    millSummary.averageRate = millNetWeight > 0 ? millWeightedRate / millNetWeight : 0;
+    millSummary.averageOriginalPrice = millNetWeight > 0 ? millSummary.totalOriginalAmount / millNetWeight : 0;
     
     const allValidRates = millSummary.allTransactions.map(s => s.rate).filter(rate => rate > 0);
     millSummary.minRate = allValidRates.length > 0 ? Math.min(...allValidRates) : 0;

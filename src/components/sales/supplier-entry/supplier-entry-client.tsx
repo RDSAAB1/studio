@@ -802,7 +802,7 @@ export default function SupplierEntryClient() {
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
                 onSaveAndPrint={handleSaveAndPrint}
-                onNew={handleNew}
+                onClear={handleNew}
                 isEditing={isEditing}
                 onSearch={handleSearchChange}
                 onPrint={handlePrint}

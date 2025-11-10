@@ -157,10 +157,10 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
                         <table className="w-full text-sm">
                             <tbody>
                                 <tr><td className="font-bold pr-2">DATE</td><td>{data.date}</td></tr>
-                                <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.supplier.name)}</td></tr>
-                                {data.supplier.so && !isCustomer && <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.supplier.so)}</td></tr>}
-                                <tr><td className="font-bold pr-2">CONTACT</td><td>{data.supplier.contact}</td></tr>
-                                <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.supplier.address)}</td></tr>
+                                <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.customer?.name || '')}</td></tr>
+                                {data.customer?.so && !isCustomer && <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.customer.so)}</td></tr>}
+                                <tr><td className="font-bold pr-2">CONTACT</td><td>{data.customer?.contact || ''}</td></tr>
+                                <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.customer?.address || '')}</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -187,7 +187,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
                     </tr>
                 </thead>
                 <tbody>
-                    {data.entries.map(entry => (
+                    {data.receipts?.map(entry => (
                          <tr key={entry.id}>
                             {fields.srNo && <td className="border border-black p-1 text-center">{entry.srNo}</td>}
                             {fields.date && <td className="border border-black p-1 text-center">{format(new Date(entry.date), "dd-MMM-yy")}</td>}
