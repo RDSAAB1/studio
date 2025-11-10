@@ -1,0 +1,11 @@
+warning: in the working copy of 'src/app/sales/customer-entry/customer-entry-client.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/sales/customer-profile/customer-profile-client.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/sales/supplier-profile/components/statement-preview.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/tools/voucher-import/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/sales/details-dialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/sales/supplier-form.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/hooks/use-supplier-profile.ts', LF will be replaced by CRLF the next time Git touches it
+src/app/sales/supplier-entry/hooks/use-supplier-entry.ts
+src/app/sales/supplier-entry/supplier-entry-client.tsx
+src/components/sales/calculated-summary.tsx
+src/components/sales/supplier-form.tsx
