@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
+import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "../utils/fuzzy-matching";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -10,6 +11,34 @@ const toNumber = (value: unknown): number => {
   }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizeProfileField = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).replace(/\s+/g, " ").trim();
+};
+
+const toFuzzyProfile = (source: any): FuzzySupplierProfile => ({
+  name: normalizeProfileField(source?.name),
+  fatherName: normalizeProfileField(source?.fatherName ?? source?.so),
+  address: normalizeProfileField(source?.address),
+  contact: normalizeProfileField(source?.contact),
+  srNo: normalizeProfileField(source?.srNo),
+});
+
+const buildProfileKey = (profile: FuzzySupplierProfile, index: number): string => {
+  const base = [profile.name, profile.fatherName || "", profile.address || ""]
+    .map((part) => part.toLowerCase().replace(/\s+/g, "_"))
+    .join("__")
+    .replace(/^_+|_+$/g, "");
+
+  if (base) {
+    return base;
+  }
+
+  return `profile_${index}`;
 };
 
 export const useSupplierSummary = (
@@ -100,47 +129,44 @@ export const useSupplierSummary = (
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
 
-    // Helper function to calculate Levenshtein distance
-    const levenshteinDistance = (str1: string, str2: string): number => {
-        const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-        for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-        for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-        for (let j = 1; j <= str2.length; j++) {
-            for (let i = 1; i <= str1.length; i++) {
-                const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-                matrix[j][i] = Math.min(
-                    matrix[j][i - 1] + 1,
-                    matrix[j - 1][i] + 1,
-                    matrix[j - 1][i - 1] + indicator
-                );
-            }
-        }
-        return matrix[str2.length][str1.length];
+    type SupplierGroup = {
+      key: string;
+      profile: FuzzySupplierProfile;
+      suppliers: typeof processedSuppliers;
     };
 
-    // Helper function to normalize strings for comparison
-    const normalize = (str: string) => (str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const supplierGroups: SupplierGroup[] = [];
 
-    // Group suppliers using STRICT exact matching (name + father + address must match exactly)
-    const groupedSuppliers = new Map<string, typeof processedSuppliers>();
-    const makeCompositeKey = (name: string, father: string, address: string) => 
-        `${normalize(name)}|${normalize(father)}|${normalize(address)}`;
-    
     processedSuppliers.forEach((supplier) => {
-        const father = supplier.fatherName || supplier.so || '';
-        const compositeKey = makeCompositeKey(supplier.name || '', father, supplier.address || '');
-        
-        const existing = groupedSuppliers.get(compositeKey);
-        if (existing) {
-            existing.push(supplier);
-        } else {
-            groupedSuppliers.set(compositeKey, [supplier]);
+      const profile = toFuzzyProfile(supplier);
+      let bestIndex = -1;
+      let bestDifference = Number.POSITIVE_INFINITY;
+
+      supplierGroups.forEach((group, index) => {
+        const match = fuzzyMatchProfiles(profile, group.profile);
+        if (!match.isMatch) {
+          return;
         }
+        if (match.totalDifference < bestDifference) {
+          bestDifference = match.totalDifference;
+          bestIndex = index;
+        }
+      });
+
+      if (bestIndex >= 0) {
+        supplierGroups[bestIndex].suppliers.push(supplier);
+      } else {
+        const key = buildProfileKey(profile, supplierGroups.length + 1);
+        supplierGroups.push({ key, profile, suppliers: [supplier] });
+      }
     });
 
-    // Create summary for each unique profile group
-    Array.from(groupedSuppliers.entries()).forEach(([groupKey, groupSuppliers]) => {
+    // Create summary for each fuzzy-matched profile group
+    supplierGroups.forEach(({ key: groupKey, profile: groupProfile, suppliers: groupSuppliers }, groupIndex) => {
       const firstSupplier = groupSuppliers[0];
+      const displayName = groupProfile.name || firstSupplier.name || `Supplier ${groupIndex + 1}`;
+      const displayFather = groupProfile.fatherName || firstSupplier.so || firstSupplier.fatherName || '';
+      const displayAddress = groupProfile.address || firstSupplier.address || '';
       
       // Get all unique payments for this group
       const allPayments = groupSuppliers.flatMap(s => s.paymentsForEntry);
@@ -184,6 +210,9 @@ export const useSupplierSummary = (
       
       const mergedData: CustomerSummary = {
         ...firstSupplier,
+        name: displayName,
+        so: displayFather,
+        address: displayAddress,
         totalAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.amount), 0),
         totalOriginalAmount,
         // Use totalPaidForEntry which includes all payment types (cash, rtgs, etc.)

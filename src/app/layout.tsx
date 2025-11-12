@@ -13,6 +13,7 @@ import { getFirebaseAuth, onAuthStateChanged, type User } from '@/lib/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { db, syncAllData } from '@/lib/database';
+import { useSyncQueue } from '@/hooks/use-sync-queue';
 
 
 const inter = Inter({
@@ -117,6 +118,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
     const { toast } = useToast();
+    useSyncQueue();
 
     useEffect(() => {
         if ('serviceWorker' in navigator) {

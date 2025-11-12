@@ -37,16 +37,19 @@ import {
   Save as SaveIcon,
 } from "lucide-react";
 import { bankBranches } from "@/lib/data";
-import type { MandiReport } from "@/lib/definitions";
+import type { MandiHeaderSettings, MandiReport } from "@/lib/definitions";
 import {
   addMandiReport,
   updateMandiReport,
   deleteMandiReport,
   fetchMandiReports,
+  getMandiHeaderSettings,
+  saveMandiHeaderSettings,
 } from "@/lib/firestore";
 import { format, parse } from "date-fns";
 import * as XLSX from "xlsx";
 import { db } from "@/lib/database";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 type VoucherBlock = {
   voucherNo: string;
@@ -86,17 +89,6 @@ type CombinedEntry = MandiReport;
 type ParseResult =
   | { success: true; voucher: VoucherBlock; payment: PaymentBlock }
   | { success: false; errors: string[] };
-
-type MandiHeaderSettings = {
-  firmName: string;
-  firmAddress: string;
-  mandiName: string;
-  licenseNo: string;
-  mandiType: string;
-  registerNo: string;
-  commodity: string;
-  financialYear: string;
-};
 
 const bankLookup = new Map(
   bankBranches.map((branch) => [branch.ifscCode.toUpperCase(), branch])
@@ -759,6 +751,12 @@ export default function VoucherImportTool() {
       );
     }
 
+    try {
+      await saveMandiHeaderSettings(settings);
+    } catch (error) {
+      console.warn("Failed to persist header settings to Firestore:", error);
+    }
+
     if (typeof window !== "undefined") {
       window.localStorage.setItem(
         HEADER_STORAGE_KEY,
@@ -792,6 +790,33 @@ export default function VoucherImportTool() {
     let mounted = true;
     const loadHeaderSettings = async () => {
       try {
+        const remote = await getMandiHeaderSettings();
+        if (mounted && remote) {
+          setHeaderSettings({
+            ...defaultHeaderSettings,
+            ...remote,
+          });
+          if (db) {
+            await db.settings.put(
+              {
+                id: HEADER_STORAGE_KEY,
+                ...remote,
+              } as any
+            );
+          }
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(
+              HEADER_STORAGE_KEY,
+              JSON.stringify(remote)
+            );
+          }
+          return;
+        }
+      } catch (error) {
+        console.warn("Failed to fetch header settings from Firestore:", error);
+      }
+
+      try {
         if (db) {
           const record = await db.settings.get(HEADER_STORAGE_KEY as any);
           if (mounted && record) {
@@ -802,14 +827,9 @@ export default function VoucherImportTool() {
             });
             return;
           }
-        } else if (typeof window !== "undefined") {
-          const stored = window.localStorage.getItem(HEADER_STORAGE_KEY);
-          if (stored) {
-            setHeaderSettings({
-              ...defaultHeaderSettings,
-              ...(JSON.parse(stored) as Partial<MandiHeaderSettings>),
-            });
-          }
+        }
+      } catch (error) {
+        console.warn("Failed to load header settings from IndexedDB:", error);
         }
 
         if (typeof window !== "undefined") {
@@ -820,9 +840,6 @@ export default function VoucherImportTool() {
               ...(JSON.parse(stored) as Partial<MandiHeaderSettings>),
             });
           }
-        }
-      } catch (error) {
-        console.warn("Failed to load mandi header settings:", error);
       }
     };
     loadHeaderSettings();
@@ -2094,12 +2111,9 @@ export default function VoucherImportTool() {
           <div className="grid gap-3 md:grid-cols-5">
             <div className="space-y-1">
               <Label>6R Issue Date</Label>
-              <Input
-                type="date"
+              <SmartDatePicker
                 value={formState.purchaseDate || ""}
-                onChange={(event) =>
-                  handleFieldChange("purchaseDate", event.target.value)
-                }
+                onChange={(next) => handleFieldChange("purchaseDate", next)}
               />
             </div>
             <div className="space-y-1 md:col-span-2">
@@ -2198,12 +2212,9 @@ export default function VoucherImportTool() {
           <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-1">
               <Label>Payment Date</Label>
-              <Input
-                type="date"
+              <SmartDatePicker
                 value={formState.paymentDate || ""}
-                onChange={(event) =>
-                  handleFieldChange("paymentDate", event.target.value)
-                }
+                onChange={(next) => handleFieldChange("paymentDate", next)}
               />
             </div>
             <div className="space-y-1">

@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 
 export default function ProjectManagementPage() {
@@ -182,7 +183,13 @@ export default function ProjectManagementPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="startDate">Start Date</Label>
-                                        <Input id="startDate" name="startDate" type="date" value={currentProject.startDate || ''} onChange={handleInputChange} />
+                                        <SmartDatePicker
+                                            id="startDate"
+                                            name="startDate"
+                                            value={currentProject.startDate || ''}
+                                            onChange={(next) => setCurrentProject(prev => ({ ...prev, startDate: next }))}
+                                            inputClassName="h-9"
+                                        />
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="totalCost">Total Cost (Optional)</Label>
@@ -194,7 +201,13 @@ export default function ProjectManagementPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="endDate">End Date (Optional)</Label>
-                                        <Input id="endDate" name="endDate" type="date" value={currentProject.endDate || ''} onChange={handleInputChange} />
+                                        <SmartDatePicker
+                                            id="endDate"
+                                            name="endDate"
+                                            value={currentProject.endDate || ''}
+                                            onChange={(next) => setCurrentProject(prev => ({ ...prev, endDate: next }))}
+                                            inputClassName="h-9"
+                                        />
                                     </div>
                                 </div>
                             </div>

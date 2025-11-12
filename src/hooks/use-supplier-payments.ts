@@ -10,10 +10,24 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
-import { toTitleCase } from "@/lib/utils";
 import { addBank } from '@/lib/firestore';
 import type { Customer } from "@/lib/definitions";
-import { levenshteinDistance } from '@/lib/utils';
+import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "@/app/sales/supplier-profile/utils/fuzzy-matching";
+
+const normalizeProfileField = (value: unknown): string => {
+    if (value === null || value === undefined) {
+        return "";
+    }
+    return String(value).replace(/\s+/g, " ").trim();
+};
+
+const toFuzzyProfile = (source: any): FuzzySupplierProfile => ({
+    name: normalizeProfileField(source?.name),
+    fatherName: normalizeProfileField(source?.fatherName ?? source?.so),
+    address: normalizeProfileField(source?.address),
+    contact: normalizeProfileField(source?.contact),
+    srNo: normalizeProfileField(source?.srNo),
+});
 
 
 export const useSupplierPayments = () => {
@@ -154,37 +168,48 @@ export const useSupplierPayments = () => {
     }, [data.customerSummaryMap]);
 
     const fuzzyProfileMatcher = useCallback(
-        (targetName: string, targetFatherName: string) => {
-            const target = toTitleCase(targetName || "").trim();
-            const targetFather = toTitleCase(targetFatherName || "").trim();
-
-            let bestKey: string | null = null;
-            let bestScore = Infinity;
-
-            data.customerSummaryMap.forEach((summary: any, key: string) => {
-                const summaryName = toTitleCase(summary?.name || "").trim();
-                if (!summaryName) return;
-
-                const summaryFather = toTitleCase(summary?.so || "").trim();
-
-                const nameDistance = levenshteinDistance(target.toLowerCase(), summaryName.toLowerCase());
-                const fatherDistance = targetFather && summaryFather
-                    ? levenshteinDistance(targetFather.toLowerCase(), summaryFather.toLowerCase())
-                    : 0;
-
-                const score = nameDistance + fatherDistance;
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestKey = key;
-                }
+        (targetName: string, targetFatherName: string, targetAddress?: string | null) => {
+            const targetProfile = toFuzzyProfile({
+                name: targetName,
+                fatherName: targetFatherName,
+                address: targetAddress,
             });
 
-            // Accept result only if reasonably close (allow minor typos)
-            if (bestKey === null) return null;
-            if (bestScore === 0) return bestKey;
-            if (target.length <= 3 && bestScore <= 1) return bestKey;
-            if (bestScore <= Math.max(2, Math.floor(target.length * 0.25))) return bestKey;
-            return null;
+            if (!targetProfile.name) {
+                return null;
+            }
+
+            const entries: Array<[string, any]> = [];
+            if (data.customerSummaryMap && typeof data.customerSummaryMap.forEach === "function") {
+                data.customerSummaryMap.forEach((value: any, key: string) => {
+                    entries.push([key, value]);
+                });
+            }
+
+            let bestKey: string | null = null;
+            let bestDifference = Number.POSITIVE_INFINITY;
+
+            for (const [key, summary] of entries) {
+                const candidateProfile = toFuzzyProfile(summary);
+                if (!candidateProfile.name) {
+                    continue;
+                }
+
+                const match = fuzzyMatchProfiles(targetProfile, candidateProfile);
+                if (!match.isMatch) {
+                    continue;
+                }
+
+                if (match.totalDifference < bestDifference) {
+                    bestDifference = match.totalDifference;
+                    bestKey = key;
+                    if (bestDifference === 0) {
+                        break;
+                    }
+                }
+            }
+
+            return bestKey;
         },
         [data.customerSummaryMap]
     );
@@ -427,7 +452,11 @@ export const useSupplierPayments = () => {
             let profileKey = profileKeyFromId;
 
             if (!profileKey) {
-                profileKey = fuzzyProfileMatcher(originalEntry.name, originalEntry.so || "");
+                profileKey = fuzzyProfileMatcher(
+                    originalEntry.name,
+                    originalEntry.so || "",
+                    originalEntry.address || ""
+                );
             }
 
             if (!profileKey) {
@@ -522,33 +551,90 @@ export const useSupplierPayments = () => {
     }, [form]);
 
     const handleSerialNoBlur = useCallback(() => {
-        if (!form.serialNoSearch.trim()) return;
+        const rawValue = form.serialNoSearch.trim();
+        if (!rawValue) return;
 
-        // Auto-format: if only numbers, convert to S00XXX format
-        let formattedSrNo = form.serialNoSearch.trim();
-        if (/^\d+$/.test(formattedSrNo)) {
-            formattedSrNo = `S${formattedSrNo.padStart(5, '0')}`;
-            form.setSerialNoSearch(formattedSrNo);
+        let formattedSrNo = rawValue.toUpperCase().replace(/\s+/g, '');
+        const numericPartFromS = formattedSrNo.startsWith('S')
+            ? formattedSrNo.slice(1)
+            : formattedSrNo;
+
+        if (/^\d+$/.test(numericPartFromS)) {
+            formattedSrNo = `S${numericPartFromS.padStart(5, '0')}`;
         }
 
-        // Find supplier with this serial number
-        const supplier = data.suppliers.find(s => s.srNo.toLowerCase() === formattedSrNo.toLowerCase());
-        if (supplier) {
-            // Find the supplier key in the summary map
-            for (const [key, summary] of data.customerSummaryMap.entries()) {
-                if (summary.allTransactions?.some(t => t.srNo === supplier.srNo)) {
-                    // Use handleCustomerSelect to auto-fill payee details
-                    handleCustomerSelect(key);
-                    // Auto-select this specific entry
-                    const newSelection = new Set<string>();
-                    newSelection.add(supplier.id);
-                    form.setSelectedEntryIds(newSelection);
-                    // Don't clear - keep the serial number visible
-                    break;
-                }
+        form.setSerialNoSearch(formattedSrNo);
+        const normalizedSrNo = formattedSrNo.toLowerCase();
+
+        const findLatestPayment = (payments: Payment[]) => {
+            return payments.reduce<Payment | null>((latest, current) => {
+                const currentMeta = current as any;
+                const latestMeta = latest as any;
+                const currentTimestamp = new Date(
+                    currentMeta?.updatedAt || currentMeta?.createdAt || current.date || ''
+                ).getTime();
+                const latestTimestamp = latest
+                    ? new Date(
+                          latestMeta?.updatedAt || latestMeta?.createdAt || latest?.date || ''
+                      ).getTime()
+                    : Number.NEGATIVE_INFINITY;
+                return currentTimestamp > latestTimestamp ? current : latest;
+            }, null);
+        };
+
+        const matchingPayments = data.paymentHistory.filter(
+            (payment) =>
+                payment.paidFor?.some(
+                    (pf) => (pf.srNo || '').toLowerCase() === normalizedSrNo
+                )
+        );
+
+        let paymentToEdit: Payment | null = null;
+        if (matchingPayments.length) {
+            const sameMethod = matchingPayments.filter(
+                (payment) =>
+                    (payment.receiptType || '').toLowerCase() === form.paymentMethod.toLowerCase()
+            );
+            paymentToEdit = findLatestPayment(sameMethod.length ? sameMethod : matchingPayments);
+        }
+
+        if (
+            paymentToEdit &&
+            (!form.editingPayment || form.editingPayment.id !== paymentToEdit.id)
+        ) {
+            handleEditPayment(paymentToEdit);
+            return;
+        }
+
+        const supplier = data.suppliers.find(
+            (s) => (s.srNo || '').toLowerCase() === normalizedSrNo
+        );
+        if (!supplier) {
+            return;
+        }
+
+        for (const [key, summary] of data.customerSummaryMap.entries()) {
+            if (
+                summary.allTransactions?.some(
+                    (transaction) => (transaction.srNo || '').toLowerCase() === normalizedSrNo
+                )
+            ) {
+                handleCustomerSelect(key);
+                const newSelection = new Set<string>();
+                newSelection.add(supplier.id);
+                form.setSelectedEntryIds(newSelection);
+                form.setParchiNo(formattedSrNo);
+                break;
             }
         }
-    }, [data.suppliers, data.customerSummaryMap, form, handleCustomerSelect]);
+    }, [
+        data.customerSummaryMap,
+        data.paymentHistory,
+        data.suppliers,
+        form,
+        handleCustomerSelect,
+        handleEditPayment,
+    ]);
 
     return {
         ...data,

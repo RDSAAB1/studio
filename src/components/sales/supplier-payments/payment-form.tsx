@@ -1,20 +1,18 @@
 
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User, Hash, CircleDollarSign } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { RtgsForm } from './rtgs-form';
-import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { addBank } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -28,20 +26,6 @@ const cdOptions = [
     { value: 'on_previously_paid_no_cd', label: 'On Paid Amount (No CD)' },
 ];
 
-const SectionTitle = ({ title, onEdit, editingPayment, icon, description }: { title: string, onEdit?: () => void, editingPayment?: boolean, icon?: React.ReactNode, description?: string }) => (
-    <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-             {icon}
-            <div>
-                <h3 className="text-sm font-semibold">{title}</h3>
-                {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            </div>
-        </div>
-        {onEdit && !editingPayment && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Pen className="h-4 w-4"/></Button>}
-    </div>
-);
-
-
 export const PaymentForm = (props: any) => {
     const {
         paymentMethod, rtgsFor,
@@ -50,18 +34,15 @@ export const PaymentForm = (props: any) => {
         settleAmount, handleSettleAmountChange,
         cdEnabled, setCdEnabled,
         cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, setCdAmount,
-        processPayment, isProcessing, resetPaymentForm, editingPayment,
+        editingPayment,
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
         finalAmountToBePaid, handleToBePaidChange,
-        calcTargetAmount, setCalcTargetAmount,
-        minRate, setMinRate, maxRate, setMaxRate,
-        selectPaymentAmount,
+        setRtgsAmount,
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
-        supplierDetails, setSupplierDetails, isPayeeEditing, setIsPayeeEditing,
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
-        utrNo, setUtrNo, checkNo, setCheckNo
+        checkNo, setCheckNo
     } = props;
 
     const paymentFromOptions = useMemo(() => {
@@ -79,15 +60,37 @@ export const PaymentForm = (props: any) => {
     }, [paymentMethod, financialState.balances, bankAccounts]);
 
 
+    useEffect(() => {
+        if (paymentMethod === 'RTGS' && finalAmountToBePaid && finalAmountToBePaid > 0 && !editingPayment) {
+            setRtgsAmount(finalAmountToBePaid);
+        }
+    }, [paymentMethod, finalAmountToBePaid, editingPayment, setRtgsAmount]);
+
     return (
         <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 text-[13px] gap-4">
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Payment & CD Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-3">
-                         <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                    <CardContent className="p-3 space-y-3 text-[12px]">
+                          {typeof props.onPaymentMethodChange === 'function' && (
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                                {(['Cash', 'Online', 'RTGS'] as const).map((method) => (
+                                    <Button
+                                        key={method}
+                                        type="button"
+                                        size="sm"
+                                        className={cn(
+                                            "h-7 px-3 text-[11px]",
+                                            paymentMethod === method ? "bg-primary text-primary-foreground" : "border border-input bg-muted/60 text-muted-foreground hover:text-foreground"
+                                        )}
+                                        variant={paymentMethod === method ? "default" : "ghost"}
+                                        onClick={() => props.onPaymentMethodChange?.(method)}
+                                    >
+                                        {method}
+                                    </Button>
+                                ))}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
                             {/* Payment Details */}
                             <div className="space-y-1 flex-1 min-w-[150px]">
                                 <Label className="text-xs">Payment Date</Label>
@@ -109,7 +112,7 @@ export const PaymentForm = (props: any) => {
                                 </div>
                             )}
                              
-                            {paymentMethod === 'Cash' && (
+                            {(paymentMethod === 'Cash' || paymentMethod === 'RTGS') && (
                                 <div className="space-y-1 flex-1 min-w-[120px]">
                                     <Label className="text-xs">Parchi No. (SR#)</Label>
                                     <Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs"/>
@@ -175,12 +178,8 @@ export const PaymentForm = (props: any) => {
                         </div>
                         
                         {cdEnabled && (
-                             <div className="p-2 border rounded-lg bg-background flex flex-wrap items-center gap-x-4 gap-y-2">
-                                <div className="flex items-center gap-2 flex-1 min-w-[120px]">
-                                    <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
-                                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1 flex-1 min-w-[200px]">
+                             <div className="p-2 border rounded-lg bg-background space-y-2">
+                                <div className="space-y-1">
                                     <Label className="text-xs">CD At</Label>
                                     <Select value={cdAt} onValueChange={setCdAt}>
                                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -189,115 +188,34 @@ export const PaymentForm = (props: any) => {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-                                    <Label className="text-xs">CD Amt</Label>
-                                    <div className="flex items-center gap-2 w-full">
-                                        <Input
-                                            type="number"
-                                            inputMode="decimal"
-                                            step="0.01"
-                                            value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
-                                            onChange={e => setCdAmount(parseFloat(e.target.value) || 0)}
-                                            className="h-8 text-xs font-bold text-primary"
-                                        />
-                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                            {formatCurrency(calculatedCdAmount)}
-                                        </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
+                                        <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">CD Amt</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                inputMode="decimal"
+                                                step="0.01"
+                                                value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
+                                                onChange={e => setCdAmount(parseFloat(e.target.value) || 0)}
+                                                className="h-8 text-xs font-bold text-primary"
+                                            />
+                                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                {formatCurrency(calculatedCdAmount)}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </CardContent>
                 </Card>
-
-                 {(props.selectedCustomerKey || props.rtgsFor === 'Outsider') && (
-                    <Card>
-                        <CardHeader>
-                            <SectionTitle 
-                                title="Payee Details" 
-                                icon={<User size={18}/>} 
-                                onEdit={() => setIsPayeeEditing(true)} 
-                                editingPayment={editingPayment}
-                                description={editingPayment ? "Click to edit payee details" : undefined}
-                            />
-                        </CardHeader>
-                        <CardContent className="space-y-3 p-3">
-                             {isPayeeEditing ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-lg bg-background border-blue-200 bg-blue-50/50">
-                                    {editingPayment && (
-                                        <div className="col-span-full mb-2">
-                                            <p className="text-xs text-blue-600 font-medium">✏️ Editing payee details for payment {editingPayment.paymentId || editingPayment.rtgsSrNo}</p>
-                                        </div>
-                                    )}
-                                    <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1 sm:col-span-2 grid grid-cols-2 gap-2">
-                                        <div><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" /></div>
-                                        <div><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
-                                    </div>
-                                    <div className="col-span-full flex justify-end">
-                                        <Button size="sm" onClick={() => setIsPayeeEditing(false)} className="h-7 text-xs">Done</Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground p-2 rounded-lg bg-background/50">
-                                    <p><span className="font-semibold">Name:</span> {supplierDetails.name}</p>
-                                    <p><span className="font-semibold">{rtgsFor === 'Outsider' ? 'Company:' : "Father's Name:"}</span> {supplierDetails.fatherName}</p>
-                                    <p><span className="font-semibold">Contact:</span> {supplierDetails.contact}</p>
-                                    <p className="col-span-full"><span className="font-semibold">Address:</span> {supplierDetails.address}</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
             </div>
-
-            {paymentMethod === 'RTGS' && (
-                <div className="space-y-3">
-                     <Card className="mt-3">
-                        <CardContent className="p-3">
-                            <RtgsForm {...props} />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Generate Payment Combinations</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3">
-                             <PaymentCombinationGenerator
-                                calcTargetAmount={calcTargetAmount}
-                                setCalcTargetAmount={setCalcTargetAmount}
-                                minRate={minRate}
-                                setMinRate={setMinRate}
-                                maxRate={maxRate}
-                                setMaxRate={setMaxRate}
-                                selectPaymentAmount={selectPaymentAmount}
-                            />
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-             
-            <CardFooter className="p-0 pt-3">
-                <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="w-full sm:w-auto p-3 rounded-lg bg-muted/50 flex items-center justify-between sm:justify-start gap-4">
-                        <div className="flex items-center gap-2">
-                           <CircleDollarSign className="h-5 w-5 text-primary"/>
-                           <div>
-                            <p className="text-xs text-muted-foreground">To Be Paid</p>
-                            <p className="text-lg font-bold text-primary">{formatCurrency(finalAmountToBePaid)}</p>
-                           </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                        <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
-                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {editingPayment ? 'Update Payment' : 'Finalize Payment'}
-                        </Button>
-                    </div>
-                </div>
-            </CardFooter>
+            <CardFooter className="p-0 pt-3" />
         </>
     );
 };

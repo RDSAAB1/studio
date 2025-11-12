@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import { Pencil, Trash2, Check, X, Download, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/database";
 import type { LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerCashAccount } from "@/lib/definitions";
@@ -15,16 +15,26 @@ import {
   fetchLedgerAccounts,
   createLedgerAccount,
   fetchLedgerEntries,
-  createLedgerEntry,
-  updateLedgerEntriesBatch,
-  deleteLedgerEntry,
   fetchLedgerCashAccounts,
   createLedgerCashAccount,
   updateLedgerCashAccount,
   deleteLedgerCashAccount,
+  getAllPayments,
+  getAllIncomes,
+  getAllExpenses,
 } from "@/lib/firestore";
 import { Switch } from "@/components/ui/switch";
 import { toTitleCase } from "@/lib/utils";
+import {
+  generateLedgerEntryId,
+  queueLedgerEntriesUpsert,
+  queueLedgerEntryDelete,
+  queueLedgerEntryUpsert,
+} from "@/lib/ledger-sync";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import * as XLSX from "xlsx";
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -47,6 +57,172 @@ const generateLinkGroupId = () => {
     return crypto.randomUUID();
   }
   return `link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+};
+
+type StatementRow = {
+  date: string;
+  supplierCash: number;
+  supplierRtgs: number;
+  supplierPayments: number;
+  incomes: number;
+  expenses: number;
+  seCash: number;
+  netTotal: number;
+};
+
+const STATEMENT_PRINT_ID = "statement-print-area";
+
+const STATEMENT_PRINT_STYLES = `
+@page {
+  size: A4 portrait;
+  margin: 18mm;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #${STATEMENT_PRINT_ID},
+  #${STATEMENT_PRINT_ID} * {
+    visibility: visible !important;
+  }
+  #${STATEMENT_PRINT_ID} {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    color: #0f172a !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid #cbd5f5 !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 16px !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-header h1 {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-meta-line {
+    margin: 4px 0 0 0 !important;
+    font-size: 11px !important;
+    color: #475569 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-meta {
+    text-align: right !important;
+    font-size: 11px !important;
+    color: #475569 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 18px !important;
+    font-size: 12px !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table th {
+    text-align: left !important;
+    font-weight: 600 !important;
+    padding: 6px 8px !important;
+    background: #eef2ff !important;
+    border: 1px solid #cbd5f5 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table td {
+    padding: 6px 8px !important;
+    border: 1px solid #cbd5f5 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table td.amount-cell {
+    text-align: right !important;
+    font-weight: 600 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table tr:nth-child(even) {
+    background: #f8fafc !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-summary-table tr.total-row th,
+  #${STATEMENT_PRINT_ID} .print-summary-table tr.total-row td {
+    background: #1e3a8a !important;
+    color: #ffffff !important;
+    border-color: #1e3a8a !important;
+  }
+  #${STATEMENT_PRINT_ID} table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    font-size: 12px !important;
+  }
+  #${STATEMENT_PRINT_ID} thead {
+    background: #eef2ff !important;
+    color: #1e293b !important;
+  }
+  #${STATEMENT_PRINT_ID} tbody tr:nth-child(even) {
+    background: #f8fafc !important;
+  }
+  #${STATEMENT_PRINT_ID} th,
+  #${STATEMENT_PRINT_ID} td {
+    border: 1px solid #cbd5f5 !important;
+    padding: 8px 10px !important;
+    text-align: right !important;
+  }
+  #${STATEMENT_PRINT_ID} th:first-child,
+  #${STATEMENT_PRINT_ID} td:first-child {
+    text-align: left !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-top: 24px !important;
+    font-size: 11px !important;
+    color: #475569 !important;
+  }
+  #${STATEMENT_PRINT_ID} .print-signature {
+    margin-top: 28px !important;
+    border-top: 1px solid #cbd5f5 !important;
+    padding-top: 6px !important;
+    text-align: center !important;
+    width: 180px !important;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+`;
+
+const parseAmount = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.replace(/[^0-9.-]/g, "");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const formatStatementDate = (value: string) => {
+  try {
+    return format(new Date(`${value}T00:00:00`), "dd MMM yyyy");
+  } catch {
+    return value;
+  }
 };
 
 const LedgerPage: React.FC = () => {
@@ -112,6 +288,47 @@ const LedgerPage: React.FC = () => {
   });
 
   const ledgerRef = useRef<HTMLDivElement>(null);
+  const statementPrintRef = useRef<HTMLDivElement>(null);
+
+  const [activeTab, setActiveTab] = useState<"ledger" | "statement">("ledger");
+  const [statementStart, setStatementStart] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [statementEnd, setStatementEnd] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [statementData, setStatementData] = useState<StatementRow[]>([]);
+  const [statementError, setStatementError] = useState<string | null>(null);
+  const [statementGeneratedAt, setStatementGeneratedAt] = useState<string>("");
+
+  const statementRangeLabel = useMemo(() => {
+    if (statementStart && statementEnd) {
+      const start = formatStatementDate(statementStart);
+      const end = formatStatementDate(statementEnd);
+      return start === end ? `for ${start}` : `from ${start} to ${end}`;
+    }
+
+    if (statementStart) {
+      return `from ${formatStatementDate(statementStart)}`;
+    }
+
+    if (statementEnd) {
+      return `up to ${formatStatementDate(statementEnd)}`;
+    }
+
+    return "for all available dates";
+  }, [statementStart, statementEnd]);
+
+  const statementGeneratedLabel = useMemo(() => {
+    if (!statementGeneratedAt) return "";
+    try {
+      return format(new Date(statementGeneratedAt), "dd MMM yyyy, hh:mm a");
+    } catch {
+      return statementGeneratedAt;
+    }
+  }, [statementGeneratedAt]);
+
+  const statementPreparedText = useMemo(() => {
+    if (statementGeneratedLabel) return statementGeneratedLabel;
+    return format(new Date(), "dd MMM yyyy, hh:mm a");
+  }, [statementGeneratedLabel]);
 
   const activeAccount = useMemo(
     () => accounts.find((account) => account.id === activeAccountId) || null,
@@ -627,69 +844,94 @@ const LedgerPage: React.FC = () => {
       return;
     }
 
-    const linkTargetId = linkAccountId && linkAccountId !== activeAccountId ? linkAccountId : "";
-    if (linkTargetId && !accounts.find((acc) => acc.id === linkTargetId)) {
+    const linkTargetId =
+      linkAccountId && linkAccountId !== activeAccountId ? linkAccountId : "";
+    if (
+      linkTargetId &&
+      !accounts.find((account) => account.id === linkTargetId)
+    ) {
       toast({ title: "Invalid linked account", variant: "destructive" });
       return;
     }
 
     const sanitizedDebit = Math.round(debitValue * 100) / 100;
     const sanitizedCredit = Math.round(creditValue * 100) / 100;
-
-    const currentEntries = activeEntries;
-    const previousBalance = currentEntries.at(-1)?.balance || 0;
-    const nextBalance = Math.round((previousBalance + sanitizedDebit - sanitizedCredit) * 100) / 100;
-
     const linkGroupId = linkTargetId ? generateLinkGroupId() : undefined;
+    const nowIso = new Date().toISOString();
 
-    setSaving(true);
-    try {
-      const primaryEntry = await createLedgerEntry({
+    const newEntryBase: LedgerEntry = {
+      id: generateLedgerEntryId(),
         accountId: activeAccountId,
         date: entryForm.date,
         particulars: entryForm.particulars.trim() || "-",
         debit: sanitizedDebit,
         credit: sanitizedCredit,
+      balance: 0,
         remarks: entryForm.remarks.trim() || undefined,
-        balance: nextBalance,
+      createdAt: nowIso,
+      updatedAt: nowIso,
         linkGroupId,
         linkStrategy: linkTargetId ? linkMode : undefined,
-      });
+    };
 
-      let updatedEntries = recalculateBalances([...currentEntries, primaryEntry]);
-      setEntriesMap((prev) => ({ ...prev, [activeAccountId]: updatedEntries }));
-      await persistEntriesToIndexedDb(activeAccountId, updatedEntries);
+    const currentEntries = activeEntries;
+    const updatedEntries = recalculateBalances([
+      ...currentEntries,
+      newEntryBase,
+    ]);
+    const savedEntry = updatedEntries[updatedEntries.length - 1];
+
+    let counterUpdatedEntries: LedgerEntry[] | null = null;
+    let savedCounterEntry: LedgerEntry | null = null;
 
       if (linkTargetId) {
         const counterEntries = entriesMap[linkTargetId] || [];
-        const counterPrevBalance = counterEntries.at(-1)?.balance || 0;
-        const counterDebit = linkMode === "mirror"
-          ? sanitizedCredit
-          : sanitizedDebit;
-        const counterCredit = linkMode === "mirror"
-          ? sanitizedDebit
-          : sanitizedCredit;
-        const counterNextBalance = Math.round((counterPrevBalance + counterDebit - counterCredit) * 100) / 100;
+      const counterDebit =
+        linkMode === "mirror" ? sanitizedCredit : sanitizedDebit;
+      const counterCredit =
+        linkMode === "mirror" ? sanitizedDebit : sanitizedCredit;
 
-        const counterEntry = await createLedgerEntry({
+      const counterEntryBase: LedgerEntry = {
+        id: generateLedgerEntryId(),
           accountId: linkTargetId,
           date: entryForm.date,
           particulars: entryForm.particulars.trim() || "-",
           debit: counterDebit,
           credit: counterCredit,
+        balance: 0,
           remarks: entryForm.remarks.trim() || undefined,
-          balance: counterNextBalance,
+        createdAt: nowIso,
+        updatedAt: nowIso,
           linkGroupId,
           linkStrategy: linkMode,
-        });
+      };
 
-        const updatedCounterEntries = recalculateBalances([...counterEntries, counterEntry]);
+      counterUpdatedEntries = recalculateBalances([
+        ...counterEntries,
+        counterEntryBase,
+      ]);
+      savedCounterEntry =
+        counterUpdatedEntries[counterUpdatedEntries.length - 1];
+    }
+
+    setSaving(true);
+    try {
         setEntriesMap((prev) => ({
           ...prev,
           [activeAccountId]: updatedEntries,
-          [linkTargetId]: updatedCounterEntries,
+        ...(linkTargetId && counterUpdatedEntries
+          ? { [linkTargetId]: counterUpdatedEntries }
+          : {}),
         }));
-        await persistEntriesToIndexedDb(linkTargetId, updatedCounterEntries);
+
+      await persistEntriesToIndexedDb(activeAccountId, updatedEntries);
+      if (linkTargetId && counterUpdatedEntries) {
+        await persistEntriesToIndexedDb(linkTargetId, counterUpdatedEntries);
+      }
+
+      await queueLedgerEntryUpsert(savedEntry);
+      if (savedCounterEntry) {
+        await queueLedgerEntryUpsert(savedCounterEntry);
       }
 
       toast({ title: "Entry added" });
@@ -852,7 +1094,7 @@ const LedgerPage: React.FC = () => {
       }
 
       if (changedEntries.length) {
-        await updateLedgerEntriesBatch(changedEntries);
+        await queueLedgerEntriesUpsert(changedEntries);
       }
 
       toast({ title: "Entry updated" });
@@ -905,9 +1147,9 @@ const LedgerPage: React.FC = () => {
 
     setSaving(true);
     try {
-      await deleteLedgerEntry(entryId);
+      await queueLedgerEntryDelete(entryId);
       if (counterpartEntryId) {
-        await deleteLedgerEntry(counterpartEntryId);
+        await queueLedgerEntryDelete(counterpartEntryId);
       }
 
       const timestamp = new Date().toISOString();
@@ -949,7 +1191,7 @@ const LedgerPage: React.FC = () => {
       }
 
       if (changedEntries.length) {
-        await updateLedgerEntriesBatch(changedEntries);
+        await queueLedgerEntriesUpsert(changedEntries);
       }
 
       toast({ title: "Entry deleted" });
@@ -1095,8 +1337,488 @@ const LedgerPage: React.FC = () => {
     return { debit, credit, balance };
   }, [displayEntries]);
 
+  const statementTotals = useMemo(() => {
+    return statementData.reduce(
+      (acc, row) => {
+        acc.supplierCash += row.supplierCash;
+        acc.supplierRtgs += row.supplierRtgs;
+        acc.supplierPayments += row.supplierPayments;
+        acc.expenses += row.expenses;
+        acc.incomes += row.incomes;
+      acc.seCash += row.seCash;
+      acc.netTotal += row.netTotal;
+        return acc;
+      },
+    {
+      supplierCash: 0,
+      supplierRtgs: 0,
+      supplierPayments: 0,
+      expenses: 0,
+      incomes: 0,
+      seCash: 0,
+      netTotal: 0,
+    }
+    );
+  }, [statementData]);
+
+  const handleGenerateStatement = async () => {
+    if (!statementStart || !statementEnd) {
+      toast({
+        title: "Select date range",
+        description: "Please choose both start and end dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (statementStart > statementEnd) {
+      toast({
+        title: "Invalid range",
+        description: "Start date cannot be after end date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setStatementLoading(true);
+    setStatementError(null);
+    try {
+      const [payments, incomes, expenses] = await Promise.all([
+        getAllPayments(),
+        getAllIncomes(),
+        getAllExpenses(),
+      ]);
+
+      const startDate = new Date(`${statementStart}T00:00:00`);
+      const endDate = new Date(`${statementEnd}T23:59:59`);
+
+      const normalizeDateKey = (raw: string | undefined | null) => {
+        if (!raw) return null;
+        const candidate = raw.includes("T") ? new Date(raw) : new Date(`${raw}T00:00:00`);
+        if (Number.isNaN(candidate.getTime())) return null;
+        if (candidate < startDate || candidate > endDate) return null;
+        return format(candidate, "yyyy-MM-dd");
+      };
+
+      const map = new Map<string, { supplierCash: number; supplierRtgs: number; supplierPayments: number; incomes: number; expenses: number }>();
+      const ensureRecord = (key: string) => {
+        if (!map.has(key)) {
+          map.set(key, { supplierCash: 0, supplierRtgs: 0, supplierPayments: 0, incomes: 0, expenses: 0 });
+        }
+        return map.get(key)!;
+      };
+
+      payments.forEach((payment) => {
+        const key = normalizeDateKey(payment.date);
+        if (!key) return;
+        const record = ensureRecord(key);
+
+        const totalAmount = parseAmount(payment.amount);
+        const rtgsAmount = parseAmount((payment as any).rtgsAmount);
+        const receiptType = (payment.receiptType || (payment as any).type || "").toLowerCase();
+        const channelHints = (payment as any).paymentMethod?.toLowerCase?.() || "";
+
+        const addCash = (amount: number) => {
+          if (amount > 0) record.supplierCash += amount;
+        };
+
+        const addRtgs = (amount: number) => {
+          if (amount > 0) record.supplierRtgs += amount;
+        };
+
+        const registerMixed = (rtgsPortion: number) => {
+          const sanitizedRtgs = Math.min(rtgsPortion, totalAmount);
+          addRtgs(sanitizedRtgs);
+          const cashPortion = Math.max(totalAmount - sanitizedRtgs, 0);
+          addCash(cashPortion);
+        };
+
+        const channelString = `${receiptType} ${channelHints}`.trim();
+        if (channelString.includes("cash")) {
+          addCash(totalAmount);
+        } else if (
+          channelString.includes("rtgs") ||
+          channelString.includes("neft") ||
+          channelString.includes("imps") ||
+          channelString.includes("online") ||
+          channelString.includes("bank") ||
+          channelString.includes("upi")
+        ) {
+          if (rtgsAmount > 0) {
+            registerMixed(rtgsAmount);
+          } else {
+            addRtgs(totalAmount);
+          }
+        } else if (rtgsAmount > 0) {
+          registerMixed(rtgsAmount);
+        } else {
+          addCash(totalAmount);
+        }
+
+        record.supplierPayments += totalAmount;
+      });
+
+      incomes.forEach((income) => {
+        const key = normalizeDateKey(income.date);
+        if (!key) return;
+        const record = ensureRecord(key);
+        record.incomes += Number(income.amount) || 0;
+      });
+
+      expenses.forEach((expense) => {
+        const key = normalizeDateKey(expense.date);
+        if (!key) return;
+        const record = ensureRecord(key);
+        record.expenses += Number(expense.amount) || 0;
+      });
+
+      const rows: StatementRow[] = Array.from(map.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, values]) => ({
+          date,
+          supplierCash: Math.round(values.supplierCash * 100) / 100,
+          supplierRtgs: Math.round(values.supplierRtgs * 100) / 100,
+          supplierPayments: Math.round(values.supplierPayments * 100) / 100,
+          incomes: Math.round(values.incomes * 100) / 100,
+          expenses: Math.round(values.expenses * 100) / 100,
+          seCash: Math.round((values.supplierCash + values.expenses) * 100) / 100,
+          netTotal: Math.round(
+            (values.supplierPayments + values.expenses - values.incomes) * 100
+          ) / 100,
+        }));
+
+      setStatementData(rows);
+      setStatementGeneratedAt(new Date().toISOString());
+    } catch (error: any) {
+      console.error("Failed to generate statement", error);
+      const message = error?.message || "Unable to generate statement right now.";
+      setStatementError(message);
+      toast({
+        title: "Statement generation failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setStatementLoading(false);
+    }
+  };
+
+  const handleExportStatement = () => {
+    if (!statementData.length) {
+      toast({
+        title: "Nothing to export",
+        description: "Generate the daily statement before exporting to Excel.",
+      });
+      return;
+    }
+
+    const header = [
+      "Date",
+      "Supplier Cash (₹)",
+      "Supplier RTGS (₹)",
+      "Supplier Payments (₹)",
+      "Expenses (₹)",
+      "Income (₹)",
+      "S/E Cash (₹)",
+      "Net Total (₹)",
+    ];
+
+    const rows = statementData.map((row) => [
+      formatStatementDate(row.date),
+      Number(row.supplierCash.toFixed(2)),
+      Number(row.supplierRtgs.toFixed(2)),
+      Number(row.supplierPayments.toFixed(2)),
+      Number(row.expenses.toFixed(2)),
+      Number(row.incomes.toFixed(2)),
+      Number(row.seCash.toFixed(2)),
+      Number(row.netTotal.toFixed(2)),
+    ]);
+
+    const totalsRow = [
+      "Totals",
+      Number(statementTotals.supplierCash.toFixed(2)),
+      Number(statementTotals.supplierRtgs.toFixed(2)),
+      Number(statementTotals.supplierPayments.toFixed(2)),
+      Number(statementTotals.expenses.toFixed(2)),
+      Number(statementTotals.incomes.toFixed(2)),
+      Number(statementTotals.seCash.toFixed(2)),
+      Number(statementTotals.netTotal.toFixed(2)),
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows, totalsRow]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Statement");
+
+    const safeStart = statementStart || "start";
+    const safeEnd = statementEnd || "end";
+    const fileName = `daily-statement-${safeStart}-to-${safeEnd}.xlsx`.replace(/[^a-zA-Z0-9-_\\.]/g, "_");
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const handlePrintStatement = () => {
+    if (!statementData.length) {
+      toast({
+        title: "Nothing to print",
+        description: "Generate the daily statement before printing.",
+      });
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+
+    const rowsHtml = statementData
+      .map((row) => {
+        return `
+          <tr>
+            <td>${formatStatementDate(row.date)}</td>
+            <td class="numeric text-primary">${formatCurrency(row.supplierCash)}</td>
+            <td class="numeric text-primary">${formatCurrency(row.supplierRtgs)}</td>
+            <td class="numeric text-primary">${formatCurrency(row.supplierPayments)}</td>
+            <td class="numeric text-expense">${formatCurrency(row.expenses)}</td>
+            <td class="numeric text-income">${formatCurrency(row.incomes)}</td>
+            <td class="numeric text-total">${formatCurrency(row.seCash)}</td>
+            <td class="numeric text-total">${formatCurrency(row.netTotal)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Daily Distribution Statement</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 24px;
+              font-family: "Segoe UI", Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+            }
+            header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 24px;
+              padding-bottom: 16px;
+              border-bottom: 2px solid #1e3a8a;
+            }
+            .brand-title {
+              font-size: 20px;
+              font-weight: 700;
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
+              color: #1e3a8a;
+            }
+            .brand-subtitle {
+              font-size: 13px;
+              color: #475569;
+            }
+            .meta {
+              font-size: 12px;
+              text-align: right;
+              color: #475569;
+              line-height: 1.5;
+            }
+            h2 {
+              margin: 0;
+              font-size: 18px;
+              font-weight: 600;
+              color: #111827;
+            }
+            .range-line {
+              margin: 4px 0 0 0;
+              font-size: 13px;
+              color: #475569;
+            }
+            .prepared-line {
+              font-size: 12px;
+              color: #64748b;
+            }
+            .summary-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              gap: 12px;
+              margin: 0 0 20px 0;
+            }
+            .summary-card {
+              border: 1px solid #d1d5db;
+              border-radius: 12px;
+              padding: 12px 14px;
+              background: #f8fafc;
+            }
+            .summary-card h4 {
+              margin: 0;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #475569;
+            }
+            .summary-card p {
+              margin: 6px 0 0 0;
+              font-size: 15px;
+              font-weight: 600;
+              color: #0f172a;
+            }
+            .summary-card.net {
+              background: linear-gradient(120deg, #2563eb10, #1d4ed810);
+              border-color: #2563eb60;
+            }
+            table.statement {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 12px;
+            }
+            table.statement thead th {
+              background: #1f2937;
+              color: #ffffff;
+              padding: 10px;
+              font-size: 12px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            table.statement tbody td {
+              border: 1px solid #d1d5db;
+              padding: 10px;
+              font-size: 12px;
+            }
+            table.statement tbody tr:nth-child(even) {
+              background: #f9fafb;
+            }
+            .numeric { text-align: right; }
+            .text-primary { color: #1d4ed8; }
+            .text-expense { color: #b91c1c; }
+            .text-income { color: #047857; }
+            .text-total { color: #0f172a; font-weight: 600; }
+            footer {
+              margin-top: 28px;
+              font-size: 11px;
+              color: #64748b;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+            }
+            .signature {
+              border-top: 1px solid #94a3b8;
+              padding-top: 6px;
+              width: 200px;
+              text-align: center;
+              font-weight: 600;
+              color: #0f172a;
+            }
+            @media print {
+              body { margin: 14mm 16mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <div>
+              <div class="brand-title">BizSuite Reports</div>
+              <div class="brand-subtitle">Daily Financial Distribution Statement</div>
+            </div>
+            <div class="meta">
+              <div><strong>Prepared:</strong> ${statementPreparedText}</div>
+              <div><strong>Range:</strong> ${statementRangeLabel}</div>
+              <div><strong>Total Days:</strong> ${statementData.length}</div>
+            </div>
+          </header>
+
+          <section>
+            <h2>Summary Overview</h2>
+            <p class="range-line">Statement ${statementRangeLabel}</p>
+            <p class="prepared-line">Generated via BizSuite Ledger</p>
+            <div class="summary-grid">
+              <div class="summary-card">
+                <h4>Supplier Cash Payments</h4>
+                <p>₹${formatCurrency(statementTotals.supplierCash)}</p>
+              </div>
+              <div class="summary-card">
+                <h4>Supplier RTGS Payments</h4>
+                <p>₹${formatCurrency(statementTotals.supplierRtgs)}</p>
+              </div>
+              <div class="summary-card">
+                <h4>Total Supplier Payments</h4>
+                <p>₹${formatCurrency(statementTotals.supplierPayments)}</p>
+              </div>
+              <div class="summary-card">
+                <h4>Total Expenses</h4>
+                <p>₹${formatCurrency(statementTotals.expenses)}</p>
+              </div>
+              <div class="summary-card">
+                <h4>Total Incomes</h4>
+                <p>₹${formatCurrency(statementTotals.incomes)}</p>
+              </div>
+              <div class="summary-card net">
+                <h4>S/E Cash (Supplier Cash + Expenses)</h4>
+                <p>₹${formatCurrency(statementTotals.seCash)}</p>
+              </div>
+              <div class="summary-card net">
+                <h4>Net Total (Supplier Payments + Expenses - Income)</h4>
+                <p>₹${formatCurrency(statementTotals.netTotal)}</p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Daily Breakdown</h2>
+            <table class="statement">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Supplier Cash (₹)</th>
+                  <th>Supplier RTGS (₹)</th>
+                  <th>Total Supplier Payments (₹)</th>
+                  <th>Expenses (₹)</th>
+                  <th>Income (₹)</th>
+                  <th>S/E Cash (₹)</th>
+                  <th>Net Total (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  rowsHtml ||
+                  `<tr><td colspan="8" style="text-align:center; padding: 18px;">No entries available for this period.</td></tr>`
+                }
+              </tbody>
+            </table>
+          </section>
+
+          <footer>
+            <div>
+              BizSuite Ledger • Printed on ${format(new Date(), "dd MMM yyyy, hh:mm a")}
+            </div>
+            <div class="signature">Authorised Signatory</div>
+          </footer>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
+  };
+
   return (
     <div className="p-6 space-y-6">
+      <style dangerouslySetInnerHTML={{ __html: STATEMENT_PRINT_STYLES }} />
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as "ledger" | "statement")}
+        className="space-y-6"
+      >
+        <TabsList>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
+          <TabsTrigger value="statement">Generate Statement</TabsTrigger>
+        </TabsList>
+        <TabsContent value="ledger" className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Ledger Accounting</h1>
@@ -1183,7 +1905,8 @@ const LedgerPage: React.FC = () => {
         </form>
       )}
 
-      <Card className="shadow-sm">
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="shadow-sm md:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border py-3">
           <div>
             <CardTitle className="text-lg">
@@ -1208,22 +1931,17 @@ const LedgerPage: React.FC = () => {
         <CardContent className="space-y-4 p-4">
           <form
             onSubmit={handleAddEntry}
-            className="grid grid-cols-1 gap-3 md:grid-cols-6"
+            className="grid grid-cols-1 gap-3 md:grid-cols-2"
           >
             <div className="space-y-1">
               <Label className="text-[11px] font-medium">Date</Label>
-              <Input
-                type="date"
+              <SmartDatePicker
                 value={entryForm.date}
-                onChange={(event) =>
-                  setEntryForm((prev) => ({ ...prev, date: event.target.value }))
-                }
-                required
+                onChange={(next) => setEntryForm((prev) => ({ ...prev, date: next }))}
                 disabled={!activeAccount || saving}
-                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-1 md:col-span-3">
+            <div className="space-y-1 md:col-span-2">
               <Label className="text-[11px] font-medium">Particulars</Label>
               <Input
                 type="text"
@@ -1267,7 +1985,7 @@ const LedgerPage: React.FC = () => {
                 className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-1 md:col-span-3">
+            <div className="space-y-1 md:col-span-2">
               <Label className="text-[11px] font-medium">Remarks</Label>
               <Textarea
                 value={entryForm.remarks}
@@ -1279,7 +1997,7 @@ const LedgerPage: React.FC = () => {
                 disabled={!activeAccount || saving}
               />
             </div>
-            <div className="space-y-1 md:col-span-3">
+            <div className="space-y-1 md:col-span-2">
               <Label className="text-[11px] font-medium">Linked Account (optional)</Label>
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
                 <select
@@ -1311,235 +2029,20 @@ const LedgerPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="md:col-span-6 flex justify-end">
+            <div className="md:col-span-2 flex justify-end">
               <Button type="submit" disabled={!activeAccount || saving || loadingEntries} className="h-8 px-4 text-sm disabled:opacity-60">
                 Add Entry
               </Button>
             </div>
           </form>
-
-          <div ref={ledgerRef} className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Account Statement</p>
-                {activeAccount && (
-                  <p className="text-xs text-muted-foreground">
-                    Ledger Date: {new Date().toLocaleDateString("en-IN")}
-                  </p>
-                )}
-              </div>
-              <div className="text-sm text-right">
-                <p className="text-muted-foreground">Total Debit: ₹{formatCurrency(totals.debit)}</p>
-                <p className="text-muted-foreground">Total Credit: ₹{formatCurrency(totals.credit)}</p>
-                <p className="font-semibold text-primary">Balance: ₹{formatCurrency(totals.balance)}</p>
-              </div>
-            </div>
-
-            <div className="overflow-hidden border border-border rounded-lg">
-              <div className="overflow-x-auto">
-                <div className="max-h-[380px] overflow-y-auto">
-                  <table className="min-w-full text-xs">
-                    <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur">
-                      <tr className="text-muted-foreground">
-                        <th className="px-3 py-2 text-left font-semibold">Date</th>
-                        <th className="px-3 py-2 text-left font-semibold">Particulars</th>
-                        <th className="px-3 py-2 text-right font-semibold">Debit (₹)</th>
-                        <th className="px-3 py-2 text-right font-semibold">Credit (₹)</th>
-                        <th className="px-3 py-2 text-right font-semibold">Balance (₹)</th>
-                        <th className="px-3 py-2 text-right font-semibold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingEntries ? (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            Loading entries…
-                          </td>
-                        </tr>
-                      ) : groupedEntries.length > 0 ? (
-                        groupedEntries.flatMap((group) => {
-                          const headerRow = (
-                            <tr key={`group-${group.date}`} className="bg-muted/60 text-muted-foreground">
-                              <td colSpan={6} className="px-3 py-1.5 text-xs font-semibold">
-                                {group.date ? new Date(group.date).toLocaleDateString("en-IN") : "No Date"}
-                              </td>
-                            </tr>
-                          );
-
-                          const entryRows = group.entries.map((entry) => {
-                            const isEditing = editingEntryId === entry.id;
-                            return (
-                              <tr key={entry.id} className="border-t border-border align-top">
-                                <td className="px-3 py-1.5 whitespace-nowrap">
-                                  {isEditing ? (
-                                    <Input
-                                      type="date"
-                                      value={editForm.date}
-                                      onChange={(event) =>
-                                        setEditForm((prev) => ({ ...prev, date: event.target.value }))
-                                      }
-                                      disabled={saving}
-                                      className="h-8"
-                                    />
-                                  ) : (
-                                    new Date(entry.date).toLocaleDateString("en-IN")
-                                  )}
-                                </td>
-                                <td className="px-3 py-1.5">
-                                  {isEditing ? (
-                                    <div className="space-y-1.5">
-                                      <Input
-                                        value={editForm.particulars}
-                                        onChange={(event) =>
-                                          setEditForm((prev) => ({
-                                            ...prev,
-                                            particulars: event.target.value,
-                                          }))
-                                        }
-                                        disabled={saving}
-                                        className="h-8"
-                                      />
-                                      <Textarea
-                                        value={editForm.remarks}
-                                        onChange={(event) =>
-                                          setEditForm((prev) => ({
-                                            ...prev,
-                                            remarks: event.target.value,
-                                          }))
-                                        }
-                                        placeholder="Remarks"
-                                        className="min-h-[48px]"
-                                        disabled={saving}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      <p className="leading-tight">{entry.particulars}</p>
-                                      {entry.remarks && (
-                                        <p className="text-[11px] text-muted-foreground leading-tight">{entry.remarks}</p>
-                                      )}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-3 py-1.5 text-right text-emerald-600">
-                                  {isEditing ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={editForm.debit}
-                                      onChange={(event) =>
-                                        setEditForm((prev) => ({ ...prev, debit: event.target.value }))
-                                      }
-                                      disabled={saving}
-                                      className="h-8"
-                                    />
-                                  ) : (
-                                    entry.debit ? formatCurrency(entry.debit) : "-"
-                                  )}
-                                </td>
-                                <td className="px-3 py-1.5 text-right text-red-500">
-                                  {isEditing ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={editForm.credit}
-                                      onChange={(event) =>
-                                        setEditForm((prev) => ({ ...prev, credit: event.target.value }))
-                                      }
-                                      disabled={saving}
-                                      className="h-8"
-                                    />
-                                  ) : (
-                                    entry.credit ? formatCurrency(entry.credit) : "-"
-                                  )}
-                                </td>
-                                <td className="px-3 py-1.5 text-right font-semibold">
-                                  {formatCurrency((entry as any).runningBalance ?? entry.balance)}
-                                </td>
-                                <td className="px-3 py-1.5 text-right">
-                                  {isEditing ? (
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => handleSaveEdit(entry.id)}
-                                        disabled={saving}
-                                        className="text-emerald-600 h-8 w-8"
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={handleCancelEdit}
-                                        disabled={saving}
-                                        className="text-red-500 h-8 w-8"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => handleEditEntry(entry)}
-                                        disabled={saving}
-                                        className="text-blue-600 h-8 w-8"
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => handleDeleteEntry(entry.id)}
-                                        disabled={saving}
-                                        className="text-red-600 h-8 w-8"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          });
-
-                          return [headerRow, ...entryRows];
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            {activeAccount
-                              ? dateFrom || dateTo
-                                ? "No entries in this date range."
-                                : "No entries yet. Add your first transaction."
-                              : loadingAccounts
-                              ? "Loading accounts…"
-                              : "Select an account to view entries."}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
         </CardContent>
-      </Card>
+        </Card>
 
-      <Card className="shadow-sm">
+        <Card className="shadow-sm md:col-span-2">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-border py-3">
-          <div>
+              <div>
             <CardTitle className="text-lg">Cash Management</CardTitle>
-            <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
               Manage denomination-wise cash counts for quick totals.
             </p>
           </div>
@@ -1742,7 +2245,472 @@ const LedgerPage: React.FC = () => {
             </p>
           ) : null}
         </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border py-3">
+          <div>
+            <CardTitle className="text-lg">Ledger Entries</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {activeAccount ? `Recent transactions for ${activeAccount.name}.` : "Select an account to view entries."}
+            </p>
+              </div>
+              <div className="text-sm text-right">
+                <p className="text-muted-foreground">Total Debit: ₹{formatCurrency(totals.debit)}</p>
+                <p className="text-muted-foreground">Total Credit: ₹{formatCurrency(totals.credit)}</p>
+                <p className="font-semibold text-primary">Balance: ₹{formatCurrency(totals.balance)}</p>
+              </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div ref={ledgerRef} className="space-y-3">
+            {activeAccount && (
+              <p className="text-xs text-muted-foreground">
+                Ledger Date: {new Date().toLocaleDateString("en-IN")}
+              </p>
+            )}
+            <div className="overflow-hidden border border-border rounded-lg">
+              <div className="overflow-x-auto">
+                <div className="max-h-[420px] overflow-y-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur">
+                      <tr className="text-muted-foreground">
+                        <th className="px-3 py-2 text-left font-semibold">Date</th>
+                        <th className="px-3 py-2 text-left font-semibold">Particulars</th>
+                        <th className="px-3 py-2 text-right font-semibold">Debit (₹)</th>
+                        <th className="px-3 py-2 text-right font-semibold">Credit (₹)</th>
+                        <th className="px-3 py-2 text-right font-semibold">Balance (₹)</th>
+                        <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingEntries ? (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            Loading entries…
+                          </td>
+                        </tr>
+                      ) : groupedEntries.length > 0 ? (
+                        groupedEntries.flatMap((group) => {
+                          const headerRow = (
+                            <tr key={`group-${group.date}`} className="bg-muted/60 text-muted-foreground">
+                              <td colSpan={6} className="px-3 py-1.5 text-xs font-semibold">
+                                {group.date ? new Date(group.date).toLocaleDateString("en-IN") : "No Date"}
+                              </td>
+                            </tr>
+                          );
+
+                          const entryRows = group.entries.map((entry) => {
+                            const isEditing = editingEntryId === entry.id;
+                            return (
+                              <tr key={entry.id} className="border-t border-border align-top">
+                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                  {isEditing ? (
+                                    <SmartDatePicker
+                                      value={editForm.date}
+                                      onChange={(next) =>
+                                        setEditForm((prev) => ({ ...prev, date: next }))
+                                      }
+                                      disabled={saving}
+                                      inputClassName="h-8 text-xs"
+                                      buttonClassName="h-8 w-8"
+                                      className="w-[190px]"
+                                    />
+                                  ) : (
+                                    new Date(entry.date).toLocaleDateString("en-IN")
+                                  )}
+                                </td>
+                                <td className="px-3 py-1.5">
+                                  {isEditing ? (
+                                    <div className="space-y-1.5">
+                                      <Input
+                                        value={editForm.particulars}
+                                        onChange={(event) =>
+                                          setEditForm((prev) => ({
+                                            ...prev,
+                                            particulars: event.target.value,
+                                          }))
+                                        }
+                                        disabled={saving}
+                                        className="h-8"
+                                      />
+                                      <Textarea
+                                        value={editForm.remarks}
+                                        onChange={(event) =>
+                                          setEditForm((prev) => ({
+                                            ...prev,
+                                            remarks: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Remarks"
+                                        className="min-h-[48px]"
+                                        disabled={saving}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      <p className="leading-tight">{entry.particulars}</p>
+                                      {entry.remarks && (
+                                        <p className="text-[11px] text-muted-foreground leading-tight">{entry.remarks}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-emerald-600">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={editForm.debit}
+                                      onChange={(event) =>
+                                        setEditForm((prev) => ({ ...prev, debit: event.target.value }))
+                                      }
+                                      disabled={saving}
+                                      className="h-8"
+                                    />
+                                  ) : (
+                                    entry.debit ? formatCurrency(entry.debit) : "-"
+                                  )}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-red-500">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={editForm.credit}
+                                      onChange={(event) =>
+                                        setEditForm((prev) => ({ ...prev, credit: event.target.value }))
+                                      }
+                                      disabled={saving}
+                                      className="h-8"
+                                    />
+                                  ) : (
+                                    entry.credit ? formatCurrency(entry.credit) : "-"
+                                  )}
+                                </td>
+                                <td className="px-3 py-1.5 text-right font-semibold">
+                                  {formatCurrency((entry as any).runningBalance ?? entry.balance)}
+                                </td>
+                                <td className="px-3 py-1.5 text-right">
+                                  {isEditing ? (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => handleSaveEdit(entry.id)}
+                                        disabled={saving}
+                                        className="text-emerald-600 h-8 w-8"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={handleCancelEdit}
+                                        disabled={saving}
+                                        className="text-red-500 h-8 w-8"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => handleEditEntry(entry)}
+                                        disabled={saving}
+                                        className="text-blue-600 h-8 w-8"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteEntry(entry.id)}
+                                        disabled={saving}
+                                        className="text-red-600 h-8 w-8"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          });
+
+                          return [headerRow, ...entryRows];
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            {activeAccount
+                              ? dateFrom || dateTo
+                                ? "No entries in this date range."
+                                : "No entries yet. Add your first transaction."
+                              : loadingAccounts
+                              ? "Loading accounts…"
+                              : "Select an account to view entries."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="statement" className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+              <h1 className="text-2xl font-semibold text-foreground">Daily Distribution Statement</h1>
+              <p className="text-sm text-muted-foreground">
+                Review supplier payments, expenses, and incomes aggregated per day.
+            </p>
+          </div>
+          </div>
+
+          <Card className="shadow-sm" >
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-muted-foreground">Start Date</Label>
+                  <SmartDatePicker
+                    value={statementStart}
+                    onChange={(next) => setStatementStart(next || "")}
+                    inputClassName="h-9 text-sm"
+                    buttonClassName="h-9 w-9"
+              />
+            </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-muted-foreground">End Date</Label>
+                  <SmartDatePicker
+                    value={statementEnd}
+                    onChange={(next) => setStatementEnd(next || "")}
+                    inputClassName="h-9 text-sm"
+                    buttonClassName="h-9 w-9"
+                  />
+                </div>
+                <div className="md:col-span-3 flex items-end">
+                  <Button onClick={handleGenerateStatement} disabled={statementLoading} className="h-9">
+                    {statementLoading ? "Generating..." : "Generate Statement"}
+              </Button>
+            </div>
+          </div>
+              {statementError && (
+                <p className="text-sm text-destructive">{statementError}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card
+            ref={statementPrintRef}
+            id={STATEMENT_PRINT_ID}
+            className="shadow-sm print-card"
+            >
+            <CardHeader className="space-y-4">
+          <div className="print-header print-only">
+            <div>
+              <h1>Daily Distribution Statement</h1>
+              <p className="print-meta-line">Statement {statementRangeLabel}</p>
+              </div>
+            <div className="print-meta">
+              <p>{statementPreparedText}</p>
+              <p>Generated via BizSuite Ledger</p>
+              </div>
+          </div>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>Per-Day Distribution</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Totals include supplier payments, expenses, and incomes recorded {statementRangeLabel}.
+                  </p>
+                  {statementGeneratedLabel && (
+                    <p className="text-xs text-muted-foreground">
+                      Prepared on {statementGeneratedLabel}.
+                    </p>
+                                    )}
+                                  </div>
+                <div className="flex flex-wrap gap-2 print-hidden">
+                                <Button
+                                  variant="outline"
+                    onClick={handlePrintStatement}
+                    className="h-9"
+                  >
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print Report
+                  </Button>
+                  <Button onClick={handleExportStatement} className="h-9">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Excel
+                                </Button>
+                              </div>
+              </div>
+              <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Supplier Cash Payments
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.supplierCash)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Supplier RTGS Payments
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.supplierRtgs)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Total Supplier Payments
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.supplierPayments)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Total Expenses
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-rose-600">
+                    ₹{formatCurrency(statementTotals.expenses)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Total Incomes
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-emerald-600">
+                    ₹{formatCurrency(statementTotals.incomes)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    S/E Cash (Supplier Cash + Expenses)
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.seCash)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-primary/60 bg-gradient-to-r from-secondary/10 via-primary/5 to-secondary/5 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    Net Total (Supplier Payments + Expenses - Income)
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.netTotal)}
+                  </p>
+                </div>
+              </div>
+              <div className="print-only">
+                <table className="print-summary-table">
+                  <tbody>
+                    <tr>
+                      <th scope="row">Supplier Cash Payments</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.supplierCash)}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Supplier RTGS Payments</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.supplierRtgs)}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total Supplier Payments</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.supplierPayments)}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total Expenses</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.expenses)}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total Incomes</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.incomes)}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">S/E Cash (Supplier Cash + Expenses)</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.seCash)}</td>
+                    </tr>
+                    <tr className="total-row">
+                      <th scope="row">Net Total (Supplier Payments + Expenses - Income)</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.netTotal)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/70 text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold">Date</th>
+                      <th className="px-4 py-2 text-right font-semibold">Supplier Cash (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Supplier RTGS (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Supplier Payments (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Expenses (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Income (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">S/E Cash (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Net Total (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statementLoading ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                          Generating statement…
+                            </td>
+                      </tr>
+                    ) : statementData.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                          No data found for the selected range.
+                            </td>
+                          </tr>
+                    ) : (
+                      statementData.map((row) => (
+                        <tr key={row.date} className="border-t border-border">
+                          <td className="px-4 py-2">{formatStatementDate(row.date)}</td>
+                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierCash)}</td>
+                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierRtgs)}</td>
+                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierPayments)}</td>
+                          <td className="px-4 py-2 text-right text-red-500">{formatCurrency(row.expenses)}</td>
+                          <td className="px-4 py-2 text-right text-emerald-600">{formatCurrency(row.incomes)}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-primary">{formatCurrency(row.seCash)}</td>
+                          <td className="px-4 py-2 text-right font-semibold">{formatCurrency(row.netTotal)}</td>
+                        </tr>
+                      ))
+                    )}
+                    </tbody>
+                  </table>
+                </div>
+              <div className="px-4 pb-8 print-only">
+                <div className="print-footer">
+                  <div>
+                    <p>Generated via BizSuite Ledger</p>
+                    <p>Prepared on {statementPreparedText}</p>
+              </div>
+                  <div className="print-signature">Authorised Signatory</div>
+                </div>
+                </div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

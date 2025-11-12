@@ -23,7 +23,7 @@ import {
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
 
@@ -52,6 +52,7 @@ const ledgerAccountsCollection = collection(firestoreDB, 'ledgerAccounts');
 const ledgerEntriesCollection = collection(firestoreDB, 'ledgerEntries');
 const ledgerCashAccountsCollection = collection(firestoreDB, 'ledgerCashAccounts');
 const mandiReportsCollection = collection(firestoreDB, 'mandiReports');
+const mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
 
 function stripUndefined<T extends Record<string, any>>(data: T): T {
     const cleanedEntries = Object.entries(data).filter(
@@ -229,6 +230,38 @@ export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
 export async function updateReceiptSettings(settings: Partial<ReceiptSettings>): Promise<void> {
     const docRef = doc(settingsCollection, "companyDetails");
     await setDoc(docRef, settings, { merge: true });
+}
+
+export async function getMandiHeaderSettings(): Promise<MandiHeaderSettings | null> {
+    const snapshot = await getDoc(mandiHeaderDocRef);
+    if (!snapshot.exists()) {
+        return null;
+    }
+    const data = snapshot.data() as Partial<MandiHeaderSettings>;
+    return {
+        firmName: data.firmName || "",
+        firmAddress: data.firmAddress || "",
+        mandiName: data.mandiName || "",
+        licenseNo: data.licenseNo || "",
+        mandiType: data.mandiType || "",
+        registerNo: data.registerNo || "",
+        commodity: data.commodity || "",
+        financialYear: data.financialYear || "",
+    };
+}
+
+export async function saveMandiHeaderSettings(settings: Partial<MandiHeaderSettings>): Promise<void> {
+    const payload: Partial<MandiHeaderSettings> = {};
+    if (settings.firmName !== undefined) payload.firmName = settings.firmName;
+    if (settings.firmAddress !== undefined) payload.firmAddress = settings.firmAddress;
+    if (settings.mandiName !== undefined) payload.mandiName = settings.mandiName;
+    if (settings.licenseNo !== undefined) payload.licenseNo = settings.licenseNo;
+    if (settings.mandiType !== undefined) payload.mandiType = settings.mandiType;
+    if (settings.registerNo !== undefined) payload.registerNo = settings.registerNo;
+    if (settings.commodity !== undefined) payload.commodity = settings.commodity;
+    if (settings.financialYear !== undefined) payload.financialYear = settings.financialYear;
+
+    await setDoc(mandiHeaderDocRef, payload, { merge: true });
 }
 
 // --- Bank & Branch Functions ---
@@ -1034,6 +1067,11 @@ export async function getAllSuppliers(): Promise<Customer[]> {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
+export async function getAllCustomers(): Promise<Customer[]> {
+  const snapshot = await getDocs(customersCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+}
+
 export async function getInitialCustomers(count = 50) {
   const q = query(customersCollection, orderBy("srNo", "desc"), limit(count));
   const snapshot = await getDocs(q);
@@ -1072,6 +1110,21 @@ export async function getMorePayments(startAfterDoc: QueryDocumentSnapshot<Docum
 export async function getAllPayments(): Promise<Payment[]> {
   const snapshot = await getDocs(supplierPaymentsCollection);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+}
+
+export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
+  const snapshot = await getDocs(customerPaymentsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+}
+
+export async function getAllIncomes(): Promise<Income[]> {
+  const snapshot = await getDocs(collection(firestoreDB, "incomes"));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+}
+
+export async function getAllExpenses(): Promise<Expense[]> {
+  const snapshot = await getDocs(collection(firestoreDB, "expenses"));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
 }
 
 export async function getInitialCustomerPayments(count = 100) {
@@ -1421,6 +1474,27 @@ export async function fetchLedgerEntries(accountId: string): Promise<LedgerEntry
     });
 }
 
+export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
+    const snapshot = await getDocs(ledgerEntriesCollection);
+    return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as Record<string, any>;
+        return {
+            id: docSnap.id,
+            accountId: data.accountId,
+            date: data.date,
+            particulars: data.particulars,
+            debit: Number(data.debit) || 0,
+            credit: Number(data.credit) || 0,
+            balance: Number(data.balance) || 0,
+            remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || data.createdAt || '',
+            linkGroupId: data.linkGroupId || undefined,
+            linkStrategy: data.linkStrategy || undefined,
+        } as LedgerEntry;
+    });
+}
+
 export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {
     const timestamp = new Date().toISOString();
     const normalizedRemarks = typeof entry.remarks === 'string' ? entry.remarks : '';
@@ -1482,6 +1556,142 @@ export async function deleteLedgerEntry(id: string): Promise<void> {
     await deleteDoc(entryRef);
 }
     
+function chunkArray<T>(items: T[], size: number): T[][] {
+    const result: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        result.push(items.slice(i, i + size));
+    }
+    return result;
+}
+
+export async function bulkUpsertSuppliers(suppliers: Customer[], chunkSize = 400) {
+    if (!suppliers.length) return;
+    const chunks = chunkArray(suppliers, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((supplier) => {
+            if (!supplier.id) {
+                throw new Error("Supplier entry missing id");
+            }
+            const ref = doc(suppliersCollection, supplier.id);
+            batch.set(ref, supplier, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertCustomers(customers: Customer[], chunkSize = 400) {
+    if (!customers.length) return;
+    const chunks = chunkArray(customers, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((customer) => {
+            if (!customer.id) {
+                throw new Error("Customer entry missing id");
+            }
+            const ref = doc(customersCollection, customer.id);
+            batch.set(ref, customer, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertPayments(payments: Payment[], chunkSize = 400) {
+    if (!payments.length) return;
+    const chunks = chunkArray(payments, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((payment) => {
+            if (!payment.id) {
+                throw new Error("Payment entry missing id");
+            }
+            const ref = doc(supplierPaymentsCollection, payment.id);
+            batch.set(ref, payment, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertCustomerPayments(payments: CustomerPayment[], chunkSize = 400) {
+    if (!payments.length) return;
+    const chunks = chunkArray(payments, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((payment) => {
+            if (!payment.id) {
+                throw new Error("Customer payment entry missing id");
+            }
+            const ref = doc(customerPaymentsCollection, payment.id);
+            batch.set(ref, payment, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertLedgerAccounts(accounts: LedgerAccount[], chunkSize = 400) {
+    if (!accounts.length) return;
+    const chunks = chunkArray(accounts, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((account) => {
+            if (!account.id) {
+                throw new Error("Ledger account entry missing id");
+            }
+            const ref = doc(ledgerAccountsCollection, account.id);
+            batch.set(ref, account, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertLedgerEntries(entries: LedgerEntry[], chunkSize = 400) {
+    if (!entries.length) return;
+    const chunks = chunkArray(entries, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((entry) => {
+            if (!entry.id) {
+                throw new Error("Ledger entry missing id");
+            }
+            const ref = doc(ledgerEntriesCollection, entry.id);
+            batch.set(ref, entry, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertLedgerCashAccounts(accounts: LedgerCashAccount[], chunkSize = 400) {
+    if (!accounts.length) return;
+    const chunks = chunkArray(accounts, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((account) => {
+            if (!account.id) {
+                throw new Error("Ledger cash account entry missing id");
+            }
+            const ref = doc(ledgerCashAccountsCollection, account.id);
+            batch.set(ref, account, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertMandiReports(reports: MandiReport[], chunkSize = 400) {
+    if (!reports.length) return;
+    const chunks = chunkArray(reports, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((report) => {
+            if (!report.id) {
+                throw new Error("Mandi report entry missing id");
+            }
+            const ref = doc(mandiReportsCollection, report.id);
+            batch.set(ref, report, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
 
 // --- Mandi Report Functions ---
 

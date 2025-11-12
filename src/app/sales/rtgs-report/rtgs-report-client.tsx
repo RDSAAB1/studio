@@ -20,7 +20,6 @@ import { BankMailFormatDialog2 } from '@/components/sales/rtgs-report/bank-mail-
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import Link from 'next/link';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -373,9 +372,6 @@ export default function RtgsReportClient() {
                         <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <Link href="/sales/rtgs-report/negative-balance">
-                            <Button size="sm" variant="secondary" className="w-full sm:w-auto">RTGS Negative</Button>
-                        </Link>
                         {filteredReportRows.length > 0 && settings && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">

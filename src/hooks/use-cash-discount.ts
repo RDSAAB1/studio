@@ -42,6 +42,11 @@ const clampNumber = (value: number, min: number, max: number) => {
     return value;
 };
 
+const roundToRupee = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    return Math.round(value);
+};
+
 export const useCashDiscount = ({
     paymentType,
     settleAmount,
@@ -224,12 +229,17 @@ export const useCashDiscount = ({
             0,
             outstanding || Number.MAX_SAFE_INTEGER
         );
+        const rupeeMaxAvailable = Math.max(0, Math.floor(cappedMaxAvailable));
+        const rupeeAmount = Math.max(
+            0,
+            Math.min(roundToRupee(cappedAmount), rupeeMaxAvailable)
+        );
 
         return {
-            amount: Math.round(cappedAmount * 100) / 100,
+            amount: rupeeAmount,
             baseAmount,
             offset,
-            maxAvailable: cappedMaxAvailable,
+            maxAvailable: rupeeMaxAvailable,
         };
     }, [
         cdAt,
@@ -247,8 +257,8 @@ export const useCashDiscount = ({
         if (manualCdAmount === null) {
             return;
         }
-        const maxAvailable = cdContext.maxAvailable;
-        const clamped = clampNumber(manualCdAmount, 0, maxAvailable);
+        const maxAvailable = Math.max(0, Math.floor(cdContext.maxAvailable));
+        const clamped = clampNumber(roundToRupee(manualCdAmount), 0, maxAvailable);
         if (clamped !== manualCdAmount) {
             setManualCdAmount(clamped);
             return;
@@ -276,11 +286,9 @@ export const useCashDiscount = ({
     const setCdAmount = useCallback(
         (value: number) => {
             const numeric = Number(value);
-            const sanitized = clampNumber(
-                Number.isFinite(numeric) ? numeric : 0,
-                0,
-                cdContext.maxAvailable
-            );
+            const rounded = roundToRupee(Number.isFinite(numeric) ? numeric : 0);
+            const maxAvailable = Math.max(0, Math.floor(cdContext.maxAvailable));
+            const sanitized = clampNumber(rounded, 0, maxAvailable);
             setManualCdAmount(sanitized);
 
             const base = cdContext.baseAmount;
@@ -305,7 +313,7 @@ export const useCashDiscount = ({
 
     const calculatedCdAmount = useMemo(() => {
         const amount = manualCdAmount !== null ? manualCdAmount : cdContext.amount;
-        return Math.round(clampNumber(amount, 0, cdContext.maxAvailable) * 100) / 100;
+        return roundToRupee(clampNumber(amount, 0, cdContext.maxAvailable));
     }, [manualCdAmount, cdContext]);
 
     return {

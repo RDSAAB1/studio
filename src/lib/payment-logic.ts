@@ -1483,8 +1483,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // ============================================================
             // Verify and adjust to prevent overpayment
             // Use original outstanding (before CD was applied) for calculation
-            console.log('=== STEP 7: Final Verification - Checking for Negative Outstanding ===');
-            
             for (const paidFor of paidForDetails) {
                 const eo = entryOutstandings.find(e => e.entry.srNo === paidFor.srNo);
                 if (eo) {

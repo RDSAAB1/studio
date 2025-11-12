@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
-type PaymentOption = {
+export type PaymentOption = {
     quantity: number;
     rate: number;
     calculatedAmount: number;
@@ -32,6 +32,7 @@ export const usePaymentCombination = ({
     const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
     const [roundFigureToggle, setRoundFigureToggle] = useState(false);
+    const [rateStep, setRateStep] = useState<1 | 5>(1);
 
     const handleGeneratePaymentOptions = () => {
         if (isNaN(calcTargetAmount) || isNaN(minRate) || isNaN(maxRate) || minRate > maxRate) {
@@ -45,10 +46,13 @@ export const usePaymentCombination = ({
         // Generate more combinations with finer quantity increments
         // Use smaller quantity steps to generate more combinations
         const qtyStep = 0.05; // Reduced from 0.10 to 0.05 for more combinations
-        const maxQty = Math.min(2000, calcTargetAmount / minRate * 1.5); // Dynamic max based on target
-        
+        const maxQty = Math.min(2000, calcTargetAmount / Math.max(minRate, 1) * 1.5); // Dynamic max based on target
+
+        const normalizedMinRate = Math.ceil(Math.max(minRate, 0) / rateStep) * rateStep;
+        const normalizedMaxRate = Math.floor(Math.max(maxRate, normalizedMinRate) / rateStep) * rateStep;
+
         for (let q = 0.05; q <= maxQty; q = parseFloat((q + qtyStep).toFixed(2))) {
-            for (let currentRate = Math.ceil(minRate); currentRate <= Math.floor(maxRate); currentRate += 1) { // Rate divisible by 1
+            for (let currentRate = normalizedMinRate; currentRate <= normalizedMaxRate; currentRate += rateStep) {
 
                 const rawAmount = q * currentRate;
                 // Round to step for round figure toggle
@@ -127,6 +131,8 @@ export const usePaymentCombination = ({
         paymentOptions,
         roundFigureToggle,
         setRoundFigureToggle,
+        rateStep,
+        setRateStep,
         handleGeneratePaymentOptions,
         requestSort,
         sortedPaymentOptions,

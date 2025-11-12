@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
@@ -573,7 +574,12 @@ export default function CashBankClient() {
 
                              <div className="space-y-1">
                                 <Label htmlFor="startDate">Start Date</Label>
-                                <Input id="startDate" name="startDate" type="date" value={currentLoan?.startDate || ''} onChange={(e) => setCurrentLoan(prev => ({...prev, startDate: e.target.value}))} />
+                                <SmartDatePicker
+                                    id="startDate"
+                                    name="startDate"
+                                    value={currentLoan?.startDate || ''}
+                                    onChange={(next) => setCurrentLoan(prev => ({...prev, startDate: next }))}
+                                />
                             </div>
                              <div className="space-y-1">
                                 <Label>Deposit To</Label>

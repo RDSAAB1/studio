@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { Edit, Trash2, PlusCircle } from "lucide-react";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -176,26 +177,26 @@ export default function CampaignsPage() {
               <Label htmlFor="startDate" className="text-right">
                 Start Date
               </Label>
-              <Input
+              <SmartDatePicker
                 id="startDate"
                 name="startDate"
-                type="date"
                 value={formData.startDate}
-                onChange={handleInputChange}
+                onChange={(next) => setFormData(prev => ({ ...prev, startDate: next }))}
                 className="col-span-3"
+                inputClassName="h-9"
               />
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="endDate" className="text-right">
                 End Date
               </Label>
-              <Input
+              <SmartDatePicker
                 id="endDate"
                 name="endDate"
-                type="date"
                 value={formData.endDate}
-                onChange={handleInputChange}
+                onChange={(next) => setFormData(prev => ({ ...prev, endDate: next }))}
                 className="col-span-3"
+                inputClassName="h-9"
               />
             </div>
             <DialogFooter>

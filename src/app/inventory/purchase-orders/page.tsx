@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -200,13 +201,27 @@ export default function PurchaseOrdersPage() {
                 <Label htmlFor="orderDate" className="text-right">
                   Order Date
                 </Label>
-                <Input id="orderDate" type="date" value={newOrder.orderDate} onChange={(e) => setNewOrder({ ...newOrder, orderDate: e.target.value })} className="col-span-3" />
+                <SmartDatePicker
+                  id="orderDate"
+                  name="orderDate"
+                  value={newOrder.orderDate || ""}
+                  onChange={(next) => setNewOrder({ ...newOrder, orderDate: next })}
+                  className="col-span-3"
+                  inputClassName="h-9"
+                />
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="deliveryDate" className="text-right">
                   Delivery Date
                 </Label>
-                <Input id="deliveryDate" type="date" value={newOrder.deliveryDate} onChange={(e) => setNewOrder({ ...newOrder, deliveryDate: e.target.value })} className="col-span-3" />
+                <SmartDatePicker
+                  id="deliveryDate"
+                  name="deliveryDate"
+                  value={newOrder.deliveryDate || ""}
+                  onChange={(next) => setNewOrder({ ...newOrder, deliveryDate: next })}
+                  className="col-span-3"
+                  inputClassName="h-9"
+                />
               </div>
                {/* You would typically add fields here to manage 'items' and calculate 'totalAmount' */}
                {/* For simplicity, adding a dummy total amount field */}
@@ -247,11 +262,25 @@ export default function PurchaseOrdersPage() {
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-orderDate" className="text-right">Order Date</Label>
-                       <Input id="edit-orderDate" type="date" value={editingOrder.orderDate ? format(new Date(editingOrder.orderDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, orderDate: e.target.value })} className="col-span-3" />
+                      <SmartDatePicker
+                        id="edit-orderDate"
+                        name="edit-orderDate"
+                        value={editingOrder.orderDate ? format(new Date(editingOrder.orderDate), 'yyyy-MM-dd') : ''}
+                        onChange={(next) => setEditingOrder(prev => prev ? { ...prev, orderDate: next } : prev)}
+                        className="col-span-3"
+                        inputClassName="h-9"
+                      />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-deliveryDate" className="text-right">Delivery Date</Label>
-                       <Input id="edit-deliveryDate" type="date" value={editingOrder.deliveryDate ? format(new Date(editingOrder.deliveryDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, deliveryDate: e.target.value })} className="col-span-3" />
+                      <SmartDatePicker
+                        id="edit-deliveryDate"
+                        name="edit-deliveryDate"
+                        value={editingOrder.deliveryDate ? format(new Date(editingOrder.deliveryDate), 'yyyy-MM-dd') : ''}
+                        onChange={(next) => setEditingOrder(prev => prev ? { ...prev, deliveryDate: next } : prev)}
+                        className="col-span-3"
+                        inputClassName="h-9"
+                      />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-status" className="text-right">Status</Label>

@@ -1,6 +1,6 @@
 
 import Dexie, { type Table } from 'dexie';
-import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport } from './definitions';
+import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
 import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments } from './firestore';
 
 export class AppDatabase extends Dexie {
@@ -24,6 +24,7 @@ export class AppDatabase extends Dexie {
     ledgerAccounts!: Table<LedgerAccount>;
     ledgerEntries!: Table<LedgerEntry>;
     mandiReports!: Table<MandiReport>;
+    syncQueue!: Table<SyncTask>;
     
     constructor() {
         super('bizsuiteDB_v2');
@@ -69,6 +70,30 @@ export class AppDatabase extends Dexie {
             ledgerAccounts: '&id, name',
             ledgerEntries: '&id, accountId, date',
             mandiReports: '&id, voucherNo, sellerName',
+        });
+
+        this.version(3).stores({
+            suppliers: '&id, &srNo, name, contact, date, customerId',
+            customers: '++id, &srNo, name, contact, date, customerId',
+            payments: '++id, paymentId, customerId, date',
+            customerPayments: '++id, paymentId, customerId, date',
+            transactions: '++id, transactionId, date, category, subCategory, type',
+            options: '++id, type, name',
+            banks: '&id, name',
+            bankBranches: '++id, &ifscCode, bankName, branchName',
+            bankAccounts: '++id, &accountNumber',
+            settings: '&id',
+            projects: '++id, name, startDate',
+            loans: '++id, loanId, startDate',
+            fundTransactions: '++id, date, type',
+            employees: '++id, employeeId, name',
+            payroll: '++id, employeeId, payPeriod',
+            attendance: '&id, employeeId, date', 
+            inventoryItems: '++id, sku, name',
+            ledgerAccounts: '&id, name',
+            ledgerEntries: '&id, accountId, date',
+            mandiReports: '&id, voucherNo, sellerName',
+            syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
         });
     }
 }

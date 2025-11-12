@@ -31,6 +31,8 @@ import { firestoreDB } from "@/lib/firebase";
 import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
+import { Checkbox } from "@/components/ui/checkbox";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 // Zod Schema for form validation
 const transactionFormSchema = z.object({
@@ -159,7 +161,10 @@ export default function IncomeExpenseClient() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' }>({
+    key: 'transactionId',
+    direction: 'descending',
+  });
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -168,6 +173,9 @@ export default function IncomeExpenseClient() {
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
+  const [bulkDate, setBulkDate] = useState<string>("");
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   
   const [payeeProfiles, setPayeeProfiles] = useState<Map<string, PayeeProfile>>(new Map());
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
@@ -829,11 +837,23 @@ export default function IncomeExpenseClient() {
   };
 
   const sortedTransactions = useMemo(() => {
-    let sortableItems = [...filteredTransactions];
-    if (sortConfig !== null) {
+    const sortableItems = [...filteredTransactions];
         sortableItems.sort((a, b) => {
             const valA = a[sortConfig.key] || '';
             const valB = b[sortConfig.key] || '';
+
+      if (sortConfig.key === 'transactionId') {
+        return sortConfig.direction === 'ascending'
+          ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
+          : String(valB).localeCompare(String(valA), undefined, { numeric: true });
+      }
+
+      if (sortConfig.key === 'date') {
+        const timeA = new Date(String(valA)).getTime();
+        const timeB = new Date(String(valB)).getTime();
+        return sortConfig.direction === 'ascending' ? timeA - timeB : timeB - timeA;
+      }
+
             if (valA < valB) {
                 return sortConfig.direction === 'ascending' ? -1 : 1;
             }
@@ -842,9 +862,6 @@ export default function IncomeExpenseClient() {
             }
             return 0;
         });
-    } else {
-        sortableItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }
     return sortableItems;
   }, [filteredTransactions, sortConfig]);
 
@@ -859,6 +876,81 @@ export default function IncomeExpenseClient() {
       };
     });
   }, [sortedTransactions]);
+
+  useEffect(() => {
+    setSelectedTransactionIds(prev => {
+      const next = new Set<string>();
+      runningLedger.forEach((tx) => {
+        if (prev.has(tx.id)) {
+          next.add(tx.id);
+        }
+      });
+      return next;
+    });
+  }, [runningLedger]);
+
+  const allSelected = runningLedger.length > 0 && selectedTransactionIds.size === runningLedger.length;
+  const someSelected = selectedTransactionIds.size > 0 && !allSelected;
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedTransactionIds(new Set(runningLedger.map((tx) => tx.id)));
+    } else {
+      setSelectedTransactionIds(new Set());
+    }
+  };
+
+  const toggleTransactionSelection = (id: string, checked: boolean) => {
+    setSelectedTransactionIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDateUpdate = async () => {
+    if (!bulkDate) {
+      toast({ title: "Select date", description: "Choose a date to apply.", variant: "destructive" });
+      return;
+    }
+    if (selectedTransactionIds.size === 0) {
+      toast({ title: "No transactions selected", description: "Select at least one transaction.", variant: "destructive" });
+      return;
+    }
+    setIsBulkUpdating(true);
+    try {
+      const updates: Promise<void>[] = [];
+      const isoDate = bulkDate;
+      selectedTransactionIds.forEach((id) => {
+        const tx = runningLedger.find((item) => item.id === id);
+        if (!tx) return;
+        if (tx.transactionType === "Income") {
+          updates.push(updateIncome(id, { date: isoDate }));
+        } else {
+          updates.push(updateExpense(id, { date: isoDate }));
+        }
+      });
+      await Promise.all(updates);
+      toast({
+        title: "Date updated",
+        description: `Updated ${selectedTransactionIds.size} transaction${selectedTransactionIds.size > 1 ? "s" : ""}.`,
+      });
+      setSelectedTransactionIds(new Set());
+    } catch (error) {
+      console.error("Bulk date update failed:", error);
+      toast({
+        title: "Failed to update dates",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
 
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
@@ -1422,11 +1514,40 @@ export default function IncomeExpenseClient() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <CardHeader className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
             <CardDescription>Debit, credit, and running balance for the selected account.</CardDescription>
           </div>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              {selectedTransactionIds.size > 0 && (
+                <>
+                  <SmartDatePicker
+                    value={bulkDate}
+                    onChange={(next) => setBulkDate(next || "")}
+                    placeholder="Select date"
+                    inputClassName="h-9 text-sm"
+                    buttonClassName="h-9 w-9"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleBulkDateUpdate}
+                    disabled={isBulkUpdating || !bulkDate}
+                  >
+                    {isBulkUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Apply Date ({selectedTransactionIds.size})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedTransactionIds(new Set())}
+                  >
+                    Clear Selection
+                  </Button>
+                </>
+              )}
           <Button
             variant="outline"
             size="sm"
@@ -1435,12 +1556,21 @@ export default function IncomeExpenseClient() {
           >
             <Printer className="mr-2 h-4 w-4" /> Print Statement
           </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="max-h-[520px] overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[36px] text-center">
+                    <Checkbox
+                      checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                      onCheckedChange={(value) => toggleSelectAll(value === true)}
+                      aria-label="Select all transactions"
+                    />
+                  </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                   <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
                   <TableHead>Description</TableHead>
@@ -1453,6 +1583,13 @@ export default function IncomeExpenseClient() {
               <TableBody>
                 {runningLedger.map((transaction) => (
                   <TableRow key={transaction.id}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={selectedTransactionIds.has(transaction.id)}
+                        onCheckedChange={(value) => toggleTransactionSelection(transaction.id, value === true)}
+                        aria-label={`Select transaction ${getDisplayId(transaction)}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
                     <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
                     <TableCell>{transaction.description || toTitleCase(transaction.payee)}</TableCell>

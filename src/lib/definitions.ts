@@ -399,6 +399,32 @@ export type PurchaseOrder = {
   totalAmount: number;
 };
 
+export type SyncTaskStatus = "pending" | "processing" | "failed";
+
+export type SyncTask<TPayload = unknown> = {
+  id?: number;
+  type: string;
+  payload: TPayload;
+  attempts: number;
+  status: SyncTaskStatus;
+  createdAt: string;
+  lastTriedAt?: string;
+  lastError?: string;
+  nextRetryAt?: number;
+  dedupeKey?: string;
+};
+
+export type MandiHeaderSettings = {
+  firmName: string;
+  firmAddress: string;
+  mandiName: string;
+  licenseNo: string;
+  mandiType: string;
+  registerNo: string;
+  commodity: string;
+  financialYear: string;
+};
+
 export type Employee = {
     id: string;
     employeeId: string;

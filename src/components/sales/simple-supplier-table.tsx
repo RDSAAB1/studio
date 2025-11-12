@@ -13,6 +13,7 @@ import { toTitleCase } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Customer, OptionItem } from "@/lib/definitions";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -732,27 +733,22 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Date</label>
-                                    <InputWithIcon icon={<Calendar className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input
-                                            type="date"
-                                            value={(multiEditData.date as string) || ''}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setMultiEditData(prev => ({ ...prev, date: value }));
-                                                if (value) {
-                                                    markMultiEditTouched('date');
-                                                } else {
-                                                    setMultiEditTouched(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete('date');
-                                                        return newSet;
-                                                    });
-                                                }
-                                            }}
-                                            placeholder="Select date"
-                                            className="pl-10 h-9 text-sm"
-                                        />
-                                    </InputWithIcon>
+                                    <SmartDatePicker
+                                        value={(multiEditData.date as string) || ''}
+                                        onChange={(next) => {
+                                            setMultiEditData(prev => ({ ...prev, date: next || undefined }));
+                                            if (next) {
+                                                markMultiEditTouched('date');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('date');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        inputClassName="text-sm h-9"
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Term (days)</label>

@@ -20,6 +20,7 @@ import { cn, calculateCustomerEntry } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
+import { SmartDatePicker } from "../ui/smart-date-picker";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 import { runTransaction, doc, collection, getDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
@@ -379,7 +380,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">Gate Pass No.</Label><Input value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">G.R. No.</Label><Input value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label className="text-xs">G.R. Date</Label><Input type="date" value={invoiceDetails.grDate} onChange={(e) => setInvoiceDetails({...invoiceDetails, grDate: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">G.R. Date</Label>
+                                        <SmartDatePicker
+                                            value={invoiceDetails.grDate || ""}
+                                            onChange={(next) => setInvoiceDetails({...invoiceDetails, grDate: next })}
+                                            inputClassName="h-8 text-xs"
+                                            buttonClassName="h-8 w-8"
+                                        />
+                                    </div>
                                     <div className="space-y-1 col-span-2"><Label className="text-xs">Transport</Label><Input value={invoiceDetails.transport} onChange={(e) => setInvoiceDetails({...invoiceDetails, transport: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.advanceFreight} onChange={(e) => setInvoiceDetails({...invoiceDetails, advanceFreight: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1">
