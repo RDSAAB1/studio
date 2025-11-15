@@ -386,24 +386,9 @@ export const useSupplierPayments = () => {
             handleSettleAmountChange(0);
             handleToBePaidChange(0);
         }
-        if (key) {
-            const customerData = data.customerSummaryMap.get(key);
-            if (customerData) {
-                form.setSupplierDetails({
-                    name: customerData.name || '',
-                    fatherName: customerData.so || '',
-                    address: customerData.address || '',
-                    contact: customerData.contact || ''
-                });
-                form.setBankDetails({
-                    acNo: customerData.acNo || '',
-                    ifscCode: customerData.ifscCode || '',
-                    bank: customerData.bank || '',
-                    branch: customerData.branch || '',
-                });
-            }
-            // Popup selection removed
-        }
+        // Do NOT auto-fill supplier/bank details when selecting supplier
+        // Details should only fill when Payment ID is entered
+        // Popup selection removed
     };
     
     const handlePaySelectedOutstanding = useCallback((paymentToEdit?: Payment) => {
@@ -630,45 +615,9 @@ export const useSupplierPayments = () => {
         form.setSerialNoSearch(formattedSrNo);
         const normalizedSrNo = formattedSrNo.toLowerCase();
 
-        const findLatestPayment = (payments: Payment[]) => {
-            return payments.reduce<Payment | null>((latest, current) => {
-                const currentMeta = current as any;
-                const latestMeta = latest as any;
-                const currentTimestamp = new Date(
-                    currentMeta?.updatedAt || currentMeta?.createdAt || current.date || ''
-                ).getTime();
-                const latestTimestamp = latest
-                    ? new Date(
-                          latestMeta?.updatedAt || latestMeta?.createdAt || latest?.date || ''
-                      ).getTime()
-                    : Number.NEGATIVE_INFINITY;
-                return currentTimestamp > latestTimestamp ? current : latest;
-            }, null);
-        };
-
-        const matchingPayments = data.paymentHistory.filter(
-            (payment) =>
-                payment.paidFor?.some(
-                    (pf) => (pf.srNo || '').toLowerCase() === normalizedSrNo
-                )
-        );
-
-        let paymentToEdit: Payment | null = null;
-        if (matchingPayments.length) {
-            const sameMethod = matchingPayments.filter(
-                (payment) =>
-                    (payment.receiptType || '').toLowerCase() === form.paymentMethod.toLowerCase()
-            );
-            paymentToEdit = findLatestPayment(sameMethod.length ? sameMethod : matchingPayments);
-        }
-
-        if (
-            paymentToEdit &&
-            (!form.editingPayment || form.editingPayment.id !== paymentToEdit.id)
-        ) {
-            handleEditPayment(paymentToEdit);
-            return;
-        }
+        // Do NOT auto-fill payment details when searching by serial number
+        // Payment details should only fill when Payment ID is entered directly
+        // Just find and select the supplier entry, don't auto-fill payment details
 
         const supplier = data.suppliers.find(
             (s) => (s.srNo || '').toLowerCase() === normalizedSrNo
@@ -693,11 +642,9 @@ export const useSupplierPayments = () => {
         }
     }, [
         data.customerSummaryMap,
-        data.paymentHistory,
         data.suppliers,
         form,
         handleCustomerSelect,
-        handleEditPayment,
     ]);
 
     return {

@@ -91,14 +91,16 @@ export default function SupplierHubClient() {
     undefined
   );
 
+  const handleSupplierKeyChange = useCallback((key: string | null) => {
+    if (typeof key === "string" || key === null) {
+      setSelectedSupplierKey(key);
+    }
+  }, []);
+
   const { filteredSupplierOptions } = useSupplierFiltering(
     supplierSummaryMap,
     selectedSupplierKey,
-    (key) => {
-      if (typeof key === "string" || key === null) {
-        setSelectedSupplierKey(key);
-      }
-    },
+    handleSupplierKeyChange,
     undefined,
     undefined,
     MILL_OVERVIEW_KEY

@@ -72,7 +72,6 @@ const menuItems = [
     icon: <Landmark className="h-5 w-5" />,
     subMenus: [
       { id: "CashBank-Management", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
-      { id: "CashBank-Ledger", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
       { id: "CashBank-RTGS", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
     ],
   },
@@ -82,6 +81,7 @@ const menuItems = [
     icon: <Scale className="h-5 w-5" />,
     subMenus: [
       { id: "Sub6-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
+      { id: "Sub6-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {
@@ -90,7 +90,6 @@ const menuItems = [
     icon: <Landmark className="h-5 w-5" />,
     subMenus: [
       { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
-      { id: "Sub7-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {

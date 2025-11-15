@@ -68,12 +68,10 @@ export const allMenuItems: MenuItem[] = [
     name: "Supplier",
     icon: ShoppingCart,
     subMenus: [
-      { id: "sales/supplier-hub", name: "Supplier Hub", icon: Sparkles },
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
       { id: "sales/supplier-profile", name: "Supplier Profile", icon: UserCircle },
       { id: "sales/supplier-bank-accounts", name: "Supplier Bank Accounts", icon: Landmark },
-      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen },
     ],
   },
     {
@@ -98,6 +96,7 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
       { id: "expense-tracker", name: "I/E Tracker", icon: Calculator },
       { id: "expense-tracker/payee-profile", name: "Payee Profile", icon: UserCircle },
+      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen },
     ],
   },
   {
@@ -172,6 +171,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Wrench,
     subMenus: [
         { id: "admin/migrations", name: "Database Migrations", icon: Database },
+        { id: "sales/supplier-hub", name: "Supplier Hub", icon: Sparkles },
         { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search },
     ]
   },

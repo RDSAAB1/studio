@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { CustomerSummary, Payment } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,7 @@ const SupplierHubPaymentSection = ({
     setSelectedEntryIds,
     setParchiNo,
     parchiNo,
+    handleEditPayment,
   } = hook as any;
 
   const { supplierBankAccounts } = useSupplierData();
@@ -81,19 +82,38 @@ const SupplierHubPaymentSection = ({
   });
 
   // Sync Supplier Hub's selectedSupplierKey with payment hook's selectedCustomerKey
+  // Only sync when Supplier Hub's key changes (user selection), not when payment hook changes it
+  const isSyncingRef = useRef(false);
+  const handleCustomerSelectRef = useRef(hook.handleCustomerSelect);
+  
   useEffect(() => {
-    if (selectedSupplierKey && selectedSupplierKey !== selectedCustomerKey) {
-      hook.handleCustomerSelect(selectedSupplierKey);
+    handleCustomerSelectRef.current = hook.handleCustomerSelect;
+  }, [hook.handleCustomerSelect]);
+
+  useEffect(() => {
+    if (isSyncingRef.current) {
+      isSyncingRef.current = false;
+      return;
     }
-  }, [selectedSupplierKey, selectedCustomerKey, hook]);
+    if (selectedSupplierKey && selectedSupplierKey !== selectedCustomerKey) {
+      handleCustomerSelectRef.current(selectedSupplierKey);
+    }
+  }, [selectedSupplierKey, selectedCustomerKey]);
 
   // Reverse sync: When payment ID is filled and supplier profile is selected in payment hook,
   // update Supplier Hub's selectedSupplierKey to keep UI in sync
+  const onSupplierKeyChangeRef = useRef(onSupplierKeyChange);
+  
   useEffect(() => {
-    if (selectedCustomerKey && selectedCustomerKey !== selectedSupplierKey && onSupplierKeyChange) {
-      onSupplierKeyChange(selectedCustomerKey);
+    onSupplierKeyChangeRef.current = onSupplierKeyChange;
+  }, [onSupplierKeyChange]);
+
+  useEffect(() => {
+    if (selectedCustomerKey && selectedCustomerKey !== selectedSupplierKey && onSupplierKeyChangeRef.current) {
+      isSyncingRef.current = true;
+      onSupplierKeyChangeRef.current(selectedCustomerKey);
     }
-  }, [selectedCustomerKey, selectedSupplierKey, onSupplierKeyChange]);
+  }, [selectedCustomerKey, selectedSupplierKey]);
 
   const transactionsForSelectedSupplier = useMemo(() => {
     return selectedSupplierSummary?.allTransactions || [];
@@ -302,7 +322,10 @@ const SupplierHubPaymentSection = ({
                 payments={cashHistoryRows}
                 onShowDetails={setSelectedPaymentForDetails}
                 onPrintRtgs={setRtgsReceiptData}
-                onEdit={hook.handleEditPayment}
+                onEdit={(payment) => {
+                  setActiveTab('process');
+                  handleEditPayment(payment);
+                }}
                 onDelete={hook.handleDeletePayment}
                 title="Cash Payment History"
                 suppliers={suppliers}
@@ -316,7 +339,10 @@ const SupplierHubPaymentSection = ({
                 payments={rtgsHistoryRows}
                 onShowDetails={setSelectedPaymentForDetails}
                 onPrintRtgs={setRtgsReceiptData}
-                onEdit={hook.handleEditPayment}
+                onEdit={(payment) => {
+                  setActiveTab('process');
+                  handleEditPayment(payment);
+                }}
                 onDelete={hook.handleDeletePayment}
                 title="RTGS Payment History"
                 suppliers={suppliers}
