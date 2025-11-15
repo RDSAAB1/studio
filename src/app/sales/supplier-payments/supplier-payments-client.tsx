@@ -31,12 +31,14 @@ import { PaymentCombinationGenerator, PaymentCombinationResults } from '@/compon
 import { RtgsForm } from '@/components/sales/supplier-payments/rtgs-form';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
+import { useSupplierData } from "@/hooks/use-supplier-data";
 
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     
   const hook = useSupplierPayments();
+  const { supplierBankAccounts } = useSupplierData();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
 
@@ -218,7 +220,7 @@ export default function SupplierPaymentsClient() {
                                 {hook.paymentMethod === 'RTGS' && (
                                   <Card className="text-[11px]">
                                     <CardContent className="p-3">
-                                      <RtgsForm {...hook} />
+                                      <RtgsForm {...hook} bankAccounts={supplierBankAccounts} />
                                     </CardContent>
                                   </Card>
                                 )}

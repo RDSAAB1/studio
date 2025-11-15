@@ -58,10 +58,40 @@ export const useSupplierPayments = () => {
         if (multiSupplierMode) {
             return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
         }
-        if (!form.selectedCustomerKey) return [];
-        const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
-        if (!profile || !Array.isArray(profile.allTransactions)) return [];
-        return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+        
+        // If selectedCustomerKey is set, use it
+        if (form.selectedCustomerKey) {
+            const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
+            if (profile && Array.isArray(profile.allTransactions)) {
+                return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+            }
+        }
+        
+        // Fallback: If no customerKey but entries are selected, try to find them in summary map first
+        // This handles the Supplier Hub case where entries are selected but customerKey might not be set
+        // Priority: Try to get entries from summary map (with outstandingForEntry) before falling back to raw suppliers
+        if (form.selectedEntryIds.size > 0) {
+            // First, try to find entries in any profile in the summary map
+            let foundEntries: Customer[] = [];
+            for (const [key, profile] of data.customerSummaryMap.entries()) {
+                if (profile && Array.isArray(profile.allTransactions)) {
+                    const matchingEntries = profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                    if (matchingEntries.length > 0) {
+                        foundEntries = [...foundEntries, ...matchingEntries];
+                    }
+                }
+            }
+            
+            // If found in summary map, return those (they have outstandingForEntry)
+            if (foundEntries.length > 0) {
+                return foundEntries;
+            }
+            
+            // Fallback to raw suppliers if not found in summary map
+            return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+        }
+        
+        return [];
     }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
     const totalOutstandingForSelected = useMemo(() => {
@@ -306,13 +336,47 @@ export const useSupplierPayments = () => {
     useEffect(() => {
         if (selectedEntries.length > 0) {
             // Always update parchiNo based on selected entries, even in edit mode
-            const srNos = selectedEntries.map(e => e.srNo).join(', ');
-            form.setParchiNo(srNos);
+            const srNos = selectedEntries.map(e => e.srNo).filter(Boolean).join(', ');
+            if (srNos) {
+                form.setParchiNo(srNos);
+            }
         } else if (!form.isBeingEdited) {
             // Only clear parchiNo for new payments if no entries selected
             form.setParchiNo('');
         }
     }, [selectedEntries, form.setParchiNo, form.isBeingEdited]);
+    
+    // Also update parchiNo when selectedEntryIds changes directly (for supplier hub)
+    // This ensures parchiNo updates immediately when entries are selected from table
+    // Works for all payment methods: Cash, Online, RTGS
+    useEffect(() => {
+        if (form.selectedEntryIds.size > 0) {
+            // Get selected entries based on current selectedEntryIds
+            let entries: Customer[] = [];
+            if (multiSupplierMode) {
+                entries = (data.suppliers || []).filter((s: Customer) => form.selectedEntryIds.has(s.id));
+            } else if (form.selectedCustomerKey) {
+                const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
+                if (profile && Array.isArray(profile.allTransactions)) {
+                    entries = profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                }
+            } else {
+                // Fallback: search in all suppliers if customerKey is not set (for supplier hub)
+                entries = (data.suppliers || []).filter((s: Customer) => form.selectedEntryIds.has(s.id));
+            }
+            
+            if (entries.length > 0) {
+                const srNos = entries.map(e => e.srNo).filter(Boolean).join(', ');
+                if (srNos) {
+                    // Always update parchiNo regardless of current value to ensure it's synced
+                    form.setParchiNo(srNos);
+                }
+            }
+        } else if (!form.isBeingEdited && form.parchiNo) {
+            // Clear parchiNo when no entries selected (only for new payments)
+            form.setParchiNo('');
+        }
+    }, [form.selectedEntryIds, multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, data.suppliers, form.parchiNo, form.setParchiNo, form.isBeingEdited]);
 
 
     const handleCustomerSelect = (key: string | null) => {
@@ -671,6 +735,10 @@ export const useSupplierPayments = () => {
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); },
         onConflict: handleConflict,
         selectedEntries,
-        totalOutstandingForSelected
+        totalOutstandingForSelected,
+        selectedEntryIds: form.selectedEntryIds,
+        setSelectedEntryIds: form.setSelectedEntryIds,
+        setParchiNo: form.setParchiNo,
+        parchiNo: form.parchiNo,
     };
 };

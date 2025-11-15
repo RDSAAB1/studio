@@ -43,6 +43,7 @@ const menuItems = [
       { id: "Supplier-Entry", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
       { id: "Supplier-Payments", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
       { id: "Supplier-Profile", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
+      { id: "Supplier-Bank-Accounts", name: "Supplier Bank Accounts", href: "/sales/supplier-bank-accounts", icon: <Landmark className="h-5 w-5" /> },
     ],
   },
   {

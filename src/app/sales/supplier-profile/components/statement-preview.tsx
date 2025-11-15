@@ -2,7 +2,7 @@
 
 
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useDeferredValue, startTransition } from 'react';
 
 import type { CustomerSummary } from "@/lib/definitions";
 
@@ -10,14 +10,51 @@ import { formatCurrency } from "@/lib/utils";
 import { parse, format } from 'date-fns';
 
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     const { toast } = useToast();
+    const deferredData = useDeferredValue(data);
+    const isPending = deferredData !== data;
+    
+    // Track computing state for large datasets
+    const [isComputing, setIsComputing] = React.useState(false);
+    const [shouldCompute, setShouldCompute] = React.useState(true); // Start as true for immediate computation
+    const computationRef = React.useRef<number | null>(null);
 
     const statementRef = React.useRef<HTMLDivElement>(null);
+    
+    // For large datasets, show processing state and compute
+    React.useEffect(() => {
+        if (!deferredData) {
+            setIsComputing(false);
+            setShouldCompute(true);
+            return;
+        }
+
+        const allTransactions = deferredData.allTransactions || [];
+        const allPayments = deferredData.allPayments || [];
+        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
+        
+        if (isLargeDataset) {
+            // Show processing state immediately
+            setIsComputing(true);
+            setShouldCompute(true); // Allow computation to proceed
+            
+            // Cancel any pending timeout
+            if (computationRef.current) {
+                clearTimeout(computationRef.current);
+            }
+        } else {
+            // Small dataset - compute immediately, no loading needed
+            setShouldCompute(true);
+            setIsComputing(false);
+        }
+    }, [deferredData]);
+    
 
 
 
@@ -258,18 +295,17 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
 
     const transactions = useMemo(() => {
-
-        const allTransactions = data.allTransactions || [];
-
-        const allPayments = data.allPayments || [];
-
+        if (!deferredData) return [];
         
-
-        // Debug: Log all payments to see what we have
-
-        console.log('All Payments in Statement:', allPayments.length);
-
-        console.log('Sample Payment:', allPayments[0]);
+        // For large datasets, wait until shouldCompute is true to prevent blocking
+        const allTransactions = deferredData.allTransactions || [];
+        const allPayments = deferredData.allPayments || [];
+        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
+        
+        if (isLargeDataset && !shouldCompute) {
+            // Return empty array to prevent blocking - computation will happen after delay
+            return [];
+        }
 
         
 
@@ -299,7 +335,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
         console.log('Deduplicated Payments:', deduplicatedPayments.length);
 
-        
+        // Create lookup map for transactions by srNo for O(1) access instead of O(n) find()
+        const transactionMap = new Map<string, typeof allTransactions[0]>();
+        allTransactions.forEach(t => {
+            if (t.srNo) {
+                transactionMap.set(t.srNo, t);
+            }
+        });
 
         const mappedTransactions = allTransactions.map(t => {
 
@@ -357,7 +399,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
             const purchaseDates = p.paidFor
                 ?.map((pf: any) => {
-                    const purchase = allTransactions.find(t => t.srNo === pf.srNo);
+                    const purchase = transactionMap.get(pf.srNo);
                     return purchase?.date;
                 })
                 .filter(Boolean) as (string | Date)[];
@@ -397,7 +439,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
             const paidForDetails = p.paidFor?.map((pf: any) => {
 
-                const purchase = allTransactions.find(t => t.srNo === pf.srNo);
+                const purchase = transactionMap.get(pf.srNo);
 
                 const originalAmount = purchase?.originalNetAmount || 0;
 
@@ -567,7 +609,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
             const paymentDetails = p.paidFor?.map((pf: any, index: number) => {
 
-            const purchase = allTransactions.find(t => t.srNo === pf.srNo);
+            const purchase = transactionMap.get(pf.srNo);
 
                 const originalAmount = purchase?.originalNetAmount || 0;
 
@@ -732,16 +774,40 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
         });
 
-        
-
         return finalTransactions;
 
-    }, [data]);
+    }, [deferredData, shouldCompute]);
+    
+    // Monitor when transactions are computed to hide loading
+    React.useEffect(() => {
+        if (!deferredData) return;
+        
+        const allTransactions = deferredData.allTransactions || [];
+        const allPayments = deferredData.allPayments || [];
+        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
+        
+        if (isLargeDataset && shouldCompute) {
+            // For large datasets, wait until transactions are computed
+            if (transactions.length > 0) {
+                // Transactions computed, hide loading after a brief moment
+                const timeoutId = setTimeout(() => {
+                    setIsComputing(false);
+                }, 100);
+                return () => clearTimeout(timeoutId);
+            } else {
+                // Still computing, keep loading visible
+                setIsComputing(true);
+            }
+        } else if (!isLargeDataset) {
+            // Small dataset - no loading needed
+            setIsComputing(false);
+        }
+    }, [transactions.length, shouldCompute, deferredData]);
 
     // Calculate statement totals from transactions to match the table
     // This ensures consistency between summary and detailed table
     const statementTotals = useMemo(() => {
-        if (!data) return { totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0, totalCd: 0, outstanding: 0 };
+        if (!deferredData) return { totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0, totalCd: 0, outstanding: 0 };
         
         // Get all payments from transactions
         const paymentTransactions = transactions.filter(t => (t as any).creditPaid > 0);
@@ -752,7 +818,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
         
         // Calculate Cash and RTGS paid from payment data (need to map back to payments)
         // Deduplicate payments same as in transactions calculation
-        const allPayments = data.allPayments || [];
+        const allPayments = deferredData.allPayments || [];
         const uniquePayments = allPayments.reduce((acc, payment) => {
             const key = `${payment.paymentId || payment.id}_${payment.date}_${payment.amount}`;
             if (!acc.has(key)) {
@@ -779,7 +845,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             }
         });
         
-        const totalOriginal = data.totalOriginalAmount || 0;
+        const totalOriginal = deferredData.totalOriginalAmount || 0;
         const outstanding = Math.max(0, Math.round((totalOriginal - totalPaidFromTransactions - totalCdFromTransactions) * 100) / 100);
         
         return {
@@ -789,7 +855,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             totalCd: totalCdFromTransactions,
             outstanding: outstanding
         };
-    }, [transactions, data]);
+    }, [transactions, deferredData]);
     
     // Use statement totals for consistency
     const statementOutstanding = statementTotals.outstanding;
@@ -811,7 +877,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
         return `
             <html>
                 <head>
-                    <title>Statement - ${data.name}</title>
+                    <title>Statement - ${deferredData?.name || ''}</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         table { width: 100%; border-collapse: collapse; margin-top: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -946,6 +1012,33 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     };
 
 
+
+    if (isPending || isComputing) {
+        const allTransactions = deferredData?.allTransactions || [];
+        const allPayments = deferredData?.allPayments || [];
+        const totalItems = allTransactions.length + allPayments.length;
+        
+        return (
+            <div className="p-6 flex items-center justify-center min-h-[400px]">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground font-medium">
+                        {isPending ? "Loading statement data..." : "Processing statement..."}
+                    </p>
+                    {!isPending && totalItems > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Processing {totalItems} entries, please wait...
+                        </p>
+                    )}
+                    {!isPending && totalItems === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Preparing statement...
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
 
@@ -1087,11 +1180,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     <h1 className="text-2xl font-bold text-left">Account Statement</h1>
 
-                    <p className="text-lg text-left">Customer: {data.name}</p>
+                    <p className="text-lg text-left">Customer: {deferredData?.name || ''}</p>
 
-                    <p className="text-left">Contact: {data.contact || 'N/A'}</p>
+                    <p className="text-left">Contact: {deferredData?.contact || 'N/A'}</p>
 
-                    <p className="text-left">Address: {data.address || 'N/A'}</p>
+                    <p className="text-left">Address: {deferredData?.address || 'N/A'}</p>
 
                 </div>
 
@@ -1113,7 +1206,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Gross Wt:</span>
 
-                                <span className="font-medium">{data.totalGrossWeight?.toFixed(2) || '0.00'} kg</span>
+                                <span className="font-medium">{deferredData?.totalGrossWeight?.toFixed(2) || '0.00'} kg</span>
 
                             </div>
 
@@ -1121,7 +1214,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Tier Wt:</span>
 
-                                <span className="font-medium">{data.totalTeirWeight?.toFixed(2) || '0.00'} kg</span>
+                                <span className="font-medium">{deferredData?.totalTeirWeight?.toFixed(2) || '0.00'} kg</span>
 
                             </div>
 
@@ -1129,7 +1222,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Final Wt:</span>
 
-                                <span className="font-medium">{data.totalFinalWeight?.toFixed(2) || '0.00'} kg</span>
+                                <span className="font-medium">{deferredData?.totalFinalWeight?.toFixed(2) || '0.00'} kg</span>
 
                             </div>
 
@@ -1137,7 +1230,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Karta Wt (@1.00%):</span>
 
-                                <span className="font-medium">{data.totalKartaWeight?.toFixed(2) || '0.00'} kg</span>
+                                <span className="font-medium">{deferredData?.totalKartaWeight?.toFixed(2) || '0.00'} kg</span>
 
                             </div>
 
@@ -1145,7 +1238,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Net Wt:</span>
 
-                                <span className="font-medium">{data.totalNetWeight?.toFixed(2) || '0.00'} kg</span>
+                                <span className="font-medium">{deferredData?.totalNetWeight?.toFixed(2) || '0.00'} kg</span>
 
                             </div>
 
@@ -1153,7 +1246,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Average Rate:</span>
 
-                                <span className="font-medium">{formatRate(data.averageRate)}</span>
+                                <span className="font-medium">{formatRate(deferredData?.averageRate)}</span>
 
                             </div>
 
@@ -1161,7 +1254,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Min Rate:</span>
 
-                                <span className="font-medium">₹{data.minRate?.toLocaleString() || '0'}</span>
+                                <span className="font-medium">₹{deferredData?.minRate?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1169,7 +1262,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Max Rate:</span>
 
-                                <span className="font-medium">₹{data.maxRate?.toLocaleString() || '0'}</span>
+                                <span className="font-medium">₹{deferredData?.maxRate?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1177,7 +1270,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Transactions:</span>
 
-                                <span className="font-medium">{data.totalTransactions} Entries</span>
+                                <span className="font-medium">{deferredData?.totalTransactions || 0} Entries</span>
 
                             </div>
 
@@ -1185,7 +1278,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Outstanding Entries:</span>
 
-                                <span className="font-medium">{data.outstandingEntryIds?.length || 0} Entries</span>
+                                <span className="font-medium">{deferredData?.outstandingEntryIds?.length || 0} Entries</span>
 
                             </div>
 
@@ -1205,25 +1298,25 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                             <div className="flex justify-between">
 
-                                <span>Total Amount (@{formatRate(data.averageRate)}/kg):</span>
+                                <span>Total Amount (@{formatRate(deferredData?.averageRate)}/kg):</span>
 
-                                <span className="font-medium">₹{data.totalAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Karta Amt (@{data.averageKartaPercentage?.toFixed(2) || '0.00'}%):</span>
-
-                                <span className="font-medium text-red-600">- ₹{data.totalKartaAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-medium">₹{deferredData?.totalAmount?.toLocaleString() || '0'}</span>
 
                             </div>
 
                             <div className="flex justify-between">
 
-                                <span>Total Laboury Amt (@{data.averageLabouryRate?.toFixed(2) || '0.00'}):</span>
+                                <span>Total Karta Amt (@{deferredData?.averageKartaPercentage?.toFixed(2) || '0.00'}%):</span>
 
-                                <span className="font-medium text-red-600">- ₹{data.totalLabouryAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-medium text-red-600">- ₹{deferredData?.totalKartaAmount?.toLocaleString() || '0'}</span>
+
+                            </div>
+
+                            <div className="flex justify-between">
+
+                                <span>Total Laboury Amt (@{deferredData?.averageLabouryRate?.toFixed(2) || '0.00'}):</span>
+
+                                <span className="font-medium text-red-600">- ₹{deferredData?.totalLabouryAmount?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1231,7 +1324,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Kanta:</span>
 
-                                <span className="font-medium text-red-600">- ₹{data.totalKanta?.toLocaleString() || '0'}</span>
+                                <span className="font-medium text-red-600">- ₹{deferredData?.totalKanta?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1239,7 +1332,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Brokerage Amt:</span>
 
-                                <span className="font-medium text-red-600">- ₹{data.totalBrokerage?.toLocaleString() || '0'}</span>
+                                <span className="font-medium text-red-600">- ₹{deferredData?.totalBrokerage?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1249,7 +1342,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Original Amount:</span>
 
-                                <span className="font-bold text-lg">₹{data.totalOriginalAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-bold text-lg">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -1271,7 +1364,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Net Payable:</span>
 
-                                <span className="font-medium">₹{data.totalOriginalAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-medium">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
 
                             </div>
 

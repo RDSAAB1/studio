@@ -68,9 +68,11 @@ export const allMenuItems: MenuItem[] = [
     name: "Supplier",
     icon: ShoppingCart,
     subMenus: [
+      { id: "sales/supplier-hub", name: "Supplier Hub", icon: Sparkles },
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
       { id: "sales/supplier-profile", name: "Supplier Profile", icon: UserCircle },
+      { id: "sales/supplier-bank-accounts", name: "Supplier Bank Accounts", icon: Landmark },
       { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen },
     ],
   },

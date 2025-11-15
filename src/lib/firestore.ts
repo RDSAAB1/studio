@@ -39,6 +39,7 @@ const fundTransactionsCollection = collection(firestoreDB, "fund_transactions");
 const banksCollection = collection(firestoreDB, "banks");
 const bankBranchesCollection = collection(firestoreDB, "bankBranches");
 const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
+const supplierBankAccountsCollection = collection(firestoreDB, "supplierBankAccounts");
 const settingsCollection = collection(firestoreDB, "settings");
 const optionsCollection = collection(firestoreDB, "options");
 const usersCollection = collection(firestoreDB, "users");
@@ -1244,6 +1245,31 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
 
 export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void, onError: (error: Error) => void) {
     return onSnapshot(bankAccountsCollection, (snapshot) => {
+        const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+        callback(accounts);
+    }, onError);
+}
+
+// --- Supplier Bank Account Functions ---
+export async function addSupplierBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
+    const docRef = doc(supplierBankAccountsCollection, accountData.accountNumber);
+    const newAccount = { ...accountData, id: docRef.id };
+    await setDoc(docRef, newAccount);
+    return newAccount as BankAccount;
+}
+
+export async function updateSupplierBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
+    const docRef = doc(supplierBankAccountsCollection, id);
+    await updateDoc(docRef, accountData);
+}
+
+export async function deleteSupplierBankAccount(id: string): Promise<void> {
+    const docRef = doc(supplierBankAccountsCollection, id);
+    await deleteDoc(docRef);
+}
+
+export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) => void, onError: (error: Error) => void) {
+    return onSnapshot(supplierBankAccountsCollection, (snapshot) => {
         const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
         callback(accounts);
     }, onError);

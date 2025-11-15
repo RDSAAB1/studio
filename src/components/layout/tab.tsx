@@ -18,7 +18,7 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-sm h-[32px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-xs h-[28px] px-2 max-w-[150px] min-w-[80px] flex-1 transition-all duration-200",
     {
       'bg-background text-primary-foreground font-medium z-10 rounded-t-md border-x border-t border-border': isActive,
       'bg-card text-muted-foreground hover:bg-accent/80 rounded-t-md border-b border-border': !isActive,
@@ -40,12 +40,12 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
               variant="ghost"
               size="icon"
               className={cn(
-                  "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
+                  "h-4 w-4 ml-1 rounded-full shrink-0 z-20 transition-colors duration-200",
                   isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
               )}
               onClick={onClose}
               >
-              <X className="h-3 w-3" />
+              <X className="h-2.5 w-2.5" />
               </Button>
           )}
       </div>

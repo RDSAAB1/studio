@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +78,7 @@ const TransactionTable = ({ transactions, onShowDetails }: { transactions: Suppl
                             <TableCell className="text-xs w-[100px]">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
                             <TableCell className="text-xs text-green-600 w-[80px]">{formatCurrency(entry.totalPaid || 0)}</TableCell>
                             <TableCell className="text-xs text-blue-600 w-[60px]">{formatCurrency(entry.totalCd || 0)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-red-600 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                            <TableCell className="text-xs font-semibold text-red-500 dark:text-red-400 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
                             <TableCell className="text-right w-[60px]">
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onShowDetails(entry)}>
                                     <Info className="h-3 w-3" />
@@ -186,62 +186,150 @@ export const SupplierProfileView = ({
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-4">
                         <div>
-                            <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
-                            <CardDescription>
+                    <h2 className="text-xl font-bold">{toTitleCase(selectedSupplierData.name)}</h2>
+                    <p className="text-sm text-muted-foreground">
                                 {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
-                            </CardDescription>
+                    </p>
                         </div>
                         <Button onClick={onGenerateStatement} size="sm">Generate Statement</Button>
                     </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* Operational Summary Card */}
+                        <Card className="border border-gray-400/50">
+                            <CardHeader className="pb-2 px-3 pt-3">
+                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                    <Scale size={16} className="text-muted-foreground"/>
+                                    Operational Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Gross Wt:</span>
+                                        <span className="font-medium">{formatWeight(selectedSupplierData.totalGrossWeight)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Teir Wt:</span>
+                                        <span className="font-medium">{formatWeight(selectedSupplierData.totalTeirWeight)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Final Wt:</span>
+                                        <span className="font-bold">{formatWeight(selectedSupplierData.totalFinalWeight)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Karta Wt (@{formatPercentage(selectedSupplierData.averageKartaPercentage)}):</span>
+                                        <span className="font-medium">{formatWeight(selectedSupplierData.totalKartaWeight)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Net Wt:</span>
+                                        <span className="font-bold text-primary">{formatWeight(selectedSupplierData.totalNetWeight)}</span>
+                                    </div>
+                                </div>
+                                <Separator className="my-2"/>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Average Rate:</span>
+                                        <span className="font-medium">{formatRate(selectedSupplierData.averageRate)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Min Rate:</span>
+                                        <span className="font-medium">{formatRate(selectedSupplierData.minRate || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Max Rate:</span>
+                                        <span className="font-medium">{formatRate(selectedSupplierData.maxRate || 0)}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Deduction Summary Card */}
+                        <Card className="border border-gray-400/50">
+                            <CardHeader className="pb-2 px-3 pt-3">
+                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                    <FileText size={16} className="text-muted-foreground"/>
+                                    Deduction Summary
+                                </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Scale size={16}/>
-                            <h4 className="text-sm font-semibold uppercase tracking-wide">Operational Snapshot</h4>
+                            <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Amount (@{formatRate(selectedSupplierData.averageRate)}/kg):</span>
+                                        <span className="font-medium">{formatCurrency(selectedSupplierData.totalAmount || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Karta (@{formatPercentage(selectedSupplierData.averageKartaPercentage)}):</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(selectedSupplierData.totalKartaAmount || 0)}</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <SummaryTile label="Gross Weight" value={formatWeight(selectedSupplierData.totalGrossWeight)} hint="Aggregate arrival weight"/>
-                            <SummaryTile label="Teir Weight" value={formatWeight(selectedSupplierData.totalTeirWeight)} hint="Packaging / tare deduction"/>
-                            <SummaryTile label="Net Weight" value={formatWeight(selectedSupplierData.totalNetWeight)} hint="Payable weight after adjustments" tone="text-primary"/>
-                            <SummaryTile label="Final Weight" value={formatWeight(selectedSupplierData.totalFinalWeight)} hint="Recorded closing weight"/>
-                            <SummaryTile label="Karta Weight" value={formatWeight(selectedSupplierData.totalKartaWeight)} hint={`Applied at ${formatPercentage(selectedSupplierData.averageKartaPercentage)}`}/>
-                            <SummaryTile label="Average Rate" value={formatRate(selectedSupplierData.averageRate)} hint={`Range ${formatCurrency(selectedSupplierData.minRate || 0)} - ${formatCurrency(selectedSupplierData.maxRate || 0)}`}/>
-                            <SummaryTile label="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} hint="Entries captured for this supplier"/>
-                            <SummaryTile label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions}`} hint="Pending against this profile" tone="text-destructive"/>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Laboury (@{formatDecimal(selectedSupplierData.averageLabouryRate)}):</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}</span>
                         </div>
-                    </section>
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <FileText size={16}/>
-                            <h4 className="text-sm font-semibold uppercase tracking-wide">Deduction Overview</h4>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Kanta:</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(selectedSupplierData.totalKanta || 0)}</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <SummaryTile label="Gross Amount" value={formatCurrency(selectedSupplierData.totalAmount || 0)} hint={`Computed @ ${formatRate(selectedSupplierData.averageRate)} per kg`}/>
-                            <SummaryTile label="Karta Charges" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} hint={`Applied at ${formatPercentage(selectedSupplierData.averageKartaPercentage)}`}/>
-                            <SummaryTile label="Laboury Charges" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} hint={`Average ${formatDecimal(selectedSupplierData.averageLabouryRate)} per kg`}/>
-                            <SummaryTile label="Kanta & Others" value={`- ${formatCurrency((selectedSupplierData.totalKanta || 0) + (selectedSupplierData.totalBrokerage || 0))}`} hint="Includes weighing & brokerage adjustments"/>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Other:</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(selectedSupplierData.totalBrokerage || 0)}</span>
                         </div>
-                    </section>
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Banknote size={16}/>
-                            <h4 className="text-sm font-semibold uppercase tracking-wide">Financial Highlights</h4>
                             </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <SummaryTile label="Net Payable" value={formatCurrency(selectedSupplierData.totalOriginalAmount || 0)} hint="After all deductions" tone="text-primary"/>
-                            <SummaryTile label="Cash Settled" value={formatCurrency(selectedSupplierData.totalCashPaid || 0)} hint="Direct cash disbursements"/>
-                            <SummaryTile label="RTGS Settled" value={formatCurrency(selectedSupplierData.totalRtgsPaid || 0)} hint="Bank transfers completed"/>
-                            <SummaryTile label="Cash Discount Granted" value={formatCurrency(selectedSupplierData.totalCdAmount || 0)} hint="Approved CD for this profile"/>
-                            <SummaryTile label="Outstanding Balance" value={formatCurrency(selectedSupplierData.totalOutstanding)} hint="Yet to be cleared" tone="text-destructive"/>
+                                <Separator className="my-2"/>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Total Original Amount:</span>
+                                    <span className="font-bold text-primary">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span>
                             </div>
-                    </section>
                 </CardContent>
             </Card>
+
+                        {/* Financial Summary Card */}
+                        <Card className="border border-gray-400/50">
+                            <CardHeader className="pb-2 px-3 pt-3">
+                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                    <Banknote size={16} className="text-muted-foreground"/>
+                                    Financial Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Net Payable:</span>
+                                        <span className="font-medium">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Cash Paid:</span>
+                                        <span className="font-medium text-green-500">{formatCurrency(selectedSupplierData.totalCashPaid || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total RTGS Paid:</span>
+                                        <span className="font-medium text-green-500">{formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total CD Granted:</span>
+                                        <span className="font-medium">{formatCurrency(selectedSupplierData.totalCdAmount || 0)}</span>
+                                    </div>
+                                </div>
+                                <Separator className="my-2"/>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Total Transactions:</span>
+                                        <span className="font-medium">{selectedSupplierData.totalTransactions} Entries</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Outstanding Entries:</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">{selectedSupplierData.totalOutstandingTransactions} Entries</span>
+                                    </div>
+                                </div>
+                                <Separator className="my-2"/>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Outstanding:</span>
+                                    <span className="font-bold text-red-500 dark:text-red-400">{formatCurrency(selectedSupplierData.totalOutstanding)}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-1">

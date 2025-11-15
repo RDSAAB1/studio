@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getSupplierBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, levenshteinDistance } from '@/lib/utils';
 
@@ -18,6 +18,7 @@ export const useSupplierData = () => {
     const [banks, setBanks] = useState<Bank[]>([]);
     const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [supplierBankAccounts, setSupplierBankAccounts] = useState<BankAccount[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [isClient, setIsClient] = useState(false);
@@ -45,6 +46,7 @@ export const useSupplierData = () => {
             getBanksRealtime(data => { if (isSubscribed) setBanks(data); }, error => console.error("Banks fetch error:", error)),
             getBankBranchesRealtime(data => { if (isSubscribed) setBankBranches(data); }, error => console.error("Bank Branches fetch error:", error)),
             getBankAccountsRealtime(data => { if (isSubscribed) setBankAccounts(data); }, error => console.error("Bank Accounts fetch error:", error)),
+            getSupplierBankAccountsRealtime(data => { if (isSubscribed) setSupplierBankAccounts(data); }, error => console.error("Supplier Bank Accounts fetch error:", error)),
         ];
 
         getReceiptSettings().then(settings => {
@@ -310,6 +312,7 @@ export const useSupplierData = () => {
         banks,
         bankBranches,
         bankAccounts,
+        supplierBankAccounts,
         receiptSettings,
         customerSummaryMap,
         financialState,

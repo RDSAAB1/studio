@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
 import type { Customer } from "@/lib/definitions";
-import { formatCurrency, cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2, Plus, Table } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Scale, FileText, Banknote } from "lucide-react";
 import { format } from "date-fns";
+import { Separator } from "@/components/ui/separator";
 
 interface SimpleCalculatedSummaryProps {
     customer: Customer;
@@ -17,32 +16,6 @@ interface SimpleCalculatedSummaryProps {
     isEditing: boolean;
     isSubmitting?: boolean;
 }
-
-const SummaryItem = ({ label, value, isHighlighted, className, valueType = 'default' }: { label: string; value: string; isHighlighted?: boolean, className?: string; valueType?: 'date' | 'weight' | 'amount' | 'percentage' | 'default' }) => {
-    const getValueColor = () => {
-        switch (valueType) {
-            case 'date':
-                return 'text-blue-700 font-bold';
-            case 'weight':
-                return 'text-green-700 font-bold';
-            case 'amount':
-                return 'text-purple-700 font-bold';
-            case 'percentage':
-                return 'text-orange-700 font-bold';
-            default:
-                return 'text-foreground font-bold';
-        }
-    };
-
-    return (
-        <div className={cn("", className)}>
-            <div className="text-[10px] text-muted-foreground font-medium">{label}</div>
-            <div className={cn("text-xs", isHighlighted ? "text-primary font-bold text-sm" : getValueColor())}>
-                {value}
-            </div>
-        </div>
-    );
-};
 
 export const SimpleCalculatedSummary = ({ 
     customer, 
@@ -77,103 +50,122 @@ export const SimpleCalculatedSummary = ({
     const brokerageAmt = brokerageRate * netWt;
     const netPayable = amount - kartaAmt - labAmt - kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt);
     
+    const formatWeight = (wt: number) => `${wt.toFixed(2)} Qtl`;
+    const formatRate = (rt: number) => `₹${rt.toFixed(2)}/Qtl`;
+    const formatPercentage = (pct: number) => `${pct.toFixed(2)}%`;
+
     return (
-        <div className="space-y-1">
-            {/* Compact Header */}
-            <div className="text-center">
-                <h4 className="text-xs font-semibold text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                    <div className="w-1 h-1 bg-primary rounded-full"></div>
-                    Summary Details
-                </h4>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Operational Summary Card */}
+            <Card className="border border-gray-400/50">
+                <CardHeader className="pb-2 px-3 pt-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Scale size={16} className="text-muted-foreground"/>
+                        Operational Summary
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                    <div className="space-y-1">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Gross Wt:</span>
+                            <span className="font-medium">{formatWeight(grossWeight)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Teir Wt:</span>
+                            <span className="font-medium">{formatWeight(teirWeight)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Final Wt:</span>
+                            <span className="font-bold">{formatWeight(finalWt)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Karta Wt (@{formatPercentage(kartaPercentage)}):</span>
+                            <span className="font-medium">{formatWeight(kartaWt)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Net Wt:</span>
+                            <span className="font-bold text-primary">{formatWeight(netWt)}</span>
+                        </div>
+                    </div>
+                    <Separator className="my-2"/>
+                    <div className="space-y-1">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Rate:</span>
+                            <span className="font-medium">{formatRate(rate)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Due Date:</span>
+                            <span className="font-medium">{isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")}</span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-            {/* Compact Grid - All in one container */}
-            <div className="bg-muted/30 border border-border rounded p-1.5">
-                <div className="grid grid-cols-6 gap-1">
-                    <SummaryItem 
-                        label="Due Date" 
-                        value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} 
-                        className="bg-blue-50/80 border border-blue-200/50 p-1 rounded"
-                        valueType="date"
-                    />
-                    <SummaryItem 
-                        label="Rate" 
-                        value={`₹${rate.toFixed(2)}/Qtl`} 
-                        className="bg-orange-50/80 border border-orange-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                    <SummaryItem 
-                        label="Gross Wt" 
-                        value={`${grossWeight.toFixed(2)} Qtl`} 
-                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
-                        valueType="weight"
-                    />
-                    <SummaryItem 
-                        label="Tier Wt" 
-                        value={`${teirWeight.toFixed(2)} Qtl`} 
-                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
-                        valueType="weight"
-                    />
-                    <SummaryItem 
-                        label="Final Wt" 
-                        value={`${finalWt.toFixed(2)} Qtl`} 
-                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
-                        valueType="weight"
-                    />
-                    <SummaryItem 
-                        label="Karta Wt" 
-                        value={`${kartaWt.toFixed(2)} Qtl`} 
-                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
-                        valueType="weight"
-                    />
-                    <SummaryItem 
-                        label="Net Wt" 
-                        value={`${netWt.toFixed(2)} Qtl`} 
-                        className="bg-green-50/80 border border-green-200/50 p-1 rounded"
-                        valueType="weight"
-                    />
-                    <SummaryItem 
-                        label="Kanta" 
-                        value={formatCurrency(kanta)} 
-                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                    <SummaryItem 
-                        label="Amount" 
-                        value={formatCurrency(amount)} 
-                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                    <SummaryItem 
-                        label="Karta Amt" 
-                        value={formatCurrency(kartaAmt)} 
-                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                    <SummaryItem 
-                        label="Lab Amt" 
-                        value={formatCurrency(labAmt)} 
-                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                    <SummaryItem 
-                        label="Brokerage Amt" 
-                        value={formatCurrency(brokerageAmt)} 
-                        className="bg-purple-50/80 border border-purple-200/50 p-1 rounded"
-                        valueType="amount"
-                    />
-                </div>
-            </div>
+            {/* Deduction Summary Card */}
+            <Card className="border border-gray-400/50">
+                <CardHeader className="pb-2 px-3 pt-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <FileText size={16} className="text-muted-foreground"/>
+                        Deduction Summary
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                    <div className="space-y-1">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Amount (@{formatRate(rate)}/Qtl):</span>
+                            <span className="font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Karta Amt (@{formatPercentage(kartaPercentage)}):</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Laboury Amt (@{formatRate(labouryRate)}):</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(labAmt)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Kanta:</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kanta)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Brokerage Amt:</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">{brokerageAddSubtract ? '- ' : '+ '}{formatCurrency(brokerageAmt)}</span>
+                        </div>
+                    </div>
+                    <Separator className="my-2"/>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Deductions:</span>
+                        <span className="font-bold text-primary">{formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt))}</span>
+                    </div>
+                </CardContent>
+            </Card>
 
-            {/* Net Payable - Compact */}
-            <div className="bg-primary/5 border border-primary/20 rounded p-1.5">
-                <SummaryItem 
-                    label="Net Payable" 
-                    value={formatCurrency(netPayable)} 
-                    isHighlighted 
-                    className="bg-primary/10 border border-primary/30 p-1.5 rounded text-center"
-                />
-            </div>
+            {/* Financial Summary Card */}
+            <Card className="border border-gray-400/50">
+                <CardHeader className="pb-2 px-3 pt-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Banknote size={16} className="text-muted-foreground"/>
+                        Financial Summary
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                    <div className="space-y-1">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Gross Amount:</span>
+                            <span className="font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Deductions:</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt))}</span>
+                        </div>
+                    </div>
+                    <Separator className="my-2"/>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Net Payable:</span>
+                        <span className="font-bold text-red-500 dark:text-red-400 text-base">{formatCurrency(netPayable)}</span>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

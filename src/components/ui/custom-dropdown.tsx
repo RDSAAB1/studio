@@ -5,10 +5,12 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react';
 import { cn, levenshteinDistance } from '@/lib/utils';
 import { Input } from './input';
+import { Button } from './button';
 
 export interface CustomDropdownOption {
     value: string;
     label: string;
+    displayValue?: string; // Optional display value for input field (if different from label)
     data?: any; // Additional data for enhanced display
 }
 
@@ -20,6 +22,11 @@ interface CustomDropdownProps {
     searchPlaceholder?: string;
     noItemsPlaceholder?: string;
     onAdd?: (newItem: string) => void;
+    inputClassName?: string;
+    showClearButton?: boolean;
+    showArrow?: boolean;
+    showGoButton?: boolean;
+    onGoClick?: () => void;
 }
 
 export const CustomDropdown: React.FC<CustomDropdownProps> = ({
@@ -30,6 +37,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     searchPlaceholder = 'Search items...',
     noItemsPlaceholder = 'No item found.',
     onAdd,
+    inputClassName,
+    showClearButton = true,
+    showArrow = true,
+    showGoButton = false,
+    onGoClick,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +54,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         // Only update search term if a valid selection is made and user is not actively typing
         // This prevents overwriting user's typing
         if (selectedItem && !isOpen) {
-            setSearchTerm(selectedItem.label);
+            // Use displayValue if available, otherwise use label
+            setSearchTerm(selectedItem.displayValue || selectedItem.label);
         } else if (!value && !isOpen) {
             setSearchTerm('');
         }
@@ -98,11 +111,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             setIsOpen(false);
             // Only reset search term if we have a valid selection
             if (selectedItem) {
-                setSearchTerm(selectedItem.label);
+                setSearchTerm(selectedItem.displayValue || selectedItem.label);
             } else if (value) {
                  const matchingOption = options.find(opt => opt.value === value || opt.label === value);
                  if (matchingOption) {
-                    setSearchTerm(matchingOption.label);
+                    setSearchTerm(matchingOption.displayValue || matchingOption.label);
                  } else {
                     setSearchTerm(value);
                  }
@@ -121,7 +134,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     const handleSelect = (item: CustomDropdownOption) => {
         onChange(item.value);
-        setSearchTerm(item.label);
+        // Use displayValue if available, otherwise use label
+        setSearchTerm(item.displayValue || item.label);
         setIsOpen(false);
     };
     
@@ -168,14 +182,33 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     onChange={handleInputChange}
                     onClick={handleInputClick}
                     onFocus={handleInputClick}
-                    className="w-full pl-8 pr-8 h-8 text-sm"
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && showGoButton && onGoClick) {
+                            e.preventDefault();
+                            onGoClick();
+                        }
+                    }}
+                    className={cn("w-full pl-8 h-8 text-sm", showGoButton ? "pr-14" : "pr-8", inputClassName)}
                 />
+                {showGoButton && (
+                    <div className="absolute inset-y-0 right-1 flex items-center">
+                        <Button
+                            size="sm"
+                            className="h-5 rounded-full px-2.5 text-[10px]"
+                            onClick={onGoClick}
+                        >
+                            Go
+                        </Button>
+                    </div>
+                )}
+                {!showGoButton && (showClearButton || showArrow) && (
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-                    {value && (
+                        {showClearButton && value && (
                         <button type="button" onClick={handleClear} className="p-0.5 focus:outline-none rounded-full hover:bg-muted">
                             <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                         </button>
                     )}
+                        {showArrow && (
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
@@ -187,7 +220,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                             <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         )}
                     </button>
+                        )}
                 </div>
+                )}
             </div>
 
             {isOpen && (

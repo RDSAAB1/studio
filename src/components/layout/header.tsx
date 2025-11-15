@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from 'next/dynamic';
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle, ClipboardList, CreditCard } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
@@ -14,10 +14,11 @@ import { format, addDays, isSunday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { syncAllData, hardSyncAllData } from "@/lib/database";
+import { useSupplierHubContext } from "@/app/sales/supplier-hub/context/supplier-hub-context";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -222,7 +223,10 @@ const DraggableCalculator = () => {
 
 export function Header({ toggleSidebar }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
+  const isSupplierHub = pathname?.includes('supplier-hub');
+  const supplierHubContext = useSupplierHubContext();
 
   const handleManualSync = async () => {
     const id = "sync-toast";
@@ -238,7 +242,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-10 items-center gap-2 border-b bg-card px-4 sm:px-6 flex-shrink-0">
+    <header className="sticky top-0 z-30 flex h-10 items-center gap-2 border-b bg-card px-4 sm:px-6 flex-shrink-0 -mt-px">
         {/* Left Aligned Items */}
         <div className="flex flex-1 items-center gap-2">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleSidebar}>
@@ -246,6 +250,37 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
             <NetworkStatusIndicator />
+            {isSupplierHub && supplierHubContext && (
+              <div className="flex items-center gap-1 ml-2">
+                <Button
+                  variant={supplierHubContext.activeSection === "overview" ? "default" : "outline"}
+                  size="sm"
+                  className="h-6 rounded-full px-2.5 text-[10px]"
+                  onClick={() => supplierHubContext.setActiveSection("overview")}
+                >
+                  <UserCircle className="mr-1 h-3 w-3" />
+                  Supplier Profile
+                </Button>
+                <Button
+                  variant={supplierHubContext.activeSection === "entry" ? "default" : "outline"}
+                  size="sm"
+                  className="h-6 rounded-full px-2.5 text-[10px]"
+                  onClick={() => supplierHubContext.setActiveSection("entry")}
+                >
+                  <ClipboardList className="mr-1 h-3 w-3" />
+                  Supplier Entry
+                </Button>
+                <Button
+                  variant={supplierHubContext.activeSection === "payments" ? "default" : "outline"}
+                  size="sm"
+                  className="h-6 rounded-full px-2.5 text-[10px]"
+                  onClick={() => supplierHubContext.setActiveSection("payments")}
+                >
+                  <CreditCard className="mr-1 h-3 w-3" />
+                  Supplier Payment
+                </Button>
+              </div>
+            )}
         </div>
         
         {/* Center: Dynamic Island Toaster */}

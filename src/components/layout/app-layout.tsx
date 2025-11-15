@@ -10,6 +10,7 @@ import CustomSidebar from '@/components/layout/custom-sidebar';
 import TabBar from '@/components/layout/tab-bar';
 import { Header } from "@/components/layout/header";
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { SupplierHubProvider } from '@/app/sales/supplier-hub/context/supplier-hub-context';
 
 export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
   const [openTabs, setOpenTabs] = usePersistedState<MenuItem[]>(
@@ -149,20 +150,22 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const pageId = pathname.substring(1);
 
   return (
+    <SupplierHubProvider>
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
-            <div className="sticky top-0 z-30 flex-shrink-0">
+              <div className="sticky top-0 z-30 flex-shrink-0 bg-card">
               <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
               <Header toggleSidebar={toggleSidebar} />
             </div>
-            <div className="flex-grow relative overflow-y-auto">
-              <main className="p-4 sm:p-6">
+              <div className="flex-grow relative overflow-y-auto overflow-x-hidden">
+                <main className="p-4 sm:p-6" style={{ margin: '-16px' }}>
                 {children}
               </main>
             </div>
           </div>
         </CustomSidebar>
     </div>
+    </SupplierHubProvider>
   );
 }
