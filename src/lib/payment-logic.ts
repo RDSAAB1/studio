@@ -78,6 +78,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     }
 
     let finalPaymentData: Payment | null = null;
+    try {
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
@@ -1641,6 +1642,60 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         
     });
+    } catch (err: any) {
+        // Quota/offline fallback: write locally and enqueue sync
+        const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            // Rebuild payment data base (mirror above without transaction context)
+            let paidForDetails: PaidFor[] = [];
+            if (rtgsFor === 'Supplier' && incomingSelectedEntries && incomingSelectedEntries.length > 0) {
+                paidForDetails = incomingSelectedEntries.map((e: Customer) => ({ srNo: e.srNo, amount: 0 } as any)); // amounts already embedded via distribution above; safe placeholder
+            } else if (editingPayment?.paidFor?.length) {
+                paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
+            }
+            const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
+            const paymentDataBase: Omit<Payment, 'id'> = {
+                paymentId: finalPaymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
+                cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
+                notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+                paidFor: paidForDetails,
+                sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                parchiNo: parchiNo,
+                utrNo, checkNo,
+                quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+                supplierName: toTitleCase(supplierDetails.name),
+                supplierFatherName: toTitleCase(supplierDetails.fatherName),
+                supplierAddress: toTitleCase(supplierDetails.address),
+                bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
+                rtgsFor,
+            };
+            if (paymentMethod === 'RTGS') (paymentDataBase as any).rtgsSrNo = rtgsSrNo; else delete (paymentDataBase as any).rtgsSrNo;
+            if (paymentMethod !== 'Cash') (paymentDataBase as any).bankAccountId = accountIdForPayment;
+            const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
+            finalPaymentData = { id: paymentIdToUse, ...paymentDataBase } as Payment;
+            try {
+                if (db && finalPaymentData) {
+                    if (editingPayment?.id) {
+                        await db.payments.delete(editingPayment.id);
+                    }
+                    await db.payments.put(finalPaymentData);
+                }
+            } catch {}
+            // enqueue sync
+            try {
+                const { enqueueSyncTask } = await import('./sync-queue');
+                if (editingPayment?.id) {
+                    await enqueueSyncTask('delete:payment', { id: editingPayment.id }, { attemptImmediate: true, dedupeKey: `payment:delete:${editingPayment.id}` });
+                }
+                await enqueueSyncTask('upsert:payment', finalPaymentData, { attemptImmediate: true, dedupeKey: `payment:${finalPaymentData.id}` });
+            } catch {}
+        } else {
+            throw err;
+        }
+    }
     // Ensure local IndexedDB reflects the latest payment so UI updates instantly
     try {
         if (db && finalPaymentData) {

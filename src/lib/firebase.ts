@@ -50,10 +50,10 @@ const firestoreDB = initializeFirestore(app, {
 });
 const storage = getStorage(app);
 
-// Suppress non-critical Firestore connection warnings.
-// The app is designed to work offline, so these warnings are expected and normal.
+// Suppress Firestore connectivity logs in production/offline.
+// App uses IndexedDB-first, so connectivity warnings are noise.
 if (typeof window !== 'undefined') {
-    setLogLevel('error');
+    setLogLevel('silent');
 }
 
 

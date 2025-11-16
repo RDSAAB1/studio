@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
+import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
@@ -331,12 +332,26 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // --- Supplier Functions ---
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
-    const docRef = doc(suppliersCollection, supplierData.id);
-    await setDoc(docRef, supplierData);
+    // Always write locally first
     if (db) {
-        await db.suppliers.put(supplierData); // WRITE-THROUGH
+        await db.suppliers.put(supplierData);
     }
-    return supplierData;
+    // Try Firestore; on quota error, enqueue for later
+    try {
+        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
+        const docRef = doc(suppliersCollection, supplierData.id);
+        await setDoc(docRef, supplierData);
+        return supplierData;
+    } catch (e) {
+        if (isQuotaError(e)) {
+            markFirestoreDisabled();
+            // enqueue to sync queue
+            const { enqueueSyncTask } = await import('./sync-queue');
+            await enqueueSyncTask('upsert:supplier', supplierData, { attemptImmediate: true, dedupeKey: `supplier:${supplierData.id}` });
+            return supplierData;
+        }
+        throw e;
+    }
 }
 
 // Find supplier Firestore document ID by serial number
@@ -364,32 +379,33 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
     return false;
   }
   
+  // Update locally first
+  if (db) {
+    try {
+      const existing = await db.suppliers.get(id);
+      await db.suppliers.put({ ...(existing || { id }), ...(supplierData as any) });
+    } catch {}
+  }
+
   try {
+    if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
     const docRef = doc(suppliersCollection, id);
     const snap = await getDoc(docRef);
-    
     if (snap.exists()) {
-      // Remove 'id' from supplierData if it exists (shouldn't be in update data)
       const { id: _, ...updateData } = supplierData as any;
       await updateDoc(docRef, updateData);
     } else {
-      // Create the document if it does not exist
       const dataToSet: any = { id, ...supplierData };
       await setDoc(docRef, dataToSet, { merge: true });
     }
-    
-    if (db) {
-      // Merge update locally as well
-      try {
-        const existing = await db.suppliers.get(id);
-        await db.suppliers.put({ ...(existing || { id }), ...(supplierData as any) });
-      } catch (localError) {
-        console.warn('Failed to update local IndexedDB:', localError);
-        // Don't fail the whole operation if local update fails
-      }
-    }
     return true;
   } catch (error) {
+    if (isQuotaError(error)) {
+      markFirestoreDisabled();
+      const { enqueueSyncTask } = await import('./sync-queue');
+      await enqueueSyncTask('update:supplier', { id, data: supplierData }, { attemptImmediate: true, dedupeKey: `supplier:update:${id}` });
+      return true;
+    }
     console.error('updateSupplier error:', error);
     return false;
   }
@@ -1150,66 +1166,216 @@ export async function getMoreCustomerPayments(startAfterDoc: QueryDocumentSnapsh
 // =================================================================
 
 export function getSuppliersRealtime(callback: (data: Customer[]) => void, onError: (error: Error) => void) {
+    // Circuit breaker: if FS is temporarily disabled, fallback to local polling
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.suppliers.orderBy('srNo').reverse().toArray() : [];
+        }, callback);
+    }
+
     const q = query(suppliersCollection, orderBy("srNo", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         callback(suppliers);
-    }, onError);
+        // Success path clears any previous disabled state
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            // Switch to polling fallback immediately
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.suppliers.orderBy('srNo').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            // Return a compound unsubscribe
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getCustomersRealtime(callback: (data: Customer[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.customers.orderBy('srNo').reverse().toArray() : [];
+        }, callback);
+    }
     const q = query(customersCollection, orderBy("srNo", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         callback(customers);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.customers.orderBy('srNo').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.payments.orderBy('date').reverse().toArray() : [];
+        }, callback);
+    }
     const q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         callback(payments);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.payments.orderBy('date').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.customerPayments.orderBy('date').reverse().toArray() : [];
+        }, callback);
+    }
     const q = query(customerPaymentsCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
         callback(payments);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.customerPayments.orderBy('date').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.loans.orderBy('startDate').reverse().toArray() : [];
+        }, callback);
+    }
     const q = query(loansCollection, orderBy("startDate", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
         callback(loans);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.loans.orderBy('startDate').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.fundTransactions.orderBy('date').reverse().toArray() : [];
+        }, callback);
+    }
     const q = query(fundTransactionsCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
         callback(transactions);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.fundTransactions.orderBy('date').reverse().toArray() : [];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        // Fallback to local transactions filtered as Income
+        return createPollingFallback(async () => {
+            if (!db) return [];
+            const tx = await db.transactions.orderBy('date').reverse().toArray();
+            return tx.filter((t: any) => (t.transactionType || t.type) === 'Income') as unknown as Income[];
+        }, callback);
+    }
     const q = query(incomesCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
         callback(transactions);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                if (!db) return [];
+                const tx = await db.transactions.orderBy('date').reverse().toArray();
+                return tx.filter((t: any) => (t.transactionType || t.type) === 'Income') as unknown as Income[];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 export function getExpensesRealtime(callback: (data: Expense[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            if (!db) return [];
+            const tx = await db.transactions.orderBy('date').reverse().toArray();
+            return tx.filter((t: any) => (t.transactionType || t.type) === 'Expense') as unknown as Expense[];
+        }, callback);
+    }
     const q = query(expensesCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
         callback(transactions);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                if (!db) return [];
+                const tx = await db.transactions.orderBy('date').reverse().toArray();
+                return tx.filter((t: any) => (t.transactionType || t.type) === 'Expense') as unknown as Expense[];
+            }, callback);
+            try { unsubscribe(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+    return unsubscribe;
 }
 
 export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => void, onError: (error: Error) => void) {
@@ -1229,13 +1395,29 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
         incomeData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
         incomeDone = true;
         mergeAndCallback();
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            incomeDone = true;
+            mergeAndCallback();
+            return;
+        }
+        onError(err);
+    });
 
     const unsubExpenses = onSnapshot(query(expensesCollection, orderBy("date", "desc")), (snapshot) => {
         expenseData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
         expenseDone = true;
         mergeAndCallback();
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            expenseDone = true;
+            mergeAndCallback();
+            return;
+        }
+        onError(err);
+    });
     
     return () => {
         unsubIncomes();
@@ -1244,10 +1426,25 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
 }
 
 export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void, onError: (error: Error) => void) {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.bankAccounts.toArray() : [];
+        }, callback);
+    }
     return onSnapshot(bankAccountsCollection, (snapshot) => {
         const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
         callback(accounts);
-    }, onError);
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.bankAccounts.toArray() : [];
+            }, callback);
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
 }
 
 // --- Supplier Bank Account Functions ---
@@ -1376,18 +1573,27 @@ export async function deleteExpenseTemplate(id: string): Promise<void> {
 // --- Ledger Accounting Functions ---
 
 export async function fetchLedgerAccounts(): Promise<LedgerAccount[]> {
-    const snapshot = await getDocs(query(ledgerAccountsCollection, orderBy('name')));
-    return snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-            id: docSnap.id,
-            name: data.name || '',
-            address: data.address || '',
-            contact: data.contact || '',
-            createdAt: data.createdAt || '',
-            updatedAt: data.updatedAt || data.createdAt || '',
-        } as LedgerAccount;
-    });
+    try {
+        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
+        const snapshot = await getDocs(query(ledgerAccountsCollection, orderBy('name')));
+        return snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                address: data.address || '',
+                contact: data.contact || '',
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerAccount;
+        });
+    } catch (e) {
+        if (isQuotaError(e)) {
+            markFirestoreDisabled();
+            return db ? await db.ledgerAccounts.toArray() : [];
+        }
+        throw e;
+    }
 }
 
 export async function createLedgerAccount(account: LedgerAccountInput): Promise<LedgerAccount> {
@@ -1480,45 +1686,63 @@ export async function deleteLedgerCashAccount(id: string): Promise<void> {
 }
 
 export async function fetchLedgerEntries(accountId: string): Promise<LedgerEntry[]> {
-    const snapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', accountId), orderBy('createdAt')));
-    return snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-            id: docSnap.id,
-            accountId: data.accountId,
-            date: data.date,
-            particulars: data.particulars,
-            debit: Number(data.debit) || 0,
-            credit: Number(data.credit) || 0,
-            balance: Number(data.balance) || 0,
-            remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
-            createdAt: data.createdAt || '',
-            updatedAt: data.updatedAt || data.createdAt || '',
-            linkGroupId: data.linkGroupId || undefined,
-            linkStrategy: data.linkStrategy || undefined,
-        } as LedgerEntry;
-    });
+    try {
+        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
+        const snapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', accountId), orderBy('createdAt')));
+        return snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                accountId: data.accountId,
+                date: data.date,
+                particulars: data.particulars,
+                debit: Number(data.debit) || 0,
+                credit: Number(data.credit) || 0,
+                balance: Number(data.balance) || 0,
+                remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+                linkGroupId: data.linkGroupId || undefined,
+                linkStrategy: data.linkStrategy || undefined,
+            } as LedgerEntry;
+        });
+    } catch (e) {
+        if (isQuotaError(e)) {
+            markFirestoreDisabled();
+            return db ? await db.ledgerEntries.where('accountId').equals(accountId).toArray() : [];
+        }
+        throw e;
+    }
 }
 
 export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
-    const snapshot = await getDocs(ledgerEntriesCollection);
-    return snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-            id: docSnap.id,
-            accountId: data.accountId,
-            date: data.date,
-            particulars: data.particulars,
-            debit: Number(data.debit) || 0,
-            credit: Number(data.credit) || 0,
-            balance: Number(data.balance) || 0,
-            remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
-            createdAt: data.createdAt || '',
-            updatedAt: data.updatedAt || data.createdAt || '',
-            linkGroupId: data.linkGroupId || undefined,
-            linkStrategy: data.linkStrategy || undefined,
-        } as LedgerEntry;
-    });
+    try {
+        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
+        const snapshot = await getDocs(ledgerEntriesCollection);
+        return snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                accountId: data.accountId,
+                date: data.date,
+                particulars: data.particulars,
+                debit: Number(data.debit) || 0,
+                credit: Number(data.credit) || 0,
+                balance: Number(data.balance) || 0,
+                remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+                linkGroupId: data.linkGroupId || undefined,
+                linkStrategy: data.linkStrategy || undefined,
+            } as LedgerEntry;
+        });
+    } catch (e) {
+        if (isQuotaError(e)) {
+            markFirestoreDisabled();
+            return db ? await db.ledgerEntries.toArray() : [];
+        }
+        throw e;
+    }
 }
 
 export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {

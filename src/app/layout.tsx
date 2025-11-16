@@ -14,6 +14,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { db, syncAllData } from '@/lib/database';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
+import '@/lib/sync-processors'; // register sync processors early
 
 
 const inter = Inter({
