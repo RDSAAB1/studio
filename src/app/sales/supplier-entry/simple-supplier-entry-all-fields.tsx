@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useTransition, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition, useRef, useDeferredValue } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -76,7 +76,6 @@ export default function SimpleSupplierEntryAllFields() {
     const [dataLoaded, setDataLoaded] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [isDataLoading, setIsDataLoading] = useState(false);
-    const [entryTableLimit, setEntryTableLimit] = useState(50);
     const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
     const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
     const [allConsolidatedGroups, setAllConsolidatedGroups] = useState<ConsolidatedReceiptData[]>([]);
@@ -88,9 +87,13 @@ export default function SimpleSupplierEntryAllFields() {
     const [documentType, setDocumentType] = useState<'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt'>('tax-invoice');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchSteps, setSearchSteps] = useState<string[]>([]);
+    const deferredSearchQuery = useDeferredValue(searchQuery);
+    const deferredSearchSteps = useDeferredValue(searchSteps);
 
     // Import/Export refs
     const importInputRef = useRef<HTMLInputElement | null>(null);
+    const formRef = useRef<HTMLFormElement | null>(null);
+    const firstInputRef = useRef<HTMLInputElement | null>(null);
 
     const handleExport = useCallback(() => {
         const rows = (allSuppliers || []).map((s) => ({
@@ -509,9 +512,25 @@ export default function SimpleSupplierEntryAllFields() {
     }, [calculateSummary]);
 
     const handleSrNoBlur = async (srNoValue: string) => {
-        let formattedSrNo = srNoValue.trim();
-        if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-            formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
+        let formattedSrNo = srNoValue.trim().toUpperCase();
+        
+        if (!formattedSrNo) return;
+        
+        // Extract numeric part from SR No (handles both "122" and "S00121" formats)
+        let numericPart: number | null = null;
+        
+        // If it starts with 'S', extract the number after 'S'
+        if (formattedSrNo.startsWith('S')) {
+            const numStr = formattedSrNo.substring(1).replace(/^0+/, ''); // Remove leading zeros
+            numericPart = parseInt(numStr, 10);
+        } else {
+            // Pure number format
+            numericPart = parseInt(formattedSrNo, 10);
+        }
+        
+        // Format the SR No if we have a valid number
+        if (numericPart !== null && !isNaN(numericPart) && isFinite(numericPart) && numericPart > 0) {
+            formattedSrNo = formatSrNo(numericPart, 'S');
             form.setValue('srNo', formattedSrNo);
             
             // Check if this serial number already exists
@@ -823,26 +842,11 @@ export default function SimpleSupplierEntryAllFields() {
     const handleNewEntry = useCallback(() => {
         form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
         setIsEditing(false);
-        setEntryTableLimit(50); // Reset to 50 entries
         toast({ title: "Form cleared" });
     }, [form, lastVariety, lastPaymentType, suppliersForSerial]);
 
-    const handleLoadMore = useCallback(() => {
-        const totalCount = totalSuppliersCount || 0;
-        const currentLimit = entryTableLimit;
-        const remainingEntries = totalCount - currentLimit;
-        
-        if (remainingEntries <= 100) {
-            // Load all remaining entries if 100 or less
-            setEntryTableLimit(totalCount);
-        } else {
-            // Load 600 more entries
-            setEntryTableLimit(prev => prev + 600);
-        }
-    }, [totalSuppliersCount, entryTableLimit]);
-
     const handleFieldFocus = useCallback(() => {
-        setEntryTableLimit(50); // Reset to 50 entries when any field is focused
+        // Field focus handler (no longer needed for entry table limit)
     }, []);
 
     const handleViewDetails = useCallback((supplier: Customer) => {
@@ -856,67 +860,81 @@ export default function SimpleSupplierEntryAllFields() {
         setIsDocumentPreviewOpen(true);
     }, []);
 
-    // Multi-step filtering logic
+    // Pre-index suppliers for faster search (only when allSuppliers changes)
+    const indexedSuppliers = useMemo(() => {
+        if (!allSuppliers || allSuppliers.length === 0) return [];
+        
+        return allSuppliers.map(supplier => ({
+            ...supplier,
+            searchIndex: [
+                supplier.name?.toLowerCase() || '',
+                supplier.so?.toLowerCase() || '',
+                supplier.address?.toLowerCase() || '',
+                supplier.srNo?.toLowerCase() || '',
+                supplier.contact?.toLowerCase() || '',
+                supplier.vehicleNo?.toLowerCase() || ''
+            ].join(' ')
+        }));
+    }, [allSuppliers]);
+
+    // Multi-step filtering logic with deferred values for smooth typing
     const filteredSuppliers = useMemo(() => {
-        if (!allSuppliers) {
+        if (!indexedSuppliers || indexedSuppliers.length === 0) {
             return [];
         }
 
         // If no search query or search steps, return all suppliers
-        if (!searchQuery || searchQuery.trim() === '' || searchSteps.length === 0) {
-            return allSuppliers;
+        if (!deferredSearchQuery || deferredSearchQuery.trim() === '' || deferredSearchSteps.length === 0) {
+            return indexedSuppliers;
         }
 
-        // If only one search step, do normal search across all fields
-        if (searchSteps.length === 1) {
-            const query = searchSteps[0].toLowerCase().trim();
-            return allSuppliers.filter(supplier => {
-                return (
-                    supplier.name?.toLowerCase().includes(query) ||
-                    supplier.so?.toLowerCase().includes(query) ||
-                    supplier.address?.toLowerCase().includes(query) ||
-                    supplier.srNo?.toLowerCase().includes(query) ||
-                    supplier.contact?.toLowerCase().includes(query) ||
-                    supplier.vehicleNo?.toLowerCase().includes(query)
-                );
-            });
+        // If only one search step, do optimized search using pre-indexed data
+        if (deferredSearchSteps.length === 1) {
+            const query = deferredSearchSteps[0].toLowerCase().trim();
+            if (!query) return indexedSuppliers;
+            
+            // Use pre-indexed search string for faster filtering
+            return indexedSuppliers.filter(supplier => 
+                supplier.searchIndex.includes(query)
+            );
         }
 
-        // Multiple search steps - apply progressive filtering
-        let result = [...allSuppliers];
+        // Multiple search steps - apply progressive filtering with early exit
+        let result = indexedSuppliers;
         
-        searchSteps.forEach(step => {
+        for (const step of deferredSearchSteps) {
             const query = step.toLowerCase().trim();
-            if (query) {
-                result = result.filter(supplier => {
-                    return (
-                        supplier.name?.toLowerCase().includes(query) ||
-                        supplier.so?.toLowerCase().includes(query) ||
-                        supplier.address?.toLowerCase().includes(query) ||
-                        supplier.srNo?.toLowerCase().includes(query) ||
-                        supplier.contact?.toLowerCase().includes(query) ||
-                        supplier.vehicleNo?.toLowerCase().includes(query)
-                    );
-                });
-            }
-        });
+            if (!query) continue;
+            
+            // Early exit if no results
+            if (result.length === 0) break;
+            
+            // Use pre-indexed search for faster filtering
+            result = result.filter(supplier => 
+                supplier.searchIndex.includes(query)
+            );
+        }
 
         return result;
-    }, [allSuppliers, searchQuery, searchSteps]);
+    }, [indexedSuppliers, deferredSearchQuery, deferredSearchSteps]);
 
-    // Handle search input with multi-step filtering
+    // Handle search input with multi-step filtering - optimized for no lag
     const handleSearchChange = useCallback((value: string) => {
+        // Update input immediately for responsive UI
         setSearchQuery(value);
         
-        // If empty, clear search steps
-        if (!value || value.trim() === '') {
-            setSearchSteps([]);
-            return;
-        }
-        
-        // Split by comma and filter out empty strings
-        const steps = value.split(',').map(step => step.trim()).filter(step => step.length > 0);
-        setSearchSteps(steps);
+        // Use startTransition for non-urgent state updates to prevent blocking
+        startTransition(() => {
+            // If empty, clear search steps
+            if (!value || value.trim() === '') {
+                setSearchSteps([]);
+                return;
+            }
+            
+            // Split by comma and filter out empty strings
+            const steps = value.split(',').map(step => step.trim()).filter(step => step.length > 0);
+            setSearchSteps(steps);
+        });
     }, []);
 
     const handlePrintSupplier = useCallback((supplier: Customer) => {
@@ -929,76 +947,139 @@ export default function SimpleSupplierEntryAllFields() {
         });
     }, []);
 
-    const handleMultiPrint = useCallback((suppliers: Customer[]) => {
-        if (suppliers.length === 0) return;
-
-        // Group suppliers by name, father name, and address
-        const groupedSuppliers = suppliers.reduce((groups, supplier) => {
-            // Normalize the key to handle case differences and extra spaces
-            const normalizedName = (supplier.name || '').trim().toLowerCase();
-            const normalizedFatherName = (supplier.fatherName || '').trim().toLowerCase();
-            const normalizedAddress = (supplier.address || '').trim().toLowerCase();
-            const key = `${normalizedName}-${normalizedFatherName}-${normalizedAddress}`;
-            
-            if (!groups[key]) {
-                groups[key] = [];
-            }
-            groups[key].push(supplier);
-            return groups;
-        }, {} as Record<string, Customer[]>);
-
-        const groups = Object.values(groupedSuppliers);
-        
-        // Prepare data for combined dialog
-        const consolidatedGroups: ConsolidatedReceiptData[] = [];
-        const individualSuppliers: Customer[] = [];
-        
-        groups.forEach((group) => {
-            if (group.length > 1) {
-                // Group with multiple entries - consolidate
-                const firstSupplier = group[0];
-                const consolidatedData: ConsolidatedReceiptData = {
-                    customer: firstSupplier,
-                    receipts: group,
-                    totalAmount: group.reduce((sum, s) => sum + (Number(s.amount) || 0), 0),
-                    totalWeight: group.reduce((sum, s) => sum + (Number(s.weight) || 0), 0),
-                    totalNetWeight: group.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0),
-                    totalKartaAmount: group.reduce((sum, s) => sum + (Number(s.kartaAmount) || 0), 0),
-                    totalLabAmount: group.reduce((sum, s) => sum + (Number(s.labouryAmount) || 0), 0),
-                    totalNetAmount: group.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
-                    receiptCount: group.length
-                };
-                consolidatedGroups.push(consolidatedData);
+    // Yield control to browser to prevent blocking
+    const yieldToBrowser = useCallback((): Promise<void> => {
+        return new Promise((resolve) => {
+            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+                window.requestIdleCallback(() => resolve(), { timeout: 1 });
             } else {
-                // Single entry - add to individual
-                individualSuppliers.push(group[0]);
+                setTimeout(() => resolve(), 0);
             }
         });
+    }, []);
+
+    const handleMultiPrint = useCallback(async (suppliers: Customer[]) => {
+        if (suppliers.length === 0) return;
+
+        // Show loading toast for large datasets
+        const isLargeDataset = suppliers.length > 1000;
         
-        // Set data for combined dialog
-        setReceiptsToPrint(individualSuppliers);
-        setAllConsolidatedGroups(consolidatedGroups);
-        setConsolidatedReceiptData(consolidatedGroups.length > 0 ? consolidatedGroups[0] : null);
-        
-        // Show appropriate message
-        const totalConsolidatedEntries = consolidatedGroups.reduce((sum, group) => sum + group.receiptCount, 0);
-        if (consolidatedGroups.length > 0 && individualSuppliers.length > 0) {
-            toast({ 
-                title: "Combined Print Preview", 
-                description: `Showing ${consolidatedGroups.length} consolidated groups (${totalConsolidatedEntries} entries) and ${individualSuppliers.length} individual receipts` 
-            });
-        } else if (consolidatedGroups.length > 0) {
-            toast({ 
-                title: "Consolidated Print Preview", 
-                description: `Showing ${consolidatedGroups.length} consolidated groups with ${totalConsolidatedEntries} total entries` 
-            });
-        } else {
-            toast({ 
-                title: "Individual Print Preview", 
-                description: `Showing individual print format for ${individualSuppliers.length} suppliers` 
+        if (isLargeDataset) {
+            toast({
+                title: "Processing Print Data",
+                description: `Preparing ${suppliers.length} entries for print. This may take a moment...`,
             });
         }
-    }, []);
+
+        try {
+            // Determine chunk size based on dataset size
+            let chunkSize = 100;
+            if (suppliers.length > 10000) {
+                chunkSize = 200;
+            } else if (suppliers.length > 5000) {
+                chunkSize = 150;
+            } else if (suppliers.length > 1000) {
+                chunkSize = 100;
+            } else {
+                chunkSize = 50;
+            }
+
+            // Step 1: Group suppliers by name, father name, and address (chunked processing)
+            const groupedSuppliers: Record<string, Customer[]> = {};
+            const totalSuppliers = suppliers.length;
+            
+            for (let i = 0; i < totalSuppliers; i += chunkSize) {
+                const chunk = suppliers.slice(i, i + chunkSize);
+                
+                // Process chunk
+                chunk.forEach((supplier) => {
+                    // Normalize the key to handle case differences and extra spaces
+                    const normalizedName = (supplier.name || '').trim().toLowerCase();
+                    const normalizedFatherName = (supplier.fatherName || '').trim().toLowerCase();
+                    const normalizedAddress = (supplier.address || '').trim().toLowerCase();
+                    const key = `${normalizedName}-${normalizedFatherName}-${normalizedAddress}`;
+                    
+                    if (!groupedSuppliers[key]) {
+                        groupedSuppliers[key] = [];
+                    }
+                    groupedSuppliers[key].push(supplier);
+                });
+
+                // Yield to browser after each chunk to prevent UI blocking
+                if (i + chunkSize < totalSuppliers) {
+                    await yieldToBrowser();
+                }
+            }
+
+            const groups = Object.values(groupedSuppliers);
+            
+            // Step 2: Prepare data for combined dialog (chunked processing)
+            const consolidatedGroups: ConsolidatedReceiptData[] = [];
+            const individualSuppliers: Customer[] = [];
+            
+            for (let i = 0; i < groups.length; i += chunkSize) {
+                const chunk = groups.slice(i, i + chunkSize);
+                
+                chunk.forEach((group) => {
+                    if (group.length > 1) {
+                        // Group with multiple entries - consolidate
+                        const firstSupplier = group[0];
+                        const consolidatedData: ConsolidatedReceiptData = {
+                            customer: firstSupplier,
+                            receipts: group,
+                            totalAmount: group.reduce((sum, s) => sum + (Number(s.amount) || 0), 0),
+                            totalWeight: group.reduce((sum, s) => sum + (Number(s.weight) || 0), 0),
+                            totalNetWeight: group.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0),
+                            totalKartaAmount: group.reduce((sum, s) => sum + (Number(s.kartaAmount) || 0), 0),
+                            totalLabAmount: group.reduce((sum, s) => sum + (Number(s.labouryAmount) || 0), 0),
+                            totalNetAmount: group.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
+                            receiptCount: group.length
+                        };
+                        consolidatedGroups.push(consolidatedData);
+                    } else {
+                        // Single entry - add to individual
+                        individualSuppliers.push(group[0]);
+                    }
+                });
+
+                // Yield to browser after each chunk to prevent UI blocking
+                if (i + chunkSize < groups.length) {
+                    await yieldToBrowser();
+                }
+            }
+            
+            // Set data for combined dialog
+            setReceiptsToPrint(individualSuppliers);
+            setAllConsolidatedGroups(consolidatedGroups);
+            setConsolidatedReceiptData(consolidatedGroups.length > 0 ? consolidatedGroups[0] : null);
+            
+            // Show appropriate message
+            const totalConsolidatedEntries = consolidatedGroups.reduce((sum, group) => sum + group.receiptCount, 0);
+            if (consolidatedGroups.length > 0 && individualSuppliers.length > 0) {
+                toast({ 
+                    title: "Combined Print Preview", 
+                    description: `Showing ${consolidatedGroups.length} consolidated groups (${totalConsolidatedEntries} entries) and ${individualSuppliers.length} individual receipts` 
+                });
+            } else if (consolidatedGroups.length > 0) {
+                toast({ 
+                    title: "Consolidated Print Preview", 
+                    description: `Showing ${consolidatedGroups.length} consolidated groups with ${totalConsolidatedEntries} total entries` 
+                });
+            } else {
+                toast({ 
+                    title: "Individual Print Preview", 
+                    description: `Showing individual print format for ${individualSuppliers.length} suppliers` 
+                });
+            }
+        } catch (error) {
+            console.error('Error processing print data:', error);
+            toast({
+                title: "Error",
+                description: "Failed to process print data. Please try again.",
+                variant: "destructive",
+            });
+        }
+    }, [toast, yieldToBrowser]);
 
 
     const handleMultiDelete = useCallback(async (supplierIds: string[]) => {
@@ -1026,11 +1107,6 @@ export default function SimpleSupplierEntryAllFields() {
             setIsDataLoading(true);
         }
         
-        // Reset to 50 entries when switching to entry
-        if (view === 'entry') {
-            setEntryTableLimit(50);
-        }
-        
         // Ultra fast switching - non-blocking transition
         startTransition(() => {
             setCurrentView(view);
@@ -1038,40 +1114,88 @@ export default function SimpleSupplierEntryAllFields() {
     }, []);
 
     const handleEditSupplier = useCallback((supplier: Customer) => {
-        // Fill form with supplier data
+        // First, set editing mode to true
+        setIsEditing(true);
+        
+        // Set current supplier with proper ID BEFORE resetting form
+        setCurrentSupplier(supplier);
+        
+        // Fill form with supplier data - ensure all fields are populated
         form.reset({
             srNo: supplier.srNo,
             date: new Date(supplier.date),
-            term: Number(supplier.term),
-            name: supplier.name,
-            so: supplier.so,
-            address: supplier.address,
-            contact: supplier.contact,
-            vehicleNo: supplier.vehicleNo,
-            variety: supplier.variety,
-            grossWeight: supplier.grossWeight,
-            teirWeight: supplier.teirWeight,
-            rate: supplier.rate,
-            kartaPercentage: supplier.kartaPercentage,
-            labouryRate: supplier.labouryRate,
-            kanta: supplier.kanta,
-            paymentType: supplier.paymentType,
+            term: Number(supplier.term) || 0,
+            name: supplier.name || '',
+            so: supplier.so || '',
+            address: supplier.address || '',
+            contact: supplier.contact || '',
+            vehicleNo: supplier.vehicleNo || '',
+            variety: supplier.variety || '',
+            grossWeight: Number(supplier.grossWeight) || 0,
+            teirWeight: Number(supplier.teirWeight) || 0,
+            rate: Number(supplier.rate) || 0,
+            kartaPercentage: Number(supplier.kartaPercentage) || 0,
+            labouryRate: Number(supplier.labouryRate) || 0,
+            kanta: Number(supplier.kanta) || 0,
+            paymentType: supplier.paymentType || 'Full',
             forceUnique: supplier.forceUnique || false,
+        }, {
+            keepDefaultValues: false,
+            keepValues: false,
+            keepDirty: false,
+            keepIsSubmitted: false,
+            keepTouched: false,
+            keepIsValid: false,
+            keepSubmitCount: false
         });
-        
-        // Set current supplier with proper ID
-        setCurrentSupplier(supplier);
         
         // Switch to entry tab with smooth transition
         handleViewChange('entry');
-        setIsEditing(true);
+        
+        // Ensure form is enabled and ready for editing
+        setTimeout(() => {
+            // Try to focus the first input field
+            if (firstInputRef.current) {
+                firstInputRef.current.focus();
+                firstInputRef.current.select(); // Select text for easy editing
+                firstInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (formRef.current) {
+                // If first input not available, scroll to form
+                formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 150);
         
         toast({ 
-            title: "Supplier loaded for editing", 
-            description: `${supplier.name} (SR# ${supplier.srNo}) loaded in form.`,
+            title: "Edit Mode Activated", 
+            description: `${supplier.name} (SR# ${supplier.srNo}) loaded. Form is ready for editing.`,
             variant: "success"
         });
     }, [form, handleViewChange, toast]);
+
+    // Check for editSupplierData from localStorage (when navigating from detail window)
+    useEffect(() => {
+        if (isClient && handleEditSupplier) {
+            const editData = localStorage.getItem('editSupplierData');
+            if (editData) {
+                try {
+                    const supplierData = JSON.parse(editData) as Customer;
+                    // Clear the localStorage
+                    localStorage.removeItem('editSupplierData');
+                    
+                    // Fill form with supplier data
+                    handleEditSupplier(supplierData);
+                    
+                    toast({
+                        title: "Entry Loaded",
+                        description: `Loaded ${supplierData.name} (SR# ${supplierData.srNo}) for editing.`,
+                    });
+                } catch (error) {
+                    console.error('Error loading edit data:', error);
+                    localStorage.removeItem('editSupplierData');
+                }
+            }
+        }
+    }, [isClient, handleEditSupplier, toast]);
 
     // Memoized entry view for ultra fast rendering
     const entryView = useMemo(() => (
@@ -1079,7 +1203,7 @@ export default function SimpleSupplierEntryAllFields() {
             <Card>
                 <CardContent className="p-4">
                     <FormProvider {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                                 <div onFocus={handleFieldFocus}>
                                     <SimpleSupplierFormAllFields 
                                         form={form}
@@ -1092,6 +1216,7 @@ export default function SimpleSupplierEntryAllFields() {
                                         handleAddOption={handleAddOption}
                                         handleUpdateOption={handleUpdateOption}
                                         handleDeleteOption={handleDeleteOption}
+                                        firstInputRef={firstInputRef}
                                     />
                                 </div>
                         </form>
@@ -1309,17 +1434,14 @@ export default function SimpleSupplierEntryAllFields() {
                 onPrintSupplier={handlePrintSupplier}
                 onMultiPrint={handleMultiPrint}
                 onMultiDelete={handleMultiDelete}
-                suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers.slice(0, entryTableLimit) : []}
+                suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers : []}
                 totalCount={filteredSuppliers.length}
-                onLoadMore={handleLoadMore}
-                showLoadMore={entryTableLimit < filteredSuppliers.length}
-                currentLimit={entryTableLimit}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 />
             </div>
         </div>
-    ), [form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleSetLastVariety, handleSetLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, currentSupplier, calculateSummary, handleNewEntry, isEditing, isSubmitting, filteredSuppliers, handleEditSupplier, entryTableLimit, handleLoadMore, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);
+    ), [form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleSetLastVariety, handleSetLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, currentSupplier, calculateSummary, handleNewEntry, isEditing, isSubmitting, filteredSuppliers, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);
 
     // Memoized data view for ultra fast rendering - always show table layout
     const dataView = useMemo(() => (

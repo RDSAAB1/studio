@@ -18,6 +18,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { Loader2 } from "lucide-react";
 
 
 type ChartType = 'financial' | 'variety';
@@ -57,45 +59,148 @@ const SummaryTile = ({ label, value, hint, tone }: { label: string; value: strin
     </div>
 );
 
-const TransactionTable = ({ transactions, onShowDetails }: { transactions: Supplier[], onShowDetails: (supplier: Supplier) => void }) => (
-    <ScrollArea className="h-[14rem]">
-        <div className="overflow-x-auto">
-            <Table className="min-w-[600px]">
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-[60px]">SR No</TableHead>
-                        <TableHead className="w-[100px]">Original Amt</TableHead>
-                        <TableHead className="w-[80px]">Paid</TableHead>
-                        <TableHead className="w-[60px]">CD</TableHead>
-                        <TableHead className="w-[100px]">Outstanding</TableHead>
-                        <TableHead className="text-right w-[60px]">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {transactions.map(entry => (
-                        <TableRow key={entry.id}>
-                            <TableCell className="font-mono text-xs w-[60px]">{entry.srNo}</TableCell>
-                            <TableCell className="text-xs w-[100px]">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
-                            <TableCell className="text-xs text-green-600 w-[80px]">{formatCurrency(entry.totalPaid || 0)}</TableCell>
-                            <TableCell className="text-xs text-blue-600 w-[60px]">{formatCurrency(entry.totalCd || 0)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-red-500 dark:text-red-400 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
-                            <TableCell className="text-right w-[60px]">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onShowDetails(entry)}>
-                                    <Info className="h-3 w-3" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                    {transactions.length === 0 && (
+const PaymentHistoryTable = ({ 
+    payments, 
+    onShowPaymentDetails 
+}: { 
+    payments: (Payment | CustomerPayment)[]; 
+    onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
+}) => {
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(payments, {
+        totalItems: payments.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: payments.length > 30,
+    });
+
+    const visiblePayments = payments.slice(0, visibleItems);
+
+    return (
+        <Card>
+            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+            <CardContent>
+                <ScrollArea ref={scrollRef} className="h-[14rem]">
+                    <div className="overflow-x-auto">
+                        <Table className="min-w-[800px]">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[100px]">ID</TableHead>
+                                    <TableHead className="w-[120px]">Date</TableHead>
+                                    <TableHead className="w-[250px]">Paid For (SR No.)</TableHead>
+                                    <TableHead className="text-right w-[100px]">Amount</TableHead>
+                                    <TableHead className="text-right w-[80px]">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {visiblePayments.map((payment, index) => (
+                                    <TableRow key={`${payment.id}-${payment.paymentId}-${index}`}>
+                                        <TableCell className="font-mono w-[100px]">{payment.paymentId}</TableCell>
+                                        <TableCell className="w-[120px]">{format(new Date(payment.date), "PPP")}</TableCell>
+                                        <TableCell className="text-xs w-[250px]">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
+                                        <TableCell className="font-semibold text-right w-[100px]">{formatCurrency(payment.amount)}</TableCell>
+                                        <TableCell className="text-right w-[80px]">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowPaymentDetails(payment)}>
+                                                <Info className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {isLoading && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-4">
+                                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                            <span className="ml-2 text-sm text-muted-foreground">Loading more payments...</span>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {!hasMore && payments.length > 30 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-2 text-xs text-muted-foreground">
+                                            Showing all {payments.length} payments
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {payments.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+const TransactionTable = ({ transactions, onShowDetails }: { transactions: Supplier[], onShowDetails: (supplier: Supplier) => void }) => {
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(transactions, {
+        totalItems: transactions.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: transactions.length > 30,
+    });
+
+    const visibleTransactions = transactions.slice(0, visibleItems);
+
+    return (
+        <ScrollArea ref={scrollRef} className="h-[14rem]">
+            <div className="overflow-x-auto">
+                <Table className="min-w-[600px]">
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground h-24">No transactions in this category.</TableCell>
+                            <TableHead className="w-[60px]">SR No</TableHead>
+                            <TableHead className="w-[100px]">Original Amt</TableHead>
+                            <TableHead className="w-[80px]">Paid</TableHead>
+                            <TableHead className="w-[60px]">CD</TableHead>
+                            <TableHead className="w-[100px]">Outstanding</TableHead>
+                            <TableHead className="text-right w-[60px]">Actions</TableHead>
                         </TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </div>
-    </ScrollArea>
-);
+                    </TableHeader>
+                    <TableBody>
+                        {visibleTransactions.map(entry => (
+                            <TableRow key={entry.id}>
+                                <TableCell className="font-mono text-xs w-[60px]">{entry.srNo}</TableCell>
+                                <TableCell className="text-xs w-[100px]">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                                <TableCell className="text-xs text-green-600 w-[80px]">{formatCurrency(entry.totalPaid || 0)}</TableCell>
+                                <TableCell className="text-xs text-blue-600 w-[60px]">{formatCurrency(entry.totalCd || 0)}</TableCell>
+                                <TableCell className="text-xs font-semibold text-red-500 dark:text-red-400 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                                <TableCell className="text-right w-[60px]">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onShowDetails(entry)}>
+                                        <Info className="h-3 w-3" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        {isLoading && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-4">
+                                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                    <span className="ml-2 text-sm text-muted-foreground">Loading more transactions...</span>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {!hasMore && transactions.length > 30 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-2 text-xs text-muted-foreground">
+                                    Showing all {transactions.length} transactions
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {transactions.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center text-muted-foreground h-24">No transactions in this category.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </ScrollArea>
+    );
+};
 
 
 export const SupplierProfileView = ({
@@ -399,46 +504,10 @@ export const SupplierProfileView = ({
                         </TabsContent>
                     </Tabs>
                      
-                   <Card>
-                      <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                             <div className="overflow-x-auto">
-                              <Table className="min-w-[800px]">
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead className="w-[100px]">ID</TableHead>
-                                          <TableHead className="w-[120px]">Date</TableHead>
-                                          <TableHead className="w-[250px]">Paid For (SR No.)</TableHead>
-                                          <TableHead className="text-right w-[100px]">Amount</TableHead>
-                                          <TableHead className="text-right w-[80px]">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {currentPaymentHistory.map((payment, index) => (
-                                          <TableRow key={`${payment.id}-${payment.paymentId}-${index}`}>
-                                              <TableCell className="font-mono w-[100px]">{payment.paymentId}</TableCell>
-                                              <TableCell className="w-[120px]">{format(new Date(payment.date), "PPP")}</TableCell>
-                                              <TableCell className="text-xs w-[250px]">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
-                                              <TableCell className="font-semibold text-right w-[100px]">{formatCurrency(payment.amount)}</TableCell>
-                                               <TableCell className="text-right w-[80px]">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowPaymentDetails(payment)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                       {currentPaymentHistory.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                  </TableBody>
-                              </Table>
-                             </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
+                   <PaymentHistoryTable 
+                      payments={currentPaymentHistory}
+                      onShowPaymentDetails={onShowPaymentDetails}
+                   />
                 </div>
             </div>
         </div>

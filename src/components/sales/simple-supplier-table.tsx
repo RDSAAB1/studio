@@ -8,12 +8,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Loader2, ArrowLeft, Edit2, Trash2, Save, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, Wheat, Banknote, Percent, Weight, Hash, Calendar, FileText, PhoneCall } from "lucide-react";
 import { toTitleCase } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Customer, OptionItem } from "@/lib/definitions";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -34,19 +36,223 @@ interface SimpleSupplierTableProps {
     suppliers: Customer[];
     totalCount: number;
     isLoading?: boolean;
-    onLoadMore?: () => void;
-    showLoadMore?: boolean;
-    currentLimit?: number;
     varietyOptions: OptionItem[];
     paymentTypeOptions: OptionItem[];
 }
 
-export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, isLoading = false, onLoadMore, showLoadMore = false, currentLimit = 0, varietyOptions, paymentTypeOptions }: SimpleSupplierTableProps) => {
+export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, isLoading = false, varietyOptions, paymentTypeOptions }: SimpleSupplierTableProps) => {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
-    const [editingRow, setEditingRow] = useState<number | null>(null);
-    const [editData, setEditData] = useState<Partial<Customer>>({});
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
+    const clickTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const lastClickTimeRef = React.useRef<number>(0);
+    
+    // Infinite scroll pagination - moved to top to be available for drag handlers
+    const { visibleItems, hasMore, isLoading: isLoadingMore, scrollRef } = useInfiniteScroll(suppliers, {
+        totalItems: suppliers.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: suppliers.length > 30,
+    });
+
+    const displaySuppliers = suppliers.slice(0, visibleItems);
+    
+    // Keep refs in sync
+    React.useEffect(() => {
+        displaySuppliersRef.current = displaySuppliers;
+    }, [displaySuppliers]);
+    
+    // Drag selection state
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+    const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
+    const tableRef = React.useRef<HTMLTableElement | null>(null);
+    const tbodyRef = React.useRef<HTMLTableSectionElement | null>(null);
+    const dragStartSelectionRef = React.useRef<Set<string>>(new Set());
+    const rafRef = React.useRef<number | null>(null);
+    const hasDraggedRef = React.useRef<boolean>(false);
+    const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
+    const displaySuppliersRef = React.useRef<typeof displaySuppliers>([]);
+    
+    // Cleanup timeout on unmount
+    React.useEffect(() => {
+        return () => {
+            if (clickTimeoutRef.current) {
+                clearTimeout(clickTimeoutRef.current);
+            }
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+            }
+        };
+    }, []);
+    
+    // Handle mouse down for drag selection
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        // Only start drag if clicking on table body (not buttons/checkboxes)
+        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+            return;
+        }
+        
+        const tbody = tbodyRef.current;
+        if (!tbody) return;
+        
+        const container = tbody.parentElement;
+        if (!container) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const x = e.clientX - containerRect.left;
+        const y = e.clientY - containerRect.top;
+        
+        // Store initial selection state
+        dragStartSelectionRef.current = new Set(selectedSuppliers);
+        hasDraggedRef.current = false;
+        dragStartRef.current = { x, y };
+        
+        setIsDragging(true);
+        setDragStart({ x, y });
+        setDragEnd({ x, y });
+        
+        // Prevent text selection during drag
+        e.preventDefault();
+    }, [selectedSuppliers]);
+    
+    // Optimized selection calculation using requestAnimationFrame
+    const updateSelection = useCallback((clientX: number, clientY: number) => {
+        if (!tbodyRef.current || !dragStartRef.current) return;
+        
+        const tbody = tbodyRef.current;
+        const container = tbody.parentElement;
+        if (!container) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const x = clientX - containerRect.left;
+        const y = clientY - containerRect.top;
+        const dragStart = dragStartRef.current;
+        
+        // Check if we've actually dragged (moved more than 5 pixels)
+        const dragDistance = Math.abs(x - dragStart.x) + Math.abs(y - dragStart.y);
+        if (dragDistance > 5) {
+            hasDraggedRef.current = true;
+        }
+        
+        setDragEnd({ x, y });
+        
+        // Use requestAnimationFrame to batch updates
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+        }
+        
+        rafRef.current = requestAnimationFrame(() => {
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const newSelection = new Set(dragStartSelectionRef.current);
+            const currentDisplaySuppliers = displaySuppliersRef.current;
+            
+            const minY = Math.min(dragStart.y, y);
+            const maxY = Math.max(dragStart.y, y);
+            
+            // Find the row where drag started
+            let startRowIndex = -1;
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowRect = row.getBoundingClientRect();
+                const rowTop = rowRect.top - containerRect.top;
+                const rowBottom = rowTop + rowRect.height;
+                if (dragStart.y >= rowTop && dragStart.y <= rowBottom) {
+                    startRowIndex = i;
+                    break;
+                }
+            }
+            
+            // Determine if we're adding or removing based on initial click
+            const initialWasSelected = startRowIndex >= 0 && startRowIndex < currentDisplaySuppliers.length 
+                ? dragStartSelectionRef.current.has(currentDisplaySuppliers[startRowIndex].id)
+                : false;
+            
+            // Update selection for rows in drag box
+            rows.forEach((row, index) => {
+                if (index >= currentDisplaySuppliers.length) return;
+                
+                const rowRect = row.getBoundingClientRect();
+                const rowTop = rowRect.top - containerRect.top;
+                const rowBottom = rowTop + rowRect.height;
+                
+                // Check if row intersects with selection box
+                if (rowBottom >= minY && rowTop <= maxY) {
+                    const supplier = currentDisplaySuppliers[index];
+                    if (supplier) {
+                        if (initialWasSelected) {
+                            // If started from selected row, deselect rows in drag box
+                            newSelection.delete(supplier.id);
+                        } else {
+                            // If started from unselected row, select rows in drag box
+                            newSelection.add(supplier.id);
+                        }
+                    }
+                }
+            });
+            
+            setSelectedSuppliers(newSelection);
+        });
+    }, []);
+    
+    // Handle mouse move for drag selection (only for visual feedback, actual selection in global handler)
+    const handleMouseMove = useCallback((e: React.MouseEvent) => {
+        if (!isDragging) return;
+        updateSelection(e.clientX, e.clientY);
+    }, [isDragging, updateSelection]);
+    
+    // Handle mouse up to end drag selection
+    const handleMouseUp = useCallback(() => {
+        const wasDragging = hasDraggedRef.current;
+        setIsDragging(false);
+        setDragStart(null);
+        setDragEnd(null);
+        dragStartRef.current = null;
+        dragStartSelectionRef.current = new Set();
+        hasDraggedRef.current = false;
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+        return wasDragging;
+    }, []);
+    
+    // Add global mouse event listeners for drag selection
+    React.useEffect(() => {
+        if (isDragging) {
+            const handleGlobalMouseMove = (e: MouseEvent) => {
+                updateSelection(e.clientX, e.clientY);
+            };
+            
+            const handleGlobalMouseUp = () => {
+                const wasDragging = hasDraggedRef.current;
+                setIsDragging(false);
+                setDragStart(null);
+                setDragEnd(null);
+                dragStartRef.current = null;
+                dragStartSelectionRef.current = new Set();
+                hasDraggedRef.current = false;
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current);
+                    rafRef.current = null;
+                }
+                return wasDragging;
+            };
+            
+            document.addEventListener('mousemove', handleGlobalMouseMove, { passive: true });
+            document.addEventListener('mouseup', handleGlobalMouseUp);
+            
+            return () => {
+                document.removeEventListener('mousemove', handleGlobalMouseMove);
+                document.removeEventListener('mouseup', handleGlobalMouseUp);
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current);
+                }
+            };
+        }
+    }, [isDragging, updateSelection]);
+    
     const [isMultiDeleting, setIsMultiDeleting] = useState(false);
     const [isMultiEditing, setIsMultiEditing] = useState(false);
     const [isMultiSaving, setIsMultiSaving] = useState(false);
@@ -77,78 +283,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
         }
     }, [multiEditData.date, multiEditData.term]);
 
-    const handleEdit = (index: number) => {
-        if (suppliers && suppliers[index]) {
-            setEditingRow(index);
-            setEditData({ ...suppliers[index] });
-        }
-    };
-
-    const handleSave = async (index: number) => {
-        if (!suppliers || !suppliers[index]) {
-            toast({ 
-                title: "Error", 
-                description: "Supplier data not found.",
-                variant: "destructive" 
-            });
-            return;
-        }
-        
-        if (!editData || Object.keys(editData).length === 0) {
-            toast({ 
-                title: "No changes", 
-                description: "Please make some changes before saving.",
-                variant: "default"
-            });
-            setEditingRow(null);
-            setEditData({});
-            return;
-        }
-        
-        const supplier = suppliers[index];
-        
-        if (!supplier.id) {
-            toast({ 
-                title: "Error", 
-                description: "Supplier ID is missing. Cannot update.",
-                variant: "destructive" 
-            });
-            return;
-        }
-        
-        try {
-            // Remove 'id' from editData if present (shouldn't be updated)
-            const { id: _, ...updateData } = editData;
-            
-            console.log('Updating supplier:', supplier.id, 'with data:', updateData);
-            const success = await updateSupplier(supplier.id, updateData);
-            
-            if (success) {
-                setEditingRow(null);
-                setEditData({});
-                
-                toast({ 
-                    title: "Entry updated successfully!", 
-                    description: "Supplier entry has been updated.",
-                    variant: "success"
-                });
-            } else {
-                throw new Error('Update function returned false');
-            }
-        } catch (error: any) {
-            console.error('Error updating supplier:', error);
-            toast({ 
-                title: "Error updating entry", 
-                description: error?.message || "Failed to update supplier entry. Please try again.",
-                variant: "destructive" 
-            });
-        }
-    };
-
-    const handleCancel = () => {
-        setEditingRow(null);
-        setEditData({});
-    };
 
     const handleDelete = async (supplierId: string) => {
         try {
@@ -375,9 +509,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
             setIsMultiDeleting(false);
         }
     };
-
-    // Show all suppliers (limited to 50 in entry form)
-    const displaySuppliers = suppliers;
 
     // Always show table structure
     const hasData = suppliers && suppliers.length > 0;
@@ -832,8 +963,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
             {/* Table */}
             <Card>
                 <CardContent className="p-0">
-                    <div className="h-96 overflow-y-auto overflow-x-auto">
-                        <table className="w-full text-sm">
+                    <ScrollArea ref={scrollRef} className="h-96">
+                        <div className="overflow-x-auto relative" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+                            <table ref={tableRef} className="w-full text-sm min-w-[1200px]">
                             <thead className="bg-muted/50">
                                 <tr>
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-8"></th>
@@ -855,9 +987,75 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                     <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-24">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {hasData ? displaySuppliers.map((supplier, index) => (
-                                    <tr key={supplier.id} className="border-b hover:bg-muted/30 h-8">
+                            <tbody ref={tbodyRef}>
+                                {hasData ? displaySuppliers.map((supplier, index) => {
+                                    const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+                                        // Prevent row click if clicking on buttons or checkbox
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                            return;
+                                        }
+                                        
+                                        // Don't trigger click if drag selection happened
+                                        if (isDragging || hasDraggedRef.current) {
+                                            return;
+                                        }
+                                        
+                                        const currentTime = Date.now();
+                                        const timeSinceLastClick = currentTime - lastClickTimeRef.current;
+                                        
+                                        // Clear any pending single click
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+                                        
+                                        // If double click happened recently (within 300ms), skip single click
+                                        if (timeSinceLastClick < 300) {
+                                            lastClickTimeRef.current = 0;
+                                            return;
+                                        }
+                                        
+                                        // Set last click time
+                                        lastClickTimeRef.current = currentTime;
+                                        
+                                        // Delay single click to detect double click
+                                        clickTimeoutRef.current = setTimeout(() => {
+                                            // Single click - show details (only if not dragging)
+                                            if (onViewDetails && !isDragging) {
+                                                onViewDetails(supplier);
+                                            }
+                                            clickTimeoutRef.current = null;
+                                        }, 300);
+                                    };
+                                    
+                                    const handleRowDoubleClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+                                        // Prevent row double click if clicking on buttons or checkbox
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                            return;
+                                        }
+                                        
+                                        // Clear pending single click
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+                                        
+                                        // Reset last click time
+                                        lastClickTimeRef.current = 0;
+                                        
+                                        // Double click - edit and focus form
+                                        if (onEditSupplier) {
+                                            onEditSupplier(supplier);
+                                        }
+                                    };
+                                    
+                                    return (
+                                    <tr 
+                                        key={supplier.id} 
+                                        className="border-b hover:bg-muted/30 h-8 cursor-pointer"
+                                        onClick={handleRowClick}
+                                        onDoubleClick={handleRowDoubleClick}
+                                    >
                                         <td className="p-1 text-xs w-8">
                                             <Button
                                                 variant="ghost"
@@ -879,65 +1077,13 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                             {format(new Date(supplier.date), 'dd/MM/yy')}
                                         </td>
                                         <td className="p-1 text-xs w-32">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    value={editData.name || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                    autoFocus
-                                                />
-                                            ) : (
                                                 <span className="text-xs truncate block">{supplier.name}</span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-24">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    value={editData.so || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, so: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                />
-                                            ) : (
                                                 <span className="text-xs truncate block">{supplier.so}</span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-40">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    value={editData.address || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                />
-                                            ) : (
                                                 <span className="text-xs truncate block">{supplier.address}</span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-16">
                                             <span className="text-xs font-medium">
@@ -945,27 +1091,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                             </span>
                                         </td>
                                         <td className="p-1 text-xs w-16">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    type="number"
-                                                    value={editData.kartaWeight || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, kartaWeight: Number(e.target.value) }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                />
-                                            ) : (
                                                 <span className="text-xs font-medium">
                                                     {Number(supplier.kartaWeight || 0).toFixed(2)}
                                                 </span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-16">
                                             <span className="text-xs font-medium">
@@ -973,27 +1101,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                             </span>
                                         </td>
                                         <td className="p-1 text-xs w-16">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    type="number"
-                                                    value={editData.rate || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, rate: Number(e.target.value) }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                />
-                                            ) : (
                                                 <span className="text-xs font-medium">
                                                     ₹{Number(supplier.rate || 0).toFixed(2)}
                                                 </span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-20">
                                             <span className="text-xs font-bold">
@@ -1016,25 +1126,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                             </span>
                                         </td>
                                         <td className="p-1 text-xs w-16">
-                                            {editingRow === index ? (
-                                                <Input
-                                                    type="number"
-                                                    value={editData.kanta || ''}
-                                                    onChange={(e) => setEditData(prev => ({ ...prev, kanta: Number(e.target.value) }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleSave(index);
-                                                        } else if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCancel();
-                                                        }
-                                                    }}
-                                                    className="h-6 text-xs"
-                                                />
-                                            ) : (
                                                 <span className="text-xs">{supplier.kanta}</span>
-                                            )}
                                         </td>
                                         <td className="p-1 text-xs w-20">
                                             <span className="text-xs font-bold">
@@ -1043,27 +1135,6 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         </td>
                                         <td className="p-1 text-xs w-24">
                                             <div className="flex items-center gap-0.5">
-                                                {editingRow === index ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
-                                                        onClick={handleCancel}
-                                                    >
-                                                        <X className="h-3 w-3 mr-1" />
-                                                        Cancel
-                                                    </Button>
-                                                ) : (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700"
-                                                            onClick={() => handleEdit(index)}
-                                                            title="Edit in Table"
-                                                        >
-                                                            <Edit2 className="h-2.5 w-2.5" />
-                                                        </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
@@ -1105,17 +1176,31 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                                                 <Trash2 className="h-2.5 w-2.5" />
                                                             )}
                                                         </Button>
-                                                    </>
-                                                )}
                                             </div>
                                         </td>
                                     </tr>
-                                )) : (
+                                    );
+                                }) : (
                                     <tr>
                                         <td colSpan={15} className="text-center py-8">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="text-sm text-muted-foreground">No data available</span>
                                             </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                {hasData && isLoadingMore && (
+                                    <tr>
+                                        <td colSpan={17} className="text-center py-4">
+                                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                            <span className="ml-2 text-sm text-muted-foreground">Loading more entries...</span>
+                                        </td>
+                                    </tr>
+                                )}
+                                {hasData && !hasMore && suppliers.length > 30 && (
+                                    <tr>
+                                        <td colSpan={17} className="text-center py-2 text-xs text-muted-foreground">
+                                            Showing all {suppliers.length} entries
                                         </td>
                                     </tr>
                                 )}
@@ -1163,22 +1248,24 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                 )}
                             </tfoot>
                         </table>
+                        {/* Drag selection box overlay */}
+                        {isDragging && dragStart && dragEnd && (
+                            <div
+                                className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-10"
+                                style={{
+                                    left: `${Math.min(dragStart.x, dragEnd.x)}px`,
+                                    top: `${Math.min(dragStart.y, dragEnd.y)}px`,
+                                    width: `${Math.abs(dragEnd.x - dragStart.x)}px`,
+                                    height: `${Math.abs(dragEnd.y - dragStart.y)}px`,
+                                }}
+                            />
+                        )}
                     </div>
+                    <ScrollBar orientation="horizontal" />
+                    <ScrollBar orientation="vertical" />
+                </ScrollArea>
                 </CardContent>
             </Card>
-
-            {/* Load More Button */}
-            {showLoadMore && onLoadMore && (
-                <div className="flex justify-center py-4">
-                    <Button
-                        variant="outline"
-                        onClick={onLoadMore}
-                        className="px-6"
-                    >
-                        Load More ({currentLimit} of {totalCount})
-                    </Button>
-                </div>
-            )}
         </div>
     );
 };

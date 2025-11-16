@@ -8,7 +8,7 @@ import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-
 import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 // UI Components
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from "lucide-react";
 import { DetailsDialog } from "@/components/sales/details-dialog";
@@ -310,6 +310,9 @@ export default function SupplierProfileClient() {
       
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Statement Preview</DialogTitle>
+          </DialogHeader>
           <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
             <StatementPreview data={selectedSupplierData} />
           </ScrollArea>

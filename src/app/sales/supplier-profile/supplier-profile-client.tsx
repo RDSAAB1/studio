@@ -7,7 +7,7 @@ import { useSupplierData } from '@/hooks/use-supplier-data';
 import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
 
 // UI Components
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from "lucide-react";
 import { DetailsDialog } from "@/components/sales/details-dialog";
@@ -282,9 +282,12 @@ export default function SupplierProfileClient() {
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={selectedSupplierData} />
-            </ScrollArea>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Statement Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+            <StatementPreview data={selectedSupplierData} />
+          </ScrollArea>
         </DialogContent>
       </Dialog>
       

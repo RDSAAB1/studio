@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, X, Search } from 'lucide-react';
 import { cn, levenshteinDistance } from '@/lib/utils';
 import { Input } from './input';
 import { Button } from './button';
+import { Loader2 } from 'lucide-react';
 
 export interface CustomDropdownOption {
     value: string;
@@ -45,8 +46,28 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [scrollTop, setScrollTop] = useState(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Debounce search term for better performance
+    useEffect(() => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 150); // 150ms debounce
+
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, [searchTerm]);
 
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
@@ -61,23 +82,35 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         }
     }, [value, selectedItem, isOpen]);
     
+    // Optimized filtering with early exit for large datasets
     const filteredItems = useMemo(() => {
-        if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
+        if (!debouncedSearchTerm || (selectedItem && debouncedSearchTerm === selectedItem.label)) {
+            // For large lists, limit initial display
+            if (options.length > 100) {
+                return options.slice(0, 100);
+            }
             return options;
         }
         
-        const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+        const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase().trim();
+        const maxResults = 200; // Limit results for performance
         
-        return options
-            .map(item => {
+        // Fast path: simple includes check first
+        const quickMatches: Array<{ item: CustomDropdownOption; distance: number }> = [];
+        const fuzzyMatches: Array<{ item: CustomDropdownOption; distance: number }> = [];
+        
+        for (let i = 0; i < options.length && (quickMatches.length + fuzzyMatches.length) < maxResults; i++) {
+            const item = options[i];
                 const lowercasedLabel = item.label.toLowerCase();
                 
-                // Check for exact matches first
+            // Quick exact/partial match
                 if (lowercasedLabel.includes(lowercasedSearchTerm)) {
-                    return { ...item, distance: 0 };
+                quickMatches.push({ item, distance: 0 });
+                continue;
                 }
                 
-                // Check for partial matches in different parts of the label
+            // Fuzzy matching only if we haven't found enough quick matches
+            if (quickMatches.length < 50) {
                 const labelParts = lowercasedLabel.split(/[\s\-\(\)]+/);
                 let minDistance = Infinity;
                 
@@ -92,19 +125,42 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     }
                 }
                 
-                // Also check the full label for fuzzy matching
                 const fullDistance = levenshteinDistance(lowercasedSearchTerm, lowercasedLabel);
                 minDistance = Math.min(minDistance, fullDistance);
                 
-                return { ...item, distance: minDistance };
-            })
-            .filter(item => 
-                // Keep items that include the search term OR are very similar (low distance)
-                item.distance <= 3
-            )
-            .sort((a, b) => a.distance - b.distance); // Sort by similarity
+                if (minDistance <= 3) {
+                    fuzzyMatches.push({ item, distance: minDistance });
+                }
+            }
+        }
+        
+        // Combine and sort
+        const allMatches = [...quickMatches, ...fuzzyMatches]
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, maxResults);
+        
+        return allMatches.map(m => m.item);
+    }, [debouncedSearchTerm, options, selectedItem]);
 
-    }, [searchTerm, options, selectedItem]);
+    // Virtual scrolling: only render visible items
+    const ITEM_HEIGHT = 32; // Approximate height of each item (reduced for smaller text)
+    const VISIBLE_ITEMS = 15; // Number of items visible at once
+    const BUFFER = 3; // Extra items to render for smooth scrolling
+    
+    const virtualItems = useMemo(() => {
+        const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER);
+        const endIndex = Math.min(
+            filteredItems.length,
+            startIndex + VISIBLE_ITEMS + BUFFER * 2
+        );
+        
+        return {
+            startIndex,
+            endIndex,
+            totalHeight: filteredItems.length * ITEM_HEIGHT,
+            visibleItems: filteredItems.slice(startIndex, endIndex),
+        };
+    }, [scrollTop, filteredItems]);
 
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -151,7 +207,12 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
         setIsOpen(true);
+        setScrollTop(0); // Reset scroll when searching
     };
+
+    const handleScroll = useCallback((e: React.UIEvent<HTMLUListElement>) => {
+        setScrollTop(e.currentTarget.scrollTop);
+    }, []);
     
     const handleInputClick = () => {
         setIsOpen(true);
@@ -227,23 +288,41 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
             {isOpen && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg">
-                    <ul className="py-1 max-h-60 overflow-y-auto scrollbar-hide">
+                    {filteredItems.length > 100 && searchTerm && (
+                        <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+                            Showing {Math.min(virtualItems.endIndex - virtualItems.startIndex, filteredItems.length)} of {filteredItems.length} results
+                        </div>
+                    )}
+                    <ul 
+                        ref={listRef}
+                        className="py-1 max-h-60 overflow-y-auto scrollbar-hide"
+                        onScroll={handleScroll}
+                        style={{ position: 'relative' }}
+                    >
+                        {/* Spacer for items before visible range */}
+                        {virtualItems.startIndex > 0 && (
+                            <li style={{ height: virtualItems.startIndex * ITEM_HEIGHT }} aria-hidden="true" />
+                        )}
+                        
                         {filteredItems.length > 0 ? (
-                            filteredItems.map((item, index) => (
+                            virtualItems.visibleItems.map((item, relativeIndex) => {
+                                const actualIndex = virtualItems.startIndex + relativeIndex;
+                                return (
                                 <li
-                                    key={`${item.value}-${index}`}
+                                        key={`${item.value}-${actualIndex}`}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         handleSelect(item);
                                     }}
                                     className={cn(
-                                        "cursor-pointer px-4 py-2 text-sm hover:bg-accent",
+                                            "cursor-pointer px-3 py-1.5 text-xs hover:bg-accent",
                                         selectedItem?.value === item.value ? 'bg-accent font-medium' : ''
                                     )}
+                                        style={{ height: ITEM_HEIGHT }}
                                 >
                                     <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center space-x-2 text-sm">
-                                            <span className="font-medium text-foreground">
+                                        <div className="flex items-center space-x-1.5 text-xs">
+                                            <span className="font-medium text-foreground text-xs">
                                                 {item.data?.name ? item.data.name : 
                                                  item.label.includes(' | ') ? item.label.split(' | ')[0] : 
                                                  item.label.split(' - ')[0]}
@@ -267,8 +346,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                                 }
                                                 
                                                 return fatherName && (
-                                                    <span className="text-muted-foreground">
-                                                        Son of {fatherName}
+                                                    <span className="text-muted-foreground text-xs">
+                                                        s/o {fatherName}
                                                     </span>
                                                 );
                                             })()}
@@ -289,7 +368,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                                     }
                                                 }
                                                 return address && (
-                                                    <span className="text-muted-foreground">
+                                                    <span className="text-muted-foreground text-xs">
                                                         | {address}
                                                     </span>
                                                 );
@@ -311,7 +390,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                                     }
                                                 }
                                                 return contact && (
-                                                    <span className="text-muted-foreground">
+                                                    <span className="text-muted-foreground text-xs">
                                                         | {contact}
                                                     </span>
                                                 );
@@ -319,17 +398,24 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                         </div>
                                     </div>
                                 </li>
-                            ))
+                                );
+                            })
                         ) : (
-                             !onAdd && <li className="px-4 py-2 text-sm text-muted-foreground text-center">{noItemsPlaceholder}</li>
+                            !onAdd && <li className="px-4 py-2 text-xs text-muted-foreground text-center">{noItemsPlaceholder}</li>
                         )}
+                        
+                        {/* Spacer for items after visible range */}
+                        {virtualItems.endIndex < filteredItems.length && (
+                            <li style={{ height: (filteredItems.length - virtualItems.endIndex) * ITEM_HEIGHT }} aria-hidden="true" />
+                        )}
+                        
                          {onAdd && searchTerm && !options.some(item => item.label.toLowerCase() === searchTerm.toLowerCase()) && (
                             <li
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     handleAddNew();
                                 }}
-                                className="cursor-pointer px-4 py-2 text-sm hover:bg-accent text-primary font-medium"
+                                className="cursor-pointer px-4 py-2 text-xs hover:bg-accent text-primary font-medium"
                             >
                                 Add "{searchTerm}"
                             </li>

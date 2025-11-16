@@ -87,6 +87,29 @@ export default function SupplierPaymentsClient() {
     setRefreshKey(Date.now());
   }, [hook.paymentHistory?.length]);
 
+  // Check for editPaymentData from localStorage (when navigating from detail window)
+  useEffect(() => {
+    const editData = localStorage.getItem('editPaymentData');
+    if (editData && hook.handleEditPayment) {
+      try {
+        const paymentData = JSON.parse(editData) as Payment;
+        // Clear the localStorage
+        localStorage.removeItem('editPaymentData');
+        
+        // Edit the payment
+        hook.handleEditPayment(paymentData);
+        
+        toast({
+          title: "Payment Loaded",
+          description: `Loaded payment ${paymentData.paymentId || paymentData.id} for editing.`,
+        });
+      } catch (error) {
+        console.error('Error loading edit payment data:', error);
+        localStorage.removeItem('editPaymentData');
+      }
+    }
+  }, [hook.handleEditPayment, toast]);
+
   const selectedSupplierSummary = useMemo(() => {
     if (!hook.selectedCustomerKey) return null;
     return supplierSummaryMap.get(hook.selectedCustomerKey) ?? null;

@@ -2,15 +2,16 @@
 
 
 
-import React, { useMemo, useDeferredValue, startTransition } from 'react';
+import React, { useMemo, useDeferredValue, useState, useEffect } from 'react';
 
 import type { CustomerSummary } from "@/lib/definitions";
 
 import { formatCurrency } from "@/lib/utils";
-import { parse, format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { generateStatement, generateStatementAsync, type StatementData } from '../utils/statement-generator';
 
 
 
@@ -21,844 +22,76 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const isPending = deferredData !== data;
     
     // Track computing state for large datasets
-    const [isComputing, setIsComputing] = React.useState(false);
-    const [shouldCompute, setShouldCompute] = React.useState(true); // Start as true for immediate computation
-    const computationRef = React.useRef<number | null>(null);
+    const [isComputing, setIsComputing] = useState(false);
+    const [statementData, setStatementData] = useState<StatementData | null>(null);
+    const [progress, setProgress] = useState(0);
 
     const statementRef = React.useRef<HTMLDivElement>(null);
     
-    // For large datasets, show processing state and compute
-    React.useEffect(() => {
+    // Generate statement using the optimized utility function
+    useEffect(() => {
         if (!deferredData) {
             setIsComputing(false);
-            setShouldCompute(true);
+            setStatementData(null);
+            setProgress(0);
             return;
         }
 
         const allTransactions = deferredData.allTransactions || [];
         const allPayments = deferredData.allPayments || [];
-        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
+        const totalItems = allTransactions.length + allPayments.length;
         
-        if (isLargeDataset) {
-            // Show processing state immediately
+        // Always use async generation for better performance, even for small datasets
             setIsComputing(true);
-            setShouldCompute(true); // Allow computation to proceed
-            
-            // Cancel any pending timeout
-            if (computationRef.current) {
-                clearTimeout(computationRef.current);
-            }
-        } else {
-            // Small dataset - compute immediately, no loading needed
-            setShouldCompute(true);
+        setProgress(0);
+        
+        generateStatementAsync(deferredData, (prog) => {
+            setProgress(prog);
+        }).then((result) => {
+            setStatementData(result);
             setIsComputing(false);
-        }
-    }, [deferredData]);
+            setProgress(100);
+        }).catch((error) => {
+            console.error('Error generating statement:', error);
+            toast({
+                title: 'Error',
+                description: `Failed to generate statement${totalItems > 1000 ? '. This is a large dataset, please wait...' : '. Please try again.'}`,
+                variant: 'destructive'
+            });
+            setIsComputing(false);
+        });
+    }, [deferredData, toast]);
     
 
 
 
     if (!data) return null;
 
-
-
-    // Standardized formatting function for consistent alignment
-
-    const formatColumn = (value: string, width: number, align: 'left' | 'right' = 'left') => {
-
-        if (align === 'right') {
-
-            return value.padStart(width, ' ');
-
-        }
-
-        return value.padEnd(width, ' ');
-
-    };
-
-
-
-    const formatRate = (value: number | null | undefined) => {
-
-        const numericValue = Number(value) || 0;
-
-        return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-    };
-
-
-
-    const parseDateSafely = (
-        input: string | Date | null | undefined,
-        reference?: string | Date | null | undefined
-    ): Date | null => {
-
-        if (!input) return null;
-
-        if (input instanceof Date && !Number.isNaN(input.getTime())) {
-
-            return input;
-
-        }
-
-        const raw = String(input).trim();
-
-        if (!raw) return null;
-
-        const referenceDate = reference ? parseDateSafely(reference) : undefined;
-
-        const shortMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-
-        const isWithinFiveDays = (candidate: Date | null) => {
-
-            if (!candidate || !referenceDate) return true;
-
-            const diff = Math.abs(candidate.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24);
-
-            return diff <= 5;
-
-        };
-
-        if (shortMatch) {
-
-            const part1 = Number(shortMatch[1]);
-
-            const part2 = Number(shortMatch[2]);
-
-            let year = Number(shortMatch[3]);
-
-            if (year < 100) {
-
-                year += year >= 70 ? 1900 : 2000;
-
-            }
-
-            const buildDate = (day: number, month: number) => {
-
-                if (day <= 0 || month <= 0 || month > 12 || day > 31) return null;
-
-                const candidate = new Date(year, month - 1, day);
-
-                if (Number.isNaN(candidate.getTime())) return null;
-
-                if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
-
-                    return null;
-
-                }
-
-                return candidate;
-
-            };
-
-            if (part1 > 12 && part2 <= 12) {
-
-                const date = buildDate(part1, part2);
-
-                if (date) return date;
-
-            } else if (part2 > 12 && part1 <= 12) {
-
-                const date = buildDate(part2, part1);
-
-                if (date) return date;
-
-            } else {
-
-                const dayFirst = buildDate(part1, part2);
-
-                if (dayFirst && isWithinFiveDays(dayFirst)) {
-
-                    return dayFirst;
-
-                }
-
-                const monthFirst = buildDate(part2, part1);
-
-                if (monthFirst && isWithinFiveDays(monthFirst)) {
-
-                    return monthFirst;
-
-                }
-
-                if (dayFirst) return dayFirst;
-
-                if (monthFirst) return monthFirst;
-
-            }
-
-        }
-
-        const formats = [
-
-            'yyyy-MM-dd',
-
-            'dd-MM-yyyy',
-
-            'dd/MM/yyyy',
-
-            'd/M/yyyy',
-
-            'MM/dd/yyyy',
-
-            'M/d/yyyy',
-
-            'MM-dd-yyyy',
-
-            'M-d-yyyy',
-
-            'dd/MM/yy',
-
-            'd/M/yy',
-
-            'MM/dd/yy',
-
-            'M/d/yy',
-
-            'dd-MMM-yy',
-
-            'dd-MMM-yyyy',
-
-            "yyyy-MM-dd'T'HH:mm:ssXXX",
-
-            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-
-            "yyyy-MM-dd'T'HH:mm:ss",
-
-            "yyyy/MM/dd HH:mm:ss",
-
-            "MM/dd/yyyy HH:mm:ss",
-
-            "M/d/yyyy HH:mm:ss",
-
-        ];
-
-        for (const fmt of formats) {
-
-            try {
-
-                const parsedDate = parse(raw, fmt, new Date());
-
-                if (!Number.isNaN(parsedDate.getTime())) {
-
-                    return parsedDate;
-
-                }
-
-            } catch {
-
-                // try next format
-
-            }
-
-        }
-
-        const timestamp = Date.parse(raw);
-
-        if (!Number.isNaN(timestamp)) {
-
-            return new Date(timestamp);
-
-        }
-
-        return null;
-
-    };
-
-
-
-    const formatDisplayDate = (
-        input: string | Date | null | undefined,
-        reference?: string | Date | null | undefined
-    ) => {
-
-        const parsedDate = parseDateSafely(input, reference);
-
-        if (!parsedDate) return '';
-
-        return format(parsedDate, 'dd-MM-yyyy');
-
-    };
-
-
-
-    const compareDateValues = (a?: Date | null, b?: Date | null) => {
-
-        const timeA = a?.getTime() ?? 0;
-
-        const timeB = b?.getTime() ?? 0;
-
-        return timeA - timeB;
-
-    };
-
-
-
-    const transactions = useMemo(() => {
-        if (!deferredData) return [];
-        
-        // For large datasets, wait until shouldCompute is true to prevent blocking
-        const allTransactions = deferredData.allTransactions || [];
-        const allPayments = deferredData.allPayments || [];
-        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
-        
-        if (isLargeDataset && !shouldCompute) {
-            // Return empty array to prevent blocking - computation will happen after delay
-            return [];
-        }
-
-        
-
-        // Remove duplicate payments based on payment ID and date
-
-        const uniquePayments = allPayments.reduce((acc, payment) => {
-
-            const key = `${payment.paymentId || payment.id}_${payment.date}_${payment.amount}`;
-
-            if (!acc.has(key)) {
-
-                acc.set(key, payment);
-
-            } else {
-
-                console.log('Duplicate payment found:', key, payment);
-
-            }
-
-            return acc;
-
-        }, new Map());
-
-        
-
-        const deduplicatedPayments = Array.from(uniquePayments.values());
-
-        console.log('Deduplicated Payments:', deduplicatedPayments.length);
-
-        // Create lookup map for transactions by srNo for O(1) access instead of O(n) find()
-        const transactionMap = new Map<string, typeof allTransactions[0]>();
-        allTransactions.forEach(t => {
-            if (t.srNo) {
-                transactionMap.set(t.srNo, t);
-            }
-        });
-
-        const mappedTransactions = allTransactions.map(t => {
-
-            const quantity = t.netWeight || t.weight || 0;
-
-            const formattedQuantity = typeof quantity === 'number' ? quantity.toFixed(2) : quantity;
-
-            
-
-            // Standardized column widths for purchase details - more compact
-
-            const srNo = formatColumn(t.srNo, 6);
-
-            const qty = formatColumn(`Qty:${formattedQuantity}`, 10);
-
-            const rate = formatColumn(`Rate:₹${t.rate || 0}`, 10);
-
-            const lab = formatColumn(`Lab:₹${t.labouryAmount || 0}`, 10);
-
-            const karta = formatColumn(`Karta:₹${t.kartaAmount || 0}`, 10);
-
-            const kanta = formatColumn(`Kanta:₹${t.kanta || 0}`, 10);
-
-            
-
-            // Format with PRCH and serial number on first row, details on second row with colors
-
-            const particulars = `PRCH ${srNo}\n${qty}|${rate}|${lab}|${karta}|${kanta}`;
-
-            
-
-            const dateValue = parseDateSafely(t.date);
-
-            return {
-
-                date: t.date,
-
-                dateValue,
-
-                displayDate: formatDisplayDate(t.date),
-
-                particulars: particulars,
-
-                debit: t.originalNetAmount || 0,
-
-                credit: 0,
-
-            };
-
-        });
-
-
-
-        const mappedPayments = deduplicatedPayments.map(p => {
-
-            const purchaseDates = p.paidFor
-                ?.map((pf: any) => {
-                    const purchase = transactionMap.get(pf.srNo);
-                    return purchase?.date;
-                })
-                .filter(Boolean) as (string | Date)[];
-
-            const parsedPurchaseReference =
-                purchaseDates
-                    ?.map(dateValue => parseDateSafely(dateValue))
-                    .find((value): value is Date => Boolean(value)) || null;
-
-            const paymentDateValue = parseDateSafely(p.date, parsedPurchaseReference);
-
-            const paymentDisplayDate = paymentDateValue
-                ? format(paymentDateValue, 'dd-MM-yyyy')
-                : formatDisplayDate(p.date, parsedPurchaseReference || undefined);
-
-            // Debug: Log current payment
-
-            console.log('Processing Payment:', {
-
-                paymentId: p.paymentId || p.id,
-
-                date: p.date,
-
-                amount: p.amount,
-
-                rtgsAmount: (p as any).rtgsAmount,
-
-                cdAmount: (p as any).cdAmount,
-
-                paidFor: p.paidFor?.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount }))
-
-            });
-
-            
-
-            // Group all purchases this payment was made for into one entry
-
-            const paidForDetails = p.paidFor?.map((pf: any) => {
-
-                const purchase = transactionMap.get(pf.srNo);
-
-                const originalAmount = purchase?.originalNetAmount || 0;
-
-                const paidAmount = pf.amount;
-
-                
-
-                // Calculate CD portion for this entry
-
-                const cdPortionForThisEntry = (p as any).cdAmount && p.paidFor ? 
-
-                    (pf.amount / p.paidFor.reduce((sum: any, pf: any) => sum + pf.amount, 0)) * (p as any).cdAmount : 0;
-
-                const actualPaymentForThisEntry = paidAmount - cdPortionForThisEntry;
-
-                
-
-                // Calculate previously paid amount (all payments before this one)
-
-               // Calculate previously paid amount for this specific purchase entry
-
-               let previouslyPaid = 0;
-
-               const previousPaymentsForThisEntry: any[] = [];
-
-               deduplicatedPayments.forEach(prevPayment => {
-
-                const prevDate = parseDateSafely(prevPayment.date, purchase?.date);
-
-                const currentDate = parseDateSafely(p.date, purchase?.date);
-
-                   if (prevDate && currentDate && prevDate < currentDate) {
-
-                       const prevPaidForThisEntry = prevPayment.paidFor?.find((prevPf: any) => prevPf.srNo === pf.srNo);
-
-                       if (prevPaidForThisEntry) {
-
-                           // Calculate the proportion of CD for this specific entry
-
-                           const totalPaidForThisPayment = prevPayment.paidFor?.reduce((sum: any, pf: any) => sum + pf.amount, 0) || 0;
-
-                           const cdPortionForThisEntry = (prevPayment as any).cdAmount && totalPaidForThisPayment > 0 ? 
-
-                               (prevPaidForThisEntry.amount / totalPaidForThisPayment) * (prevPayment as any).cdAmount : 0;
-
-                           
-
-                           const actualPrevPayment = prevPaidForThisEntry.amount - cdPortionForThisEntry;
-
-                           previouslyPaid += actualPrevPayment;
-
-                           
-
-                           previousPaymentsForThisEntry.push({
-
-                               paymentId: prevPayment.paymentId || prevPayment.id,
-
-                               date: prevPayment.date,
-
-                               amount: prevPaidForThisEntry.amount,
-
-                               cdPortion: cdPortionForThisEntry,
-
-                               actualPayment: actualPrevPayment
-
-                           });
-
-                       }
-
-                   }
-
-               });
-
-               
-
-               // Debug: Log previously paid calculation for this entry
-
-               if (previousPaymentsForThisEntry.length > 0) {
-
-                   console.log(`Previously Paid for ${pf.srNo}:`, {
-
-                       totalPreviouslyPaid: previouslyPaid,
-
-                       previousPayments: previousPaymentsForThisEntry as any[]
-
-                   });
-
-               }
-
-                
-
-                const remaining = originalAmount - previouslyPaid - actualPaymentForThisEntry - cdPortionForThisEntry;
-
-                
-
-                // Standardized column widths for payment details
-
-                const srNo = formatColumn(pf.srNo, 8);
-
-                
-
-                // Right-align numbers, then add ₹ symbol
-
-                const origNum = formatColumn(originalAmount.toString(), 12, 'right');
-
-                const prevNum = formatColumn(Math.round(previouslyPaid).toString(), 12, 'right');
-
-                const nowNum = formatColumn(Math.round(actualPaymentForThisEntry).toString(), 12, 'right');
-
-                const balNum = formatColumn(Math.round(remaining).toString(), 12, 'right');
-
-                
-
-                const orig = `₹${origNum}`;
-
-                const prev = `₹${prevNum}`;
-
-                const now = `₹${nowNum}`;
-
-                const bal = `₹${balNum}`;
-
-                
-
-                return `${srNo}|${orig}|${prev}|${now}|${bal}`;
-
-            }).join('\n') || 'Unknown Purchase';
-
-            
-
-            // IMPORTANT: For outstanding calculation, use sum of paidFor.amount, not rtgsAmount
-            // rtgsAmount is for display/tracking only, but outstanding should use actual paidFor.amount
-            // Calculate total paid amount from paidFor entries
-            // paidFor.amount is already the actual paid amount (CD is separate and already accounted for)
-            const totalPaidForPayment = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-            // For display: Paid amount = totalPaidForPayment (this is the actual paid amount, CD is separate)
-            const actualPaymentAmount = totalPaidForPayment;
-
-            
-
-            // Format particulars with proper line breaks and table-like structure
-
-            const paymentType = p.receiptType || p.type;
-
-            
-
-            // Create header row using standardized formatting
-
-            const paymentHeaderSrNo = formatColumn('SR No', 6);
-
-            const paymentHeaderOrig = formatColumn('₹Original', 8);
-
-            const paymentHeaderPrev = formatColumn('₹Previous', 8);
-
-            const paymentHeaderNow = formatColumn('₹Current', 8);
-
-            const paymentHeaderBal = formatColumn('₹Balance', 8);
-
-            
-
-            const paymentHeaderRow = `${paymentHeaderSrNo}|${paymentHeaderOrig}|${paymentHeaderPrev}|${paymentHeaderNow}|${paymentHeaderBal}`;
-
-            const paymentSeparatorRow = '------|--------|--------|--------|--------';
-
-            
-
-            // Create payment details with serial numbers on separate lines
-
-            const paymentDetails = p.paidFor?.map((pf: any, index: number) => {
-
-            const purchase = transactionMap.get(pf.srNo);
-
-                const originalAmount = purchase?.originalNetAmount || 0;
-
-                const paidAmount = pf.amount;
-
-                
-
-                // Calculate CD portion for this entry
-
-                const cdPortionForThisEntry = (p as any).cdAmount && p.paidFor ? 
-
-                    (pf.amount / p.paidFor.reduce((sum: any, pf: any) => sum + pf.amount, 0)) * (p as any).cdAmount : 0;
-
-                const actualPaymentForThisEntry = paidAmount - cdPortionForThisEntry;
-
-                
-
-                // Calculate previously paid amount for this specific purchase entry
-
-                let previouslyPaid = 0;
-
-            deduplicatedPayments.forEach(prevPayment => {
-
-                    const prevDate = parseDateSafely(prevPayment.date, purchase?.date);
-
-                    const currentDate = parseDateSafely(p.date, purchase?.date);
-
-                    if (prevDate && currentDate && prevDate < currentDate) {
-
-                        const prevPaidForThisEntry = prevPayment.paidFor?.find((prevPf: any) => prevPf.srNo === pf.srNo);
-
-                        if (prevPaidForThisEntry) {
-
-                            const totalPaidForThisPayment = prevPayment.paidFor?.reduce((sum: any, pf: any) => sum + pf.amount, 0) || 0;
-
-                            const cdPortionForThisEntry = (prevPayment as any).cdAmount && totalPaidForThisPayment > 0 ? 
-
-                                (prevPaidForThisEntry.amount / totalPaidForThisPayment) * (prevPayment as any).cdAmount : 0;
-
-                            
-
-                            const actualPrevPayment = prevPaidForThisEntry.amount - cdPortionForThisEntry;
-
-                            previouslyPaid += actualPrevPayment;
-
-                        }
-
-                    }
-
-                });
-
-                
-
-                const remaining = originalAmount - previouslyPaid - actualPaymentForThisEntry - cdPortionForThisEntry;
-
-                
-
-                // Format as compact single line - reduced column widths
-
-                const srNo = formatColumn(pf.srNo, 6);
-
-                const origNum = formatColumn(originalAmount.toString(), 8, 'right');
-
-                const prevNum = formatColumn(Math.round(previouslyPaid).toString(), 8, 'right');
-
-                const nowNum = formatColumn(Math.round(actualPaymentForThisEntry).toString(), 8, 'right');
-
-                const balNum = formatColumn(Math.round(remaining).toString(), 8, 'right');
-
-                
-
-                const orig = `₹${origNum}`;
-
-                const prev = `₹${prevNum}`;
-
-                const now = `₹${nowNum}`;
-
-                const bal = `₹${balNum}`;
-
-                
-
-                return `${srNo}|${orig}|${prev}|${now}|${bal}`;
-
-            }).join('\n') || '';
-
-
-
-            const particulars = `PAY: ${paymentType}\n${paymentHeaderRow}\n${paymentSeparatorRow}\n${paymentDetails}`;
-
-            
-
-            return {
-
-                date: p.date,
-
-                dateValue: paymentDateValue,
-
-                referenceDate: parsedPurchaseReference || undefined,
-
-                displayDate: paymentDisplayDate,
-
-                particulars: particulars as any,
-
-                debit: 0,
-
-                creditPaid: actualPaymentAmount, // Sum of paidFor.amount (actual paid amount)
-
-                creditCd: (p as any).cdAmount || 0, // CD amount
-
-                credit: actualPaymentAmount + ((p as any).cdAmount || 0), // Total credit = Paid + CD (for balance calculation)
-
-            };
-
-        });
-
-
-
-        const resolveReferenceDate = (entry: any): Date | null => {
-
-            if (entry.referenceDate instanceof Date) return entry.referenceDate;
-
-            if (entry.dateValue instanceof Date) return entry.dateValue;
-
-            return parseDateSafely(entry.date);
-
-        };
-
-        const finalTransactions = [...mappedTransactions, ...mappedPayments]
-
-            .sort((a, b) => {
-
-                const primary = compareDateValues(a.dateValue, b.dateValue);
-
-                if (primary !== 0) return primary;
-
-                return compareDateValues(
-                    resolveReferenceDate(a),
-                    resolveReferenceDate(b)
-                );
-
-            });
-
-            
-
-        // Debug: Log total amounts
-
-        const totalDebit = mappedTransactions.reduce((sum, t) => sum + t.debit, 0);
-
-        const totalCredit = mappedPayments.reduce((sum, p) => sum + p.credit, 0);
-
-        console.log('Statement Totals:', {
-
-            totalDebit,
-
-            totalCredit,
-
-            totalTransactions: mappedTransactions.length,
-
-            totalPayments: mappedPayments.length,
-
-            outstanding: totalDebit - totalCredit
-
-        });
-
-        return finalTransactions;
-
-    }, [deferredData, shouldCompute]);
-    
-    // Monitor when transactions are computed to hide loading
-    React.useEffect(() => {
-        if (!deferredData) return;
-        
-        const allTransactions = deferredData.allTransactions || [];
-        const allPayments = deferredData.allPayments || [];
-        const isLargeDataset = allTransactions.length > 100 || allPayments.length > 100;
-        
-        if (isLargeDataset && shouldCompute) {
-            // For large datasets, wait until transactions are computed
-            if (transactions.length > 0) {
-                // Transactions computed, hide loading after a brief moment
-                const timeoutId = setTimeout(() => {
-                    setIsComputing(false);
-                }, 100);
-                return () => clearTimeout(timeoutId);
-            } else {
-                // Still computing, keep loading visible
-                setIsComputing(true);
-            }
-        } else if (!isLargeDataset) {
-            // Small dataset - no loading needed
-            setIsComputing(false);
-        }
-    }, [transactions.length, shouldCompute, deferredData]);
-
-    // Calculate statement totals from transactions to match the table
-    // This ensures consistency between summary and detailed table
-    const statementTotals = useMemo(() => {
-        if (!deferredData) return { totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0, totalCd: 0, outstanding: 0 };
-        
-        // Get all payments from transactions
-        const paymentTransactions = transactions.filter(t => (t as any).creditPaid > 0);
-        
-        // Calculate totals from transactions
-        const totalPaidFromTransactions = paymentTransactions.reduce((sum, t) => sum + ((t as any).creditPaid || 0), 0);
-        const totalCdFromTransactions = paymentTransactions.reduce((sum, t) => sum + ((t as any).creditCd || 0), 0);
-        
-        // Calculate Cash and RTGS paid from payment data (need to map back to payments)
-        // Deduplicate payments same as in transactions calculation
-        const allPayments = deferredData.allPayments || [];
-        const uniquePayments = allPayments.reduce((acc, payment) => {
-            const key = `${payment.paymentId || payment.id}_${payment.date}_${payment.amount}`;
-            if (!acc.has(key)) {
-                acc.set(key, payment);
-            }
-            return acc;
-        }, new Map());
-        
-        const deduplicatedPayments = Array.from(uniquePayments.values());
-        
-        let totalCashPaid = 0;
-        let totalRtgsPaid = 0;
-        
-        deduplicatedPayments.forEach(p => {
-            const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
-            if (receiptType === 'cash') {
-                // Sum of paidFor.amount for cash payments
-                const cashAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-                totalCashPaid += cashAmount;
-            } else if (receiptType === 'rtgs') {
-                // Sum of paidFor.amount for RTGS payments (not rtgsAmount)
-                const rtgsAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-                totalRtgsPaid += rtgsAmount;
-            }
-        });
-        
-        const totalOriginal = deferredData.totalOriginalAmount || 0;
-        const outstanding = Math.max(0, Math.round((totalOriginal - totalPaidFromTransactions - totalCdFromTransactions) * 100) / 100);
-        
-        return {
-            totalPaid: totalPaidFromTransactions,
-            totalCashPaid: totalCashPaid,
-            totalRtgsPaid: totalRtgsPaid,
-            totalCd: totalCdFromTransactions,
-            outstanding: outstanding
-        };
-    }, [transactions, deferredData]);
-    
-    // Use statement totals for consistency
+    // Use statement data from the utility function
+    const transactions = statementData?.transactions || [];
+    const statementTotals = statementData?.totals || { totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0, totalCd: 0, outstanding: 0 };
     const statementOutstanding = statementTotals.outstanding;
+
+    // Format rate for display
+    const formatRate = (value: number | null | undefined) => {
+        const numericValue = Number(value) || 0;
+        return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    // Format display date helper
+    const formatDisplayDate = (date: string | Date | null | undefined, referenceDate?: Date) => {
+        if (!date) return '';
+        if (date instanceof Date) {
+            return format(date, 'dd-MM-yyyy');
+        }
+        try {
+            const parsed = parse(date, 'dd-MM-yyyy', new Date());
+            if (!Number.isNaN(parsed.getTime())) {
+                return format(parsed, 'dd-MM-yyyy');
+            }
+        } catch {}
+        return String(date);
+    };
 
     const POPUP_FEATURES = 'width=1200,height=800,scrollbars=yes';
 
@@ -1013,7 +246,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
 
 
-    if (isPending || isComputing) {
+    if (isPending || isComputing || !statementData) {
         const allTransactions = deferredData?.allTransactions || [];
         const allPayments = deferredData?.allPayments || [];
         const totalItems = allTransactions.length + allPayments.length;
@@ -1023,12 +256,22 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p className="text-muted-foreground font-medium">
-                        {isPending ? "Loading statement data..." : "Processing statement..."}
+                        {isPending ? "Loading statement data..." : "Generating statement..."}
                     </p>
                     {!isPending && totalItems > 0 && (
+                        <>
                         <p className="text-xs text-muted-foreground">
                             Processing {totalItems} entries, please wait...
                         </p>
+                            {progress > 0 && progress < 100 && (
+                                <div className="w-64 bg-gray-200 rounded-full h-2">
+                                    <div 
+                                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
                     {!isPending && totalItems === 0 && (
                         <p className="text-xs text-muted-foreground">
@@ -1480,13 +723,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                     <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-green-600 font-bold">
 
-                                        {(transaction as any).creditPaid > 0 ? formatCurrency((transaction as any).creditPaid) : '-'}
+                                        {transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-'}
 
                                     </td>
 
                                     <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-purple-600 font-bold">
 
-                                        {(transaction as any).creditCd > 0 ? formatCurrency((transaction as any).creditCd) : '-'}
+                                        {transaction.creditCd > 0 ? formatCurrency(transaction.creditCd) : '-'}
 
                                     </td>
 
@@ -1516,13 +759,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                             <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight text-green-600 font-extrabold">
 
-                                {formatCurrency(transactions.reduce((sum, t) => sum + ((t as any).creditPaid || 0), 0))}
+                                {formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}
 
                             </td>
 
                             <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight text-purple-600 font-extrabold">
 
-                                {formatCurrency(transactions.reduce((sum, t) => sum + ((t as any).creditCd || 0), 0))}
+                                {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}
 
                             </td>
 

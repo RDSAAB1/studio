@@ -8,12 +8,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Printer, Info, Download, Trash2, Pen } from "lucide-react";
+import { Printer, Info, Download, Trash2, Pen, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 
 export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers }: any) => {
+    // Infinite scroll pagination
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(payments, {
+        totalItems: payments.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: payments.length > 30,
+    });
+
+    const visiblePayments = payments.slice(0, visibleItems);
+
     // Helper function to get receipt holder name from supplier data
     const getReceiptHolderName = React.useCallback((payment: any) => {
         // First try parchiName field
@@ -59,25 +71,26 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                 {onExport && <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>}
             </CardHeader>
             <CardContent className="p-0">
-                <div className="overflow-x-auto overflow-y-auto max-h-96">
-                    <div className="min-w-[1000px]">
-                        <Table className="w-full">
-                            <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                    <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID & 6R</TableHead>
-                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
-                                    <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
-                                    <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
-                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank</TableHead>
-                                    <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details</TableHead>
-                                    <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate</TableHead>
-                                    <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
-                                    <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
-                                    <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {payments.map((p: any) => (
+                <ScrollArea ref={scrollRef} className="h-96">
+                    <div className="overflow-x-auto">
+                        <div className="min-w-[1000px]">
+                            <Table className="w-full">
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50">
+                                        <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID & 6R</TableHead>
+                                        <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
+                                        <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
+                                        <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
+                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank</TableHead>
+                                        <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details</TableHead>
+                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate</TableHead>
+                                        <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
+                                        <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
+                                        <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {visiblePayments.map((p: any) => (
                                     <TableRow key={p.id} className="hover:bg-muted/50">
                                         <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
                                             <div className="text-foreground font-semibold text-[11px] break-words">
@@ -168,16 +181,32 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))}
-                                {payments.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                    ))}
+                                    {isLoading && (
+                                        <TableRow>
+                                            <TableCell colSpan={10} className="text-center py-4">
+                                                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                                <span className="ml-2 text-sm text-muted-foreground">Loading more payments...</span>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                    {!hasMore && payments.length > 30 && (
+                                        <TableRow>
+                                            <TableCell colSpan={10} className="text-center py-2 text-xs text-muted-foreground">
+                                                Showing all {payments.length} payments
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                    {payments.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
-                </div>
+                </ScrollArea>
             </CardContent>
         </Card>
     );

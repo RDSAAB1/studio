@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +24,8 @@ import { Switch } from "@/components/ui/switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
 import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime } from "@/lib/firestore";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; 
 
@@ -112,6 +114,124 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
         {children}
     </div>
 );
+
+// Expense Tracker Table Component with Infinite Scroll
+const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
+  runningLedger,
+  allSelected,
+  someSelected,
+  toggleSelectAll,
+  requestSort,
+  selectedTransactionIds,
+  toggleTransactionSelection,
+  getDisplayId,
+  handleEdit,
+  handleDelete,
+}: {
+  runningLedger: any[];
+  allSelected: boolean;
+  someSelected: boolean;
+  toggleSelectAll: (checked: boolean) => void;
+  requestSort: (key: any) => void;
+  selectedTransactionIds: Set<string>;
+  toggleTransactionSelection: (id: string, checked: boolean) => void;
+  getDisplayId: (tx: any) => string;
+  handleEdit: (tx: any) => void;
+  handleDelete: (tx: any) => void;
+}) {
+  const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(runningLedger, {
+    totalItems: runningLedger.length,
+    initialLoad: 30,
+    loadMore: 30,
+    threshold: 5,
+    enabled: runningLedger.length > 30,
+  });
+
+  const visibleTransactions = runningLedger.slice(0, visibleItems);
+
+  return (
+    <ScrollArea ref={scrollRef} className="h-[520px]">
+      <div className="overflow-x-auto">
+        <Table className="min-w-[800px]">
+          <TableHeader>
+          <TableRow>
+            <TableHead className="w-[36px] text-center">
+              <Checkbox
+                checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                onCheckedChange={(value) => toggleSelectAll(value === true)}
+                aria-label="Select all transactions"
+              />
+            </TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+            <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead className="text-right">Debit</TableHead>
+            <TableHead className="text-right">Credit</TableHead>
+            <TableHead className="text-right">Running Balance</TableHead>
+            <TableHead className="text-center">Actions</TableHead>
+          </TableRow>
+          </TableHeader>
+          <TableBody>
+          {visibleTransactions.map((transaction) => (
+            <TableRow key={transaction.id}>
+              <TableCell className="text-center">
+                <Checkbox
+                  checked={selectedTransactionIds.has(transaction.id)}
+                  onCheckedChange={(value) => toggleTransactionSelection(transaction.id, value === true)}
+                  aria-label={`Select transaction ${getDisplayId(transaction)}`}
+                />
+              </TableCell>
+              <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
+              <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
+              <TableCell>{transaction.description || toTitleCase(transaction.payee)}</TableCell>
+              <TableCell className="text-right text-rose-600 font-medium">{transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}</TableCell>
+              <TableCell className="text-right text-emerald-600 font-medium">{transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}</TableCell>
+              <TableCell className={cn("text-right font-semibold", transaction.runningBalance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                {formatCurrency(transaction.runningBalance)}
+              </TableCell>
+              <TableCell className="text-center">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </TableCell>
+            </TableRow>
+          ))}
+          {isLoading && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading more transactions...</span>
+              </TableCell>
+            </TableRow>
+          )}
+          {!hasMore && runningLedger.length > 30 && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-2 text-xs text-muted-foreground">
+                Showing all {runningLedger.length} transactions
+              </TableCell>
+            </TableRow>
+          )}
+          </TableBody>
+        </Table>
+      </div>
+    </ScrollArea>
+  );
+});
 
 const SummaryMetricsCard = ({
   metrics,
@@ -1560,69 +1680,18 @@ export default function IncomeExpenseClient() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="max-h-[520px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[36px] text-center">
-                    <Checkbox
-                      checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                      onCheckedChange={(value) => toggleSelectAll(value === true)}
-                      aria-label="Select all transactions"
-                    />
-                  </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Running Balance</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runningLedger.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={selectedTransactionIds.has(transaction.id)}
-                        onCheckedChange={(value) => toggleTransactionSelection(transaction.id, value === true)}
-                        aria-label={`Select transaction ${getDisplayId(transaction)}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
-                    <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
-                    <TableCell>{transaction.description || toTitleCase(transaction.payee)}</TableCell>
-                    <TableCell className="text-right text-rose-600 font-medium">{transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}</TableCell>
-                    <TableCell className="text-right text-emerald-600 font-medium">{transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}</TableCell>
-                    <TableCell className={cn("text-right font-semibold", transaction.runningBalance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                      {formatCurrency(transaction.runningBalance)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ExpenseTrackerTable 
+            runningLedger={runningLedger}
+            allSelected={allSelected}
+            someSelected={someSelected}
+            toggleSelectAll={toggleSelectAll}
+            requestSort={requestSort}
+            selectedTransactionIds={selectedTransactionIds}
+            toggleTransactionSelection={toggleTransactionSelection}
+            getDisplayId={getDisplayId}
+            handleEdit={handleEdit}
+            handleDelete={handleDelete}
+          />
         </CardContent>
       </Card>
 

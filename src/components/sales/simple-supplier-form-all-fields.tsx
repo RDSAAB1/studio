@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import { cn, toTitleCase } from "@/lib/utils";
@@ -77,6 +77,7 @@ interface SimpleSupplierFormAllFieldsProps {
     handleAddOption: (collectionName: string, name: string) => void;
     handleUpdateOption: (collectionName: string, id: string, name: string) => void;
     handleDeleteOption: (collectionName: string, id: string, name: string) => void;
+    firstInputRef?: React.RefObject<HTMLInputElement>;
 }
 
 const SimpleSupplierFormAllFields = ({ 
@@ -89,7 +90,8 @@ const SimpleSupplierFormAllFields = ({
     setLastPaymentType, 
     handleAddOption, 
     handleUpdateOption, 
-    handleDeleteOption 
+    handleDeleteOption,
+    firstInputRef
 }: SimpleSupplierFormAllFieldsProps) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
@@ -113,8 +115,20 @@ const SimpleSupplierFormAllFields = ({
                             <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
                                     id="srNo" 
-                                    {...form.register('srNo')} 
-                                    onBlur={(e) => handleSrNoBlur(e.target.value)} 
+                                    {...(() => {
+                                        const registration = form.register('srNo', {
+                                            onBlur: (e: React.FocusEvent<HTMLInputElement>) => handleSrNoBlur(e.target.value)
+                                        });
+                                        return {
+                                            ...registration,
+                                            ref: (e: HTMLInputElement | null) => {
+                                                registration.ref(e);
+                                                if (firstInputRef && e) {
+                                                    (firstInputRef as React.MutableRefObject<HTMLInputElement | null>).current = e;
+                                                }
+                                            }
+                                        };
+                                    })()}
                                     className="font-code h-8 text-sm pl-10" 
                                 />
                             </InputWithIcon>

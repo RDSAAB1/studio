@@ -13,10 +13,22 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Info, Pen, Printer, Trash, Loader2 } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 
 export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier', isDeleting = false }: any) {
     
+    // Infinite scroll pagination
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(entries, {
+        totalItems: entries.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: entries.length > 30,
+    });
+
+    const visibleEntries = entries.slice(0, visibleItems);
+
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = entries.map((c: Customer) => c.id);
         onSelectionChange(checked ? new Set(allEntryIds) : new Set());
@@ -40,8 +52,9 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
     return (
         <Card>
             <CardContent className="p-0">
-                <ScrollArea className="h-[60vh]">
-                    <Table>
+                <ScrollArea ref={scrollRef} className="h-[60vh]">
+                    <div className="overflow-x-auto">
+                        <Table className="min-w-[800px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="px-3 py-2 text-xs w-10">
@@ -61,7 +74,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {entries.map((entry: Customer) => (
+                            {visibleEntries.map((entry: Customer) => (
                                 <TableRow key={entry.id} className="h-12" data-state={selectedIds.has(entry.id) ? 'selected' : ''}>
                                     <TableCell className="px-3 py-1">
                                         <Checkbox
@@ -123,8 +136,26 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     </TableCell>
                                 </TableRow>
                             ))}
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={9} className="text-center py-4">
+                                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                        <span className="ml-2 text-sm text-muted-foreground">Loading more entries...</span>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!hasMore && entries.length > 30 && (
+                                <TableRow>
+                                    <TableCell colSpan={9} className="text-center py-2 text-xs text-muted-foreground">
+                                        Showing all {entries.length} entries
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                    <ScrollBar orientation="vertical" />
                 </ScrollArea>
             </CardContent>
         </Card>

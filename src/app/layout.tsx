@@ -44,17 +44,33 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+		const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                const companySettings = await getRtgsSettings();
-                setIsSetupComplete(!!companySettings?.companyName);
-                // Initial data sync on login
-                syncAllData();
-            } else {
-                setIsSetupComplete(undefined);
-            }
-            setAuthChecked(true);
+			setAuthChecked(true);
+			if (currentUser) {
+				// Fetch settings in background (non-blocking)
+				getRtgsSettings()
+					.then((companySettings) => {
+						setIsSetupComplete(!!companySettings?.companyName);
+					})
+					.catch(() => {
+						setIsSetupComplete(false);
+					});
+
+				// Initial data sync on login (defer to idle)
+				if (typeof window !== 'undefined') {
+					const schedule = (cb: () => void) => {
+						if ('requestIdleCallback' in window) {
+							(window as any).requestIdleCallback(cb, { timeout: 1500 });
+						} else {
+							setTimeout(cb, 0);
+						}
+					};
+					schedule(() => { try { syncAllData(); } catch {} });
+				}
+			} else {
+				setIsSetupComplete(undefined);
+			}
         });
 
         return () => unsubscribe();
@@ -98,7 +114,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    if (!authChecked || (user && isSetupComplete === undefined)) {
+	if (!authChecked) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

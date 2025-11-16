@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 interface TransactionTableProps {
     suppliers: any[];
@@ -29,6 +30,17 @@ export const TransactionTable = React.memo(
             });
         }, [suppliers]);
 
+        // Infinite scroll pagination
+        const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedSuppliers, {
+            totalItems: sortedSuppliers.length,
+            initialLoad: 30,
+            loadMore: 30,
+            threshold: 5,
+            enabled: sortedSuppliers.length > 30,
+        });
+
+        const visibleSuppliers = sortedSuppliers.slice(0, visibleItems);
+
         const allSuppliers = useMemo(() => sortedSuppliers, [sortedSuppliers]);
 
         const handleSelectAll = (checked: boolean) => {
@@ -47,7 +59,7 @@ export const TransactionTable = React.memo(
         };
 
         const tableBody = (
-            <ScrollArea className="h-56 text-[12px]">
+            <ScrollArea ref={scrollRef} className="h-56 text-[12px]">
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
@@ -68,7 +80,7 @@ export const TransactionTable = React.memo(
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedSuppliers.map((entry: any) => {
+                            {visibleSuppliers.map((entry: any) => {
                                 const outstanding = Number((entry as any).outstandingForEntry || entry.netAmount || 0);
                                 const hasOutstanding = outstanding > 0.01;
                                 const isNegative = outstanding < -0.01;
@@ -158,6 +170,21 @@ export const TransactionTable = React.memo(
                                     </React.Fragment>
                                 );
                             })}
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="text-center py-4">
+                                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                        <span className="ml-2 text-sm text-muted-foreground">Loading more entries...</span>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!hasMore && sortedSuppliers.length > 30 && (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="text-center py-2 text-xs text-muted-foreground">
+                                        Showing all {sortedSuppliers.length} entries
+                                    </TableCell>
+                                </TableRow>
+                            )}
                             {sortedSuppliers.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={8} className="text-center text-muted-foreground h-24">

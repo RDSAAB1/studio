@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
@@ -12,7 +13,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes, Briefcase } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes, Briefcase, Edit2, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { handleDeletePaymentLogic } from "@/lib/payment-logic";
+import { db } from "@/lib/database";
 
 interface DetailsDialogProps {
     isOpen: boolean;
@@ -20,6 +25,9 @@ interface DetailsDialogProps {
     customer: Customer | null;
     paymentHistory?: (Payment | CustomerPayment)[];
     entryType?: 'Supplier' | 'Customer';
+    onEditEntry?: (customer: Customer) => void;
+    onEditPayment?: (payment: Payment | CustomerPayment) => void;
+    onDeletePayment?: (payment: Payment | CustomerPayment) => void;
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -32,16 +40,20 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, entryType = 'Supplier' }: DetailsDialogProps) => {
-    if (!customer) return null;
+export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, entryType = 'Supplier', onEditEntry, onEditPayment, onDeletePayment }: DetailsDialogProps) => {
+    const router = useRouter();
+    const { toast } = useToast();
+    const [paymentToDelete, setPaymentToDelete] = useState<Payment | CustomerPayment | null>(null);
 
-    const paymentsForDetailsEntry = useMemo(() => 
-        (paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo)),
-        [paymentHistory, customer.srNo]
-    );
+    // All hooks must be called before any conditional returns
+    const paymentsForDetailsEntry = useMemo(() => {
+        if (!customer) return [];
+        return (paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo));
+    }, [paymentHistory, customer?.srNo]);
 
-    const totalPaidForThisEntry = useMemo(() => 
-        paymentsForDetailsEntry.reduce((sum, p) => {
+    const totalPaidForThisEntry = useMemo(() => {
+        if (!customer) return 0;
+        return paymentsForDetailsEntry.reduce((sum, p) => {
             const paidForThis = p.paidFor?.find(pf => pf.srNo === customer.srNo);
             
             if (!paidForThis) return sum;
@@ -49,12 +61,12 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
             // paidForThis.amount IS the actual paid amount (To Be Paid amount)
             // This is the actual payment amount, NOT (To Be Paid - CD)
             return sum + paidForThis.amount;
-        }, 0),
-        [paymentsForDetailsEntry, customer.srNo]
-    );
+        }, 0);
+    }, [paymentsForDetailsEntry, customer?.srNo]);
 
-    const totalCdForThisEntry = useMemo(() =>
-        paymentsForDetailsEntry.reduce((sum, p) => {
+    const totalCdForThisEntry = useMemo(() => {
+        if (!customer) return 0;
+        return paymentsForDetailsEntry.reduce((sum, p) => {
             const paidForThisDetail = p.paidFor?.find(pf => pf.srNo === customer.srNo);
             if (!paidForThisDetail) return sum;
 
@@ -72,25 +84,50 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                 }
             }
             return sum;
-        }, 0),
-        [paymentsForDetailsEntry, customer.srNo]
-    );
+        }, 0);
+    }, [paymentsForDetailsEntry, customer?.srNo]);
     
-    const finalOutstanding = (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry;
-    
+    // Calculate derived values (not hooks, so safe to be after early return check)
+    const finalOutstanding = customer ? (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry : 0;
     const isCustomer = entryType === 'Customer';
+    const totalBagWeightKg = customer ? (customer.bags || 0) * (customer.bagWeightKg || 0) : 0;
+    const displayBrokerageAmount = customer ? (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0) : 0;
+    const displayCdAmount = customer ? (Number(customer.amount) || 0) * ((Number(customer.cdRate) || 0) / 100) : 0;
 
-    const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
-
-    const displayBrokerageAmount = (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0);
-    const displayCdAmount = (Number(customer.amount) || 0) * ((Number(customer.cdRate) || 0) / 100);
+    // Early return after all hooks
+    if (!customer) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
                 <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center flex-shrink-0">
-                    <div>
+                    <div className="flex items-center gap-2">
                         <DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle>
+                        {!isCustomer && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                    if (onEditEntry) {
+                                        onEditEntry(customer);
+                                        onOpenChange(false);
+                                    } else {
+                                        // Navigate to supplier entry page with customer data
+                                        localStorage.setItem('editSupplierData', JSON.stringify(customer));
+                                        router.push('/sales/supplier-entry');
+                                        onOpenChange(false);
+                                        toast({
+                                            title: "Navigating to Supplier Entry",
+                                            description: `Loading ${customer.name} (SR# ${customer.srNo}) for editing...`,
+                                        });
+                                    }
+                                }}
+                            >
+                                <Edit2 className="h-3 w-3 mr-1" />
+                                Edit Entry
+                            </Button>
+                        )}
                     </div>
                     <DialogClose asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
@@ -189,6 +226,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     <TableHead className="p-2 text-xs text-right">Paid Amount</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Total Settled</TableHead>
+                                                    <TableHead className="p-2 text-xs text-center">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -222,6 +260,42 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                             <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right text-blue-600">{formatCurrency(cdForThisEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(settledAmountForEntry)}</TableCell>
+                                                            <TableCell className="p-2">
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700"
+                                                                        onClick={() => {
+                                                                            if (onEditPayment) {
+                                                                                onEditPayment(payment);
+                                                                                onOpenChange(false);
+                                                                            } else {
+                                                                                // Navigate to supplier payments page with payment data
+                                                                                localStorage.setItem('editPaymentData', JSON.stringify(payment));
+                                                                                router.push('/sales/supplier-payments');
+                                                                                onOpenChange(false);
+                                                                                toast({
+                                                                                    title: "Navigating to Payments",
+                                                                                    description: `Loading payment ${payment.paymentId || payment.id} for editing...`,
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        title="Edit Payment"
+                                                                    >
+                                                                        <Edit2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                                                                        onClick={() => setPaymentToDelete(payment)}
+                                                                        title="Delete Payment"
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
                                                         </TableRow>
                                                     );
                                                 })}
@@ -235,6 +309,54 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                     </div>
                 </ScrollArea>
             </DialogContent>
+            
+            {/* Delete Payment Confirmation Dialog */}
+            <AlertDialog open={!!paymentToDelete} onOpenChange={(open) => !open && setPaymentToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Payment?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete payment {paymentToDelete?.paymentId || paymentToDelete?.id}? 
+                            This action cannot be undone and will remove this payment from the system.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={async () => {
+                                if (paymentToDelete && paymentToDelete.id) {
+                                    try {
+                                        if (onDeletePayment) {
+                                            onDeletePayment(paymentToDelete);
+                                        } else {
+                                            // Get all suppliers for the delete logic
+                                            const allSuppliers = await db.suppliers.toArray();
+                                            await handleDeletePaymentLogic(paymentToDelete as any, allSuppliers);
+                                            toast({
+                                                title: "Payment Deleted",
+                                                description: `Payment ${paymentToDelete.paymentId || paymentToDelete.id} has been deleted successfully.`,
+                                                variant: "success",
+                                            });
+                                        }
+                                        setPaymentToDelete(null);
+                                        onOpenChange(false);
+                                    } catch (error) {
+                                        console.error('Error deleting payment:', error);
+                                        toast({
+                                            title: "Error",
+                                            description: "Failed to delete payment. Please try again.",
+                                            variant: "destructive",
+                                        });
+                                    }
+                                }
+                            }}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
     );
 };

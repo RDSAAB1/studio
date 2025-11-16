@@ -569,7 +569,18 @@ const handleDelete = async (id: string) => {
     setConsolidatedReceiptData(null);
   };
   
-  const handlePrint = () => {
+  // Yield control to browser to prevent blocking
+  const yieldToBrowser = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => resolve(), { timeout: 1 });
+      } else {
+        setTimeout(() => resolve(), 0);
+      }
+    });
+  }, []);
+
+  const handlePrint = useCallback(async () => {
     if (selectedSupplierIds.size > 0) {
         const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
         if (entriesToPrint.length === 0) {
@@ -577,33 +588,89 @@ const handleDelete = async (id: string) => {
             return;
         }
 
-        if (entriesToPrint.length === 1) {
-            setReceiptsToPrint(entriesToPrint);
-            setConsolidatedReceiptData(null);
-        } else {
-            const firstCustomerId = entriesToPrint[0].customerId;
-            const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-    
-            if (!allSameCustomer) {
-                toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
-                return;
-            }
-            
-            const supplier = entriesToPrint[0];
-            const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-            
-            setConsolidatedReceiptData({
-                supplier: {
-                    name: supplier.name,
-                    so: supplier.so,
-                    address: supplier.address,
-                    contact: supplier.contact,
-                },
-                entries: entriesToPrint,
-                totalAmount: totalAmount,
-                date: format(new Date(), "dd-MMM-yy"),
+        // Show loading toast for large datasets
+        const isLargeDataset = entriesToPrint.length > 1000;
+        if (isLargeDataset) {
+            toast({
+                title: "Processing Print Data",
+                description: `Preparing ${entriesToPrint.length} entries for print. This may take a moment...`,
             });
-            setReceiptsToPrint([]);
+        }
+
+        try {
+            // Determine chunk size based on dataset size
+            let chunkSize = 100;
+            if (entriesToPrint.length > 10000) {
+                chunkSize = 200;
+            } else if (entriesToPrint.length > 5000) {
+                chunkSize = 150;
+            } else if (entriesToPrint.length > 1000) {
+                chunkSize = 100;
+            } else {
+                chunkSize = 50;
+            }
+
+            if (entriesToPrint.length === 1) {
+                setReceiptsToPrint(entriesToPrint);
+                setConsolidatedReceiptData(null);
+            } else {
+                // Process in chunks to check if all same customer
+                const firstCustomerId = entriesToPrint[0].customerId;
+                let allSameCustomer = true;
+                
+                for (let i = 0; i < entriesToPrint.length; i += chunkSize) {
+                    const chunk = entriesToPrint.slice(i, i + chunkSize);
+                    const chunkSameCustomer = chunk.every(e => e.customerId === firstCustomerId);
+                    
+                    if (!chunkSameCustomer) {
+                        allSameCustomer = false;
+                        break;
+                    }
+                    
+                    // Yield to browser after each chunk
+                    if (i + chunkSize < entriesToPrint.length) {
+                        await yieldToBrowser();
+                    }
+                }
+        
+                if (!allSameCustomer) {
+                    toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
+                    return;
+                }
+                
+                // Calculate total amount in chunks
+                let totalAmount = 0;
+                for (let i = 0; i < entriesToPrint.length; i += chunkSize) {
+                    const chunk = entriesToPrint.slice(i, i + chunkSize);
+                    totalAmount += chunk.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+                    
+                    // Yield to browser after each chunk
+                    if (i + chunkSize < entriesToPrint.length) {
+                        await yieldToBrowser();
+                    }
+                }
+                
+                const supplier = entriesToPrint[0];
+                setConsolidatedReceiptData({
+                    supplier: {
+                        name: supplier.name,
+                        so: supplier.so,
+                        address: supplier.address,
+                        contact: supplier.contact,
+                    },
+                    entries: entriesToPrint,
+                    totalAmount: totalAmount,
+                    date: format(new Date(), "dd-MMM-yy"),
+                });
+                setReceiptsToPrint([]);
+            }
+        } catch (error) {
+            console.error('Error processing print data:', error);
+            toast({
+                title: "Error",
+                description: "Failed to process print data. Please try again.",
+                variant: "destructive",
+            });
         }
     } else {
       const formValues = form.getValues();
@@ -614,7 +681,7 @@ const handleDelete = async (id: string) => {
          toast({ title: "Please fill form or select entries to print.", variant: "destructive" });
       }
     }
-  };
+  }, [selectedSupplierIds, filteredSuppliers, toast, yieldToBrowser, form]);
 
     const handleExport = () => {
         if (!suppliers) return;

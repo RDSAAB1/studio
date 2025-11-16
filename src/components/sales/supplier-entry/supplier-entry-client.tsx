@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 
@@ -66,18 +66,12 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 export default function SupplierEntryClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [lastVisibleSupplier, setLastVisibleSupplier] = useState<any>(null);
-  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
-
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-  const [lastVisiblePayment, setLastVisiblePayment] = useState<any>(null);
-  const [hasMorePayments, setHasMorePayments] = useState(true);
 
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -270,51 +264,36 @@ export default function SupplierEntryClient() {
     }
   }, []);
 
-  const loadInitialData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [suppliersResult, paymentsResult] = await Promise.all([
-        getInitialSuppliers(),
-        getInitialPayments()
-      ]);
-      
-      setSuppliers(suppliersResult.data);
-      setLastVisibleSupplier(suppliersResult.lastVisible);
-      setHasMoreSuppliers(suppliersResult.hasMore);
-
-      setPaymentHistory(paymentsResult.data);
-      setLastVisiblePayment(paymentsResult.lastVisible);
-      setHasMorePayments(paymentsResult.hasMore);
-
-      handleNew();
-
-    } catch (error) {
-      console.error("Error loading initial data:", error);
-      toast({ title: 'Error loading data', variant: 'destructive' });
-    }
-    setIsLoading(false);
-  }, [handleNew, toast]);
-  
+  // Load all suppliers and payments using realtime listeners
   useEffect(() => {
-    if(isClient) {
-        loadInitialData();
-    }
-  }, [isClient, loadInitialData]);
+    if (!isClient) return;
+    
+    setIsLoading(true);
+    
+    // Setup realtime listeners for all data
+    const unsubSuppliers = getSuppliersRealtime((data) => {
+      setSuppliers(data);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error loading suppliers:", error);
+      toast({ title: 'Error loading suppliers', variant: 'destructive' });
+      setIsLoading(false);
+    });
 
-  const loadMoreData = useCallback(async () => {
-    if (!hasMoreSuppliers || isLoadingMore) return;
-    setIsLoadingMore(true);
-    try {
-        const result = await getMoreSuppliers(lastVisibleSupplier);
-        setSuppliers(prev => [...prev, ...result.data]);
-        setLastVisibleSupplier(result.lastVisible);
-        setHasMoreSuppliers(result.hasMore);
-    } catch(e) {
-        console.error("Failed to load more suppliers", e);
-        toast({title: 'Error', description: 'Could not load more entries.', variant: 'destructive'});
-    }
-    setIsLoadingMore(false);
-  }, [hasMoreSuppliers, isLoadingMore, lastVisibleSupplier, toast]);
+    const unsubPayments = getPaymentsRealtime((data) => {
+      setPaymentHistory(data);
+    }, (error) => {
+      console.error("Error loading payments:", error);
+      toast({ title: 'Error loading payments', variant: 'destructive' });
+    });
+
+    handleNew();
+
+    return () => {
+      unsubSuppliers();
+      unsubPayments();
+    };
+  }, [isClient, handleNew, toast]);
 
 
   useEffect(() => {
@@ -550,7 +529,18 @@ export default function SupplierEntryClient() {
     setConsolidatedReceiptData(null);
   };
   
-  const handlePrint = () => {
+  // Yield control to browser to prevent blocking
+  const yieldToBrowser = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => resolve(), { timeout: 1 });
+      } else {
+        setTimeout(() => resolve(), 0);
+      }
+    });
+  }, []);
+
+  const handlePrint = useCallback(async () => {
     if (selectedSupplierIds.size > 0) {
         const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
         if (entriesToPrint.length === 0) {
@@ -558,33 +548,89 @@ export default function SupplierEntryClient() {
             return;
         }
 
-        if (entriesToPrint.length === 1) {
-            setReceiptsToPrint(entriesToPrint);
-            setConsolidatedReceiptData(null);
-        } else {
-            const firstCustomerId = entriesToPrint[0].customerId;
-            const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-    
-            if (!allSameCustomer) {
-                toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
-                return;
-            }
-            
-            const supplier = entriesToPrint[0];
-            const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-            
-            setConsolidatedReceiptData({
-                supplier: {
-                    name: supplier.name,
-                    so: supplier.so,
-                    address: supplier.address,
-                    contact: supplier.contact,
-                },
-                entries: entriesToPrint,
-                totalAmount: totalAmount,
-                date: format(new Date(), "dd-MMM-yy"),
+        // Show loading toast for large datasets
+        const isLargeDataset = entriesToPrint.length > 1000;
+        if (isLargeDataset) {
+            toast({
+                title: "Processing Print Data",
+                description: `Preparing ${entriesToPrint.length} entries for print. This may take a moment...`,
             });
-            setReceiptsToPrint([]);
+        }
+
+        try {
+            // Determine chunk size based on dataset size
+            let chunkSize = 100;
+            if (entriesToPrint.length > 10000) {
+                chunkSize = 200;
+            } else if (entriesToPrint.length > 5000) {
+                chunkSize = 150;
+            } else if (entriesToPrint.length > 1000) {
+                chunkSize = 100;
+            } else {
+                chunkSize = 50;
+            }
+
+            if (entriesToPrint.length === 1) {
+                setReceiptsToPrint(entriesToPrint);
+                setConsolidatedReceiptData(null);
+            } else {
+                // Process in chunks to check if all same customer
+                const firstCustomerId = entriesToPrint[0].customerId;
+                let allSameCustomer = true;
+                
+                for (let i = 0; i < entriesToPrint.length; i += chunkSize) {
+                    const chunk = entriesToPrint.slice(i, i + chunkSize);
+                    const chunkSameCustomer = chunk.every(e => e.customerId === firstCustomerId);
+                    
+                    if (!chunkSameCustomer) {
+                        allSameCustomer = false;
+                        break;
+                    }
+                    
+                    // Yield to browser after each chunk
+                    if (i + chunkSize < entriesToPrint.length) {
+                        await yieldToBrowser();
+                    }
+                }
+        
+                if (!allSameCustomer) {
+                    toast({ title: "Consolidated receipts are for a single supplier.", variant: "destructive" });
+                    return;
+                }
+                
+                // Calculate total amount in chunks
+                let totalAmount = 0;
+                for (let i = 0; i < entriesToPrint.length; i += chunkSize) {
+                    const chunk = entriesToPrint.slice(i, i + chunkSize);
+                    totalAmount += chunk.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+                    
+                    // Yield to browser after each chunk
+                    if (i + chunkSize < entriesToPrint.length) {
+                        await yieldToBrowser();
+                    }
+                }
+                
+                const supplier = entriesToPrint[0];
+                setConsolidatedReceiptData({
+                    supplier: {
+                        name: supplier.name,
+                        so: supplier.so,
+                        address: supplier.address,
+                        contact: supplier.contact,
+                    },
+                    entries: entriesToPrint,
+                    totalAmount: totalAmount,
+                    date: format(new Date(), "dd-MMM-yy"),
+                });
+                setReceiptsToPrint([]);
+            }
+        } catch (error) {
+            console.error('Error processing print data:', error);
+            toast({
+                title: "Error",
+                description: "Failed to process print data. Please try again.",
+                variant: "destructive",
+            });
         }
     } else {
       const formValues = form.getValues();
@@ -595,7 +641,7 @@ export default function SupplierEntryClient() {
          toast({ title: "Please fill form or select entries to print.", variant: "destructive" });
       }
     }
-  };
+  }, [selectedSupplierIds, filteredSuppliers, toast, yieldToBrowser, form]);
 
     const handleExport = () => {
         if (!suppliers) return;
@@ -850,13 +896,6 @@ export default function SupplierEntryClient() {
         onPrintRow={handleSinglePrint}
       />
       
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
@@ -1612,19 +1651,6 @@ export default function SupplierEntryClient() {
 
       
 
-      {hasMoreSuppliers && (
-
-        <div className="text-center">
-
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-
-                {isLoadingMore ? "Loading..." : "Load More"}
-
-            </Button>
-
-        </div>
-
-       )}
 
 
 

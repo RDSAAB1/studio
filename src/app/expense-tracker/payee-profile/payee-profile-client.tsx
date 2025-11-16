@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 
 type PayeeTransaction = Transaction & {
     runningBalance: number;
@@ -45,6 +46,115 @@ const MetricTile = ({ label, value, tone }: { label: string; value: string; tone
         <p className={cn("mt-1 text-xl font-semibold leading-tight", tone)}>{value}</p>
     </div>
 );
+
+// Payee Transaction Table with Infinite Scroll
+const PayeeTransactionTable = ({ 
+    transactions,
+    onEditTransaction,
+    onDeleteTransaction
+}: { 
+    transactions: PayeeTransaction[];
+    onEditTransaction: (tx: Transaction) => void;
+    onDeleteTransaction: (tx: Transaction) => void;
+}) => {
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(transactions, {
+        totalItems: transactions.length,
+        initialLoad: 30,
+        loadMore: 30,
+        threshold: 5,
+        enabled: transactions.length > 30,
+    });
+
+    const visibleTransactions = transactions.slice(0, visibleItems);
+
+    const formatSignedCurrency = (value: number) => {
+        const formatted = formatCurrency(Math.abs(value));
+        return value >= 0 ? formatted : `-${formatted}`;
+    };
+
+    const resolveDescription = (tx: Transaction) => {
+        const raw =
+            (tx.description && tx.description.trim()) ||
+            (typeof (tx as any).notes === 'string' && (tx as any).notes.trim()) ||
+            (typeof (tx as any).narration === 'string' && (tx as any).narration.trim()) ||
+            '';
+        return raw || '-';
+    };
+
+    return (
+        <ScrollArea ref={scrollRef} className="h-96">
+            <div className="overflow-x-auto">
+                <Table className="min-w-[700px]">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>SR No.</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Debit</TableHead>
+                        <TableHead className="text-right">Credit</TableHead>
+                        <TableHead className="text-right">Running Balance</TableHead>
+                        <TableHead className="text-right w-20">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {visibleTransactions.map(tx => (
+                        <TableRow key={tx.id}>
+                            <TableCell>{format(new Date(tx.date), 'dd-MMM-yyyy')}</TableCell>
+                            <TableCell className="font-mono text-xs">{tx.transactionId || '-'}</TableCell>
+                            <TableCell className="max-w-[320px]">
+                                {resolveDescription(tx)}
+                            </TableCell>
+                            <TableCell className={cn(
+                                "text-right font-semibold",
+                                tx.transactionType === 'Expense' ? "text-rose-600" : "text-muted-foreground"
+                            )}>
+                                {tx.transactionType === 'Expense' ? formatCurrency(tx.amount) : '-'}
+                            </TableCell>
+                            <TableCell className={cn(
+                                "text-right font-semibold",
+                                tx.transactionType === 'Income' ? "text-emerald-600" : "text-muted-foreground"
+                            )}>
+                                {tx.transactionType === 'Income' ? formatCurrency(tx.amount) : '-'}
+                            </TableCell>
+                            <TableCell className={cn(
+                                "text-right font-semibold",
+                                tx.runningBalance >= 0 ? "text-emerald-700" : "text-rose-600"
+                            )}>
+                                {formatSignedCurrency(tx.runningBalance)}
+                            </TableCell>
+                            <TableCell className="text-right space-x-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7"
+                                    onClick={() => onEditTransaction(tx)}>
+                                    <Pen className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                                    onClick={() => onDeleteTransaction(tx)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    {isLoading && (
+                        <TableRow>
+                            <TableCell colSpan={7} className="text-center py-4">
+                                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                <span className="ml-2 text-sm text-muted-foreground">Loading more transactions...</span>
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {!hasMore && transactions.length > 30 && (
+                        <TableRow>
+                            <TableCell colSpan={7} className="text-center py-2 text-xs text-muted-foreground">
+                                Showing all {transactions.length} transactions
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+            </div>
+        </ScrollArea>
+    );
+};
 
 interface PayeeProfileClientProps {
     autoOpenNewAccount?: boolean;
@@ -381,6 +491,8 @@ const resolveDescription = (tx: Transaction) => {
     };
 
 
+    const [showProfilesList, setShowProfilesList] = useState(false);
+
     if (!isClient) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -416,6 +528,15 @@ const resolveDescription = (tx: Transaction) => {
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Account
                             </Button>
+                            <Button 
+                                onClick={() => setShowProfilesList(!showProfilesList)} 
+                                size="sm" 
+                                variant={showProfilesList ? "default" : "outline"}
+                                className="w-full sm:w-auto"
+                            >
+                                <Users className="mr-2 h-4 w-4" />
+                                {showProfilesList ? "Hide Profiles" : "All Profiles"}
+                            </Button>
                             {onRequestManageCategories && (
                                 <Button
                                     onClick={onRequestManageCategories}
@@ -428,6 +549,116 @@ const resolveDescription = (tx: Transaction) => {
                                 </Button>
                             )}
                         </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {showProfilesList && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>All Payee Profiles</CardTitle>
+                        <CardDescription>Manage all payee profiles. Edit or delete profiles from here.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ScrollArea className="h-[400px]">
+                            <div className="overflow-x-auto">
+                                <Table className="min-w-[800px]">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Contact</TableHead>
+                                        <TableHead>Address</TableHead>
+                                        <TableHead>Nature</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Sub Category</TableHead>
+                                        <TableHead className="text-right">Transactions</TableHead>
+                                        <TableHead className="text-right">Net Balance</TableHead>
+                                        <TableHead className="text-right w-24">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from(payeeSummaryMap.values())
+                                        .sort((a, b) => a.name.localeCompare(b.name))
+                                        .map((summary) => (
+                                            <TableRow key={summary.name}>
+                                                <TableCell className="font-medium">{summary.name}</TableCell>
+                                                <TableCell>{summary.profile?.contact || '—'}</TableCell>
+                                                <TableCell className="max-w-[200px] truncate">
+                                                    {summary.profile?.address || '—'}
+                                                </TableCell>
+                                                <TableCell>{summary.profile?.nature || '—'}</TableCell>
+                                                <TableCell>{summary.profile?.category || '—'}</TableCell>
+                                                <TableCell>{summary.profile?.subCategory || '—'}</TableCell>
+                                                <TableCell className="text-right">{summary.transactionCount}</TableCell>
+                                                <TableCell className={cn(
+                                                    "text-right font-semibold",
+                                                    summary.netAmount >= 0 ? "text-emerald-700" : "text-rose-600"
+                                                )}>
+                                                    {formatSignedCurrency(summary.netAmount)}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-8 w-8"
+                                                            onClick={() => {
+                                                                handleEditPayee(summary.name, summary);
+                                                                setShowProfilesList(false);
+                                                            }}
+                                                            title="Edit Profile"
+                                                        >
+                                                            <Pen className="h-4 w-4" />
+                                                        </Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                    title="Delete Profile"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This will permanently delete all {summary.transactionCount} transactions for "{summary.name}" and remove the profile. This action cannot be undone.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction 
+                                                                        onClick={() => {
+                                                                            handleDeletePayee(summary.name);
+                                                                            if (selectedPayee === summary.name) {
+                                                                                setSelectedPayee(null);
+                                                                            }
+                                                                        }}
+                                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                                    >
+                                                                        Delete All
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    {payeeSummaryMap.size === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                                                No payee profiles found. Add a new profile to get started.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                            </div>
+                        </ScrollArea>
                     </CardContent>
                 </Card>
             )}
@@ -513,60 +744,11 @@ const resolveDescription = (tx: Transaction) => {
                             <CardTitle>Transaction History</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ScrollArea className="h-96">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>SR No.</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Debit</TableHead>
-                                            <TableHead className="text-right">Credit</TableHead>
-                                            <TableHead className="text-right">Running Balance</TableHead>
-                                            <TableHead className="text-right w-20">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {selectedPayeeData.transactions.map(tx => (
-                                            <TableRow key={tx.id}>
-                                                <TableCell>{format(new Date(tx.date), 'dd-MMM-yyyy')}</TableCell>
-                                            <TableCell className="font-mono text-xs">{tx.transactionId || '-'}</TableCell>
-                                            <TableCell className="max-w-[320px]">
-                                                {resolveDescription(tx)}
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                "text-right font-semibold",
-                                                tx.transactionType === 'Expense' ? "text-rose-600" : "text-muted-foreground"
-                                            )}>
-                                                {tx.transactionType === 'Expense' ? formatCurrency(tx.amount) : '-'}
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                "text-right font-semibold",
-                                                tx.transactionType === 'Income' ? "text-emerald-600" : "text-muted-foreground"
-                                            )}>
-                                                {tx.transactionType === 'Income' ? formatCurrency(tx.amount) : '-'}
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                "text-right font-semibold",
-                                                tx.runningBalance >= 0 ? "text-emerald-700" : "text-rose-600"
-                                            )}>
-                                                {formatSignedCurrency(tx.runningBalance)}
-                                            </TableCell>
-                                            <TableCell className="text-right space-x-1">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7"
-                                                    onClick={() => handleEditTransaction(tx)}>
-                                                    <Pen className="h-3.5 w-3.5" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
-                                                    onClick={() => handleDeleteTransaction(tx)}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
+                            <PayeeTransactionTable 
+                                transactions={selectedPayeeData.transactions}
+                                onEditTransaction={handleEditTransaction}
+                                onDeleteTransaction={handleDeleteTransaction}
+                            />
                         </CardContent>
                     </Card>
                 </div>
