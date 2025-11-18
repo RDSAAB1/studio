@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot, where, orderBy, Timestamp } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
 import type { Customer } from "@/lib/definitions"; // Assuming Customer type is relevant
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,28 @@ export default function AnalyticsPage() {
   // Add more state variables for other data needed for analytics, e.g., orders, campaigns
 
   useEffect(() => {
-    const q = query(collection(firestoreDB, "customers")); // Example: fetch customer data
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:customers');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        collection(firestoreDB, "customers"),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(collection(firestoreDB, "customers"));
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const customersData = snapshot.docs.map(doc => ({
@@ -24,15 +45,17 @@ export default function AnalyticsPage() {
       }));
       setCustomers(customersData);
       setLoading(false);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:customers', String(Date.now()));
+      }
     }, (error) => {
       console.error("Error fetching customers: ", error);
       setLoading(false);
-      // Handle error appropriately
     });
 
-    // Implement similar fetching for other relevant collections (e.g., 'orders', 'campaigns')
-
-    return () => unsubscribe(); // Clean up listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   // Example: Simple transformation for a chart (e.g., customers by date)

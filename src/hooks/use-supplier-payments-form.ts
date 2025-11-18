@@ -89,30 +89,28 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
     
     const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS') => {
-        if (method === paymentMethod) {
-            setPaymentMethod(method);
-            return;
-        }
-
+        // Always allow switching to the selected method
         setPaymentMethod(method);
+        
         if (method === 'Cash') {
             handleSetSelectedAccountId('CashInHand');
             return;
         }
 
+        // When switching to Online or RTGS, try to select a bank account
         const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
         const accountExists = safeBankAccounts.some(ba => ba.id === defaultBankId);
         const firstBankId = safeBankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
 
-        if (selectedAccountId === 'CashInHand' || method !== paymentMethod) {
+        // Only update account if currently on CashInHand or invalid account
+        if (selectedAccountId === 'CashInHand' || !safeBankAccounts.some(ba => ba.id === selectedAccountId && ba.id !== 'CashInHand')) {
             if (defaultBankId && defaultBankId !== 'CashInHand' && accountExists) {
                 handleSetSelectedAccountId(defaultBankId);
             } else if (firstBankId) {
                 handleSetSelectedAccountId(firstBankId);
-            } else {
-                handleSetSelectedAccountId('CashInHand');
-                setPaymentMethod('Cash');
             }
+            // If no bank accounts available, allow Online/RTGS selection anyway
+            // User can add bank accounts later or select one when available
         }
     };
 

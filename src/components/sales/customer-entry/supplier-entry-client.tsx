@@ -319,7 +319,9 @@ export default function SupplierEntryClient() {
       unsubVarieties();
       unsubPaymentTypes();
     };
-  }, [isClient, form, toast]);
+    // Removed form and toast from dependencies - form is stable, toast is stable from useToast
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);

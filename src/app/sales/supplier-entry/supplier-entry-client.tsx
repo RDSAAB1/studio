@@ -254,7 +254,9 @@ export default function SupplierEntryClient() {
       unsubVarieties();
       unsubPaymentTypes();
     };
-  }, [isClient, form, toast]);
+    // Removed form and toast from dependencies - form is stable, toast is stable from useToast
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -275,7 +277,10 @@ export default function SupplierEntryClient() {
         performCalculations(value as Partial<FormValues>, false);
     });
     return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
+    // Only re-subscribe if form instance changes (rare)
+    // performCalculations callback already handles dependencies internally
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   
   const handleEdit = (id: string) => {

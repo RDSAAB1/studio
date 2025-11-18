@@ -67,7 +67,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 							setTimeout(cb, 0);
 						}
 					};
-					schedule(() => { try { syncAllData(); } catch {} });
+					// Initialize local-first sync (async IIFE to handle await)
+					(async () => {
+						const { initLocalFirstSync } = await import('@/lib/local-first-sync');
+						initLocalFirstSync();
+						schedule(() => { try { syncAllData(); } catch {} });
+					})();
 				}
 			} else {
 				setIsSetupComplete(undefined);
@@ -164,7 +169,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
             };
         }
-    }, [toast]);
+        // Removed toast from dependencies - it's stable from useToast hook
+        // Service worker registration doesn't need toast as dependency
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <html lang="en" suppressHydrationWarning>

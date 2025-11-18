@@ -38,7 +38,7 @@ export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     
   const hook = useSupplierPayments();
-  const { supplierBankAccounts } = useSupplierData();
+  const { supplierBankAccounts, banks, bankBranches } = useSupplierData();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
 
@@ -108,7 +108,9 @@ export default function SupplierPaymentsClient() {
         localStorage.removeItem('editPaymentData');
       }
     }
-  }, [hook.handleEditPayment, toast]);
+  }, [hook.handleEditPayment]);
+    // Removed toast from dependencies - it's stable from useToast hook
+    // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const selectedSupplierSummary = useMemo(() => {
     if (!hook.selectedCustomerKey) return null;
@@ -152,23 +154,47 @@ export default function SupplierPaymentsClient() {
     [normalizedSerialFilter, selectedSupplierSrNos]
   );
 
+  // Helper function to extract numeric part from serial number for sorting
+  const getSerialNumberForSort = (payment: Payment): number => {
+    const srNo = payment.paidFor?.[0]?.srNo || payment.parchiNo || '';
+    if (!srNo) return 0;
+    // Extract numeric part from serial number (e.g., "S00001" -> 1, "00001" -> 1)
+    const numericMatch = srNo.toString().match(/\d+/);
+    return numericMatch ? parseInt(numericMatch[0], 10) : 0;
+  };
+
   const cashHistoryRows = useMemo(() => {
-    return hook.paymentHistory
+    const filtered = hook.paymentHistory
       .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash")
       .filter(paymentMatchesSelection);
+    // Sort by serial number (ascending - low to high)
+    return [...filtered].sort((a, b) => {
+      const srNoA = getSerialNumberForSort(a);
+      const srNoB = getSerialNumberForSort(b);
+      return srNoA - srNoB;
+    });
   }, [hook.paymentHistory, paymentMatchesSelection]);
 
   const rtgsHistoryRows = useMemo(() => {
-    return hook.paymentHistory
+    const filtered = hook.paymentHistory
       .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "rtgs")
       .filter(paymentMatchesSelection);
+    // Sort by serial number (ascending - low to high)
+    return [...filtered].sort((a, b) => {
+      const srNoA = getSerialNumberForSort(a);
+      const srNoB = getSerialNumberForSort(b);
+      return srNoA - srNoB;
+    });
   }, [hook.paymentHistory, paymentMatchesSelection]);
 
 
     const handlePaymentMethodChange = useCallback(
       (method: 'Cash' | 'Online' | 'RTGS') => {
-        if (hook.paymentMethod === method) return;
-        hook.setPaymentMethod(method);
+        // Call the setPaymentMethod directly from the hook
+        // It's already handleSetPaymentMethod which has all the logic
+        if (hook.setPaymentMethod) {
+          hook.setPaymentMethod(method);
+        }
       },
       [hook]
     );
@@ -243,7 +269,7 @@ export default function SupplierPaymentsClient() {
                                 {hook.paymentMethod === 'RTGS' && (
                                   <Card className="text-[11px]">
                                     <CardContent className="p-3">
-                                      <RtgsForm {...hook} bankAccounts={supplierBankAccounts} />
+                                      <RtgsForm {...hook} bankAccounts={supplierBankAccounts} banks={banks} bankBranches={bankBranches} />
                                     </CardContent>
                                   </Card>
                                 )}
@@ -252,6 +278,7 @@ export default function SupplierPaymentsClient() {
                                 {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && (
                                   <PaymentForm
                                     {...hook}
+                                    bankAccounts={hook.bankAccounts}
                                     bankBranches={hook.bankBranches}
                                     onPaymentMethodChange={handlePaymentMethodChange}
                                   />

@@ -447,7 +447,10 @@ export default function SimpleSupplierEntryAllFields() {
             unsubVarieties();
             unsubPaymentTypes();
         };
-    }, [isClient, form]);
+        // Removed form from dependencies - form is stable
+        // This prevents re-subscribing to getOptionsRealtime on every render
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isClient]);
 
     // Calculate summary with real-time updates (debounced for performance)
     const calculateSummary = useCallback(() => {

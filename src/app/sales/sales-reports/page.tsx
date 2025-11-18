@@ -23,8 +23,29 @@ export default function SalesReportsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0);
 
   useEffect(() => {
-    const salesCollectionRef = collection(firestoreDB, "customers"); // Changed to customers collection
-    const q = query(salesCollectionRef, orderBy("date", "desc"));
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:customers');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    const salesCollectionRef = collection(firestoreDB, "customers");
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        salesCollectionRef,
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(salesCollectionRef, orderBy("date", "desc"));
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data: Customer[] = [];
@@ -71,6 +92,11 @@ export default function SalesReportsPage() {
       setTotalTransactions(data.length);
       setAverageSaleAmount(data.length > 0 ? totalAmount / data.length : 0);
       setLoading(false);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:customers', String(Date.now()));
+      }
     }, (error) => {
       console.error("Error fetching sales data:", error);
       setLoading(false);

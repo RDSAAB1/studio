@@ -23,16 +23,43 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState({ name: '', description: '', startDate: '', endDate: '' });
 
   useEffect(() => {
-    const q = query(collection(firestoreDB, "campaigns"));
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:campaigns');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        collection(firestoreDB, "campaigns"),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(collection(firestoreDB, "campaigns"));
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const campaignsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as Campaign,
-        startDate: doc.data().startDate ? format(new Date(doc.data().startDate), 'yyyy-MM-dd') : '', // Format date for input
-        endDate: doc.data().endDate ? format(new Date(doc.data().endDate), 'yyyy-MM-dd') : '', // Format date for input
+        startDate: doc.data().startDate ? format(new Date(doc.data().startDate), 'yyyy-MM-dd') : '',
+        endDate: doc.data().endDate ? format(new Date(doc.data().endDate), 'yyyy-MM-dd') : '',
       }));
       setCampaigns(campaignsData);
       setLoading(false);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:campaigns', String(Date.now()));
+      }
     }, (error) => {
       console.error("Error fetching campaigns: ", error);
       setLoading(false);

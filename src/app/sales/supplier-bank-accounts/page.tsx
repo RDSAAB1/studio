@@ -123,7 +123,7 @@ export default function SupplierBankAccountsPage() {
     );
 
     return () => unsubscribe();
-  }, [toast]);
+  }, []); // Removed toast from dependencies to prevent re-subscriptions
 
   // Reset form when editing account changes
   useEffect(() => {

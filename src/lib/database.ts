@@ -109,125 +109,54 @@ export { db };
 
 
 // --- Synchronization Logic ---
+// ✅ UPDATED: Use incremental sync from local-first-sync instead of reading entire collections
 export async function syncAllData() {
     if (!db) return;
 
-    console.log("Starting full data sync...");
+    console.log("Starting incremental data sync...");
 
-    // Sync Suppliers
-    getSuppliersRealtime(async (suppliers) => {
-        if (suppliers.length > 0) {
-            try {
-                // Handle duplicate srNo values by updating existing records instead of creating new ones
-                // Process in batches to avoid overwhelming IndexedDB
-                const BATCH_SIZE = 100;
-                let syncedCount = 0;
-                let skippedCount = 0;
-                
-                for (let i = 0; i < suppliers.length; i += BATCH_SIZE) {
-                    const batch = suppliers.slice(i, i + BATCH_SIZE);
-                    
-                    try {
-                        // First, check for existing suppliers with same srNo
-                        const existingSrNos = new Set<string>();
-                        for (const supplier of batch) {
-                            if (supplier.srNo) {
-                                const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
-                                if (existing) {
-                                    existingSrNos.add(supplier.srNo);
-                                    // Update existing record
-                                    await db.suppliers.update(existing.id, supplier);
-                                    syncedCount++;
-                                }
-                            }
-                        }
-                        
-                        // Add new suppliers (those without existing srNo)
-                        const newSuppliers = batch.filter(s => !s.srNo || !existingSrNos.has(s.srNo));
-                        if (newSuppliers.length > 0) {
-                            try {
-                                await db.suppliers.bulkPut(newSuppliers);
-                                syncedCount += newSuppliers.length;
-                            } catch (bulkError: any) {
-                                // If bulkPut fails due to duplicate srNo, process individually
-                                if (bulkError.name === 'BulkError' || bulkError.name === 'ConstraintError') {
-                                    for (const supplier of newSuppliers) {
-                                        try {
-                                            if (supplier.srNo) {
-                                                const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
-                                                if (existing) {
-                                                    await db.suppliers.update(existing.id, supplier);
-                                                    syncedCount++;
-                                                } else {
-                                                    await db.suppliers.add(supplier);
-                                                    syncedCount++;
-                                                }
-                                            } else {
-                                                await db.suppliers.add(supplier);
-                                                syncedCount++;
-                                            }
-                                        } catch (err: any) {
-                                            if (err.name === 'ConstraintError') {
-                                                // Duplicate srNo - update existing
-                                                if (supplier.srNo) {
-                                                    const existing = await db.suppliers.where('srNo').equals(supplier.srNo).first();
-                                                    if (existing) {
-                                                        await db.suppliers.update(existing.id, supplier);
-                                                        syncedCount++;
-                                                    } else {
-                                                        skippedCount++;
-                                                    }
-                                                } else {
-                                                    skippedCount++;
-                                                }
-                                            } else {
-                                                console.warn('Error syncing supplier:', supplier.srNo || supplier.id, err);
-                                                skippedCount++;
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    throw bulkError;
-                                }
-                            }
-                        }
-                    } catch (batchError: any) {
-                        console.warn(`Error syncing batch ${i}-${i + BATCH_SIZE}:`, batchError);
+    // ✅ Use incremental sync from local-first-sync manager
+    // This will only sync changed documents, not entire collections
+    try {
+        const { forceSyncFromFirestore } = await import('./local-first-sync');
+        await forceSyncFromFirestore();
+        console.log("✅ Incremental sync completed - only changed documents synced");
+    } catch (error) {
+        console.error("Sync Error:", error);
+        // Fallback to old method if local-first-sync fails (only for first time)
+        console.warn("Falling back to full sync (first time only)...");
+        
+        // First sync - get all (only once)
+        getSuppliersRealtime(async (suppliers) => {
+            if (suppliers.length > 0 && db) {
+                try {
+                    await db.suppliers.bulkPut(suppliers);
+                    console.log(`Synced ${suppliers.length} suppliers (first sync).`);
+                    // Save last sync time
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('lastSync:suppliers', String(Date.now()));
                     }
-                }
-                
-                if (syncedCount > 0) {
-                    console.log(`Synced ${syncedCount} suppliers${skippedCount > 0 ? `, skipped ${skippedCount} duplicates` : ''}.`);
-                }
-            } catch (error: any) {
-                // Fallback: log error but don't crash
-                if (error.name === 'BulkError') {
-                    console.warn(`BulkError during supplier sync: ${error.message}. Some suppliers may not have synced.`);
-                } else {
+                } catch (error: any) {
                     console.error("Sync Error (Suppliers):", error);
                 }
             }
-        }
-    }, (error) => console.error("Sync Error (Suppliers):", error));
+        }, (error) => console.error("Sync Error (Suppliers):", error));
 
-    // Sync Payments
-    getPaymentsRealtime(async (payments) => {
-        if (payments.length > 0) {
-            try {
-                await db.payments.bulkPut(payments);
-                console.log(`Synced ${payments.length} payments.`);
-            } catch (error: any) {
-                // Ignore ConstraintError for duplicate keys - this is not a real error
-                if (error.name === 'ConstraintError') {
-                    console.log(`Ignored duplicate key constraint error - ${payments.length} payments processed.`);
-                } else {
+        getPaymentsRealtime(async (payments) => {
+            if (payments.length > 0 && db) {
+                try {
+                    await db.payments.bulkPut(payments);
+                    console.log(`Synced ${payments.length} payments (first sync).`);
+                    // Save last sync time
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('lastSync:payments', String(Date.now()));
+                    }
+                } catch (error: any) {
                     console.error("Sync Error (Payments):", error);
                 }
             }
-        }
-    }, (error) => console.error("Sync Error (Payments):", error));
-
-    // Add other sync functions here as needed
+        }, (error) => console.error("Sync Error (Payments):", error));
+    }
 }
 
 // Hard sync: replace local IndexedDB with fresh Firestore data (suppliers, payments)

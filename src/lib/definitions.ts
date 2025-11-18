@@ -89,6 +89,95 @@ export type Customer = {
   isDeleted?: boolean; // For soft delete
 };
 
+// Kanta Parchi - Separate collection for weight/calculation entries
+export type KantaParchi = {
+  id: string; // Firestore unique ID
+  srNo: string; // Human-readable sequential ID (e.g., KP0001)
+  date: string;
+  name: string;
+  contact: string;
+  vehicleNo: string;
+  variety: string;
+  grossWeight: number;
+  teirWeight: number;
+  weight: number;
+  netWeight: number;
+  rate: number;
+  bags: number;
+  bagWeightKg: number;
+  bagRate: number;
+  bagAmount: number;
+  amount: number;
+  cdRate: number; // CD percentage
+  cdAmount: number; // Calculated CD amount
+  brokerageRate: number; // Brokerage rate per quintal
+  brokerageAmount: number; // Calculated brokerage amount
+  isBrokerageIncluded: boolean;
+  kanta: number;
+  advanceFreight: number;
+  originalNetAmount: number;
+  netAmount: number;
+  paymentType: string;
+  customerId: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+// Customer Document - Separate collection for tax invoice/bill of supply/chalan
+export type CustomerDocument = {
+  id: string; // Firestore unique ID
+  documentSrNo: string; // Document serial number (e.g., DOC0001)
+  kantaParchiSrNo: string; // Reference to Kanta Parchi srNo (read-only reference)
+  documentType: 'tax-invoice' | 'bill-of-supply' | 'challan';
+  date: string;
+  
+  // Customer details (copied from Kanta Parchi for reference, read-only)
+  name: string;
+  companyName?: string;
+  address: string;
+  contact: string;
+  gstin?: string;
+  stateName?: string;
+  stateCode?: string;
+  
+  // Document creation fields
+  hsnCode: string;
+  taxRate: number;
+  isGstIncluded: boolean;
+  nineRNo?: string;
+  gatePassNo?: string;
+  grNo?: string;
+  grDate?: string;
+  transport?: string;
+  
+  // Shipping details
+  shippingName?: string;
+  shippingCompanyName?: string;
+  shippingAddress?: string;
+  shippingContact?: string;
+  shippingGstin?: string;
+  shippingStateName?: string;
+  shippingStateCode?: string;
+  
+  // Calculated amounts (from Kanta Parchi reference)
+  netWeight: number;
+  rate: number;
+  amount: number;
+  cdAmount: number;
+  brokerageAmount: number;
+  kanta: number;
+  bagAmount: number;
+  advanceFreight: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  totalTaxAmount: number;
+  totalInvoiceValue: number;
+  
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type Transaction = {
   id: string; // Firestore unique ID
   transactionId: string; // Human-readable ID (e.g., IN00001, EX00001)

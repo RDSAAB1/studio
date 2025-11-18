@@ -255,30 +255,49 @@ export default function SupplierProfileClient() {
   useEffect(() => {
     setIsClient(true);
     
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [suppliersData, paymentsData] = await Promise.all([
-          getSuppliersRealtime(),
-          getPaymentsRealtime()
-        ]);
-        
+    let isSubscribed = true;
+    
+    // Use realtime listeners (they return unsubscribe functions, not promises)
+    const unsubSuppliers = getSuppliersRealtime((suppliersData) => {
+      if (isSubscribed) {
         setSuppliers(suppliersData);
-        setPaymentHistory(paymentsData);
-      } catch (error) {
-        console.error('Error loading data:', error);
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error('Error loading suppliers:', error);
+      if (isSubscribed) {
         toast({
           title: "Error",
           description: "Failed to load supplier data",
           variant: "destructive",
         });
-      } finally {
         setLoading(false);
       }
-    };
+    });
 
-    loadData();
-  }, [toast]);
+    const unsubPayments = getPaymentsRealtime((paymentsData) => {
+      if (isSubscribed) {
+        setPaymentHistory(paymentsData);
+      }
+    }, (error) => {
+      console.error('Error loading payments:', error);
+      if (isSubscribed) {
+        toast({
+          title: "Error",
+          description: "Failed to load payment data",
+          variant: "destructive",
+        });
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubSuppliers();
+      unsubPayments();
+    };
+    // Removed toast from dependencies - it's stable from useToast hook
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isClient || loading) {
     return (

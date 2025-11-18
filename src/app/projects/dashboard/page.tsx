@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, orderBy, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming you have initialized Firestore in firebase.ts
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -68,9 +68,48 @@ export default function ProjectDashboardPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const projectsQuery = query(collection(firestoreDB, 'projects'));
-    const tasksQuery = query(collection(firestoreDB, 'tasks'));
+    
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (collectionName: string): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem(`lastSync:${collectionName}`);
+      return stored ? parseInt(stored, 10) : undefined;
+    };
 
+    const projectsLastSync = getLastSyncTime('projects');
+    const tasksLastSync = getLastSyncTime('tasks');
+    
+    let projectsQuery;
+    let tasksQuery;
+    
+    if (projectsLastSync) {
+      // ✅ Only get projects modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(projectsLastSync);
+      projectsQuery = query(
+        collection(firestoreDB, 'projects'),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      projectsQuery = query(collection(firestoreDB, 'projects'));
+    }
+
+    if (tasksLastSync) {
+      // ✅ Only get tasks modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(tasksLastSync);
+      tasksQuery = query(
+        collection(firestoreDB, 'tasks'),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      tasksQuery = query(collection(firestoreDB, 'tasks'));
+    }
+
+    let tasksSnapshot: any = null;
+    
     const unsubscribeProjects = onSnapshot(projectsQuery, (projectSnapshot) => {
       const projects = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       const totalProjects = projects.length;
@@ -78,7 +117,6 @@ export default function ProjectDashboardPage() {
       const completedProjects = projects.filter(p => p.status === 'Completed').length;
       const totalProjectCost = projects.reduce((sum, p) => sum + (p.totalCost || 0), 0);
       const totalProjectBilled = projects.reduce((sum, p) => sum + (p.totalBilled || 0), 0);
-
 
       // Dummy progress calculation for now, assuming progress is based on completed tasks
       const projectProgress = projects.map(project => {
@@ -97,9 +135,13 @@ export default function ProjectDashboardPage() {
         totalProjectCost,
         totalProjectBilled
       }));
+
+      // ✅ Save last sync time
+      if (projectSnapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:projects', String(Date.now()));
+      }
     });
 
-    let tasksSnapshot: any = null;
     const unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
         tasksSnapshot = snapshot;
       const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
@@ -109,8 +151,13 @@ export default function ProjectDashboardPage() {
         openTasks: tasks.filter(t => t.status === 'Open').length,
         inProgressTasks: tasks.filter(t => t.status === 'InProgress').length,
         completedTasks: tasks.filter(t => t.status === 'Completed').length,
-        latestTasks: tasks.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).slice(0, 5), // Get latest 5 tasks
+        latestTasks: tasks.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).slice(0, 5),
       }));
+
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:tasks', String(Date.now()));
+      }
     });
 
     return () => {

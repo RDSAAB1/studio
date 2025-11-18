@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, orderBy, where, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming firebase.ts exports db as firestoreDB
 import { PurchaseOrder } from '@/lib/definitions'; // Assuming PurchaseOrder type exists
 
@@ -41,13 +41,40 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     if (!isClient) return;
 
-    const q = query(collection(firestoreDB, 'purchaseOrders'), orderBy('orderDate', 'desc'));
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:purchaseOrders');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        collection(firestoreDB, 'purchaseOrders'),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(collection(firestoreDB, 'purchaseOrders'), orderBy('orderDate', 'desc'));
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as PurchaseOrder[];
       setPurchaseOrders(ordersData);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:purchaseOrders', String(Date.now()));
+      }
     }, (error) => {
       console.error("Error fetching purchase orders: ", error);
       toast({
@@ -56,8 +83,9 @@ export default function PurchaseOrdersPage() {
       });
     });
 
-    return () => unsubscribe(); // Cleanup listener on unmount
-  }, [isClient, toast]);
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
 
   const handleAddOrder = async () => {
     if (!newOrder.supplierId || !newOrder.orderDate || !newOrder.items || newOrder.items.length === 0) {

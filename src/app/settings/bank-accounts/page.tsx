@@ -77,7 +77,9 @@ export default function BankAccountsPage() {
     );
 
     return () => unsubscribe();
-  }, [toast]);
+    // Removed toast from dependencies - it's stable from useToast hook
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset form when editing account changes
   useEffect(() => {

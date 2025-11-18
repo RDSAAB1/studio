@@ -5,14 +5,14 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
+import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData, KantaParchi, CustomerDocument } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addKantaParchi, updateKantaParchi, deleteKantaParchi, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument, getKantaParchiBySrNo, getKantaParchiRealtime } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -60,6 +60,14 @@ export const formSchema = z.object({
     shippingStateName: z.string().optional(),
     shippingStateCode: z.string().optional(),
     advanceFreight: z.coerce.number().optional(),
+    hsnCode: z.string().optional(),
+    taxRate: z.coerce.number().optional(),
+    isGstIncluded: z.boolean().optional(),
+    nineRNo: z.string().optional(),
+    gatePassNo: z.string().optional(),
+    grNo: z.string().optional(),
+    grDate: z.string().optional(),
+    transport: z.string().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -91,7 +99,14 @@ export default function CustomerEntryClient() {
   const [hasMorePayments, setHasMorePayments] = useState(true);
 
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
+  const [currentKantaParchi, setCurrentKantaParchi] = useState<KantaParchi | null>(null);
+  const [allKantaParchi, setAllKantaParchi] = useState<KantaParchi[]>([]);
+  const [selectedKantaParchiSrNo, setSelectedKantaParchiSrNo] = useState<string>('');
+  const [currentDocument, setCurrentDocument] = useState<CustomerDocument | null>(null);
+  const [activeTab, setActiveTab] = useState<"weight" | "document">("weight");
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingKantaParchi, setIsEditingKantaParchi] = useState(false);
+  const [isEditingDocument, setIsEditingDocument] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -173,13 +188,35 @@ export default function CustomerEntryClient() {
         toast({ title: 'Error', description: 'Could not load initial data.', variant: 'destructive' });
     }
     setIsLoading(false);
-  }, [form, toast]);
+    // Removed toast from dependencies - it's stable from useToast hook
+    // form reference is stable, only need to include if form instance changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   useEffect(() => {
     if (isClient) {
       loadInitialData();
     }
   }, [isClient, loadInitialData]);
+
+  // Load all Kanta Parchi entries for dropdown selection
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const unsubscribe = getKantaParchiRealtime(
+      (kantaParchiList) => {
+        setAllKantaParchi(kantaParchiList);
+      },
+      (error) => {
+        console.error("Error loading Kanta Parchi list:", error);
+        toast({ title: 'Error', description: 'Could not load Kanta Parchi list.', variant: 'destructive' });
+      }
+    );
+
+    return () => unsubscribe();
+    // Removed toast from dependencies - it's stable from useToast hook
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
 
   const loadMoreData = useCallback(async () => {
       if (!hasMoreCustomers || isLoadingMore) return;
@@ -194,7 +231,9 @@ export default function CustomerEntryClient() {
           toast({ title: 'Error', description: 'Could not load more entries.', variant: 'destructive' });
       }
       setIsLoadingMore(false);
-  }, [lastVisibleCustomer, hasMoreCustomers, isLoadingMore, toast]);
+      // Removed toast from dependencies - it's stable from useToast hook
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastVisibleCustomer, hasMoreCustomers, isLoadingMore]);
 
 
   useEffect(() => {
@@ -230,7 +269,10 @@ export default function CustomerEntryClient() {
       unsubVarieties();
       unsubPaymentTypes();
     };
-  }, [isClient, form, toast]);
+    // Removed form and toast from dependencies - form is stable, toast is stable from useToast
+    // This prevents re-subscribing to getOptionsRealtime on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -256,7 +298,54 @@ export default function CustomerEntryClient() {
         performCalculations(value as Partial<FormValues>);
     });
     return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
+    // Only re-subscribe if form instance changes (rare)
+    // performCalculations callback already handles paymentHistory updates internally
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  // Load selected Kanta Parchi data when selection changes
+  useEffect(() => {
+    const loadSelectedKantaParchi = async () => {
+      if (selectedKantaParchiSrNo && selectedKantaParchiSrNo !== '') {
+        try {
+          const kantaParchi = await getKantaParchiBySrNo(selectedKantaParchiSrNo);
+          if (kantaParchi) {
+            setCurrentKantaParchi(kantaParchi);
+            // Load Kanta Parchi data into form (read-only reference for basic fields)
+            form.setValue('srNo', kantaParchi.srNo);
+            form.setValue('name', kantaParchi.name);
+            form.setValue('contact', kantaParchi.contact);
+            form.setValue('vehicleNo', kantaParchi.vehicleNo);
+            form.setValue('variety', kantaParchi.variety);
+            form.setValue('grossWeight', kantaParchi.grossWeight);
+            form.setValue('teirWeight', kantaParchi.teirWeight);
+            form.setValue('rate', kantaParchi.rate);
+            form.setValue('bags', kantaParchi.bags);
+            form.setValue('bagWeightKg', kantaParchi.bagWeightKg);
+            form.setValue('bagRate', kantaParchi.bagRate);
+            // Set date from Kanta Parchi
+            if (kantaParchi.date) {
+              form.setValue('date', new Date(kantaParchi.date));
+            }
+            // CD, Brokerage Rate, Kanta, and Advance/Freight should be filled in Create Document tab, not from Kanta Parchi
+            form.setValue('isBrokerageIncluded', kantaParchi.isBrokerageIncluded);
+          }
+        } catch (error) {
+          console.error("Error loading selected Kanta Parchi:", error);
+          toast({ title: 'Error', description: 'Could not load selected Kanta Parchi.', variant: 'destructive' });
+        }
+      } else {
+        setCurrentKantaParchi(null);
+      }
+    };
+    
+    if (activeTab === "document") {
+      loadSelectedKantaParchi();
+    }
+    // Removed form and toast from dependencies - form is stable, toast is stable from useToast
+    // This prevents re-running this effect on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKantaParchiSrNo, activeTab]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
@@ -271,14 +360,33 @@ export default function CustomerEntryClient() {
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
-      contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
+      contact: customerState.contact, gstin: customerState.gstin || '', stateName: customerState.stateName || '', stateCode: customerState.stateCode || '',
+      vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, 
-      cd: customerState.cdRate || customerState.cd || 0,
-      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
+      // For CD: prioritize cdRate (percentage), if not available and we have cd (amount) and amount, calculate percentage
+      cd: customerState.cdRate !== undefined && customerState.cdRate !== null 
+        ? customerState.cdRate 
+        : (customerState.cd && customerState.amount && customerState.amount > 0 
+          ? (customerState.cd / customerState.amount) * 100 
+          : 0),
+      // For Brokerage: prioritize brokerageRate (rate), if not available and we have brokerage (amount) and netWeight, calculate rate
+      brokerage: customerState.brokerageRate !== undefined && customerState.brokerageRate !== null
+        ? customerState.brokerageRate
+        : (customerState.brokerage && customerState.netWeight && customerState.netWeight > 0
+          ? customerState.brokerage / customerState.netWeight
+          : 0),
       kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
+      hsnCode: (customerState as any).hsnCode || '1006',
+      taxRate: (customerState as any).taxRate || 5,
+      isGstIncluded: customerState.isGstIncluded || false,
+      nineRNo: (customerState as any).nineRNo || '',
+      gatePassNo: customerState.gatePassNo || '',
+      grNo: customerState.grNo || '',
+      grDate: customerState.grDate || '',
+      transport: customerState.transport || '',
       bagWeightKg: customerState.bagWeightKg || 0,
       bagRate: customerState.bagRate || 0,
       shippingName: customerState.shippingName || '',
@@ -381,6 +489,188 @@ export default function CustomerEntryClient() {
     }
   };
 
+  // Handle New Kanta Parchi - Reset form for new entry
+  const handleNewKantaParchi = useCallback(() => {
+    setIsEditingKantaParchi(false);
+    setCurrentKantaParchi(null);
+    
+    // Generate next srNo from allKantaParchi
+    let nextSrNum = 1;
+    if (allKantaParchi.length > 0) {
+      const sortedKantaParchi = [...allKantaParchi].sort((a, b) => {
+        // Extract number from srNo (assuming format like C0001 or KP0001)
+        const numA = parseInt(a.srNo.replace(/[^\d]/g, '')) || 0;
+        const numB = parseInt(b.srNo.replace(/[^\d]/g, '')) || 0;
+        return numB - numA; // Sort descending
+      });
+      const lastSrNo = sortedKantaParchi[0]?.srNo || 'C00000';
+      const lastNum = parseInt(lastSrNo.replace(/[^\d]/g, '')) || 0;
+      nextSrNum = lastNum + 1;
+    }
+    
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
+    newState.srNo = formatSrNo(nextSrNum, 'C');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    newState.date = today.toISOString().split('T')[0];
+    newState.dueDate = today.toISOString().split('T')[0];
+    
+    resetFormToState(newState);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [allKantaParchi, lastVariety, lastPaymentType, resetFormToState, form]);
+
+  // Save Kanta Parchi (Weight Details tab)
+  const saveKantaParchi = async () => {
+    const formValues = form.getValues();
+    const calculated = calculateCustomerEntry(formValues, paymentHistory);
+    
+    const kantaParchiData: KantaParchi = {
+      id: formValues.srNo,
+      srNo: formValues.srNo,
+      date: formValues.date.toISOString().split('T')[0],
+      name: toTitleCase(formValues.name),
+      contact: formValues.contact,
+      vehicleNo: toTitleCase(formValues.vehicleNo),
+      variety: toTitleCase(formValues.variety),
+      grossWeight: formValues.grossWeight,
+      teirWeight: formValues.teirWeight,
+      weight: calculated.weight || 0,
+      netWeight: calculated.netWeight || 0,
+      rate: formValues.rate,
+      bags: formValues.bags,
+      bagWeightKg: formValues.bagWeightKg,
+      bagRate: formValues.bagRate,
+      bagAmount: calculated.bagAmount || 0,
+      amount: calculated.amount || 0,
+      cdRate: formValues.cd || 0,
+      cdAmount: calculated.cd || 0,
+      brokerageRate: formValues.brokerage || 0,
+      brokerageAmount: calculated.brokerage || 0,
+      isBrokerageIncluded: formValues.isBrokerageIncluded,
+      kanta: formValues.kanta,
+      advanceFreight: formValues.advanceFreight || 0,
+      originalNetAmount: calculated.originalNetAmount || 0,
+      netAmount: calculated.netAmount || 0,
+      paymentType: formValues.paymentType,
+      customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
+    };
+
+    try {
+      if (isEditingKantaParchi && currentKantaParchi) {
+        await updateKantaParchi(currentKantaParchi.srNo, kantaParchiData);
+        toast({ title: "Kanta Parchi updated successfully.", variant: "success" });
+      } else {
+        await addKantaParchi(kantaParchiData);
+        toast({ title: "Kanta Parchi saved successfully.", variant: "success" });
+      }
+      setCurrentKantaParchi(kantaParchiData);
+      setIsEditingKantaParchi(true);
+    } catch (error) {
+      console.error("Error saving Kanta Parchi:", error);
+      toast({ title: "Failed to save Kanta Parchi.", variant: "destructive" });
+    }
+  };
+
+  // Save Customer Document (Create Document tab) - References Kanta Parchi srNo
+  const saveCustomerDocument = async (docType: DocumentType = 'tax-invoice') => {
+    const formValues = form.getValues();
+    
+    // Validate that Kanta Parchi is selected
+    if (!selectedKantaParchiSrNo || !currentKantaParchi) {
+      toast({ 
+        title: "Kanta Parchi Required", 
+        description: "Please select a Kanta Parchi before creating document.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const calculated = calculateCustomerEntry(formValues, paymentHistory);
+    
+    // Calculate tax amounts
+    const tableTotalAmount = (calculated.netWeight || 0) * formValues.rate;
+    const taxRate = formValues.taxRate || 5;
+    const isGstIncluded = formValues.isGstIncluded || false;
+    
+    let taxableAmount: number;
+    let totalTaxAmount: number;
+    let totalInvoiceValue: number;
+
+    if (isGstIncluded) {
+      taxableAmount = tableTotalAmount / (1 + (taxRate / 100));
+      totalTaxAmount = tableTotalAmount - taxableAmount;
+      totalInvoiceValue = tableTotalAmount + (formValues.advanceFreight || 0);
+    } else {
+      taxableAmount = tableTotalAmount;
+      totalTaxAmount = taxableAmount * (taxRate / 100);
+      totalInvoiceValue = taxableAmount + totalTaxAmount + (formValues.advanceFreight || 0);
+    }
+
+    const cgstAmount = totalTaxAmount / 2;
+    const sgstAmount = totalTaxAmount / 2;
+
+    // Generate document serial number
+    const documentSrNo = currentDocument?.documentSrNo || `DOC${Date.now()}`;
+
+    const documentData: CustomerDocument = {
+      id: documentSrNo,
+      documentSrNo: documentSrNo,
+      kantaParchiSrNo: selectedKantaParchiSrNo, // Reference to selected Kanta Parchi
+      documentType: docType,
+      date: formValues.date.toISOString().split('T')[0],
+      name: toTitleCase(formValues.name),
+      companyName: toTitleCase(formValues.companyName || ''),
+      address: toTitleCase(formValues.address),
+      contact: formValues.contact,
+      gstin: formValues.gstin || '',
+      stateName: formValues.stateName || '',
+      stateCode: formValues.stateCode || '',
+      hsnCode: formValues.hsnCode || '1006',
+      taxRate: taxRate,
+      isGstIncluded: isGstIncluded,
+      nineRNo: formValues.nineRNo || '',
+      gatePassNo: formValues.gatePassNo || '',
+      grNo: formValues.grNo || '',
+      grDate: formValues.grDate || '',
+      transport: formValues.transport || '',
+      shippingName: toTitleCase(formValues.shippingName || ''),
+      shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
+      shippingAddress: toTitleCase(formValues.shippingAddress || ''),
+      shippingContact: formValues.shippingContact || '',
+      shippingGstin: formValues.shippingGstin || '',
+      shippingStateName: formValues.shippingStateName || '',
+      shippingStateCode: formValues.shippingStateCode || '',
+      netWeight: calculated.netWeight || 0,
+      rate: formValues.rate,
+      amount: calculated.amount || 0,
+      cdAmount: calculated.cd || 0,
+      brokerageAmount: calculated.brokerage || 0,
+      kanta: formValues.kanta,
+      bagAmount: calculated.bagAmount || 0,
+      advanceFreight: formValues.advanceFreight || 0,
+      taxableAmount: taxableAmount,
+      cgstAmount: cgstAmount,
+      sgstAmount: sgstAmount,
+      totalTaxAmount: totalTaxAmount,
+      totalInvoiceValue: totalInvoiceValue,
+    };
+
+    try {
+      if (isEditingDocument && currentDocument) {
+        await updateCustomerDocument(currentDocument.documentSrNo, documentData);
+        toast({ title: "Document updated successfully.", variant: "success" });
+      } else {
+        await addCustomerDocument(documentData);
+        toast({ title: "Document saved successfully.", variant: "success" });
+      }
+      setCurrentDocument(documentData);
+      setIsEditingDocument(true);
+    } catch (error) {
+      console.error("Error saving Customer Document:", error);
+      toast({ title: "Failed to save document.", variant: "destructive" });
+    }
+  };
+
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
@@ -417,6 +707,16 @@ export default function CustomerEntryClient() {
         shippingStateName: formValues.shippingStateName || '',
         shippingStateCode: formValues.shippingStateCode || '',
         advanceFreight: formValues.advanceFreight || 0,
+        hsnCode: formValues.hsnCode || '',
+        taxRate: formValues.taxRate || 5,
+        isGstIncluded: formValues.isGstIncluded || false,
+        nineRNo: formValues.nineRNo || '',
+        gatePassNo: formValues.gatePassNo || '',
+        grNo: formValues.grNo || '',
+        grDate: formValues.grDate || '',
+        transport: formValues.transport || '',
+        cdRate: formValues.cd || 0, // Save CD percentage as cdRate
+        brokerageRate: formValues.brokerage || 0, // Save brokerage percentage as brokerageRate
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
@@ -470,28 +770,95 @@ export default function CustomerEntryClient() {
   };
 
   const onSubmit = async (callback?: (savedEntry: Customer) => void) => {
-    if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
-        if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(deletePayments, callback));
-            setIsUpdateConfirmOpen(true);
-            return;
-        }
+    const formValues = form.getValues();
+    const isValid = await form.trigger();
+    
+    if (!isValid) {
+      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
+      return;
     }
-    executeSubmit(false, callback);
+
+    // Based on active tab, save to appropriate collection
+    if (activeTab === "weight") {
+      // Save Kanta Parchi
+      await saveKantaParchi();
+      if (callback) {
+        // Convert Kanta Parchi to Customer format for callback compatibility
+        const customerFormat = {
+          ...currentCustomer,
+          srNo: formValues.srNo,
+          date: formValues.date.toISOString().split('T')[0],
+          name: toTitleCase(formValues.name),
+          contact: formValues.contact,
+        } as Customer;
+        callback(customerFormat);
+      }
+    } else if (activeTab === "document") {
+      // Save Customer Document
+      await saveCustomerDocument('tax-invoice');
+      if (callback && currentDocument) {
+        // Convert Document to Customer format for callback compatibility
+        const customerFormat = {
+          ...currentCustomer,
+          srNo: currentDocument.kantaParchiSrNo,
+          name: currentDocument.name,
+          contact: currentDocument.contact,
+        } as Customer;
+        callback(customerFormat);
+      }
+    }
   };
 
   const handleSaveAndPrint = async (docType: DocumentType) => {
+    const formValues = form.getValues();
     const isValid = await form.trigger();
-    if (isValid) {
-      onSubmit((savedEntry) => {
-        setDocumentPreviewCustomer(savedEntry);
+    
+    if (!isValid) {
+      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
+      return;
+    }
+
+    // If on Create Document tab, save document first
+    if (activeTab === "document") {
+      // Ensure Kanta Parchi exists
+      if (!currentKantaParchi && !formValues.srNo) {
+        toast({ 
+          title: "Kanta Parchi Required", 
+          description: "Please save Kanta Parchi first before creating document.",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      // If Kanta Parchi not saved yet, save it first
+      if (!currentKantaParchi) {
+        await saveKantaParchi();
+      }
+      
+      // Save document with specified type
+      await saveCustomerDocument(docType);
+      
+      // Load document data for preview
+      if (currentDocument) {
+        setDocumentPreviewCustomer({
+          ...currentCustomer,
+          ...currentDocument,
+          srNo: currentDocument.kantaParchiSrNo,
+        } as Customer);
         setDocumentType(docType);
         setIsDocumentPreviewOpen(true);
-        handleNew();
-      });
+      }
     } else {
-      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
+      // If on Weight Details tab, save Kanta Parchi and show preview
+      await saveKantaParchi();
+      if (currentKantaParchi) {
+        setDocumentPreviewCustomer({
+          ...currentCustomer,
+          ...currentKantaParchi,
+        } as Customer);
+        setDocumentType(docType);
+        setIsDocumentPreviewOpen(true);
+      }
     }
   };
   
@@ -682,6 +1049,15 @@ export default function CustomerEntryClient() {
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
                 allCustomers={safeCustomers}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                allKantaParchi={allKantaParchi}
+                selectedKantaParchiSrNo={selectedKantaParchiSrNo}
+                onKantaParchiSelect={setSelectedKantaParchiSrNo}
+                onNewKantaParchi={handleNewKantaParchi}
+                documentType={documentType}
+                onDocumentTypeChange={setDocumentType}
+                receiptSettings={receiptSettings}
             />
             
             <CalculatedSummary

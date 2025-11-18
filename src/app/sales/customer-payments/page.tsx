@@ -146,7 +146,9 @@ export default function CustomerPaymentsPage() {
     if (paymentHistory && !editingPayment) {
         setReceiptNo(getNextReceiptNo(paymentHistory));
     }
-  }, [paymentHistory, getNextReceiptNo, editingPayment]);
+    // getNextReceiptNo is stable - only depends on its own logic
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentHistory, editingPayment]);
 
   const resetPaymentForm = useCallback(() => {
       setSelectedEntryIds(new Set());

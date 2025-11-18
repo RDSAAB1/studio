@@ -47,10 +47,11 @@ export function withQuotaGuard<T>(fn: () => Promise<T>): Promise<T> {
 export type Unsubscribe = () => void;
 
 // Utility to implement a polling fallback with an initial invoke and interval.
+// Polling interval increased to 30 seconds to reduce read operations when Firestore is disabled
 export function createPollingFallback<T>(
 	initial: () => Promise<T>,
 	onData: (data: T) => void,
-	intervalMs: number = 10_000,
+	intervalMs: number = 30_000, // Increased from 10s to 30s to reduce reads
 ): Unsubscribe {
 	let cancelled = false;
 	let timer: number | undefined;

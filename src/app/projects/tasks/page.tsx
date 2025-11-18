@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where, orderBy, Timestamp } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase config
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,30 @@ export default function TasksPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const q = query(collection(firestoreDB, "tasks"));
+    
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:tasks');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        collection(firestoreDB, "tasks"),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(collection(firestoreDB, "tasks"));
+    }
+
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData: Task[] = [];
       querySnapshot.forEach((doc) => {
@@ -49,11 +72,16 @@ export default function TasksPage() {
         });
       });
       setTasks(tasksData);
+      
+      // ✅ Save last sync time
+      if (querySnapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:tasks', String(Date.now()));
+      }
     }, (error) => {
       console.error("Error fetching tasks: ", error);
     });
 
-    return () => unsubscribe(); // Clean up the listener on unmount
+    return () => unsubscribe();
   }, []);
 
   const handleAddTask = async () => {

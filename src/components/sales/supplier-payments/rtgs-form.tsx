@@ -21,28 +21,55 @@ export const RtgsForm = (props: any) => {
         supplierDetails = {},
         setSupplierDetails,
         bankAccounts = [],
+        banks: propsBanks,
+        bankBranches: propsBankBranches,
     } = props;
     
-    const { banks, bankBranches } = useSupplierData();
+    // Use props if provided, otherwise get from useSupplierData hook
+    const supplierData = useSupplierData();
+    const banks = propsBanks !== undefined ? (Array.isArray(propsBanks) ? propsBanks : []) : supplierData.banks;
+    const bankBranches = propsBankBranches !== undefined ? (Array.isArray(propsBankBranches) ? propsBankBranches : []) : supplierData.bankBranches;
     
     const bankOptions = React.useMemo(() => {
-        if (!Array.isArray(banks)) return [];
-        return banks.map((bank: any) => ({
-            value: bank.name,
-            label: toTitleCase(bank.name)
-        }));
+        if (!Array.isArray(banks)) {
+            console.log('RtgsForm: banks is not an array', typeof banks, banks);
+            return [];
+        }
+        if (banks.length === 0) {
+            console.log('RtgsForm: banks array is empty');
+        }
+        const options = banks
+            .filter(bank => bank && (bank.name || bank.id)) // Filter out invalid banks
+            .map((bank: any) => ({
+                value: bank.name || bank.id || '',
+                label: toTitleCase(bank.name || bank.id || '')
+            }))
+            .filter(opt => opt.value && opt.label); // Filter out invalid options
+        console.log('RtgsForm: bankOptions created', options.length, 'options from', banks.length, 'banks');
+        if (options.length === 0 && banks.length > 0) {
+            console.warn('RtgsForm: No valid bank options created, sample bank:', banks[0]);
+        }
+        return options;
     }, [banks]);
 
     const availableBranchOptions = React.useMemo(() => {
-        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
+        if (!bankDetails.bank || !bankDetails.bank.trim()) return [];
+        if (!Array.isArray(bankBranches)) return [];
         const uniqueBranches = new Map<string, { value: string; label: string }>();
-        bankBranches
-            .filter((branch: any) => branch.bankName === bankDetails.bank)
-            .forEach((branch: any) => {
-                if (!uniqueBranches.has(branch.branchName)) {
-                    uniqueBranches.set(branch.branchName, { value: branch.branchName, label: toTitleCase(branch.branchName) });
-                }
-            });
+        const selectedBankName = (bankDetails.bank || '').trim().toLowerCase();
+        const matchingBranches = bankBranches.filter((branch: any) => {
+            const branchBankName = (branch.bankName || '').trim().toLowerCase();
+            return branchBankName === selectedBankName;
+        });
+        matchingBranches.forEach((branch: any) => {
+            const branchName = branch.branchName?.trim();
+            if (branchName && !uniqueBranches.has(branchName)) {
+                uniqueBranches.set(branchName, { 
+                    value: branchName, 
+                    label: toTitleCase(branchName) 
+                });
+            }
+        });
         return Array.from(uniqueBranches.values());
     }, [bankDetails.bank, bankBranches]);
 

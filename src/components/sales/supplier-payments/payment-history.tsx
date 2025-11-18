@@ -15,16 +15,34 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 
 export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers }: any) => {
+    // Helper function to extract numeric part from serial number for sorting
+    const getSerialNumberForSort = React.useCallback((payment: any): number => {
+        const srNo = payment.paidFor?.[0]?.srNo || payment.parchiNo || '';
+        if (!srNo) return 0;
+        // Extract numeric part from serial number (e.g., "S00001" -> 1, "00001" -> 1)
+        const numericMatch = srNo.toString().match(/\d+/);
+        return numericMatch ? parseInt(numericMatch[0], 10) : 0;
+    }, []);
+
+    // Sort payments by serial number (descending - high to low)
+    const sortedPayments = React.useMemo(() => {
+        return [...payments].sort((a: any, b: any) => {
+            const srNoA = getSerialNumberForSort(a);
+            const srNoB = getSerialNumberForSort(b);
+            return srNoB - srNoA; // Descending order
+        });
+    }, [payments, getSerialNumberForSort]);
+
     // Infinite scroll pagination
-    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(payments, {
-        totalItems: payments.length,
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedPayments, {
+        totalItems: sortedPayments.length,
         initialLoad: 30,
         loadMore: 30,
         threshold: 5,
-        enabled: payments.length > 30,
+        enabled: sortedPayments.length > 30,
     });
 
-    const visiblePayments = payments.slice(0, visibleItems);
+    const visiblePayments = sortedPayments.slice(0, visibleItems);
 
     // Helper function to get receipt holder name from supplier data
     const getReceiptHolderName = React.useCallback((payment: any) => {
@@ -63,10 +81,10 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
     
     return (
         <Card>
-            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">
                     {title || 'Payment History'} 
-                    <span className="ml-2 text-sm text-muted-foreground">({payments.length})</span>
+                    <span className="ml-2 text-sm text-muted-foreground">({sortedPayments.length})</span>
                 </CardTitle>
                 {onExport && <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>}
             </CardHeader>
@@ -190,14 +208,14 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {!hasMore && payments.length > 30 && (
+                                    {!hasMore && sortedPayments.length > 30 && (
                                         <TableRow>
                                             <TableCell colSpan={10} className="text-center py-2 text-xs text-muted-foreground">
-                                                Showing all {payments.length} payments
+                                                Showing all {sortedPayments.length} payments
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {payments.length === 0 && (
+                                    {sortedPayments.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
                                         </TableRow>

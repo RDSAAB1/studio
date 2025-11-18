@@ -42,7 +42,9 @@ export const PaymentForm = (props: any) => {
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
-        checkNo, setCheckNo
+        checkNo, setCheckNo,
+        onPaymentMethodChange, // Explicitly extract onPaymentMethodChange
+        setPaymentMethod // Also get setPaymentMethod directly as fallback
     } = props;
 
     const paymentFromOptions = useMemo(() => {
@@ -71,8 +73,7 @@ export const PaymentForm = (props: any) => {
             <div className="grid grid-cols-1 text-[13px] gap-4">
                 <Card>
                     <CardContent className="p-3 space-y-3 text-[12px]">
-                          {typeof props.onPaymentMethodChange === 'function' && (
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
                                 {(['Cash', 'Online', 'RTGS'] as const).map((method) => (
                                     <Button
                                         key={method}
@@ -83,13 +84,20 @@ export const PaymentForm = (props: any) => {
                                             paymentMethod === method ? "bg-primary text-primary-foreground" : "border border-input bg-muted/60 text-muted-foreground hover:text-foreground"
                                         )}
                                         variant={paymentMethod === method ? "default" : "ghost"}
-                                        onClick={() => props.onPaymentMethodChange?.(method)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (onPaymentMethodChange) {
+                                                onPaymentMethodChange(method);
+                                            } else if (setPaymentMethod) {
+                                                setPaymentMethod(method);
+                                            }
+                                        }}
                                     >
                                         {method}
                                     </Button>
                                 ))}
                             </div>
-                          )}
                           <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
                             {/* Payment Details */}
                             <div className="space-y-1 flex-1 min-w-[150px]">

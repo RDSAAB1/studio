@@ -22,11 +22,21 @@ interface TransactionTableProps {
 
 export const TransactionTable = React.memo(
     ({ suppliers, onShowDetails, selectedIds, onSelectionChange, embed = false }: TransactionTableProps) => {
+        // Helper function to extract numeric part from serial number for sorting
+        const getSerialNumberForSort = (entry: any): number => {
+            const srNo = entry.srNo || '';
+            if (!srNo) return 0;
+            // Extract numeric part from serial number (e.g., "S00001" -> 1, "00001" -> 1)
+            const numericMatch = srNo.toString().match(/\d+/);
+            return numericMatch ? parseInt(numericMatch[0], 10) : 0;
+        };
+
         const sortedSuppliers = useMemo(() => {
             return [...suppliers].sort((a: any, b: any) => {
-                const outstandingA = Number((a as any).outstandingForEntry || a.netAmount || 0);
-                const outstandingB = Number((b as any).outstandingForEntry || b.netAmount || 0);
-                return outstandingB - outstandingA;
+                // Sort by serial number (descending - high to low)
+                const srNoA = getSerialNumberForSort(a);
+                const srNoB = getSerialNumberForSort(b);
+                return srNoB - srNoA; // Descending order
             });
         }, [suppliers]);
 

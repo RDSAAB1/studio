@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
@@ -416,16 +416,24 @@ export default function IncomeExpenseClient() {
     formState: { errors },
   } = form;
   
-  const selectedTransactionType = watch('transactionType');
-  const selectedPaymentMethod = watch('paymentMethod');
-  const selectedExpenseNature = watch('expenseNature');
-  const selectedCategory = watch('category');
-  const selectedSubCategory = watch('subCategory');
-  const quantity = watch('quantity');
-  const rate = watch('rate');
-  const incomeAmountValue = watch('incomeAmount');
-  const expenseAmountValue = watch('expenseAmount');
-  const payeeValue = watch('payee');
+  // Use useWatch to efficiently watch multiple fields at once (single subscription)
+  const watchedValues = useWatch({
+    control: form.control,
+    name: ['transactionType', 'paymentMethod', 'expenseNature', 'category', 'subCategory', 'quantity', 'rate', 'incomeAmount', 'expenseAmount', 'payee']
+  });
+
+  const [
+    selectedTransactionType,
+    selectedPaymentMethod,
+    selectedExpenseNature,
+    selectedCategory,
+    selectedSubCategory,
+    quantity,
+    rate,
+    incomeAmountValue,
+    expenseAmountValue,
+    payeeValue
+  ] = watchedValues;
 
   const selectedAccountProfile = useMemo(() => {
       if (!payeeValue) return undefined;

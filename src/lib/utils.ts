@@ -220,7 +220,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const rate = values.rate || 0;
     const amount = Math.round(netWeight * rate);
     
-    const brokerageRate = Number(values.brokerageRate) || 0;
+    const brokerageRate = Number(values.brokerage || values.brokerageRate) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
     const cdRate = Number(values.cd) || 0;

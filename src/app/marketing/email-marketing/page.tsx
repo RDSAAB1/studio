@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc, where, orderBy, Timestamp } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,15 +34,44 @@ export default function EmailMarketingPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const q = query(collection(firestoreDB, "emailCampaigns")); // Assuming a collection named 'emailCampaigns'
+    if (!isClient) return;
+
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:emailCampaigns');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        collection(firestoreDB, "emailCampaigns"),
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(collection(firestoreDB, "emailCampaigns"));
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const campaignsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as Omit<EmailCampaign, 'id'>,
-        createdAt: doc.data().createdAt.toDate() // Convert Firestore Timestamp to Date
+        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(doc.data().createdAt || Date.now())
       }));
       setCampaigns(campaignsData);
       setLoading(false);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:emailCampaigns', String(Date.now()));
+      }
     }, (err) => {
       console.error("Error fetching email campaigns:", err);
       setError("Failed to load email campaigns.");
@@ -50,8 +79,9 @@ export default function EmailMarketingPage() {
       toast({ title: "Failed to load email campaigns", variant: "destructive" });
     });
 
-    return () => unsubscribe(); // Cleanup the listener on unmount
-  }, [toast]);
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

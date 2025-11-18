@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import PlaceholderPage from "@/components/placeholder-page";
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming db is exported from firebase.ts
 import { Order } from '@/lib/definitions'; // Assuming you have an Order type defined
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,8 +18,29 @@ export default function OrderTrackingPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // ✅ Use incremental sync - only read changed documents
+    const getLastSyncTime = (): number | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const stored = localStorage.getItem('lastSync:orders');
+      return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
     const ordersCollection = collection(firestoreDB, 'orders');
-    const q = query(ordersCollection, orderBy('orderDate', 'desc')); // Assuming a 'createdAt' field for ordering
+    let q;
+    
+    if (lastSyncTime) {
+      // ✅ Only get documents modified after last sync
+      const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+      q = query(
+        ordersCollection,
+        where('updatedAt', '>', lastSyncTimestamp),
+        orderBy('updatedAt')
+      );
+    } else {
+      // First sync - get all (only once)
+      q = query(ordersCollection, orderBy('orderDate', 'desc'));
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
@@ -28,13 +49,17 @@ export default function OrderTrackingPage() {
       })) as Order[];
       setOrders(ordersData);
       setLoading(false);
+      
+      // ✅ Save last sync time
+      if (snapshot.size > 0 && typeof window !== 'undefined') {
+        localStorage.setItem('lastSync:orders', String(Date.now()));
+      }
     }, (err) => {
       console.error("Error fetching orders: ", err);
       setError("Failed to load orders.");
       setLoading(false);
     });
 
-    // Clean up the listener on component unmount
     return () => unsubscribe();
   }, []);
 
