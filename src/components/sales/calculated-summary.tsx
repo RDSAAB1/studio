@@ -33,6 +33,7 @@ interface CalculatedSummaryProps {
     onDeleteSelected?: () => void;
     onDeleteAll?: () => void;
     isDeleting?: boolean;
+    activeTab?: "weight" | "document";
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -70,7 +71,8 @@ export const CalculatedSummary = ({
     onUpdateSelected,
     onDeleteSelected,
     onDeleteAll,
-    isDeleting = false
+    isDeleting = false,
+    activeTab = "weight"
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo || isDeleting;
@@ -85,24 +87,101 @@ export const CalculatedSummary = ({
         if (!customer || !customer.bags || !customer.bagWeightKg) return 0;
         return customer.bags * customer.bagWeightKg;
     }, [customer]);
+
+    // Calculate tax amounts for document tab
+    const taxCalculations = useMemo(() => {
+        if (activeTab !== "document" || !isCustomerForm) return null;
+        
+        const calcNetWeight = customer.netWeight || 0;
+        const calcRate = customer.rate || 0;
+        const calcTaxRate = (customer.taxRate as number) || 5;
+        const calcIsGstIncluded = (customer.isGstIncluded as boolean) || false;
+        const calcAdvanceFreight = (customer.advanceFreight as number) || 0;
+        
+        const tableTotalAmount = calcNetWeight * calcRate;
+        
+        let taxableAmount: number;
+        let totalTaxAmount: number;
+        let totalInvoiceValue: number;
+
+        if (calcIsGstIncluded) {
+            taxableAmount = tableTotalAmount / (1 + (calcTaxRate / 100));
+            totalTaxAmount = tableTotalAmount - taxableAmount;
+            totalInvoiceValue = tableTotalAmount + calcAdvanceFreight;
+        } else {
+            taxableAmount = tableTotalAmount;
+            totalTaxAmount = taxableAmount * (calcTaxRate / 100);
+            totalInvoiceValue = taxableAmount + totalTaxAmount + calcAdvanceFreight;
+        }
+
+        const cgstAmount = totalTaxAmount / 2;
+        const sgstAmount = totalTaxAmount / 2;
+
+        return {
+            tableTotalAmount,
+            taxableAmount,
+            totalTaxAmount,
+            cgstAmount,
+            sgstAmount,
+            totalInvoiceValue,
+            taxRate: calcTaxRate
+        };
+    }, [activeTab, isCustomerForm, customer.netWeight, customer.rate, customer.taxRate, customer.isGstIncluded, customer.advanceFreight]);
+    
+    // Determine which summary to show - completely separate
+    const showKantaParchiSummary = activeTab === "weight" && isCustomerForm;
+    const showDocumentSummary = activeTab === "document" && isCustomerForm;
+    const showSupplierSummary = !isCustomerForm;
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-3 space-y-3">
                  <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
-                    {!isCustomerForm && <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />}
-                    <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
-                    {isCustomerForm && <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />}
-                    {isCustomerForm && <SummaryItem label="Total Bag Wt" value={`${totalBagWeight.toFixed(2)} kg`} />}
-                    {!isCustomerForm && <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />}
-                    <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
-                    {!isCustomerForm && <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />}
-                    {!isCustomerForm && <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />}
-                    {isCustomerForm && <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />}
-                    {isCustomerForm && <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />}
-                    <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
-                    {isCustomerForm && <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />}
-                    <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
+                    {/* Kanta Parchi Summary (Weight Details tab) - ONLY shows when on weight tab */}
+                    {showKantaParchiSummary && (
+                        <>
+                            <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />
+                            <SummaryItem label="Total Bag Wt" value={`${totalBagWeight.toFixed(2)} kg`} />
+                            <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
+                            <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />
+                            <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />
+                            <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
+                            <SummaryItem label="Kanta" value={formatCurrency(customer.kanta || 0)} />
+                            <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
+                        </>
+                    )}
+                    
+                    {/* Document Summary (Create Document tab) - ONLY shows when on document tab */}
+                    {showDocumentSummary && taxCalculations && (
+                        <>
+                            <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Rate" value={formatCurrency(customer.rate || 0)} />
+                            <SummaryItem label="Table Total" value={formatCurrency(Math.round(taxCalculations.tableTotalAmount))} />
+                            <SummaryItem label="Taxable Amt" value={formatCurrency(Math.round(taxCalculations.taxableAmount))} />
+                            <SummaryItem label={`CGST (${taxCalculations.taxRate/2}%)`} value={formatCurrency(Math.round(taxCalculations.cgstAmount))} />
+                            <SummaryItem label={`SGST (${taxCalculations.taxRate/2}%)`} value={formatCurrency(Math.round(taxCalculations.sgstAmount))} />
+                            {(customer.advanceFreight || 0) > 0 && (
+                                <SummaryItem label="Freight/Advance" value={formatCurrency(customer.advanceFreight || 0)} />
+                            )}
+                            <SummaryItem label="Total Invoice Value" value={formatCurrency(Math.round(taxCalculations.totalInvoiceValue))} isHighlighted />
+                        </>
+                    )}
+
+                    {/* Supplier Form Summary (if not customer form) */}
+                    {showSupplierSummary && (
+                        <>
+                            <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
+                            <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
+                            <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
+                            <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
+                            <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
+                        </>
+                    )}
                 </div>
                 
                 <Separator />

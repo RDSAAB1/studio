@@ -24,7 +24,7 @@ import {
   PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database,
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Mail,
   LineChart, ClipboardCheck, Users2, UserPlus, Landmark, Truck,
-  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings, BookOpen
+  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings, BookOpen, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -64,6 +64,7 @@ const menuItems = [
       { id: "Reports-Sales", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
       { id: "Reports-OrderTracking", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
       { id: "Reports-ProductCatalog", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
+      { id: "Reports-FirestoreMonitor", name: "Firestore Monitor", href: "/admin/firestore-monitor", icon: <Activity className="h-5 w-5" /> },
     ],
   },
   {

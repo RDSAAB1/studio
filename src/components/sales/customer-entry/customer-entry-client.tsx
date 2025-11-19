@@ -1070,6 +1070,7 @@ export default function CustomerEntryClient() {
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
                 onImport={handleImport}
                 onExport={handleExport}
+                activeTab={activeTab}
             />
         </form>
       </FormProvider>      

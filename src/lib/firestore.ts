@@ -25,6 +25,7 @@ import {
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
+import { firestoreMonitor } from "./firestore-monitor";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
@@ -1345,6 +1346,9 @@ export async function getAllSuppliers(): Promise<Customer[]> {
   const snapshot = await getDocs(q);
   const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
   
+  // Track Firestore read
+  firestoreMonitor.logRead('suppliers', 'getAllSuppliers', suppliers.length);
+  
   // Save to local IndexedDB and update last sync time
   if (db && suppliers.length > 0) {
     await db.suppliers.bulkPut(suppliers);
@@ -1392,6 +1396,9 @@ export async function getAllCustomers(): Promise<Customer[]> {
 
   const snapshot = await getDocs(q);
   const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+  
+  // Track Firestore read
+  firestoreMonitor.logRead('customers', 'getAllCustomers', customers.length);
   
   // Save to local IndexedDB and update last sync time
   if (db && customers.length > 0) {
@@ -1475,6 +1482,9 @@ export async function getAllPayments(): Promise<Payment[]> {
 
   const snapshot = await getDocs(q);
   const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  
+  // Track Firestore read
+  firestoreMonitor.logRead('payments', 'getAllPayments', payments.length);
   
   // Save to local IndexedDB and update last sync time
   if (db && payments.length > 0) {
@@ -1654,11 +1664,81 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
         }, callback);
     }
 
-    const q = query(suppliersCollection, orderBy("srNo", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        callback(suppliers);
-        // Success path clears any previous disabled state
+    let localSuppliers: Customer[] = [];
+    let callbackCalledFromIndexedDB = false;
+    
+    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    if (db) {
+        db.suppliers.orderBy('srNo').reverse().toArray().then((localData) => {
+            localSuppliers = localData as Customer[];
+            callbackCalledFromIndexedDB = true;
+            // Always call callback with IndexedDB results (even if empty) to clear loading state
+            callback(localData as Customer[]);
+        }).catch(() => {
+            // If IndexedDB read fails, ensure Firestore will call callback
+            callbackCalledFromIndexedDB = false;
+        });
+    }
+
+    // ✅ Use incremental sync - only listen to NEW changes after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:suppliers');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+        // Only listen to NEW changes after last sync
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            suppliersCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        // First sync - get all (only once)
+        q = query(suppliersCollection, orderBy("srNo", "desc"));
+    }
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const newSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        
+        // Track Firestore read
+        firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', newSuppliers.length);
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localSuppliers.length > 0) {
+            const mergedMap = new Map<string, Customer>();
+            // Add all local suppliers
+            localSuppliers.forEach(s => mergedMap.set(s.id, s));
+            // Update/add new suppliers from Firestore
+            newSuppliers.forEach(s => mergedMap.set(s.id, s));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                const aSrNo = parseInt(a.srNo || '0') || 0;
+                const bSrNo = parseInt(b.srNo || '0') || 0;
+                return bSrNo - aSrNo;
+            });
+            callback(merged);
+            
+            // Update IndexedDB with new changes
+            if (db && newSuppliers.length > 0) {
+                await db.suppliers.bulkPut(newSuppliers);
+            }
+        } else {
+            // No local data or first sync - use Firestore data directly
+            callback(newSuppliers);
+            if (db && newSuppliers.length > 0) {
+                await db.suppliers.bulkPut(newSuppliers);
+            }
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:suppliers', String(Date.now()));
+        }
     }, (err: any) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
@@ -1682,10 +1762,76 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
             return db ? await db.customers.orderBy('srNo').reverse().toArray() : [];
         }, callback);
     }
-    const q = query(customersCollection, orderBy("srNo", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        callback(customers);
+
+    let localCustomers: Customer[] = [];
+    let callbackCalledFromIndexedDB = false;
+    
+    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    if (db) {
+        db.customers.orderBy('srNo').reverse().toArray().then((localData) => {
+            localCustomers = localData as Customer[];
+            callbackCalledFromIndexedDB = true;
+            callback(localData as Customer[]);
+        }).catch(() => {
+            callbackCalledFromIndexedDB = false;
+        });
+    }
+
+    // ✅ Use incremental sync - only listen to NEW changes after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:customers');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+        // Only listen to NEW changes after last sync
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            customersCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        // First sync - get all (only once)
+        q = query(customersCollection, orderBy("srNo", "desc"));
+    }
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const newCustomers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        
+        // Track Firestore read
+        firestoreMonitor.logRead('customers', 'getCustomersRealtime', newCustomers.length);
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localCustomers.length > 0) {
+            const mergedMap = new Map<string, Customer>();
+            localCustomers.forEach(c => mergedMap.set(c.id, c));
+            newCustomers.forEach(c => mergedMap.set(c.id, c));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                const aSrNo = parseInt(a.srNo || '0') || 0;
+                const bSrNo = parseInt(b.srNo || '0') || 0;
+                return bSrNo - aSrNo;
+            });
+            callback(merged);
+            
+            if (db && newCustomers.length > 0) {
+                await db.customers.bulkPut(newCustomers);
+            }
+        } else {
+            callback(newCustomers);
+            if (db && newCustomers.length > 0) {
+                await db.customers.bulkPut(newCustomers);
+            }
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:customers', String(Date.now()));
+        }
     }, (err: any) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
@@ -1707,10 +1853,74 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             return db ? await db.payments.orderBy('date').reverse().toArray() : [];
         }, callback);
     }
-    const q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        callback(payments);
+
+    let localPayments: Payment[] = [];
+    let callbackCalledFromIndexedDB = false;
+    
+    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    if (db) {
+        db.payments.orderBy('date').reverse().toArray().then((localData) => {
+            localPayments = localData as Payment[];
+            callbackCalledFromIndexedDB = true;
+            callback(localData as Payment[]);
+        }).catch(() => {
+            callbackCalledFromIndexedDB = false;
+        });
+    }
+
+    // ✅ Use incremental sync - only listen to NEW changes after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:payments');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+        // Only listen to NEW changes after last sync
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            supplierPaymentsCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        // First sync - get all (only once)
+        q = query(supplierPaymentsCollection, orderBy("date", "desc"));
+    }
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        
+        // Track Firestore read
+        firestoreMonitor.logRead('payments', 'getPaymentsRealtime', newPayments.length);
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
+            const mergedMap = new Map<string, Payment>();
+            localPayments.forEach(p => mergedMap.set(p.id, p));
+            newPayments.forEach(p => mergedMap.set(p.id, p));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            });
+            callback(merged);
+            
+            if (db && newPayments.length > 0) {
+                await db.payments.bulkPut(newPayments);
+            }
+        } else {
+            callback(newPayments);
+            if (db && newPayments.length > 0) {
+                await db.payments.bulkPut(newPayments);
+            }
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:payments', String(Date.now()));
+        }
     }, (err: any) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
@@ -1732,10 +1942,74 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
             return db ? await db.customerPayments.orderBy('date').reverse().toArray() : [];
         }, callback);
     }
-    const q = query(customerPaymentsCollection, orderBy("date", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
-        callback(payments);
+
+    let localPayments: CustomerPayment[] = [];
+    let callbackCalledFromIndexedDB = false;
+    
+    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    if (db) {
+        db.customerPayments.orderBy('date').reverse().toArray().then((localData) => {
+            localPayments = localData as CustomerPayment[];
+            callbackCalledFromIndexedDB = true;
+            callback(localData as CustomerPayment[]);
+        }).catch(() => {
+            callbackCalledFromIndexedDB = false;
+        });
+    }
+
+    // ✅ Use incremental sync - only listen to NEW changes after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:customerPayments');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+        // Only listen to NEW changes after last sync
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            customerPaymentsCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        // First sync - get all (only once)
+        q = query(customerPaymentsCollection, orderBy("date", "desc"));
+    }
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+        
+        // Track Firestore read
+        firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', newPayments.length);
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
+            const mergedMap = new Map<string, CustomerPayment>();
+            localPayments.forEach(p => mergedMap.set(p.id, p));
+            newPayments.forEach(p => mergedMap.set(p.id, p));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            });
+            callback(merged);
+            
+            if (db && newPayments.length > 0) {
+                await db.customerPayments.bulkPut(newPayments);
+            }
+        } else {
+            callback(newPayments);
+            if (db && newPayments.length > 0) {
+                await db.customerPayments.bulkPut(newPayments);
+            }
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:customerPayments', String(Date.now()));
+        }
     }, (err: any) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
@@ -2453,7 +2727,21 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
 }
 
 export function getProjectsRealtime(callback: (data: Project[]) => void, onError: (error: Error) => void) {
-    // ✅ Use incremental sync for realtime listener
+    let localProjects: Project[] = [];
+    let callbackCalledFromIndexedDB = false;
+    
+    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    if (db) {
+        db.projects.orderBy('startDate').reverse().toArray().then((localData) => {
+            localProjects = localData as Project[];
+            callbackCalledFromIndexedDB = true;
+            callback(localData as Project[]);
+        }).catch(() => {
+            callbackCalledFromIndexedDB = false;
+        });
+    }
+
+    // ✅ Use incremental sync - only listen to NEW changes after last sync
     const getLastSyncTime = (): number | undefined => {
         if (typeof window === 'undefined') return undefined;
         const stored = localStorage.getItem('lastSync:projects');
@@ -2476,9 +2764,28 @@ export function getProjectsRealtime(callback: (data: Project[]) => void, onError
         q = query(projectsCollection, orderBy("startDate", "desc"));
     }
 
-    return onSnapshot(q, (snapshot) => {
-        const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        callback(projects);
+    return onSnapshot(q, async (snapshot) => {
+        const newProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localProjects.length > 0) {
+            const mergedMap = new Map<string, Project>();
+            localProjects.forEach(p => mergedMap.set(p.id, p));
+            newProjects.forEach(p => mergedMap.set(p.id, p));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+            });
+            callback(merged);
+            
+            if (db && newProjects.length > 0) {
+                await db.projects.bulkPut(newProjects);
+            }
+        } else {
+            callback(newProjects);
+            if (db && newProjects.length > 0) {
+                await db.projects.bulkPut(newProjects);
+            }
+        }
         
         // ✅ Save last sync time
         if (snapshot.size > 0 && typeof window !== 'undefined') {
