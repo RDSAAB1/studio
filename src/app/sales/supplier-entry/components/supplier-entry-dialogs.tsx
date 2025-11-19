@@ -1692,3 +1692,311 @@ export const SupplierEntryDialogs = ({
 };
 
 
+
+      <ReceiptPrintDialog
+
+        suppliers={receiptsToPrint}
+
+        onClose={() => setReceiptsToPrint([])}
+
+        receiptSettings={receiptSettings}
+
+      />
+
+
+
+      <ConsolidatedReceiptPrintDialog
+
+        data={consolidatedReceiptData}
+
+        onClose={() => setConsolidatedReceiptData(null)}
+
+        receiptSettings={receiptSettings}
+
+      />
+
+
+
+      {/* Update Confirm Dialog */}
+
+      <UpdateConfirmDialog
+
+        isOpen={isUpdateConfirmOpen}
+
+        onClose={() => {
+
+          setIsUpdateConfirmOpen(false);
+
+          setUpdateAction(null);
+
+        }}
+
+        onConfirm={(deletePayments) => {
+
+          if (updateAction) {
+
+            updateAction(deletePayments);
+
+          }
+
+          setIsUpdateConfirmOpen(false);
+
+          setUpdateAction(null);
+
+        }}
+
+      />
+
+
+
+      {/* Receipt Settings Dialog */}
+
+      <ReceiptSettingsDialog
+
+        isOpen={!!receiptSettings}
+
+        onClose={() => setReceiptSettings(null)}
+
+        settings={receiptSettings}
+
+        onSave={setReceiptSettings}
+
+      />
+
+
+
+      {/* Statement Preview Dialog */}
+
+      <Dialog open={isStatementPreviewOpen} onOpenChange={setIsStatementPreviewOpen}>
+
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+
+          <ScrollArea className="h-[80vh]">
+
+            {statementPreviewData && (
+
+              <StatementPreview data={statementPreviewData} />
+
+            )}
+
+          </ScrollArea>
+
+        </DialogContent>
+
+      </Dialog>
+
+
+
+      {/* Delete Confirm Dialog */}
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+
+        <AlertDialogContent>
+
+          <AlertDialogHeader>
+
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+
+            <AlertDialogDescription>
+
+              Are you sure you want to delete this supplier? This action cannot be undone.
+
+            </AlertDialogDescription>
+
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+            <AlertDialogAction
+
+              onClick={() => {
+
+                if (deleteAction) {
+
+                  deleteAction();
+
+                }
+
+                setIsDeleteConfirmOpen(false);
+
+                setDeleteAction(null);
+
+              }}
+
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+
+            >
+
+              Delete
+
+            </AlertDialogAction>
+
+          </AlertDialogFooter>
+
+        </AlertDialogContent>
+
+      </AlertDialog>
+
+    </>
+
+  );
+
+};
+
+
+
+      <ReceiptPrintDialog
+
+        suppliers={receiptsToPrint}
+
+        onClose={() => setReceiptsToPrint([])}
+
+        receiptSettings={receiptSettings}
+
+      />
+
+
+
+      <ConsolidatedReceiptPrintDialog
+
+        data={consolidatedReceiptData}
+
+        onClose={() => setConsolidatedReceiptData(null)}
+
+        receiptSettings={receiptSettings}
+
+      />
+
+
+
+      {/* Update Confirm Dialog */}
+
+      <UpdateConfirmDialog
+
+        isOpen={isUpdateConfirmOpen}
+
+        onClose={() => {
+
+          setIsUpdateConfirmOpen(false);
+
+          setUpdateAction(null);
+
+        }}
+
+        onConfirm={(deletePayments) => {
+
+          if (updateAction) {
+
+            updateAction(deletePayments);
+
+          }
+
+          setIsUpdateConfirmOpen(false);
+
+          setUpdateAction(null);
+
+        }}
+
+      />
+
+
+
+      {/* Receipt Settings Dialog */}
+
+      <ReceiptSettingsDialog
+
+        isOpen={!!receiptSettings}
+
+        onClose={() => setReceiptSettings(null)}
+
+        settings={receiptSettings}
+
+        onSave={setReceiptSettings}
+
+      />
+
+
+
+      {/* Statement Preview Dialog */}
+
+      <Dialog open={isStatementPreviewOpen} onOpenChange={setIsStatementPreviewOpen}>
+
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+
+          <ScrollArea className="h-[80vh]">
+
+            {statementPreviewData && (
+
+              <StatementPreview data={statementPreviewData} />
+
+            )}
+
+          </ScrollArea>
+
+        </DialogContent>
+
+      </Dialog>
+
+
+
+      {/* Delete Confirm Dialog */}
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+
+        <AlertDialogContent>
+
+          <AlertDialogHeader>
+
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+
+            <AlertDialogDescription>
+
+              Are you sure you want to delete this supplier? This action cannot be undone.
+
+            </AlertDialogDescription>
+
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+            <AlertDialogAction
+
+              onClick={() => {
+
+                if (deleteAction) {
+
+                  deleteAction();
+
+                }
+
+                setIsDeleteConfirmOpen(false);
+
+                setDeleteAction(null);
+
+              }}
+
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+
+            >
+
+              Delete
+
+            </AlertDialogAction>
+
+          </AlertDialogFooter>
+
+        </AlertDialogContent>
+
+      </AlertDialog>
+
+    </>
+
+  );
+
+};
+
+

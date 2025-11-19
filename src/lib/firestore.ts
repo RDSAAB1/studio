@@ -1635,6 +1635,48 @@ export async function getAllExpenses(): Promise<Expense[]> {
   return expenses;
 }
 
+// Fetch ALL supplier bank accounts
+export async function getAllSupplierBankAccounts(): Promise<BankAccount[]> {
+  const snapshot = await getDocs(supplierBankAccountsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+}
+
+// Fetch ALL banks
+export async function getAllBanks(): Promise<Bank[]> {
+  const snapshot = await getDocs(banksCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bank));
+}
+
+// Fetch ALL bank branches
+export async function getAllBankBranches(): Promise<BankBranch[]> {
+  const snapshot = await getDocs(bankBranchesCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+}
+
+// Fetch ALL bank accounts (regular)
+export async function getAllBankAccounts(): Promise<BankAccount[]> {
+  const snapshot = await getDocs(bankAccountsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+}
+
+// Fetch ALL projects
+export async function getAllProjects(): Promise<Project[]> {
+  const snapshot = await getDocs(projectsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+}
+
+// Fetch ALL loans
+export async function getAllLoans(): Promise<Loan[]> {
+  const snapshot = await getDocs(loansCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+}
+
+// Fetch ALL fund transactions
+export async function getAllFundTransactions(): Promise<FundTransaction[]> {
+  const snapshot = await getDocs(fundTransactionsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+}
+
 export async function getInitialCustomerPayments(count = 100) {
   const q = query(customerPaymentsCollection, orderBy("date", "desc"), limit(count));
   const snapshot = await getDocs(q);

@@ -1,7 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses } from './firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -157,6 +157,426 @@ export async function syncAllData() {
             }
         }, (error) => console.error("Sync Error (Payments):", error));
     }
+}
+
+// Sync collection info type
+export interface SyncCollectionInfo {
+  collectionName: string;
+  displayName: string;
+  totalInFirestore: number;
+  fetched: number;
+  sent: number;
+  status: 'pending' | 'syncing' | 'success' | 'error';
+  error?: string;
+}
+
+// Comprehensive sync function that returns detailed information
+export async function syncAllDataWithDetails(
+  selectedCollections?: string[],
+  onProgress?: (collections: SyncCollectionInfo[]) => void
+): Promise<SyncCollectionInfo[]> {
+  if (!db) return [];
+
+  const collections: SyncCollectionInfo[] = [];
+  
+  // Helper to update progress
+  const updateProgress = () => {
+    if (onProgress) {
+      onProgress([...collections]);
+    }
+  };
+  
+  // Define all collections to sync
+  const allCollectionConfigs = [
+    { name: 'suppliers', displayName: 'Suppliers', getAllFn: getAllSuppliers, localTable: () => db.suppliers },
+    { name: 'customers', displayName: 'Customers', getAllFn: getAllCustomers, localTable: () => db.customers },
+    { name: 'payments', displayName: 'Payments', getAllFn: getAllPayments, localTable: () => db.payments },
+    { name: 'customerPayments', displayName: 'Customer Payments', getAllFn: getAllCustomerPayments, localTable: () => db.customerPayments },
+    { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', getAllFn: getAllSupplierBankAccounts, localTable: () => db.bankAccounts, isSpecial: true },
+    { name: 'banks', displayName: 'Banks', getAllFn: getAllBanks, localTable: () => db.banks },
+    { name: 'bankBranches', displayName: 'Bank Branches', getAllFn: getAllBankBranches, localTable: () => db.bankBranches },
+    { name: 'bankAccounts', displayName: 'Bank Accounts', getAllFn: getAllBankAccounts, localTable: () => db.bankAccounts },
+    { name: 'projects', displayName: 'Projects', getAllFn: getAllProjects, localTable: () => db.projects },
+    { name: 'loans', displayName: 'Loans', getAllFn: getAllLoans, localTable: () => db.loans },
+    { name: 'fundTransactions', displayName: 'Fund Transactions', getAllFn: getAllFundTransactions, localTable: () => db.fundTransactions },
+  ];
+
+  // Filter collections based on selection
+  const collectionConfigs = selectedCollections 
+    ? allCollectionConfigs.filter(config => selectedCollections.includes(config.name))
+    : allCollectionConfigs;
+
+  // Sync each collection
+  for (let i = 0; i < collectionConfigs.length; i++) {
+    const config = collectionConfigs[i];
+    const info: SyncCollectionInfo = {
+      collectionName: config.name,
+      displayName: config.displayName,
+      totalInFirestore: 0,
+      fetched: 0,
+      sent: 0,
+      status: 'syncing',
+    };
+    collections.push(info);
+    updateProgress();
+
+    try {
+      info.status = 'syncing';
+      info.error = `Fetching data from Firestore...`;
+      updateProgress();
+      // Get total count in Firestore
+      info.error = `Fetching ${config.displayName} from Firestore...`;
+      updateProgress();
+      const allData = await config.getAllFn();
+      info.totalInFirestore = allData.length;
+      info.error = `Found ${allData.length} records. Processing...`;
+      updateProgress();
+      
+      // Save to local
+      if (allData.length > 0) {
+        const localTable = config.localTable();
+        if (localTable) {
+          // Get existing local data count before sync
+          const existingCount = await localTable.count();
+          
+          // Handle duplicates for collections with unique indexes
+          let dataToSync = allData;
+          if (config.name === 'bankBranches') {
+            // First, clean up existing duplicates in local database
+            info.error = `Cleaning up duplicates in ${config.displayName}...`;
+            updateProgress();
+            try {
+              const existingBranches = await localTable.toArray();
+              const ifscMap = new Map<string, any[]>();
+              
+              // Group existing branches by IFSC code
+              existingBranches.forEach((branch: any) => {
+                const ifscCode = branch.ifscCode?.toUpperCase()?.trim() || '';
+                if (ifscCode) {
+                  if (!ifscMap.has(ifscCode)) {
+                    ifscMap.set(ifscCode, []);
+                  }
+                  ifscMap.get(ifscCode)!.push(branch);
+                }
+              });
+              
+              // Remove duplicate existing records (keep the most recent one)
+              for (const [ifscCode, branches] of ifscMap.entries()) {
+                if (branches.length > 1) {
+                  // Sort by updatedAt/createdAt, keep the most recent
+                  branches.sort((a, b) => {
+                    const timeA = a.updatedAt || a.createdAt || '';
+                    const timeB = b.updatedAt || b.createdAt || '';
+                    return timeB.localeCompare(timeA);
+                  });
+                  
+                  // Delete all except the first (most recent)
+                  const toDelete = branches.slice(1);
+                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  if (deleteIds.length > 0) {
+                    await localTable.bulkDelete(deleteIds);
+                    console.warn(`Cleaned up ${deleteIds.length} duplicate bankBranches with IFSC: ${ifscCode}`);
+                  }
+                }
+              }
+            } catch (cleanupError) {
+              console.warn('Error cleaning up existing duplicates:', cleanupError);
+            }
+            
+            // Remove duplicates from incoming data, keep the most recent one
+            info.error = `Removing duplicates from ${config.displayName}...`;
+            updateProgress();
+            const uniqueMap = new Map<string, any>();
+            const itemsWithoutIfsc: any[] = [];
+            
+            allData.forEach((item: any) => {
+              const ifscCode = item.ifscCode?.toUpperCase()?.trim() || '';
+              if (ifscCode) {
+                const existing = uniqueMap.get(ifscCode);
+                if (!existing) {
+                  uniqueMap.set(ifscCode, item);
+                } else {
+                  // Keep the one with more recent updatedAt or createdAt
+                  const existingTime = existing.updatedAt || existing.createdAt || '';
+                  const currentTime = item.updatedAt || item.createdAt || '';
+                  if (currentTime > existingTime) {
+                    uniqueMap.set(ifscCode, item);
+                  }
+                }
+              } else {
+                // Items without IFSC code - add them separately (they won't conflict with unique index)
+                itemsWithoutIfsc.push(item);
+              }
+            });
+            
+            dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutIfsc];
+            if (dataToSync.length < allData.length) {
+              console.warn(`Removed ${allData.length - dataToSync.length} duplicate bankBranches from Firestore data based on IFSC code`);
+            }
+          } else if (config.name === 'bankAccounts' || config.name === 'supplierBankAccounts') {
+            // First, clean up existing duplicates in local database
+            try {
+              const existingAccounts = await localTable.toArray();
+              const accountMap = new Map<string, any[]>();
+              
+              // Group existing accounts by account number
+              existingAccounts.forEach((account: any) => {
+                const accountNumber = account.accountNumber?.trim() || '';
+                if (accountNumber) {
+                  if (!accountMap.has(accountNumber)) {
+                    accountMap.set(accountNumber, []);
+                  }
+                  accountMap.get(accountNumber)!.push(account);
+                }
+              });
+              
+              // Remove duplicate existing records (keep the most recent one)
+              for (const [accountNumber, accounts] of accountMap.entries()) {
+                if (accounts.length > 1) {
+                  // Sort by updatedAt/createdAt, keep the most recent
+                  accounts.sort((a, b) => {
+                    const timeA = a.updatedAt || a.createdAt || '';
+                    const timeB = b.updatedAt || b.createdAt || '';
+                    return timeB.localeCompare(timeA);
+                  });
+                  
+                  // Delete all except the first (most recent)
+                  const toDelete = accounts.slice(1);
+                  const deleteIds = toDelete.map((a: any) => a.id).filter((id: any) => id !== undefined);
+                  if (deleteIds.length > 0) {
+                    await localTable.bulkDelete(deleteIds);
+                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with account number: ${accountNumber}`);
+                  }
+                }
+              }
+            } catch (cleanupError) {
+              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+            }
+            
+            // Remove duplicates from incoming data, keep the most recent one
+            const uniqueMap = new Map<string, any>();
+            const itemsWithoutAccount: any[] = [];
+            
+            allData.forEach((item: any) => {
+              const accountNumber = item.accountNumber?.trim() || '';
+              if (accountNumber) {
+                const existing = uniqueMap.get(accountNumber);
+                if (!existing) {
+                  uniqueMap.set(accountNumber, item);
+                } else {
+                  // Keep the one with more recent updatedAt or createdAt
+                  const existingTime = existing.updatedAt || existing.createdAt || '';
+                  const currentTime = item.updatedAt || item.createdAt || '';
+                  if (currentTime > existingTime) {
+                    uniqueMap.set(accountNumber, item);
+                  }
+                }
+              } else {
+                // Items without account number - add them separately
+                itemsWithoutAccount.push(item);
+              }
+            });
+            
+            dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutAccount];
+            if (dataToSync.length < allData.length) {
+              console.warn(`Removed ${allData.length - dataToSync.length} duplicate ${config.name} from Firestore data based on account number`);
+            }
+          }
+          
+          // Use bulkPut to update/insert with error handling
+          let actualFetched = dataToSync.length;
+          info.error = `Syncing ${dataToSync.length} ${config.displayName} records...`;
+          updateProgress();
+          try {
+            await localTable.bulkPut(dataToSync);
+            info.error = undefined;
+          } catch (bulkError: any) {
+            // If bulkPut fails, try individual puts to identify problematic records
+            if (bulkError.name === 'BulkError' || bulkError.failures) {
+              console.warn(`BulkPut failed for ${config.name}, trying individual puts...`);
+              let successCount = 0;
+              let failureCount = 0;
+              const failedItems: string[] = [];
+              
+              for (const item of dataToSync) {
+                try {
+                  await localTable.put(item);
+                  successCount++;
+                } catch (itemError: any) {
+                  failureCount++;
+                  const itemId = item.id || item.ifscCode || item.accountNumber || 'unknown';
+                  failedItems.push(itemId);
+                  console.warn(`Failed to sync ${config.name} item (${itemId}):`, itemError.message);
+                }
+              }
+              
+              actualFetched = successCount;
+              
+              // Log warning but don't fail the entire sync if some items succeeded
+              if (failureCount > 0) {
+                const warningMsg = `${failureCount} of ${dataToSync.length} ${config.name} items failed to sync. ${successCount} succeeded. Failed items: ${failedItems.join(', ')}`;
+                console.warn(warningMsg);
+                // Only throw error if ALL items failed
+                if (successCount === 0) {
+                  throw new Error(warningMsg);
+                } else {
+                  // Some succeeded, some failed - log but continue
+                  info.error = `${failureCount} items failed (see console for details)`;
+                }
+              }
+            } else {
+              throw bulkError;
+            }
+          }
+          
+          info.fetched = actualFetched;
+          
+          // Count pending changes for this collection (data to be sent to Firestore)
+          // Check sync queue for pending tasks related to this collection
+          if (db) {
+            try {
+              const allPendingTasks = await db.syncQueue
+                .where('status')
+                .anyOf(['pending', 'failed'])
+                .toArray();
+              const pendingTasks = allPendingTasks.filter(task => {
+                const taskType = (task as any).type || '';
+                return taskType.includes(config.name) || taskType.includes(`:${config.name}`);
+              });
+              info.sent = pendingTasks.length;
+            } catch {
+              info.sent = 0;
+            }
+          } else {
+            info.sent = 0;
+          }
+          
+          info.status = 'success';
+          info.error = undefined;
+          updateProgress();
+        } else {
+          info.status = 'error';
+          info.error = 'Local table not found';
+          updateProgress();
+        }
+      } else {
+        // Even if no data, check for pending changes
+        if (db) {
+          try {
+            const allPendingTasks = await db.syncQueue
+              .where('status')
+              .anyOf(['pending', 'failed'])
+              .toArray();
+            const pendingTasks = allPendingTasks.filter(task => {
+              const taskType = (task as any).type || '';
+              return taskType.includes(config.name) || taskType.includes(`:${config.name}`);
+            });
+            info.sent = pendingTasks.length;
+          } catch {
+            info.sent = 0;
+          }
+        }
+        info.status = 'success';
+      }
+    } catch (error: any) {
+      info.status = 'error';
+      info.error = error.message || 'Unknown error';
+      console.error(`Error syncing ${config.name}:`, error);
+    }
+  }
+
+  // Handle incomes and expenses separately (stored in transactions table)
+  const incomeInfo: SyncCollectionInfo = {
+    collectionName: 'incomes',
+    displayName: 'Incomes',
+    totalInFirestore: 0,
+    fetched: 0,
+    sent: 0,
+    status: 'syncing',
+  };
+  collections.push(incomeInfo);
+
+  try {
+    const incomes = await getAllIncomes();
+    incomeInfo.totalInFirestore = incomes.length;
+    if (incomes.length > 0) {
+      const allTransactions = incomes.map(inc => ({ ...inc, type: 'income' } as Transaction));
+      await db.transactions.bulkPut(allTransactions);
+      incomeInfo.fetched = incomes.length;
+    }
+    // Check for pending sync tasks
+    if (db) {
+      try {
+        const allPendingTasks = await db.syncQueue
+          .where('status')
+          .anyOf(['pending', 'failed'])
+          .toArray();
+        const pendingTasks = allPendingTasks.filter(task => {
+          const taskType = (task as any).type || '';
+          return taskType.includes('incomes') || taskType.includes('income');
+        });
+        incomeInfo.sent = pendingTasks.length;
+      } catch {
+        incomeInfo.sent = 0;
+      }
+    }
+    incomeInfo.status = 'success';
+  } catch (error: any) {
+    incomeInfo.status = 'error';
+    incomeInfo.error = error.message || 'Unknown error';
+  }
+
+  const expenseInfo: SyncCollectionInfo = {
+    collectionName: 'expenses',
+    displayName: 'Expenses',
+    totalInFirestore: 0,
+    fetched: 0,
+    sent: 0,
+    status: 'syncing',
+  };
+  collections.push(expenseInfo);
+
+  try {
+    const expenses = await getAllExpenses();
+    expenseInfo.totalInFirestore = expenses.length;
+    if (expenses.length > 0) {
+      const allTransactions = expenses.map(exp => ({ ...exp, type: 'expense' } as Transaction));
+      await db.transactions.bulkPut(allTransactions);
+      expenseInfo.fetched = expenses.length;
+    }
+    // Check for pending sync tasks
+    if (db) {
+      try {
+        const allPendingTasks = await db.syncQueue
+          .where('status')
+          .anyOf(['pending', 'failed'])
+          .toArray();
+        const pendingTasks = allPendingTasks.filter(task => {
+          const taskType = (task as any).type || '';
+          return taskType.includes('expenses') || taskType.includes('expense');
+        });
+        expenseInfo.sent = pendingTasks.length;
+      } catch {
+        expenseInfo.sent = 0;
+      }
+    }
+    expenseInfo.status = 'success';
+  } catch (error: any) {
+    expenseInfo.status = 'error';
+    expenseInfo.error = error.message || 'Unknown error';
+  }
+
+  // Update lastSync times
+  if (typeof window !== 'undefined') {
+    const now = Date.now();
+    collections.forEach(col => {
+      if (col.status === 'success') {
+        localStorage.setItem(`lastSync:${col.collectionName}`, String(now));
+      }
+    });
+  }
+
+  return collections;
 }
 
 // Hard sync: replace local IndexedDB with fresh Firestore data (all collections)

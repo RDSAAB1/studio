@@ -17,7 +17,8 @@ import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter, usePathname } from "next/navigation";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { syncAllData, hardSyncAllData } from "@/lib/database";
+import { syncAllData, hardSyncAllData, syncAllDataWithDetails } from "@/lib/database";
+import { SyncDialog } from "@/components/sync-dialog";
 import { useSupplierHubContext } from "@/app/sales/supplier-hub/context/supplier-hub-context";
 
 const DynamicIslandToaster = dynamic(
@@ -229,41 +230,14 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const supplierHubContext = useSupplierHubContext();
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   
-  const handleManualSync = async () => {
-    if (isSyncing) return; // Prevent multiple simultaneous syncs
-    
-    const id = "sync-toast";
-    setIsSyncing(true);
-    toast({ id, title: "🔄 Syncing all data from Firestore...", description: "This may take a few moments. Please wait..." });
-    
-    try {
-        // Perform a hard sync to ensure IndexedDB mirrors Firestore exactly
-        // This clears all lastSync times and fetches all data fresh from Firestore
-        await hardSyncAllData();
-        
-        // Force a page refresh to reload all realtime listeners with fresh data
-        toast({ 
-            id, 
-            title: "✅ Sync Complete", 
-            description: "All data synced successfully. Refreshing to apply changes...", 
-            variant: "success" 
-        });
-        
-        // Small delay to show success message, then refresh
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
-    } catch (error) {
-        console.error("Manual sync failed:", error);
-        toast({ 
-            id, 
-            title: "❌ Sync Failed", 
-            description: error instanceof Error ? error.message : "Could not sync data. Please try again.", 
-            variant: "destructive" 
-        });
-        setIsSyncing(false);
-    }
+  const handleSyncClick = () => {
+    setSyncDialogOpen(true);
+  };
+
+  const handleSync = async (selectedCollections?: string[], onProgress?: (collections: any[]) => void) => {
+    return await syncAllDataWithDetails(selectedCollections, onProgress);
   }
 
   return (
@@ -321,13 +295,18 @@ export function Header({ toggleSidebar }: HeaderProps) {
             variant="ghost" 
             size="icon" 
             className="h-8 w-8" 
-            onClick={handleManualSync}
+            onClick={handleSyncClick}
             disabled={isSyncing}
             title="Sync all data from Firestore"
           >
              <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
              <span className="sr-only">Sync Data</span>
           </Button>
+          <SyncDialog 
+            open={syncDialogOpen} 
+            onOpenChange={setSyncDialogOpen}
+            onSync={handleSync}
+          />
           <NotificationBell />
           <DraggableCalculator />
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/settings')}>
