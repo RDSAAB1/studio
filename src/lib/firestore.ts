@@ -1880,12 +1880,18 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     
     if (lastSyncTime) {
         // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            supplierPaymentsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
+        try {
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            q = query(
+                supplierPaymentsCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } catch (error) {
+            // If updatedAt query fails (no index or missing fields), fallback to full sync
+            console.warn('Incremental sync failed for payments, using full sync:', error);
+            q = query(supplierPaymentsCollection, orderBy("date", "desc"));
+        }
     } else {
         // First sync - get all (only once)
         q = query(supplierPaymentsCollection, orderBy("date", "desc"));
@@ -1900,18 +1906,24 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         // Merge new changes with local data
         if (callbackCalledFromIndexedDB && localPayments.length > 0) {
             const mergedMap = new Map<string, Payment>();
+            // Add all local payments first
             localPayments.forEach(p => mergedMap.set(p.id, p));
+            // Update/add new payments from Firestore
             newPayments.forEach(p => mergedMap.set(p.id, p));
             const merged = Array.from(mergedMap.values()).sort((a, b) => {
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
             });
             callback(merged);
+            // Update localPayments for next merge
+            localPayments = merged;
             
             if (db && newPayments.length > 0) {
                 await db.payments.bulkPut(newPayments);
             }
         } else {
+            // No local data or first sync - use Firestore data directly
             callback(newPayments);
+            localPayments = newPayments;
             if (db && newPayments.length > 0) {
                 await db.payments.bulkPut(newPayments);
             }

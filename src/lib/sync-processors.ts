@@ -1,6 +1,6 @@
 import { registerSyncProcessor } from "./sync-queue";
 import { firestoreDB } from "./firebase";
-import { doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import type { Customer, Payment } from "./definitions";
 import { markFirestoreDisabled, isQuotaError } from "./realtime-guard";
 
@@ -49,7 +49,12 @@ registerSyncProcessor<Payment>("upsert:payment", async (task) => {
 	if (!payload?.id) throw new Error("Missing payment id");
 	try {
 		const ref = doc(firestoreDB, "payments", payload.id);
-		await setDoc(ref, payload, { merge: true });
+		// Ensure updatedAt is set for incremental sync
+		const paymentWithTimestamp = {
+			...payload,
+			updatedAt: payload.updatedAt || Timestamp.now()
+		};
+		await setDoc(ref, paymentWithTimestamp, { merge: true });
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;

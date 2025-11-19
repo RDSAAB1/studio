@@ -1,7 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments } from './firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -159,22 +159,106 @@ export async function syncAllData() {
     }
 }
 
-// Hard sync: replace local IndexedDB with fresh Firestore data (suppliers, payments)
+// Hard sync: replace local IndexedDB with fresh Firestore data (all collections)
+// This clears all lastSync times and forces a full sync from Firestore
 export async function hardSyncAllData() {
     if (!db) return;
+    
     try {
-        const [suppliers, payments] = await Promise.all([
-            getAllSuppliers(),
-            getAllPayments(),
+        console.log('🔄 Starting full sync from Firestore...');
+        
+        // ✅ Clear all lastSync times to force full sync on next realtime listener update
+        if (typeof window !== 'undefined') {
+            const syncKeys = [
+                'lastSync:suppliers',
+                'lastSync:customers',
+                'lastSync:payments',
+                'lastSync:customerPayments',
+                'lastSync:incomes',
+                'lastSync:expenses',
+                'lastSync:projects',
+                'lastSync:loans',
+                'lastSync:fundTransactions',
+            ];
+            syncKeys.forEach(key => localStorage.removeItem(key));
+            console.log('✅ Cleared all lastSync timestamps');
+        }
+        
+        // ✅ Fetch all data from Firestore in parallel
+        const [
+            suppliers,
+            customers,
+            payments,
+            customerPayments,
+            incomes,
+            expenses
+        ] = await Promise.all([
+            getAllSuppliers().catch(e => { console.warn('Failed to sync suppliers:', e); return []; }),
+            getAllCustomers().catch(e => { console.warn('Failed to sync customers:', e); return []; }),
+            getAllPayments().catch(e => { console.warn('Failed to sync payments:', e); return []; }),
+            getAllCustomerPayments().catch(e => { console.warn('Failed to sync customerPayments:', e); return []; }),
+            getAllIncomes().catch(e => { console.warn('Failed to sync incomes:', e); return []; }),
+            getAllExpenses().catch(e => { console.warn('Failed to sync expenses:', e); return []; }),
         ]);
-        await db.transaction('rw', db.suppliers, db.payments, async () => {
+        
+        // ✅ Update IndexedDB with fresh data
+        await db.transaction('rw', db.suppliers, db.customers, db.payments, db.customerPayments, db.transactions, async () => {
+            // Clear existing data
             await db.suppliers.clear();
+            await db.customers.clear();
             await db.payments.clear();
-            if (suppliers?.length) await db.suppliers.bulkAdd(suppliers);
-            if (payments?.length) await db.payments.bulkAdd(payments);
+            await db.customerPayments.clear();
+            
+            // Add fresh data
+            if (suppliers?.length) {
+                await db.suppliers.bulkAdd(suppliers);
+                console.log(`✅ Synced ${suppliers.length} suppliers`);
+            }
+            if (customers?.length) {
+                await db.customers.bulkAdd(customers);
+                console.log(`✅ Synced ${customers.length} customers`);
+            }
+            if (payments?.length) {
+                await db.payments.bulkAdd(payments);
+                console.log(`✅ Synced ${payments.length} payments`);
+            }
+            if (customerPayments?.length) {
+                await db.customerPayments.bulkAdd(customerPayments);
+                console.log(`✅ Synced ${customerPayments.length} customer payments`);
+            }
+            
+            // Handle incomes and expenses (stored in transactions table)
+            if (incomes?.length || expenses?.length) {
+                const allTransactions: Transaction[] = [
+                    ...(incomes?.map(inc => ({ ...inc, type: 'income' } as Transaction)) || []),
+                    ...(expenses?.map(exp => ({ ...exp, type: 'expense' } as Transaction)) || [])
+                ];
+                if (allTransactions.length > 0) {
+                    // Clear only income/expense transactions
+                    const existing = await db.transactions.where('type').anyOf(['income', 'expense']).toArray();
+                    if (existing.length > 0) {
+                        await db.transactions.bulkDelete(existing.map(t => t.id!));
+                    }
+                    await db.transactions.bulkAdd(allTransactions);
+                    console.log(`✅ Synced ${incomes?.length || 0} incomes and ${expenses?.length || 0} expenses`);
+                }
+            }
         });
+        
+        // ✅ Update lastSync times after successful sync
+        if (typeof window !== 'undefined') {
+            const now = Date.now();
+            localStorage.setItem('lastSync:suppliers', String(now));
+            localStorage.setItem('lastSync:customers', String(now));
+            localStorage.setItem('lastSync:payments', String(now));
+            localStorage.setItem('lastSync:customerPayments', String(now));
+            localStorage.setItem('lastSync:incomes', String(now));
+            localStorage.setItem('lastSync:expenses', String(now));
+        }
+        
+        console.log('✅ Full sync completed successfully');
     } catch (e) {
-        console.error('Hard sync failed:', e);
+        console.error('❌ Hard sync failed:', e);
         throw e;
     }
 }

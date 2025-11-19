@@ -474,9 +474,14 @@ export const useSupplierPayments = () => {
         setActiveTab('process');
         setIsProcessing(true);
         
+        const paymentMode: 'Supplier' | 'Outsider' = (paymentToEdit as any).rtgsFor === 'Outsider' ? 'Outsider' : 'Supplier';
+        if (form.rtgsFor !== paymentMode) {
+            form.setRtgsFor(paymentMode);
+        }
+        
         try {
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            if (form.rtgsFor === 'Supplier' && !firstSrNo) {
+            if (paymentMode === 'Supplier' && !firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
                  handleSettleAmountChange(0);
@@ -485,7 +490,7 @@ export const useSupplierPayments = () => {
                  return;
             }
             
-            if (form.rtgsFor === 'Outsider') {
+            if (paymentMode === 'Outsider') {
                 handlePaySelectedOutstanding(paymentToEdit);
                 toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
                 setIsProcessing(false);

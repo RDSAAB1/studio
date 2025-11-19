@@ -154,24 +154,23 @@ export default function SupplierPaymentsClient() {
     [normalizedSerialFilter, selectedSupplierSrNos]
   );
 
-  // Helper function to extract numeric part from serial number for sorting
-  const getSerialNumberForSort = (payment: Payment): number => {
-    const srNo = payment.paidFor?.[0]?.srNo || payment.parchiNo || '';
-    if (!srNo) return 0;
-    // Extract numeric part from serial number (e.g., "S00001" -> 1, "00001" -> 1)
-    const numericMatch = srNo.toString().match(/\d+/);
-    return numericMatch ? parseInt(numericMatch[0], 10) : 0;
+  // Helper: normalize payment id for sorting
+  const getPaymentIdForSort = (payment: Payment): string => {
+    return (payment?.id || payment?.paymentId || '').toString();
   };
 
   const cashHistoryRows = useMemo(() => {
     const filtered = hook.paymentHistory
       .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash")
       .filter(paymentMatchesSelection);
-    // Sort by serial number (ascending - low to high)
+    // Sort by ID (descending - high to low)
     return [...filtered].sort((a, b) => {
-      const srNoA = getSerialNumberForSort(a);
-      const srNoB = getSerialNumberForSort(b);
-      return srNoA - srNoB;
+      const idA = getPaymentIdForSort(a);
+      const idB = getPaymentIdForSort(b);
+      if (!idA && !idB) return 0;
+      if (!idA) return 1;
+      if (!idB) return -1;
+      return idB.localeCompare(idA, undefined, { numeric: true, sensitivity: "base" });
     });
   }, [hook.paymentHistory, paymentMatchesSelection]);
 
@@ -179,11 +178,14 @@ export default function SupplierPaymentsClient() {
     const filtered = hook.paymentHistory
       .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "rtgs")
       .filter(paymentMatchesSelection);
-    // Sort by serial number (ascending - low to high)
+    // Sort by ID (descending - high to low)
     return [...filtered].sort((a, b) => {
-      const srNoA = getSerialNumberForSort(a);
-      const srNoB = getSerialNumberForSort(b);
-      return srNoA - srNoB;
+      const idA = getPaymentIdForSort(a);
+      const idB = getPaymentIdForSort(b);
+      if (!idA && !idB) return 0;
+      if (!idA) return 1;
+      if (!idB) return -1;
+      return idB.localeCompare(idA, undefined, { numeric: true, sensitivity: "base" });
     });
   }, [hook.paymentHistory, paymentMatchesSelection]);
 

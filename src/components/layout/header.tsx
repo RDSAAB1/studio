@@ -228,16 +228,41 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const isSupplierHub = pathname?.includes('supplier-hub');
   const supplierHubContext = useSupplierHubContext();
 
+  const [isSyncing, setIsSyncing] = useState(false);
+  
   const handleManualSync = async () => {
+    if (isSyncing) return; // Prevent multiple simultaneous syncs
+    
     const id = "sync-toast";
-    toast({ id, title: "Syncing data...", description: "Please wait..." });
+    setIsSyncing(true);
+    toast({ id, title: "🔄 Syncing all data from Firestore...", description: "This may take a few moments. Please wait..." });
+    
     try {
         // Perform a hard sync to ensure IndexedDB mirrors Firestore exactly
+        // This clears all lastSync times and fetches all data fresh from Firestore
         await hardSyncAllData();
-        toast({ id, title: "Sync Complete", description: "Your data is up to date.", variant: "success" });
+        
+        // Force a page refresh to reload all realtime listeners with fresh data
+        toast({ 
+            id, 
+            title: "✅ Sync Complete", 
+            description: "All data synced successfully. Refreshing to apply changes...", 
+            variant: "success" 
+        });
+        
+        // Small delay to show success message, then refresh
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
     } catch (error) {
         console.error("Manual sync failed:", error);
-        toast({ id, title: "Sync Failed", description: "Could not sync data.", variant: "destructive" });
+        toast({ 
+            id, 
+            title: "❌ Sync Failed", 
+            description: error instanceof Error ? error.message : "Could not sync data. Please try again.", 
+            variant: "destructive" 
+        });
+        setIsSyncing(false);
     }
   }
 
@@ -292,8 +317,15 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end")}>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleManualSync}>
-             <RefreshCw className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8" 
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            title="Sync all data from Firestore"
+          >
+             <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
              <span className="sr-only">Sync Data</span>
           </Button>
           <NotificationBell />

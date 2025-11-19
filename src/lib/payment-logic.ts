@@ -1,6 +1,6 @@
 'use client';
 
-import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference, WriteBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference, WriteBatch, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency, generateReadableId } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
@@ -1638,8 +1638,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
         const newPaymentRef = doc(firestoreDB, "payments", paymentIdToUse);
-        transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
-        finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
+        const now = Timestamp.now();
+        transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id, updatedAt: now });
+        finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase, updatedAt: now } as Payment;
         
     });
     } catch (err: any) {
@@ -1675,7 +1676,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             if (paymentMethod === 'RTGS') (paymentDataBase as any).rtgsSrNo = rtgsSrNo; else delete (paymentDataBase as any).rtgsSrNo;
             if (paymentMethod !== 'Cash') (paymentDataBase as any).bankAccountId = accountIdForPayment;
             const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
-            finalPaymentData = { id: paymentIdToUse, ...paymentDataBase } as Payment;
+            const now = Timestamp.now();
+            finalPaymentData = { id: paymentIdToUse, ...paymentDataBase, updatedAt: now } as Payment;
             try {
                 if (db && finalPaymentData) {
                     if (editingPayment?.id) {
