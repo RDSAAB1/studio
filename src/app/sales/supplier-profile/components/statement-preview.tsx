@@ -114,10 +114,10 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         table { width: 100%; border-collapse: collapse; margin-top: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        th, td { border: 2px solid #000; padding: 6px; text-align: left; }
+                        th, td { border: 1px solid #999; padding: 6px; text-align: left; }
                         th { background-color: #e5e5e5 !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        thead tr { background-color: #dbeafe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; background-image: linear-gradient(to right, #dbeafe, #e0e7ff) !important; }
-                        tfoot tr { background-color: #fef3c7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; background-image: linear-gradient(to right, #fef3c7, #fed7aa) !important; }
+                        thead tr { background-color: #e5e5e5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        tfoot tr { background-color: #e5e5e5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         .header { text-align: center; margin-bottom: 20px; }
                         .summary { margin-top: 20px; }
                         .particulars-column { width: 35%; font-size: 17px; line-height: 1.4; white-space: pre; font-family: 'Courier New', monospace !important; }
@@ -132,9 +132,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         .preview-toolbar button.secondary:hover { background-color: #d1d5db; opacity: 1; }
                         @media print {
                             .preview-toolbar { display: none !important; }
-                            th, td { border: 2px solid #000 !important; font-size: 12px !important; padding: 1px 2px !important; line-height: 1.15 !important; }
-                            table { border: 2px solid #000 !important; }
-                            .statement-table th, .statement-table td { font-size: 11px !important; padding: 1px 2px !important; line-height: 1.15 !important; }
+                            th, td { border: 1px solid #999 !important; font-size: 12px !important; padding: 1px 2px !important; line-height: 1.15 !important; }
+                            table { border: 1px solid #999 !important; }
+                            .statement-table th, .statement-table td { font-size: 11px !important; padding: 1px 2px !important; line-height: 1.15 !important; border: 1px solid #999 !important; }
                             .particulars-column { width: 30% !important; font-size: 11px !important; line-height: 1.1 !important; }
                             .hidden-table-container td { font-size: 11px !important; line-height: 1.1 !important; }
                             .amount-columns { width: 17.5% !important; font-size: 11px !important; }
@@ -143,10 +143,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
                             .gap-4 { gap: 1rem !important; }
                             .mb-6 { margin-bottom: 1.5rem !important; }
+                            .p-2 { padding: 0.5rem !important; }
                             .p-4 { padding: 1rem !important; }
-                            .text-base { font-size: 16px !important; }
-                            .text-xl { font-size: 18px !important; }
-                            .text-lg { font-size: 16px !important; }
+                            .text-xs { font-size: 10px !important; }
+                            .text-sm { font-size: 12px !important; }
+                            .text-base { font-size: 14px !important; }
+                            .text-xl { font-size: 14px !important; }
+                            .text-lg { font-size: 14px !important; }
                             .text-2xl { font-size: 20px !important; }
                             .rounded-lg { border-radius: 0.5rem !important; }
                             .border { border: 1px solid #000 !important; }
@@ -160,12 +163,19 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             .text-red-800 { color: #991b1b !important; }
                             .text-green-800 { color: #166534 !important; }
                             .text-red-600 { color: #dc2626 !important; }
+                            .text-red-400 { color: #f87171 !important; }
                             .text-green-600 { color: #16a34a !important; }
                             .text-blue-600 { color: #2563eb !important; }
+                            .text-blue-400 { color: #60a5fa !important; }
+                            .text-green-400 { color: #4ade80 !important; }
+                            .text-foreground { color: #000 !important; }
+                            .bg-muted { background-color: #e5e5e5 !important; }
                             .font-semibold { font-weight: 600 !important; }
                             .font-medium { font-weight: 500 !important; }
                             .font-bold { font-weight: 700 !important; }
+                            .mb-1\.5 { margin-bottom: 0.375rem !important; }
                             .mb-3 { margin-bottom: 0.75rem !important; }
+                            .space-y-0\.5 > * + * { margin-top: 0.125rem !important; }
                             .space-y-2 > * + * { margin-top: 0.5rem !important; }
                             .flex { display: flex !important; }
                             .justify-between { justify-content: space-between !important; }
@@ -264,9 +274,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             Processing {totalItems} entries, please wait...
                         </p>
                             {progress > 0 && progress < 100 && (
-                                <div className="w-64 bg-gray-200 rounded-full h-2">
+                                <div className="w-64 bg-muted rounded-full h-2">
                                     <div 
-                                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                        className="bg-primary h-2 rounded-full transition-all duration-300"
                                         style={{ width: `${progress}%` }}
                                     />
                                 </div>
@@ -285,7 +295,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
     return (
 
-        <div className="p-6">
+        <div className="p-6 bg-card text-card-foreground">
 
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
 
@@ -297,7 +307,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                         onClick={handlePreview}
 
-                        className="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50"
+                        className="px-4 py-2 border border-primary text-primary rounded hover:bg-primary/10 transition-colors"
 
                     >
 
@@ -309,7 +319,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                         onClick={handlePrint}
 
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
 
                     >
 
@@ -329,7 +339,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     .statement-content table {
 
-                        border: 2px solid #000 !important;
+                        border: 2px solid hsl(var(--border)) !important;
 
                     }
 
@@ -337,13 +347,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     .statement-content td {
 
-                        border: 2px solid #000 !important;
+                        border: 2px solid hsl(var(--border)) !important;
 
                     }
 
                     .statement-content th {
 
-                        background-color: #e5e5e5 !important;
+                        background-color: hsl(var(--muted)) !important;
 
                         font-weight: bold !important;
 
@@ -401,6 +411,20 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     @media print {
 
+                        .statement-content table {
+
+                            border: 1px solid #999 !important;
+
+                        }
+
+                        .statement-content th,
+
+                        .statement-content td {
+
+                            border: 1px solid #999 !important;
+
+                        }
+
                         .statement-content .hidden-table-container table {
 
                             border: none !important;
@@ -412,6 +436,42 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             border: none !important;
 
                             font-size: 9px !important;
+
+                        }
+
+                        /* Summary sections print styles */
+
+                        .statement-content [class*="bg-blue-500"],
+
+                        .statement-content [class*="bg-red-500"],
+
+                        .statement-content [class*="bg-green-500"] {
+
+                            padding: 0.5rem !important;
+
+                        }
+
+                        .statement-content [class*="text-sm"] {
+
+                            font-size: 12px !important;
+
+                        }
+
+                        .statement-content [class*="text-xs"] {
+
+                            font-size: 10px !important;
+
+                        }
+
+                        .statement-content [class*="mb-1"] {
+
+                            margin-bottom: 0.375rem !important;
+
+                        }
+
+                        .statement-content [class*="space-y-0"] > * + * {
+
+                            margin-top: 0.125rem !important;
 
                         }
 
@@ -439,11 +499,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     {/* Operational Summary */}
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2">
 
-                        <h3 className="text-xl font-semibold text-blue-800 mb-3">Operational Summary</h3>
+                        <h3 className="text-sm font-semibold text-blue-400 mb-1.5">Operational Summary</h3>
 
-                        <div className="space-y-2 text-base">
+                        <div className="space-y-0.5 text-xs">
 
                             <div className="flex justify-between">
 
@@ -533,11 +593,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     {/* Deduction Summary */}
 
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2">
 
-                        <h3 className="text-xl font-semibold text-red-800 mb-3">Deduction Summary</h3>
+                        <h3 className="text-sm font-semibold text-red-400 mb-1.5">Deduction Summary</h3>
 
-                        <div className="space-y-2 text-base">
+                        <div className="space-y-0.5 text-xs">
 
                             <div className="flex justify-between">
 
@@ -585,7 +645,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Total Original Amount:</span>
 
-                                <span className="font-bold text-lg">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
+                                <span className="font-bold text-sm">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
 
                             </div>
 
@@ -597,11 +657,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     {/* Financial Summary */}
 
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2">
 
-                        <h3 className="text-xl font-semibold text-green-800 mb-3">Financial Summary</h3>
+                        <h3 className="text-sm font-semibold text-green-400 mb-1.5">Financial Summary</h3>
 
-                        <div className="space-y-2 text-base">
+                        <div className="space-y-0.5 text-xs">
 
                             <div className="flex justify-between">
 
@@ -641,7 +701,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <span>Outstanding:</span>
 
-                                <span className="font-bold text-lg text-red-600">₹{statementOutstanding.toLocaleString()}</span>
+                                <span className="font-bold text-sm text-red-400">₹{statementOutstanding.toLocaleString()}</span>
 
                             </div>
 
@@ -655,23 +715,23 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                 <div className="w-full">
                 <div className="max-h-[600px] overflow-auto">
-                <table className="statement-table min-w-[1100px] border-collapse border-2 border-gray-800 text-xs leading-tight">
+                <table className="statement-table min-w-[1100px] border-collapse border-2 border-border text-xs leading-tight text-foreground">
 
                     <thead>
 
-                        <tr className="bg-gradient-to-r from-blue-100 to-indigo-100 leading-tight">
+                        <tr className="bg-muted leading-tight">
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-left font-bold text-blue-800 text-[11px] leading-tight w-[12%]">Date</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-[11px] leading-tight w-[12%]">Date</th>
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-left font-bold text-indigo-800 text-[11px] leading-tight w-[40%]">Particulars</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-[11px] leading-tight w-[40%]">Particulars</th>
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-right font-bold text-red-800 text-xs leading-tight">Debit</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Debit</th>
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-right font-bold text-green-800 text-xs leading-tight">Paid</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Paid</th>
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-right font-bold text-purple-800 text-[11px] leading-tight">CD</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-[11px] leading-tight">CD</th>
 
-                            <th className="border-2 border-gray-800 px-1 py-0.5 text-right font-bold text-orange-800 text-[11px] leading-tight">Balance</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-[11px] leading-tight">Balance</th>
 
                         </tr>
 
@@ -685,21 +745,21 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                             return (
 
-                                <tr key={index} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                <tr key={index} className={`hover:bg-muted/50 ${index % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-[10px] leading-tight date-column text-blue-800 font-semibold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-[10px] leading-tight date-column text-blue-400 font-semibold">
 
                                         {transaction.displayDate ?? formatDisplayDate(transaction.date, (transaction as any).referenceDate)}
 
                                     </td>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-[11px] leading-tight particulars-column w-[40%]">
+                                    <td className="border-2 border-border px-1 py-0.5 text-[11px] leading-tight particulars-column w-[40%] text-foreground">
 
                                         <div className="hidden-table-container">
 
                                             {typeof transaction.particulars === 'string' ? (
 
-                                                <div style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', lineHeight: '1.1', whiteSpace: 'pre', color: '#1f2937' }}>
+                                                <div className="text-foreground" style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', lineHeight: '1.1', whiteSpace: 'pre' }}>
 
                                             {transaction.particulars}
 
@@ -715,25 +775,25 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                     </td>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-red-600 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-red-400 font-bold">
 
                                         {transaction.debit > 0 ? formatCurrency(transaction.debit) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-green-600 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-green-400 font-bold">
 
                                         {transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-purple-600 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-purple-400 font-bold">
 
                                         {transaction.creditCd > 0 ? formatCurrency(transaction.creditCd) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight font-bold amount-columns text-orange-600">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight font-bold amount-columns text-orange-400">
 
                                         {formatCurrency(balance)}
 
@@ -749,27 +809,27 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                     <tfoot>
 
-                        <tr className="bg-gradient-to-r from-yellow-100 to-orange-100 font-bold">
+                        <tr className="bg-muted font-bold">
 
-                            <td className="border-2 border-gray-800 px-1 py-0.5 text-[10px] leading-tight text-orange-900 font-extrabold" colSpan={3}>
+                            <td className="border-2 border-border px-1 py-0.5 text-[10px] leading-tight text-foreground font-extrabold" colSpan={3}>
 
                                 TOTALS
 
                             </td>
 
-                            <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight text-green-600 font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}
 
                             </td>
 
-                            <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight text-purple-600 font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}
 
                             </td>
 
-                            <td className="border-2 border-gray-800 px-1 py-0.5 text-right text-[10px] leading-tight text-orange-600 font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(statementOutstanding)}
 

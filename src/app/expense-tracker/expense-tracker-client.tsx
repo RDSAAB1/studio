@@ -23,7 +23,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes, getAllExpenses } from "@/lib/firestore";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
@@ -301,8 +301,39 @@ export default function IncomeExpenseClient() {
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
 
     useEffect(() => {
-        const unsubIncome = getIncomeRealtime(setIncome, console.error);
-        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+        // First, fetch ALL income and expense transactions for payee extraction
+        // Then set up realtime listeners for updates
+        const fetchAllTransactions = async () => {
+            try {
+                console.log('[Income/Expense] Fetching all transactions for payee extraction...');
+                const [allIncomes, allExpenses] = await Promise.all([
+                    getAllIncomes(),
+                    getAllExpenses()
+                ]);
+                console.log('[Income/Expense] Fetched all:', {
+                    incomes: allIncomes.length,
+                    expenses: allExpenses.length,
+                    incomePayees: [...new Set(allIncomes.map(i => i.payee).filter(Boolean))].slice(0, 10),
+                    expensePayees: [...new Set(allExpenses.map(e => e.payee).filter(Boolean))].slice(0, 10)
+                });
+                setIncome(allIncomes);
+                setExpenses(allExpenses);
+            } catch (error) {
+                console.error('[Income/Expense] Error fetching all transactions:', error);
+            }
+        };
+
+        fetchAllTransactions();
+
+        // Then set up realtime listeners for updates
+        const unsubIncome = getIncomeRealtime((data) => {
+            console.log('[Income] Realtime update:', data.length, 'income transactions');
+            setIncome(data);
+        }, console.error);
+        const unsubExpenses = getExpensesRealtime((data) => {
+            console.log('[Expenses] Realtime update:', data.length, 'expense transactions');
+            setExpenses(data);
+        }, console.error);
         const unsubPayments = getPaymentsRealtime(setPayments, console.error);
         const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
@@ -321,14 +352,65 @@ export default function IncomeExpenseClient() {
   }, [income, expenses])
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
-      if (!income || !expenses) return [];
-      const combined = [...income, ...expenses];
-      return combined.sort((a, b) => (b.transactionId || '').localeCompare(a.transactionId || ''));
+      console.log('[AllTransactions] Checking data:', {
+          income: income?.length || 0,
+          expenses: expenses?.length || 0,
+          incomeSample: income?.slice(0, 3).map(i => ({ id: i.id, payee: i.payee, transactionId: i.transactionId })),
+          expensesSample: expenses?.slice(0, 3).map(e => ({ id: e.id, payee: e.payee, transactionId: e.transactionId }))
+      });
+      
+      // Handle empty arrays - income and expenses might be [] initially
+      const incomeArray = income || [];
+      const expensesArray = expenses || [];
+      
+      // Don't return early - even if empty, we should process them
+      const combined = [...incomeArray, ...expensesArray];
+      const sorted = combined.sort((a, b) => (b.transactionId || '').localeCompare(a.transactionId || ''));
+      
+      // Check payees in transactions
+      const transactionsWithPayees = sorted.filter(t => t.payee && typeof t.payee === 'string' && t.payee.trim() !== '');
+      const uniquePayeesFromTransactions = [...new Set(transactionsWithPayees.map(t => toTitleCase(t.payee.trim())))];
+      
+      console.log('[AllTransactions] Combined transactions:', {
+          incomeCount: incomeArray.length,
+          expensesCount: expensesArray.length,
+          totalTransactions: sorted.length,
+          transactionsWithPayees: transactionsWithPayees.length,
+          uniquePayeesFromTransactions: uniquePayeesFromTransactions.length,
+          uniquePayeesList: uniquePayeesFromTransactions,
+          samplePayees: sorted.slice(0, 20).map(t => ({ payee: t.payee, hasPayee: !!(t.payee && t.payee.trim()) }))
+      });
+      return sorted;
   }, [income, expenses]);
 
   const uniquePayees = useMemo(() => {
-      const payees = new Set((allTransactions || []).map(t => toTitleCase(t.payee)));
-      return Array.from(payees).sort();
+      if (!allTransactions || allTransactions.length === 0) {
+          console.log('[UniquePayees] No transactions found');
+          return [];
+      }
+      
+      // Extract all payees from transactions
+      const allPayees = allTransactions
+          .map(t => t.payee)
+          .filter(p => p && typeof p === 'string' && p.trim() !== '');
+      
+      console.log('[UniquePayees] Raw payees from transactions:', {
+          totalTransactions: allTransactions.length,
+          payeesWithValue: allPayees.length,
+          samplePayees: allPayees.slice(0, 20)
+      });
+      
+      const payees = new Set(allPayees.map(p => toTitleCase(p.trim())));
+      const uniqueList = Array.from(payees).sort();
+      
+      console.log('[UniquePayees] From transactions:', {
+          totalTransactions: allTransactions.length,
+          payeesWithValue: allPayees.length,
+          uniquePayeesCount: uniqueList.length,
+          uniquePayees: uniqueList
+      });
+      
+      return uniqueList;
   }, [allTransactions]);
 
   const filteredTransactions = useMemo(() => {
@@ -340,10 +422,28 @@ export default function IncomeExpenseClient() {
 
   const accountOptions = useMemo(() => {
       const names = new Set<string>();
-      payeeProfiles.forEach((_profile, name) => names.add(toTitleCase(name)));
-      uniquePayees.forEach(name => names.add(toTitleCase(name)));
+      
+      // Add payees from payeeProfiles collection
+      payeeProfiles.forEach((_profile, name) => {
+          const normalized = toTitleCase(name.trim());
+          if (normalized) names.add(normalized);
+      });
+      
+      // Add payees from transactions (income/expense)
+      uniquePayees.forEach(name => {
+          const normalized = toTitleCase(name.trim());
+          if (normalized) names.add(normalized);
+      });
 
-      return Array.from(names)
+      console.log('[Payee Dropdown] Building options:', {
+          payeeProfilesCount: payeeProfiles.size,
+          uniquePayeesCount: uniquePayees.length,
+          totalUniqueNames: names.size,
+          payeeProfilesKeys: Array.from(payeeProfiles.keys()).slice(0, 10),
+          uniquePayeesSample: uniquePayees.slice(0, 10)
+      });
+
+      const options = Array.from(names)
           .sort((a, b) => a.localeCompare(b))
           .map(name => {
               const profile = payeeProfiles.get(name) || payeeProfiles.get(toTitleCase(name));
@@ -357,6 +457,7 @@ export default function IncomeExpenseClient() {
               return {
                   value: name,
                   label: labelParts.join(' | '),
+                  displayValue: name, // Show only name in input field
                   data: {
                       name,
                       category: profile?.category,
@@ -366,6 +467,11 @@ export default function IncomeExpenseClient() {
                   },
               };
           });
+      
+      console.log('[Payee Dropdown] Final options count:', options.length);
+      console.log('[Payee Dropdown] First 10 options:', options.slice(0, 10).map(o => o.value));
+      
+      return options;
   }, [payeeProfiles, uniquePayees]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
@@ -748,13 +854,32 @@ export default function IncomeExpenseClient() {
 
   useEffect(() => {
     const unsubscribe = getPayeeProfilesRealtime((profiles) => {
+        console.log('[PayeeProfiles] ========================================');
+        console.log('[PayeeProfiles] Received profiles in component:', profiles.length);
+        console.log('[PayeeProfiles] All profile names from Firestore:', profiles.map(p => p.name));
+        console.log('[PayeeProfiles] ========================================');
         const mappedProfiles = new Map<string, PayeeProfile>();
         profiles.forEach(profile => {
-            if (!profile?.name) return;
-            mappedProfiles.set(toTitleCase(profile.name), profile);
+            if (!profile?.name) {
+                console.warn('[PayeeProfiles] Profile without name:', profile);
+                return;
+            }
+            const normalizedName = toTitleCase(profile.name.trim());
+            if (normalizedName) {
+                // Store with normalized name as key
+                mappedProfiles.set(normalizedName, profile);
+                // Also store with original case if different
+                if (profile.name !== normalizedName) {
+                    mappedProfiles.set(profile.name, profile);
+                }
+            }
         });
+        console.log('[PayeeProfiles] Mapped profiles count:', mappedProfiles.size);
+        console.log('[PayeeProfiles] Mapped profile keys (all):', Array.from(mappedProfiles.keys()));
         setPayeeProfiles(mappedProfiles);
-    }, console.error);
+    }, (error) => {
+        console.error('[PayeeProfiles] Error in component:', error);
+    });
 
     return () => unsubscribe();
   }, []);

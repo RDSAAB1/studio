@@ -70,10 +70,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: `Settlement amount (${formatCurrency(settleAmount)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
     }
 
+    // Only apply CD if cdEnabled is true
+    const effectiveCdAmount = cdEnabled ? calculatedCdAmount : 0;
+    
     // Total to settle = actual payment amount + CD (for validation only, not saved)
-    const totalToSettle = finalAmountToPay + calculatedCdAmount;
+    const totalToSettle = finalAmountToPay + effectiveCdAmount;
 
-    if (finalAmountToPay <= 0 && calculatedCdAmount <= 0) {
+    if (finalAmountToPay <= 0 && effectiveCdAmount <= 0) {
         return { success: false, message: "Payment and CD amount cannot both be zero." };
     }
 
@@ -335,6 +338,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // STEP 3: Distribute CD (if enabled)
             // ============================================================
             const cdToDistribute = cdEnabled && calculatedCdAmount ? Math.round(calculatedCdAmount * 100) / 100 : 0;
+            // Ensure CD is only applied when enabled
+            if (!cdEnabled) {
+                // If CD is disabled, set all CD allocations to 0
+                for (const { entry } of entryOutstandings) {
+                    cdAllocations[entry.srNo] = 0;
+                }
+            }
             const cdAllocations: { [srNo: string]: number } = {};
             
             // Initialize all CD allocations to 0
@@ -1618,7 +1628,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             // amount = "To Be Paid" amount (actual payment, WITHOUT CD)
             // cdAmount = CD amount (separate field)
-            amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
+            amount: Math.round(finalAmountToPay), cdAmount: Math.round(effectiveCdAmount),
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
             paidFor: paidForDetails,

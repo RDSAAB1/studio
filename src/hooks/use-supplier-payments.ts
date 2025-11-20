@@ -281,20 +281,23 @@ export const useSupplierPayments = () => {
         editingPayment: form.editingPayment, // Pass editing payment to exclude from CD calculations
     });
     
+    // IMPORTANT: Only apply CD if cdEnabled is true
+    const effectiveCdAmount = cdProps.cdEnabled ? calculatedCdAmount : 0;
+    
     // To Be Paid amount is the actual payment amount that will be transferred
     // For Full payment: To Be Paid = settleAmount - CD (cash matches settlement minus discount)
     // For Partial payment: To Be Paid = toBePaidAmountManual (user entered amount)
     // Total settlement = To Be Paid + CD
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-            // For Full payment: actual cash paid = settle amount - CD
-            const adjustedToBePaid = settleAmount - calculatedCdAmount;
+            // For Full payment: actual cash paid = settle amount - CD (only if CD is enabled)
+            const adjustedToBePaid = settleAmount - effectiveCdAmount;
             return Math.max(0, Math.round(adjustedToBePaid * 100) / 100);
         }
         // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)
         // Settle Amount = toBePaidAmount + CD (handled separately in useEffect)
         return Math.max(0, Math.round(toBePaidAmountManual * 100) / 100);
-    }, [form.paymentType, settleAmount, calculatedCdAmount, toBePaidAmountManual]);
+    }, [form.paymentType, settleAmount, effectiveCdAmount, toBePaidAmountManual]);
     
     // Use finalToBePaid as the actual toBePaidAmount
     const toBePaidAmount = finalToBePaid;
@@ -311,9 +314,10 @@ export const useSupplierPayments = () => {
     };
 
     // Auto-calculate settle amount for Partial payment type
+    // IMPORTANT: Only add CD to settlement if CD is enabled
     useEffect(() => {
         if (form.paymentType === 'Partial') {
-            const newSettleAmount = toBePaidAmountManual + calculatedCdAmount;
+            const newSettleAmount = toBePaidAmountManual + effectiveCdAmount;
             const roundedSettle = Math.round(newSettleAmount * 100) / 100;
             const currentSettle = Math.round(settleAmountManual * 100) / 100;
             
@@ -322,7 +326,7 @@ export const useSupplierPayments = () => {
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [toBePaidAmountManual, calculatedCdAmount, form.paymentType]);
+    }, [toBePaidAmountManual, effectiveCdAmount, form.paymentType]);
 
     // Auto-update Target Amount when To Be Paid changes in Full mode
     useEffect(() => {
@@ -557,7 +561,7 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -692,5 +696,7 @@ export const useSupplierPayments = () => {
         setSelectedEntryIds: form.setSelectedEntryIds,
         setParchiNo: form.setParchiNo,
         parchiNo: form.parchiNo,
+        bankAccounts: data.bankAccounts,
+        bankBranches: data.bankBranches,
     };
 };

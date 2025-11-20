@@ -197,142 +197,151 @@ export const RtgsForm = (props: any) => {
     };
 
     return (
-        <div className="space-y-3 text-[12px]">
+        <div className="space-y-2 text-[10px]">
             <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-muted-foreground">Bank Details</p>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
-                    <Settings className="h-4 w-4" />
+                <p className="text-[11px] font-semibold text-muted-foreground">Bank Details</p>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen(true)}>
+                    <Settings className="h-3.5 w-3.5" />
                 </Button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                 <div className="space-y-1">
-                    <Label className="text-xs">A/C Holder</Label>
-                    <CustomDropdown
-                        options={nameOptions.map(opt => ({ 
-                            value: opt.value, 
-                            label: opt.label,
-                            displayValue: opt.displayValue 
-                        }))}
-                        value={(() => {
-                            if (!supplierDetails.name) return '';
-                            // Try to find matching option
-                            const matchingOption = nameOptions.find(opt => 
-                                opt.name === supplierDetails.name && 
-                                opt.account.accountNumber === bankDetails.acNo
-                            );
-                            if (matchingOption) {
-                                return matchingOption.value;
-                            }
-                            // If no match, return just the name (for custom input)
-                            return supplierDetails.name;
-                        })()}
-                        onChange={(value) => {
-                            if (value) {
-                                const selectedNameOption = nameOptions.find(opt => opt.value === value);
-                                if (selectedNameOption && selectedNameOption.account) {
-                                    const acc = selectedNameOption.account;
-                                    // Fill only name in supplierDetails
-                                    setSupplierDetails?.({ ...supplierDetails, name: acc.accountHolderName });
-                                    // Auto-fill all bank details from selected account
-                                    setBankDetails({
-                                        ...bankDetails,
-                                        acNo: acc.accountNumber,
-                                        bank: acc.bankName,
-                                        branch: acc.branchName,
-                                        ifscCode: acc.ifscCode,
-                                    });
-                                } else {
-                                    // Custom input - extract just the name part if it contains __
-                                    const nameOnly = value.includes('__') ? value.split('__')[0] : value;
-                                    setSupplierDetails?.({ ...supplierDetails, name: nameOnly });
+            <div className="space-y-2">
+                {/* Row 1 */}
+                <div className="grid grid-cols-2 gap-2 items-end">
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">A/C Holder</Label>
+                        <CustomDropdown
+                            options={nameOptions.map(opt => ({ 
+                                value: opt.value, 
+                                label: opt.label,
+                                displayValue: opt.displayValue 
+                            }))}
+                            value={(() => {
+                                if (!supplierDetails.name) return '';
+                                // Try to find matching option
+                                const matchingOption = nameOptions.find(opt => 
+                                    opt.name === supplierDetails.name && 
+                                    opt.account.accountNumber === bankDetails.acNo
+                                );
+                                if (matchingOption) {
+                                    return matchingOption.value;
                                 }
-                            } else {
-                                setSupplierDetails?.({ ...supplierDetails, name: '' });
-                            }
-                        }}
-                        placeholder="Select or enter name"
-                        allowCustomInput={true}
-                    />
-                </div>
-                 <div className="space-y-1">
-                    <Label className="text-xs">Bank</Label>
-                    <CustomDropdown options={bankOptions} value={bankDetails.bank} onChange={handleBankSelect} onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }} placeholder="Select or add bank" />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-xs">Branch</Label>
-                    <CustomDropdown options={availableBranchOptions} value={bankDetails.branch} onChange={handleBranchSelect} onAdd={handleAddBranch} placeholder="Select or add branch"/>
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-xs">IFSC</Label>
-                    <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-8 text-xs font-mono uppercase"/>
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-xs">A/C No.</Label>
-                    <CustomDropdown
-                        options={React.useMemo(() => {
-                            if (!Array.isArray(filteredBankAccounts)) return [];
-                            return filteredBankAccounts.map((acc: any) => ({
-                                value: acc.accountNumber,
-                                label: acc.accountNumber
-                            }));
-                        }, [filteredBankAccounts])}
-                        value={bankDetails.acNo || ''}
-                        onChange={async (value) => {
-                            if (value) {
-                                const selectedAccount = filteredBankAccounts.find((acc: any) => acc.accountNumber === value);
-                                if (selectedAccount) {
-                                    // Auto-fill all bank details from selected account
-                                    setBankDetails({
-                                        ...bankDetails,
-                                        acNo: selectedAccount.accountNumber,
-                                        bank: selectedAccount.bankName,
-                                        branch: selectedAccount.branchName,
-                                        ifscCode: selectedAccount.ifscCode,
-                                    });
-                                    // Also update name if not set
-                                    if (!supplierDetails.name && selectedAccount.accountHolderName) {
-                                        setSupplierDetails?.({ ...supplierDetails, name: selectedAccount.accountHolderName });
+                                // If no match, return just the name (for custom input)
+                                return supplierDetails.name;
+                            })()}
+                            onChange={(value) => {
+                                if (value) {
+                                    const selectedNameOption = nameOptions.find(opt => opt.value === value);
+                                    if (selectedNameOption && selectedNameOption.account) {
+                                        const acc = selectedNameOption.account;
+                                        // Fill only name in supplierDetails
+                                        setSupplierDetails?.({ ...supplierDetails, name: acc.accountHolderName });
+                                        // Auto-fill all bank details from selected account
+                                        setBankDetails({
+                                            ...bankDetails,
+                                            acNo: acc.accountNumber,
+                                            bank: acc.bankName,
+                                            branch: acc.branchName,
+                                            ifscCode: acc.ifscCode,
+                                        });
+                                    } else {
+                                        // Custom input - extract just the name part if it contains __
+                                        const nameOnly = value.includes('__') ? value.split('__')[0] : value;
+                                        setSupplierDetails?.({ ...supplierDetails, name: nameOnly });
                                     }
                                 } else {
-                                    // Custom input - check if it's a new account number
-                                    // If bank, branch, IFSC are filled, save to supplier bank accounts
-                                    if (bankDetails.bank && bankDetails.branch && bankDetails.ifscCode && supplierDetails.name) {
-                                        try {
-                                            // Check if account already exists
-                                            const exists = bankAccounts.some((acc: any) => acc.accountNumber === value);
-                                            if (!exists) {
-                                                await addSupplierBankAccount({
-                                                    accountHolderName: supplierDetails.name,
-                                                    accountNumber: value,
-                                                    bankName: bankDetails.bank,
-                                                    ifscCode: bankDetails.ifscCode,
-                                                    branchName: bankDetails.branch,
-                                                    accountType: 'Other' as const,
-                                                });
-                                                toast({
-                                                    title: "Account Saved",
-                                                    description: "New supplier bank account has been saved",
-                                                });
-                                            }
-                                        } catch (error: any) {
-                                            console.error('Error saving supplier bank account:', error);
-                                            // Don't show error toast, just continue
+                                    setSupplierDetails?.({ ...supplierDetails, name: '' });
+                                }
+                            }}
+                            placeholder="Select or enter name"
+                            allowCustomInput={true}
+                        />
+                    </div>
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">Bank</Label>
+                        <CustomDropdown options={bankOptions} value={bankDetails.bank} onChange={handleBankSelect} onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }} placeholder="Select or add bank" />
+                    </div>
+                </div>
+                {/* Row 2 */}
+                <div className="grid grid-cols-2 gap-2 items-end">
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">Branch</Label>
+                        <CustomDropdown options={availableBranchOptions} value={bankDetails.branch} onChange={handleBranchSelect} onAdd={handleAddBranch} placeholder="Select or add branch"/>
+                    </div>
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">IFSC</Label>
+                        <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-7 text-[10px] font-mono uppercase"/>
+                    </div>
+                </div>
+                {/* Row 3 */}
+                <div className="grid grid-cols-2 gap-2 items-end">
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">A/C No.</Label>
+                        <CustomDropdown
+                            options={React.useMemo(() => {
+                                if (!Array.isArray(filteredBankAccounts)) return [];
+                                return filteredBankAccounts.map((acc: any) => ({
+                                    value: acc.accountNumber,
+                                    label: acc.accountNumber
+                                }));
+                            }, [filteredBankAccounts])}
+                            value={bankDetails.acNo || ''}
+                            onChange={async (value) => {
+                                if (value) {
+                                    const selectedAccount = filteredBankAccounts.find((acc: any) => acc.accountNumber === value);
+                                    if (selectedAccount) {
+                                        // Auto-fill all bank details from selected account
+                                        setBankDetails({
+                                            ...bankDetails,
+                                            acNo: selectedAccount.accountNumber,
+                                            bank: selectedAccount.bankName,
+                                            branch: selectedAccount.branchName,
+                                            ifscCode: selectedAccount.ifscCode,
+                                        });
+                                        // Also update name if not set
+                                        if (!supplierDetails.name && selectedAccount.accountHolderName) {
+                                            setSupplierDetails?.({ ...supplierDetails, name: selectedAccount.accountHolderName });
                                         }
+                                    } else {
+                                        // Custom input - check if it's a new account number
+                                        // If bank, branch, IFSC are filled, save to supplier bank accounts
+                                        if (bankDetails.bank && bankDetails.branch && bankDetails.ifscCode && supplierDetails.name) {
+                                            try {
+                                                // Check if account already exists
+                                                const exists = bankAccounts.some((acc: any) => acc.accountNumber === value);
+                                                if (!exists) {
+                                                    await addSupplierBankAccount({
+                                                        accountHolderName: supplierDetails.name,
+                                                        accountNumber: value,
+                                                        bankName: bankDetails.bank,
+                                                        ifscCode: bankDetails.ifscCode,
+                                                        branchName: bankDetails.branch,
+                                                        accountType: 'Other' as const,
+                                                    });
+                                                    toast({
+                                                        title: "Account Saved",
+                                                        description: "New supplier bank account has been saved",
+                                                    });
+                                                }
+                                            } catch (error: any) {
+                                                console.error('Error saving supplier bank account:', error);
+                                                // Don't show error toast, just continue
+                                            }
+                                        }
+                                        // Set account number
+                                        setBankDetails({...bankDetails, acNo: value});
                                     }
-                                    // Set account number
-                                    setBankDetails({...bankDetails, acNo: value});
+                                } else {
+                                    setBankDetails({...bankDetails, acNo: ''});
                                 }
-                            } else {
-                                setBankDetails({...bankDetails, acNo: ''});
-                            }
-                        }}
-                        placeholder="Select or enter account number"
-                        allowCustomInput={true}
-                    />
-                </div>
-                 <div className="space-y-1">
-                    <Label className="text-xs">Check No.</Label>
-                    <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-8 text-xs"/>
+                            }}
+                            placeholder="Select or enter account number"
+                            allowCustomInput={true}
+                        />
+                    </div>
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">Check No.</Label>
+                        <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-7 text-[10px]"/>
+                    </div>
                 </div>
             </div>
         </div>

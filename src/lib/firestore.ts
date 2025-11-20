@@ -1076,44 +1076,56 @@ export type PayeeProfile = {
 const buildPayeeProfileDocId = (name: string) =>
     toTitleCase(name || '').trim().replace(/\s+/g, '_').toLowerCase();
 
+// Fetch ALL payee profiles (for manual sync or initial load)
+export async function getAllPayeeProfiles(): Promise<PayeeProfile[]> {
+    try {
+        const snapshot = await getDocs(payeeProfilesCollection);
+        const profiles = snapshot.docs.map(doc => ({
+            ...(doc.data() as PayeeProfile)
+        }));
+        console.log('[PayeeProfiles] getAllPayeeProfiles - Fetched:', profiles.length, 'profiles from Firestore');
+        console.log('[PayeeProfiles] All profile names in Firestore:', profiles.map(p => p.name));
+        console.log('[PayeeProfiles] Document IDs:', snapshot.docs.map(doc => doc.id));
+        console.log('[PayeeProfiles] Snapshot size:', snapshot.size);
+        return profiles;
+    } catch (error) {
+        console.error('[PayeeProfiles] Error in getAllPayeeProfiles:', error);
+        throw error;
+    }
+}
+
 export function getPayeeProfilesRealtime(
     callback: (data: PayeeProfile[]) => void,
     onError: (error: Error) => void,
 ) {
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:payeeProfiles');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
+    // First, fetch all profiles using getAllPayeeProfiles
+    getAllPayeeProfiles()
+        .then((allProfiles) => {
+            console.log('[PayeeProfiles] Initial fetch - All profiles:', allProfiles.length);
+            console.log('[PayeeProfiles] Profile names:', allProfiles.map(p => p.name));
+            callback(allProfiles);
+        })
+        .catch((error) => {
+            console.error('[PayeeProfiles] Error in initial fetch:', error);
+            onError(error);
+        });
 
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            payeeProfilesCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(payeeProfilesCollection);
-    }
-
+    // Then set up realtime listener for changes (without orderBy to avoid index issues)
+    const q = query(payeeProfilesCollection);
     return onSnapshot(q, (snapshot) => {
-        const profiles = snapshot.docs.map(doc => ({
-            ...(doc.data() as PayeeProfile)
-        }));
+        const profiles = snapshot.docs.map(doc => {
+            const data = doc.data() as PayeeProfile;
+            return {
+                ...data,
+                id: doc.id,
+            };
+        });
+        console.log('[PayeeProfiles] Realtime update - Profiles:', profiles.length);
         callback(profiles);
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:payeeProfiles', String(Date.now()));
-        }
-    }, onError);
+    }, (error) => {
+        console.error('[PayeeProfiles] Error in realtime listener:', error);
+        // Don't call onError here as we already have initial data
+    });
 }
 
 export async function upsertPayeeProfile(profile: PayeeProfile, previousName?: string): Promise<void> {
@@ -1551,43 +1563,28 @@ export async function getAllIncomes(): Promise<Income[]> {
     try {
       const localTransactions = await db.transactions.where('type').equals('Income').toArray();
       if (localTransactions.length > 0) {
+        console.log('[getAllIncomes] Found in IndexedDB:', localTransactions.length);
         return localTransactions as Income[];
       }
     } catch (error) {
+      console.warn('[getAllIncomes] Error reading from IndexedDB:', error);
       // If local read fails, continue with Firestore
     }
   }
 
-  // ✅ Use incremental sync - only get changed incomes
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:incomes');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
-  let q;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      collection(firestoreDB, "incomes"),
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
-    q = query(collection(firestoreDB, "incomes"));
+  // Always fetch ALL incomes from Firestore (no incremental sync for payee extraction)
+  // This ensures we get all payees for the dropdown
+  try {
+    const q = query(incomesCollection);
+    const snapshot = await getDocs(q);
+    const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+    console.log('[getAllIncomes] Fetched from Firestore:', incomes.length);
+    console.log('[getAllIncomes] Sample payees:', [...new Set(incomes.map(i => i.payee).filter(Boolean))].slice(0, 10));
+    return incomes;
+  } catch (error) {
+    console.error('[getAllIncomes] Error fetching from Firestore:', error);
+    throw error;
   }
-
-  const snapshot = await getDocs(q);
-  const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
-  
-  // Save last sync time
-  if (snapshot.size > 0 && typeof window !== 'undefined') {
-    localStorage.setItem('lastSync:incomes', String(Date.now()));
-  }
-  
-  return incomes;
 }
 
 export async function getAllExpenses(): Promise<Expense[]> {
@@ -1596,43 +1593,28 @@ export async function getAllExpenses(): Promise<Expense[]> {
     try {
       const localTransactions = await db.transactions.where('type').equals('Expense').toArray();
       if (localTransactions.length > 0) {
+        console.log('[getAllExpenses] Found in IndexedDB:', localTransactions.length);
         return localTransactions as Expense[];
       }
     } catch (error) {
+      console.warn('[getAllExpenses] Error reading from IndexedDB:', error);
       // If local read fails, continue with Firestore
     }
   }
 
-  // ✅ Use incremental sync - only get changed expenses
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:expenses');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
-  let q;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      collection(firestoreDB, "expenses"),
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
-    q = query(collection(firestoreDB, "expenses"));
+  // Always fetch ALL expenses from Firestore (no incremental sync for payee extraction)
+  // This ensures we get all payees for the dropdown
+  try {
+    const q = query(expensesCollection);
+    const snapshot = await getDocs(q);
+    const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+    console.log('[getAllExpenses] Fetched from Firestore:', expenses.length);
+    console.log('[getAllExpenses] Sample payees:', [...new Set(expenses.map(e => e.payee).filter(Boolean))].slice(0, 10));
+    return expenses;
+  } catch (error) {
+    console.error('[getAllExpenses] Error fetching from Firestore:', error);
+    throw error;
   }
-
-  const snapshot = await getDocs(q);
-  const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
-  
-  // Save last sync time
-  if (snapshot.size > 0 && typeof window !== 'undefined') {
-    localStorage.setItem('lastSync:expenses', String(Date.now()));
-  }
-  
-  return expenses;
 }
 
 // Fetch ALL supplier bank accounts

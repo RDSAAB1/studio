@@ -64,11 +64,11 @@ export const useSupplierFiltering = (
       option.label !== 'Mill (Total Overview)'
     );
     
-    // Only add Mill Overview if it has data
+    // Always add Mill Overview if MILL_OVERVIEW_KEY is provided
     const millOverviewData = supplierSummaryMap.get(MILL_OVERVIEW_KEY);
     let optionsWithMillOverview = filteredOptions;
     
-    if (millOverviewData && millOverviewData.totalTransactions > 0) {
+    if (MILL_OVERVIEW_KEY && millOverviewData) {
       const millOverviewOption = {
         value: MILL_OVERVIEW_KEY,
         label: 'Mill (Total Overview)',

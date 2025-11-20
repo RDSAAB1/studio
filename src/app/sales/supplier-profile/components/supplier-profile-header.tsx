@@ -63,13 +63,60 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
     });
     
     if (matchingSupplier) {
-      // Create the same key format used in supplier filtering
-      const supplierKey = `${matchingSupplier.name || ''}_${matchingSupplier.fatherName || ''}_${matchingSupplier.address || ''}`.trim();
-      setSelectedSupplierKey(supplierKey);
-      toast({
-        title: "Supplier Found",
-        description: `Selected ${matchingSupplier.name} (SR# ${formattedSrNo})`,
+      // Create the same key format used in supplier filtering (buildProfileKey format)
+      // Format: name__fatherName__address (double underscore, lowercase, underscores for spaces)
+      const normalizeField = (value: unknown): string => {
+        if (value === null || value === undefined) return "";
+        return String(value).replace(/\s+/g, " ").trim();
+      };
+      
+      const name = normalizeField(matchingSupplier.name || '');
+      const fatherName = normalizeField(matchingSupplier.fatherName || matchingSupplier.so || '');
+      const address = normalizeField(matchingSupplier.address || '');
+      
+      const supplierKey = [name, fatherName, address]
+        .map((part) => part.toLowerCase().replace(/\s+/g, "_"))
+        .join("__")
+        .replace(/^_+|_+$/g, "");
+      
+      // Find matching key in filteredSupplierOptions
+      const matchingOption = filteredSupplierOptions.find(opt => {
+        // Check if the option's key matches or if the data matches
+        const optData = opt.data;
+        const optName = normalizeField(optData?.name || '');
+        const optFatherName = normalizeField(optData?.fatherName || optData?.so || '');
+        const optAddress = normalizeField(optData?.address || '');
+        const optKey = [optName, optFatherName, optAddress]
+          .map((part) => part.toLowerCase().replace(/\s+/g, "_"))
+          .join("__")
+          .replace(/^_+|_+$/g, "");
+        
+        return optKey === supplierKey || opt.value === supplierKey;
       });
+      
+      if (matchingOption) {
+        setSelectedSupplierKey(matchingOption.value);
+        toast({
+          title: "Supplier Found",
+          description: `Selected ${matchingSupplier.name} (SR# ${formattedSrNo})`,
+        });
+      } else {
+        // Try to find by value directly
+        const directMatch = filteredSupplierOptions.find(opt => opt.value === supplierKey);
+        if (directMatch) {
+          setSelectedSupplierKey(directMatch.value);
+          toast({
+            title: "Supplier Found",
+            description: `Selected ${matchingSupplier.name} (SR# ${formattedSrNo})`,
+          });
+        } else {
+          toast({
+            title: "Supplier Found But Not in Filter",
+            description: `Supplier ${matchingSupplier.name} (SR# ${formattedSrNo}) found but not in current filter. Try adjusting date range.`,
+            variant: "default",
+          });
+        }
+      }
     } else {
       toast({
         title: "Supplier Not Found",

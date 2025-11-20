@@ -40,7 +40,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     onAdd,
     inputClassName,
     showClearButton = true,
-    showArrow = true,
+    showArrow = false,
     showGoButton = false,
     onGoClick,
 }) => {
@@ -71,6 +71,16 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
+    // Clear search term when dropdown opens to show all options
+    useEffect(() => {
+        if (isOpen) {
+            // When dropdown opens, always clear search term to show all options
+            // This ensures users can see all available options when they click
+            setSearchTerm('');
+            // Debounced search term will be cleared by the debounce effect
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         // Only update search term if a valid selection is made and user is not actively typing
         // This prevents overwriting user's typing
@@ -84,12 +94,24 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     
     // Optimized filtering with early exit for large datasets
     const filteredItems = useMemo(() => {
-        if (!debouncedSearchTerm || (selectedItem && debouncedSearchTerm === selectedItem.label)) {
-            // For large lists, limit initial display
-            if (options.length > 100) {
-                return options.slice(0, 100);
-            }
-            return options;
+        // If no search term, show all options
+        if (!debouncedSearchTerm || debouncedSearchTerm.trim() === '') {
+            // Return all options, sorted alphabetically by label
+            return [...options].sort((a, b) => {
+                // Sort Cash In Hand first, then alphabetically
+                if (a.value === 'CashInHand') return -1;
+                if (b.value === 'CashInHand') return 1;
+                return a.label.localeCompare(b.label);
+            });
+        }
+        
+        // If search term matches selected item exactly, show all options
+        if (selectedItem && debouncedSearchTerm === selectedItem.label) {
+            return [...options].sort((a, b) => {
+                if (a.value === 'CashInHand') return -1;
+                if (b.value === 'CashInHand') return 1;
+                return a.label.localeCompare(b.label);
+            });
         }
         
         const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase().trim();
@@ -144,8 +166,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     // Virtual scrolling: only render visible items
     const ITEM_HEIGHT = 32; // Approximate height of each item (reduced for smaller text)
-    const VISIBLE_ITEMS = 15; // Number of items visible at once
-    const BUFFER = 3; // Extra items to render for smooth scrolling
+    const VISIBLE_ITEMS = 20; // Number of items visible at once
+    const BUFFER = 5; // Extra items to render for smooth scrolling
     
     const virtualItems = useMemo(() => {
         const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER);
@@ -215,6 +237,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     }, []);
     
     const handleInputClick = () => {
+        if (!isOpen) {
+            // Clear search term when opening to show all options
+            setSearchTerm('');
+            setDebouncedSearchTerm('');
+        }
         setIsOpen(true);
     };
 
@@ -295,9 +322,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     )}
                     <ul 
                         ref={listRef}
-                        className="py-1 max-h-60 overflow-y-auto scrollbar-hide"
+                        className="py-1 max-h-80 overflow-y-auto scrollbar-hide"
                         onScroll={handleScroll}
-                        style={{ position: 'relative' }}
+                        style={{ position: 'relative', minHeight: filteredItems.length === 0 ? 'auto' : '0' }}
                     >
                         {/* Spacer for items before visible range */}
                         {virtualItems.startIndex > 0 && (
@@ -321,81 +348,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                         style={{ height: ITEM_HEIGHT }}
                                 >
                                     <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center space-x-1.5 text-xs">
-                                            <span className="font-medium text-foreground text-xs">
-                                                {item.data?.name ? item.data.name : 
-                                                 item.label.includes(' | ') ? item.label.split(' | ')[0] : 
-                                                 item.label.split(' - ')[0]}
-                                            </span>
-                                            {(() => {
-                                                // Parse father name from label if data is not available
-                                                let fatherName = item.data?.fatherName || item.data?.so;
-                                                
-                                                if (!fatherName && item.label.includes(' | F:')) {
-                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
-                                                    const parts = item.label.split(' | ');
-                                                    if (parts.length > 1 && parts[1].startsWith('F:')) {
-                                                        fatherName = parts[1].substring(2).trim(); // Remove "F:" prefix
-                                                    }
-                                                } else if (!fatherName && item.label.includes(' - ')) {
-                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
-                                                    const parts = item.label.split(' - ');
-                                                    if (parts.length > 1) {
-                                                        fatherName = parts[1].replace(/\s*\([^)]*\)$/, '').trim();
-                                                    }
-                                                }
-                                                
-                                                return fatherName && (
-                                                    <span className="text-muted-foreground text-xs">
-                                                        s/o {fatherName}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {(() => {
-                                                // Parse address from label if data is not available
-                                                let address = item.data?.address;
-                                                if (!address && item.label.includes(' | ')) {
-                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
-                                                    const parts = item.label.split(' | ');
-                                                    if (parts.length > 2) {
-                                                        address = parts[2].trim();
-                                                    }
-                                                } else if (!address && item.label.includes(' - ')) {
-                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
-                                                    const parts = item.label.split(' - ');
-                                                    if (parts.length > 2) {
-                                                        address = parts[2].replace(/\s*\([^)]*\)$/, '').trim();
-                                                    }
-                                                }
-                                                return address && (
-                                                    <span className="text-muted-foreground text-xs">
-                                                        | {address}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {(() => {
-                                                // Parse contact from label if data is not available
-                                                let contact = item.data?.contact;
-                                                if (!contact && item.label.includes(' | ')) {
-                                                    // Parse from new format: "Name | F:Father Name | Address | Contact"
-                                                    const parts = item.label.split(' | ');
-                                                    if (parts.length > 3) {
-                                                        contact = parts[3].trim();
-                                                    }
-                                                } else if (!contact && item.label.includes('(')) {
-                                                    // Fallback to old format: "Name - Father Name - Address (Contact)"
-                                                    const match = item.label.match(/\(([^)]+)\)/);
-                                                    if (match) {
-                                                        contact = match[1].trim();
-                                                    }
-                                                }
-                                                return contact && (
-                                                    <span className="text-muted-foreground text-xs">
-                                                        | {contact}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </div>
+                                        <span className="text-xs truncate">
+                                            {item.label}
+                                        </span>
                                     </div>
                                 </li>
                                 );
