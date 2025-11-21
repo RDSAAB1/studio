@@ -63,6 +63,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
+    const loadedEntryIdRef = useRef<string | null>(null);
     const [holidays, setHolidays] = useState<Holiday[]>([]);
     const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
@@ -113,80 +114,129 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
 
     // Load entry data when dialog opens
     useEffect(() => {
-        if (open && entry) {
-            const loadEntryData = async () => {
-                let fullEntry: Customer | null = null;
-                
-                // Try to get full entry from database using id or srNo
-                if (entry.id && db) {
-                    try {
-                        fullEntry = await db.suppliers.get(entry.id) as Customer | null;
-                    } catch (error) {
-                        console.error('Error fetching supplier by id:', error);
-                    }
-                }
-                
-                // If not found by id, try by srNo
-                if (!fullEntry && entry.srNo && db) {
-                    try {
-                        fullEntry = await db.suppliers.where('srNo').equals(entry.srNo).first() as Customer | null;
-                    } catch (error) {
-                        console.error('Error fetching supplier by srNo:', error);
-                    }
-                }
-                
-                // Fallback to entry passed as prop
-                const supplierToUse = fullEntry || entry;
-                
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                let formDate: Date;
+        // Reset loaded entry ref when dialog closes
+        if (!open) {
+            loadedEntryIdRef.current = null;
+            return;
+        }
+        
+        if (!entry) return;
+        
+        // Get entry ID to check if we've already loaded this entry
+        const entryId = entry.id || entry.srNo;
+        if (!entryId) return;
+        
+        // Skip if we've already loaded this entry
+        if (loadedEntryIdRef.current === entryId) {
+            return;
+        }
+        
+        const loadEntryData = async () => {
+            console.log('[SupplierEntryEdit] Loading entry data:', {
+                entryId: entry.id,
+                entrySrNo: entry.srNo,
+                entryName: entry.name
+            });
+            
+            let fullEntry: Customer | null = null;
+            
+            // Try to get full entry from database using id or srNo
+            if (entry.id && db) {
                 try {
-                    formDate = supplierToUse.date ? new Date(supplierToUse.date) : today;
-                    if (isNaN(formDate.getTime())) formDate = today;
-                } catch {
-                    formDate = today;
+                    fullEntry = await db.suppliers.get(entry.id) as Customer | null;
+                    console.log('[SupplierEntryEdit] Found by id:', !!fullEntry);
+                } catch (error) {
+                    console.error('[SupplierEntryEdit] Error fetching supplier by id:', error);
                 }
-                
-                const formValues: FormValues = {
-                    srNo: supplierToUse.srNo || '',
-                    date: formDate,
-                    term: Number(supplierToUse.term) || 0,
-                    name: supplierToUse.name || '',
-                    so: supplierToUse.so || '',
-                    address: supplierToUse.address || '',
-                    contact: supplierToUse.contact || '',
-                    vehicleNo: supplierToUse.vehicleNo || '',
-                    variety: supplierToUse.variety || '',
-                    grossWeight: supplierToUse.grossWeight || 0,
-                    teirWeight: supplierToUse.teirWeight || 0,
-                    rate: supplierToUse.rate || 0,
-                    kartaPercentage: supplierToUse.kartaPercentage || 1,
-                    labouryRate: supplierToUse.labouryRate || 2,
-                    kanta: supplierToUse.kanta || 50,
-                    paymentType: supplierToUse.paymentType || 'Full',
-                    forceUnique: supplierToUse.forceUnique || false,
-                };
-                
-                // Ensure supplier has all required fields with defaults
-                const supplierWithDefaults: Customer = {
-                    ...supplierToUse,
-                    netWeight: supplierToUse.netWeight || 0,
-                    rate: supplierToUse.rate || 0,
-                    taxRate: supplierToUse.taxRate || 0,
-                    isGstIncluded: supplierToUse.isGstIncluded || false,
-                    advanceFreight: supplierToUse.advanceFreight || 0,
-                };
-                
-                setCurrentSupplier(supplierWithDefaults);
-                form.reset(formValues);
-                performCalculations(formValues, false);
+            }
+            
+            // If not found by id, try by srNo
+            if (!fullEntry && entry.srNo && db) {
+                try {
+                    fullEntry = await db.suppliers.where('srNo').equals(entry.srNo).first() as Customer | null;
+                    console.log('[SupplierEntryEdit] Found by srNo:', !!fullEntry, fullEntry?.id);
+                } catch (error) {
+                    console.error('[SupplierEntryEdit] Error fetching supplier by srNo:', error);
+                }
+            }
+            
+            // Fallback to entry passed as prop, but ensure it has an id
+            const supplierToUse = fullEntry || entry;
+            
+            // If supplierToUse doesn't have an id, try to find it
+            if (!supplierToUse.id && supplierToUse.srNo && db) {
+                try {
+                    const found = await db.suppliers.where('srNo').equals(supplierToUse.srNo).first() as Customer | null;
+                    if (found) {
+                        Object.assign(supplierToUse, { id: found.id });
+                        console.log('[SupplierEntryEdit] Added missing id:', found.id);
+                    }
+                } catch (error) {
+                    console.error('[SupplierEntryEdit] Error finding id for entry:', error);
+                }
+            }
+            
+            console.log('[SupplierEntryEdit] Final supplier to use:', {
+                id: supplierToUse.id,
+                srNo: supplierToUse.srNo,
+                name: supplierToUse.name
+            });
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            let formDate: Date;
+            try {
+                formDate = supplierToUse.date ? new Date(supplierToUse.date) : today;
+                if (isNaN(formDate.getTime())) formDate = today;
+            } catch {
+                formDate = today;
+            }
+            
+            const formValues: FormValues = {
+                srNo: supplierToUse.srNo || '',
+                date: formDate,
+                term: Number(supplierToUse.term) || 0,
+                name: supplierToUse.name || '',
+                so: supplierToUse.so || '',
+                address: supplierToUse.address || '',
+                contact: supplierToUse.contact || '',
+                vehicleNo: supplierToUse.vehicleNo || '',
+                variety: supplierToUse.variety || '',
+                grossWeight: supplierToUse.grossWeight || 0,
+                teirWeight: supplierToUse.teirWeight || 0,
+                rate: supplierToUse.rate || 0,
+                kartaPercentage: supplierToUse.kartaPercentage || 1,
+                labouryRate: supplierToUse.labouryRate || 2,
+                kanta: supplierToUse.kanta || 50,
+                paymentType: supplierToUse.paymentType || 'Full',
+                forceUnique: supplierToUse.forceUnique || false,
             };
             
-            loadEntryData();
-        }
-    }, [open, entry, form, performCalculations]);
+            // Ensure supplier has all required fields with defaults
+            const supplierWithDefaults: Customer = {
+                ...supplierToUse,
+                netWeight: supplierToUse.netWeight || 0,
+                rate: supplierToUse.rate || 0,
+                taxRate: supplierToUse.taxRate || 0,
+                isGstIncluded: supplierToUse.isGstIncluded || false,
+                advanceFreight: supplierToUse.advanceFreight || 0,
+            };
+            
+            // Mark this entry as loaded before setting state
+            loadedEntryIdRef.current = entryId;
+            
+            setCurrentSupplier(supplierWithDefaults);
+            form.reset(formValues);
+            
+            // Perform calculations after a small delay to ensure form is reset
+            setTimeout(() => {
+                performCalculations(formValues, false);
+            }, 0);
+        };
+        
+        loadEntryData();
+    }, [open, entry?.id, entry?.srNo, db]);
 
     // Load options and settings
     useEffect(() => {
@@ -247,24 +297,91 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
 
         setIsSubmitting(true);
         try {
-            // Find supplier ID if not available
+            // Find supplier ID - try multiple methods
             let supplierId = currentSupplier.id;
+            
+            console.log('[SupplierEntryEdit] Looking for supplier ID:', {
+                currentSupplierId: currentSupplier.id,
+                entryId: entry?.id,
+                srNo: values.srNo,
+                currentSupplierSrNo: currentSupplier.srNo
+            });
+            
+            // Try entry.id first (from prop)
+            if (!supplierId && entry?.id) {
+                supplierId = entry.id;
+                console.log('[SupplierEntryEdit] Using entry.id:', supplierId);
+            }
+            
+            // Try finding by srNo in database
             if (!supplierId && values.srNo && db) {
-                const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
-                if (foundSupplier?.id) {
-                    supplierId = foundSupplier.id;
-                } else {
-                    throw new Error('Supplier entry not found in database');
+                try {
+                    const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
+                    if (foundSupplier?.id) {
+                        supplierId = foundSupplier.id;
+                        console.log('[SupplierEntryEdit] Found by srNo:', supplierId);
+                    }
+                } catch (error) {
+                    console.error('[SupplierEntryEdit] Error finding supplier by srNo:', error);
+                }
+            }
+            
+            // Try currentSupplier.srNo if values.srNo didn't work
+            if (!supplierId && currentSupplier.srNo && db) {
+                try {
+                    const foundSupplier = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
+                    if (foundSupplier?.id) {
+                        supplierId = foundSupplier.id;
+                        console.log('[SupplierEntryEdit] Found by currentSupplier.srNo:', supplierId);
+                    }
+                } catch (error) {
+                    console.error('[SupplierEntryEdit] Error finding supplier by currentSupplier.srNo:', error);
                 }
             }
 
             if (!supplierId) {
-                throw new Error('Cannot update: Supplier ID not found');
+                console.error('[SupplierEntryEdit] Cannot find supplier ID:', {
+                    currentSupplier: {
+                        id: currentSupplier.id,
+                        srNo: currentSupplier.srNo
+                    },
+                    entry: {
+                        id: entry?.id,
+                        srNo: entry?.srNo
+                    },
+                    values: {
+                        srNo: values.srNo
+                    }
+                });
+                throw new Error('Cannot update: Supplier ID not found. Please ensure the entry exists in the database.');
             }
+            
+            console.log('[SupplierEntryEdit] Using supplier ID:', supplierId);
+
+            // Recalculate all fields using calculateSupplierEntry
+            const entryDataForCalculation = {
+                ...currentSupplier,
+                ...values,
+                date: format(values.date, 'yyyy-MM-dd'),
+                name: toTitleCase(values.name),
+                so: toTitleCase(values.so),
+                address: toTitleCase(values.address),
+                variety: toTitleCase(values.variety),
+                vehicleNo: toTitleCase(values.vehicleNo),
+            };
+            
+            const { warning, suggestedTerm, ...calculatedFields } = calculateSupplierEntry(
+                entryDataForCalculation,
+                safePaymentHistory,
+                holidays,
+                dailyPaymentLimit,
+                safeSuppliers || []
+            );
 
             const completeEntry: Customer = {
                 ...currentSupplier,
                 ...values,
+                ...calculatedFields, // Include all calculated fields
                 id: supplierId,
                 customerId: currentSupplier.customerId || '',
                 date: format(values.date, 'yyyy-MM-dd'),
@@ -278,9 +395,62 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
             };
 
             const { id, ...updateData } = completeEntry as any;
+            
+            // Log what we're updating
+            console.log('[SupplierEntryEdit] Updating supplier:', {
+                id,
+                updateDataKeys: Object.keys(updateData),
+                calculatedFields: Object.keys(calculatedFields),
+                sampleData: {
+                    name: updateData.name,
+                    variety: updateData.variety,
+                    grossWeight: updateData.grossWeight,
+                    rate: updateData.rate,
+                    weight: updateData.weight,
+                    netWeight: updateData.netWeight,
+                    amount: updateData.amount,
+                    originalNetAmount: updateData.originalNetAmount
+                }
+            });
+            
+            // Verify the update data is not empty
+            if (!updateData || Object.keys(updateData).length === 0) {
+                throw new Error('Update data is empty');
+            }
+            
             const success = await updateSupplier(id, updateData);
             
+            // Verify the update actually happened in local DB
+            if (success && db) {
+                const updatedEntry = await db.suppliers.get(id);
+                console.log('[SupplierEntryEdit] Verification - Entry after update:', {
+                    id,
+                    found: !!updatedEntry,
+                    name: updatedEntry?.name,
+                    variety: updatedEntry?.variety,
+                    grossWeight: updatedEntry?.grossWeight,
+                    rate: updatedEntry?.rate
+                });
+                
+                if (!updatedEntry) {
+                    console.error('[SupplierEntryEdit] ERROR: Entry not found in local DB after update!');
+                    throw new Error('Entry was not updated in local database');
+                }
+            }
+            
             if (success) {
+                // Force immediate sync to Firestore
+                try {
+                    const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
+                    // Wait a bit for the local update to complete
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await forceSyncToFirestore();
+                    console.log('[SupplierEntryEdit] Sync to Firestore completed');
+                } catch (syncError) {
+                    console.error('[SupplierEntryEdit] Sync error (non-critical):', syncError);
+                    // Don't fail the update if sync fails - it will retry later
+                }
+                
                 toast({ title: "Entry updated successfully!", variant: "success" });
                 onSuccess?.();
                 onOpenChange(false);

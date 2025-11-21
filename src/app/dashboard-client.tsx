@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PaddyCostingSection } from '@/components/dashboard/paddy-costing-section';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -42,6 +43,7 @@ export default function DashboardClient() {
     const [isClient, setIsClient] = useState(false);
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [kantaParchi, setKantaParchi] = useState<KantaParchi[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
@@ -67,6 +69,7 @@ export default function DashboardClient() {
         setIsClient(true);
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
         const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+        const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, console.error);
         const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
@@ -83,7 +86,7 @@ export default function DashboardClient() {
         }, console.error);
 
         return () => {
-            unsubSuppliers(); unsubCustomers(); unsubFunds();
+            unsubSuppliers(); unsubCustomers(); unsubKantaParchi(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
             unsubLoans(); unsubProjects(); unsubExpCats(); unsubIncCats();
             unsubSupplierPayments(); unsubCustomerPayments();
@@ -141,12 +144,47 @@ export default function DashboardClient() {
         const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
         const currentTotalExpense = expenseFromEntries + expenseForSuppliers;
 
+        // Calculate Customer Receivables: For each kanta parchi entry, calculate outstanding
+        // Outstanding = Original Net Amount - (Sum of all payments for that entry)
+        const customerReceivablesMap = new Map<string, number>();
+        
+        // Initialize with original amounts from kanta parchi entries
+        // Note: We use all kanta parchi entries (not filtered by date) because receivables are cumulative
+        kantaParchi.forEach(kp => {
+            const originalAmount = Number(kp.originalNetAmount) || Number(kp.netAmount) || 0;
+            customerReceivablesMap.set(kp.srNo, originalAmount);
+        });
+        
+        // Also include customer entries (for backward compatibility with old data)
+        customers.forEach(customer => {
+            // Only add if not already in map (kanta parchi takes priority)
+            if (!customerReceivablesMap.has(customer.srNo)) {
+                const originalAmount = Number(customer.originalNetAmount) || Number(customer.netAmount) || 0;
+                customerReceivablesMap.set(customer.srNo, originalAmount);
+            }
+        });
+        
+        // Subtract payments from receivables
+        // Note: We use all customer payments (not filtered by date) because receivables are cumulative
+        customerPayments.forEach(payment => {
+            if (payment.paidFor && payment.paidFor.length > 0) {
+                payment.paidFor.forEach(paidFor => {
+                    const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
+                    const newReceivable = Math.max(0, currentReceivable - (Number(paidFor.amount) || 0));
+                    customerReceivablesMap.set(paidFor.srNo, newReceivable);
+                });
+            }
+        });
+        
+        // Sum all outstanding receivables
+        const totalCustomerReceivables = Array.from(customerReceivablesMap.values()).reduce((sum, amount) => sum + amount, 0);
+
         return {
             totalIncome: currentTotalIncome,
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
             totalSupplierDues: filteredData.filteredSuppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
-            totalCustomerReceivables: filteredData.filteredCustomers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0),
+            totalCustomerReceivables: totalCustomerReceivables,
             totalCdReceived: cdReceived,
             expenseBreakdown: {
                 supplierPayment: supplierPaymentRegular,
@@ -154,7 +192,7 @@ export default function DashboardClient() {
                 outsiderRTGS: outsiderRTGS,
             }
         }
-    }, [filteredData]);
+    }, [filteredData, kantaParchi, customers, customerPayments]);
     
      const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -595,6 +633,9 @@ export default function DashboardClient() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Paddy Costing Section */}
+            <PaddyCostingSection suppliers={suppliers} expenses={expenses} />
         </div>
     );
 }

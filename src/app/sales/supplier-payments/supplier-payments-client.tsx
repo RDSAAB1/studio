@@ -9,7 +9,7 @@ import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Banknote, Scale, FileText } from "lucide-react";
+import { Loader2, Search, Banknote, Scale, FileText, Filter, Calendar as CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -71,11 +75,15 @@ export default function SupplierPaymentsClient() {
   const hook = useSupplierPayments();
   const { supplierBankAccounts, banks, bankBranches } = useSupplierData();
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [supplierDataRefreshKey, setSupplierDataRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
   const [editEntryDialogOpen, setEditEntryDialogOpen] = useState(false);
   const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<Customer | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [activeTransactionTab, setActiveTransactionTab] = useState<string>("all");
+  const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+  const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+  const [filterVariety, setFilterVariety] = useState<string>("all");
 
   const paymentCombination = usePaymentCombination({
     calcTargetAmount: hook?.calcTargetAmount || (() => 0),
@@ -84,12 +92,19 @@ export default function SupplierPaymentsClient() {
   });
 
   // Use the same supplier summary and filtering as supplier profile
+  // Add supplierDataRefreshKey to force recalculation when entry is edited
   const { supplierSummaryMap, MILL_OVERVIEW_KEY } = useSupplierSummary(
     hook?.suppliers || [],
     hook?.paymentHistory || [],
     undefined,
     undefined
   );
+  
+  // Force summary recalculation when supplier data refresh key changes
+  useEffect(() => {
+    // This effect will trigger when supplierDataRefreshKey changes,
+    // causing the component to re-render and recalculate summaries
+  }, [supplierDataRefreshKey]);
 
   const onSelectSupplierKey = useCallback((key: string | null) => {
     if (key) {
@@ -112,10 +127,61 @@ export default function SupplierPaymentsClient() {
     supplierSummaryMap,
     hook.selectedCustomerKey as string | null,
     onSelectSupplierKey as (key: string | null) => void,
-    undefined,
-    undefined,
+    filterStartDate,
+    filterEndDate,
     MILL_OVERVIEW_KEY
   );
+
+  const isWithinDateRange = useCallback(
+    (dateString?: string | Date) => {
+      if (!filterStartDate && !filterEndDate) return true;
+      if (!dateString) return false;
+      const date =
+        typeof dateString === "string" ? new Date(dateString) : dateString;
+      if (Number.isNaN(date.getTime())) return false;
+      if (filterStartDate && date < filterStartDate) return false;
+      if (filterEndDate && date > filterEndDate) return false;
+      return true;
+    },
+    [filterStartDate, filterEndDate]
+  );
+
+  const varietyFilteredSupplierOptions = useMemo(() => {
+    if (!filterVariety || filterVariety === "all") {
+      return filteredSupplierOptions;
+    }
+    return filteredSupplierOptions.filter((option) => {
+      const transactions = option.data?.allTransactions || [];
+      return transactions.some(
+        (transaction: any) =>
+          toTitleCase(transaction?.variety || "") === filterVariety
+      );
+    });
+  }, [filteredSupplierOptions, filterVariety]);
+
+  const varietyOptions = useMemo(() => {
+    const varieties = new Set<string>();
+    supplierSummaryMap.forEach((summary) => {
+      summary?.allTransactions?.forEach((transaction: any) => {
+        if (transaction?.variety) {
+          varieties.add(toTitleCase(transaction.variety));
+        }
+      });
+    });
+    return Array.from(varieties).sort();
+  }, [supplierSummaryMap]);
+
+  const hasActiveSupplierFilters = Boolean(
+    filterStartDate ||
+    filterEndDate ||
+    filterVariety !== "all"
+  );
+
+  const handleClearSupplierFilters = () => {
+    setFilterStartDate(undefined);
+    setFilterEndDate(undefined);
+    setFilterVariety("all");
+  };
 
   // Set Mill Overview as default if no supplier is selected
   useEffect(() => {
@@ -159,24 +225,33 @@ export default function SupplierPaymentsClient() {
     return supplierSummaryMap.get(hook.selectedCustomerKey) ?? null;
     }, [hook.selectedCustomerKey, supplierSummaryMap]);
 
+  const transactionsForSelectedSupplier = useMemo(() => {
+    const allTransactions = selectedSupplierSummary?.allTransactions || [];
+    return allTransactions.filter((transaction: any) => {
+      const matchesDate = isWithinDateRange(transaction?.date);
+      const matchesVariety =
+        !filterVariety ||
+        filterVariety === "all" ||
+        toTitleCase(transaction?.variety || "") === filterVariety;
+      return matchesDate && matchesVariety;
+    });
+  }, [selectedSupplierSummary, filterVariety, isWithinDateRange]);
+
   // Create filtered summary based on selected receipts
   const filteredSupplierSummary = useMemo(() => {
     if (!selectedSupplierSummary) return null;
     
-    // If no receipts are selected, return full summary
-    if (!hook.selectedEntries || hook.selectedEntries.length === 0) {
-      return selectedSupplierSummary;
-    }
-
-    // Filter transactions to only selected receipts
+    // Determine base transactions depending on selection
     const selectedSrNos = new Set(
       hook.selectedEntries.map((e: Customer) => (e.srNo || "").toLowerCase()).filter(Boolean)
     );
     
-    const filteredTransactions = selectedSupplierSummary.allTransactions.filter((t: Customer) => 
-      selectedSrNos.has((t.srNo || "").toLowerCase())
-    );
-
+    const filteredTransactions = hook.selectedEntries && hook.selectedEntries.length > 0
+      ? transactionsForSelectedSupplier.filter((t: Customer) =>
+          selectedSrNos.has((t.srNo || "").toLowerCase())
+        )
+      : transactionsForSelectedSupplier;
+    
     // Recalculate summary totals from filtered transactions
     const totalGrossWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.grossWeight) || 0), 0);
     const totalTeirWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.teirWeight) || 0), 0);
@@ -312,11 +387,7 @@ export default function SupplierPaymentsClient() {
       averageKartaPercentage,
       averageLabouryRate,
     };
-  }, [selectedSupplierSummary, hook.selectedEntries, hook.paymentHistory]);
-
-  const transactionsForSelectedSupplier = useMemo(() => {
-    return selectedSupplierSummary?.allTransactions || [];
-  }, [selectedSupplierSummary]);
+  }, [selectedSupplierSummary, hook.selectedEntries, hook.paymentHistory, transactionsForSelectedSupplier]);
 
   // Calculate transaction counts for status section
   const transactionCounts = useMemo(() => {
@@ -395,9 +466,11 @@ export default function SupplierPaymentsClient() {
         !selectedSupplierSrNos.length ||
         paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr));
 
-      return matchesSerial && matchesReceipts && matchesSupplier;
+      const matchesDate = isWithinDateRange(payment.date);
+
+      return matchesSerial && matchesReceipts && matchesSupplier && matchesDate;
     },
-    [normalizedSerialFilter, selectedSupplierSrNos, selectedReceiptSrNos]
+    [normalizedSerialFilter, selectedSupplierSrNos, selectedReceiptSrNos, isWithinDateRange]
   );
 
   // Helper: normalize payment id for sorting
@@ -466,7 +539,7 @@ export default function SupplierPaymentsClient() {
                         <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                             <div className="flex flex-1 min-w-[220px]">
                                         <CustomDropdown
-                                            options={filteredSupplierOptions.map(({ value, data, label }) => {
+                                            options={varietyFilteredSupplierOptions.map(({ value, data, label }) => {
                                                 // If label already exists (e.g., for Mill Overview), use it
                                                 if (label) {
                                                     return { value, label };
@@ -500,6 +573,102 @@ export default function SupplierPaymentsClient() {
                                             />
                                         </div>
                             <div className="flex items-center gap-2 md:pl-3">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className={`h-8 w-8 ${hasActiveSupplierFilters ? "text-primary border-primary" : ""}`}
+                                    title="Filter suppliers"
+                                  >
+                                    <Filter className="h-4 w-4" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 space-y-3 text-[11px] z-50" align="end">
+                                  <div className="space-y-1">
+                                    <Label className="text-[11px]">Start Date</Label>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          className={cn(
+                                            "w-full justify-start text-left font-normal h-8 text-[11px]",
+                                            !filterStartDate && "text-muted-foreground"
+                                          )}
+                                        >
+                                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                                          {filterStartDate ? format(filterStartDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                                        <Calendar
+                                          mode="single"
+                                          selected={filterStartDate}
+                                          onSelect={setFilterStartDate}
+                                          initialFocus
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[11px]">End Date</Label>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          className={cn(
+                                            "w-full justify-start text-left font-normal h-8 text-[11px]",
+                                            !filterEndDate && "text-muted-foreground"
+                                          )}
+                                        >
+                                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                                          {filterEndDate ? format(filterEndDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                                        <Calendar
+                                          mode="single"
+                                          selected={filterEndDate}
+                                          onSelect={setFilterEndDate}
+                                          initialFocus
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[11px]">Variety</Label>
+                                    <Select
+                                      value={filterVariety}
+                                      onValueChange={(value) => setFilterVariety(value)}
+                                    >
+                                      <SelectTrigger className="h-8 text-[11px]">
+                                        <SelectValue placeholder="All varieties" />
+                                      </SelectTrigger>
+                                      <SelectContent className="z-[60]">
+                                        <SelectItem value="all">All varieties</SelectItem>
+                                        {varietyOptions.map((variety) => (
+                                          <SelectItem key={variety} value={variety}>
+                                            {variety}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="flex items-center justify-between pt-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-[11px]"
+                                      onClick={handleClearSupplierFilters}
+                                    >
+                                      Reset
+                                    </Button>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Filters apply instantly
+                                    </span>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                                 <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm}>Clear</Button>
                                 <Button size="sm" className="h-7 text-[11px]" onClick={hook.processPayment}>Finalize</Button>
                                                         </div>
@@ -641,12 +810,12 @@ export default function SupplierPaymentsClient() {
                               <div className="space-y-2 min-w-0 w-full max-w-full overflow-hidden h-[250px]">
                                 {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && (
                                   <div className="w-full max-w-full overflow-hidden h-full">
-                                    <PaymentForm
-                                      {...hook}
-                                      bankAccounts={hook.bankAccounts}
-                                      bankBranches={hook.bankBranches}
-                                      onPaymentMethodChange={handlePaymentMethodChange}
-                                    />
+                                  <PaymentForm
+                                    {...hook}
+                                    bankAccounts={hook.bankAccounts}
+                                    bankBranches={hook.bankBranches}
+                                    onPaymentMethodChange={handlePaymentMethodChange}
+                                  />
                                   </div>
                                 )}
                               </div>
@@ -987,9 +1156,24 @@ export default function SupplierPaymentsClient() {
             open={editEntryDialogOpen}
             onOpenChange={setEditEntryDialogOpen}
             entry={selectedEntryForEdit}
-            onSuccess={() => {
+            onSuccess={async () => {
+              // Force refresh of supplier data and summary
               setRefreshKey(Date.now());
-              // Refresh data if needed
+              setSupplierDataRefreshKey(Date.now());
+              
+              // Wait a bit for the local update to propagate to IndexedDB
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Force a recalculation by temporarily clearing and resetting the selected supplier
+              const currentKey = hook.selectedCustomerKey;
+              if (currentKey) {
+                // Temporarily clear to force summary recalculation
+                hook.handleCustomerSelect(null);
+                // Reset immediately to trigger recalculation with updated data
+                setTimeout(() => {
+                  hook.handleCustomerSelect(currentKey);
+                }, 50);
+              }
             }}
           />
 

@@ -23,6 +23,7 @@ import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialo
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
+import { CustomerImportDialog } from "./customer-import-dialog";
 import { Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -118,6 +119,7 @@ export default function CustomerEntryClient() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('tax-invoice');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
@@ -133,12 +135,53 @@ export default function CustomerEntryClient() {
 
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
   
+  // Convert Kanta Parchi entries to Customer format for table display
+  const kantaParchiAsCustomers = useMemo(() => {
+    return allKantaParchi.map((kp: KantaParchi) => ({
+      id: kp.id || kp.srNo,
+      srNo: kp.srNo,
+      date: kp.date,
+      name: kp.name,
+      variety: kp.variety,
+      netWeight: kp.netWeight,
+      netAmount: kp.netAmount,
+      originalNetAmount: kp.originalNetAmount,
+      contact: kp.contact,
+      vehicleNo: kp.vehicleNo,
+      grossWeight: kp.grossWeight,
+      teirWeight: kp.teirWeight,
+      weight: kp.weight,
+      rate: kp.rate,
+      bags: kp.bags,
+      bagWeightKg: kp.bagWeightKg,
+      bagRate: kp.bagRate,
+      bagAmount: kp.bagAmount,
+      amount: kp.amount,
+      cdRate: kp.cdRate,
+      cdAmount: kp.cdAmount,
+      brokerageRate: kp.brokerageRate,
+      brokerageAmount: kp.brokerageAmount,
+      isBrokerageIncluded: kp.isBrokerageIncluded,
+      kanta: kp.kanta,
+      advanceFreight: kp.advanceFreight,
+      paymentType: kp.paymentType,
+      customerId: kp.customerId,
+      isKantaParchi: true, // Flag to identify kanta parchi entries
+    } as Customer));
+  }, [allKantaParchi]);
+  
+  // Combine customers and kanta parchi entries
+  const allEntries = useMemo(() => {
+    return [...safeCustomers, ...kantaParchiAsCustomers];
+  }, [safeCustomers, kantaParchiAsCustomers]);
+  
   const filteredCustomers = useMemo(() => {
+    const entriesToFilter = allEntries;
     if (!debouncedSearchTerm) {
-      return safeCustomers;
+      return entriesToFilter;
     }
     const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-    return safeCustomers.filter(customer => {
+    return entriesToFilter.filter(customer => {
       return (
         customer.name?.toLowerCase().startsWith(lowercasedFilter) ||
         customer.contact?.startsWith(lowercasedFilter) ||
@@ -423,6 +466,66 @@ export default function CustomerEntryClient() {
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
+    // Check if it's a kanta parchi entry
+    const kantaParchiToEdit = allKantaParchi.find(kp => (kp.id || kp.srNo) === id);
+    if (kantaParchiToEdit) {
+      // Edit kanta parchi - switch to weight tab and load kanta parchi data
+      setActiveTab("weight");
+      setSelectedKantaParchiSrNo(kantaParchiToEdit.srNo);
+      setIsEditingKantaParchi(true);
+      setCurrentKantaParchi(kantaParchiToEdit);
+      
+      // Load kanta parchi data into form
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let formDate;
+      try {
+        formDate = kantaParchiToEdit.date ? new Date(kantaParchiToEdit.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+      } catch {
+        formDate = today;
+      }
+      
+      const formValues: FormValues = {
+        srNo: kantaParchiToEdit.srNo,
+        date: formDate,
+        bags: kantaParchiToEdit.bags || 0,
+        name: kantaParchiToEdit.name,
+        so: '',
+        address: '',
+        contact: kantaParchiToEdit.contact,
+        vehicleNo: kantaParchiToEdit.vehicleNo,
+        variety: kantaParchiToEdit.variety,
+        grossWeight: kantaParchiToEdit.grossWeight || 0,
+        teirWeight: kantaParchiToEdit.teirWeight || 0,
+        rate: kantaParchiToEdit.rate || 0,
+        cd: kantaParchiToEdit.cdRate || 0,
+        brokerage: kantaParchiToEdit.brokerageRate || 0,
+        kanta: kantaParchiToEdit.kanta || 0,
+        paymentType: kantaParchiToEdit.paymentType || 'Full',
+        isBrokerageIncluded: kantaParchiToEdit.isBrokerageIncluded || false,
+        bagWeightKg: kantaParchiToEdit.bagWeightKg || 0,
+        bagRate: kantaParchiToEdit.bagRate || 0,
+        advanceFreight: kantaParchiToEdit.advanceFreight || 0,
+        forceUnique: false,
+      };
+      
+      const customerState = {
+        ...kantaParchiToEdit,
+        id: kantaParchiToEdit.id || kantaParchiToEdit.srNo,
+        so: '',
+        address: '',
+        companyName: '',
+      } as Customer;
+      
+      setCurrentCustomer(customerState);
+      form.reset(formValues);
+      performCalculations(formValues);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    
+    // Otherwise, edit regular customer entry
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
@@ -475,9 +578,32 @@ export default function CustomerEntryClient() {
       toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
       return;
     }
+    
+    // Check if it's a kanta parchi entry
+    const kantaParchiToDelete = allKantaParchi.find(kp => (kp.id || kp.srNo) === id);
+    if (kantaParchiToDelete) {
+      try {
+        await deleteKantaParchi(kantaParchiToDelete.srNo);
+        setAllKantaParchi(prev => prev.filter(kp => (kp.id || kp.srNo) !== id));
+        toast({ title: "Kanta Parchi deleted successfully.", variant: "success" });
+        if (currentKantaParchi && (currentKantaParchi.id || currentKantaParchi.srNo) === id) {
+          handleNewKantaParchi();
+        }
+        return;
+      } catch (error) {
+        console.error("Error deleting Kanta Parchi:", error);
+        toast({ title: "Failed to delete Kanta Parchi.", variant: "destructive" });
+        return;
+      }
+    }
+    
+    // Otherwise, delete regular customer entry
     try {
+      const customerToDelete = safeCustomers.find(c => c.id === id);
       await deleteCustomer(id);
-      await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
+      if (customerToDelete) {
+        await deleteCustomerPaymentsForSrNo(customerToDelete.srNo);
+      }
       setCustomers(prev => prev.filter(c => c.id !== id));
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentCustomer.id === id) {
@@ -939,54 +1065,8 @@ export default function CustomerEntryClient() {
         toast({title: "Exported", description: "Customer data has been exported."});
     }
 
-    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-                
-                let nextSrNum = (customers || []).length > 0 ? Math.max(...(customers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-
-                for (const item of json) {
-                    const customerData: Partial<Customer> = {
-                        srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
-                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                        name: toTitleCase(item.name),
-                        companyName: toTitleCase(item.companyName || ''),
-                        address: toTitleCase(item.address || ''),
-                        contact: String(item.contact || ''),
-                        gstin: item.gstin || '',
-                        vehicleNo: toTitleCase(item.vehicleNo || ''),
-                        variety: toTitleCase(item.variety || ''),
-                        grossWeight: Number(item.grossWeight) || 0,
-                        teirWeight: Number(item.teirWeight) || 0,
-                        rate: Number(item.rate) || 0,
-                        bags: Number(item.bags) || 0,
-                        bagWeightKg: Number(item.bagWeightKg) || 0,
-                        bagRate: Number(item.bagRate) || 0,
-                        kanta: Number(item.kanta) || 0,
-                        cd: Number(item.cd) || 0,
-                        brokerage: Number(item.brokerage) || 0,
-                        isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
-                        paymentType: item.paymentType || 'Full',
-                    };
-                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
-                    await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
-                }
-                toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
-            } catch (error) {
-                console.error("Import failed:", error);
-                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
-            }
-        };
-        reader.readAsBinaryString(file);
+    const handleImport = () => {
+        setIsImportDialogOpen(true);
     };
 
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
@@ -1132,6 +1212,17 @@ export default function CustomerEntryClient() {
                 updateAction(deletePayments);
             }
         }}
+      />
+
+      <CustomerImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        onImportComplete={() => {
+          // Refresh data after import
+          loadInitialData();
+        }}
+        existingKantaParchiSrNos={allKantaParchi.map(kp => kp.srNo)}
+        existingDocumentSrNos={[]} // TODO: Get existing document srNos if needed
       />
     </div>
   );

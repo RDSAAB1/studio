@@ -141,7 +141,27 @@ export async function writeLocalFirst<T extends { id: string }>(
                         ...changes,
                         updatedAt: new Date().toISOString()
                     };
+                    
+                    console.log(`[writeLocalFirst] Updating ${collectionName}:${id}`, {
+                        existingKeys: Object.keys(existing),
+                        changesKeys: Object.keys(changes),
+                        updatedKeys: Object.keys(updated),
+                        sampleChanges: {
+                            name: changes.name || existing.name,
+                            variety: changes.variety || existing.variety,
+                            grossWeight: changes.grossWeight || existing.grossWeight
+                        }
+                    });
+                    
                     await localTable.put(updated);
+                    
+                    // Verify the update
+                    const verify = await localTable.get(id);
+                    if (!verify) {
+                        throw new Error(`Failed to verify update: ${collectionName}:${id}`);
+                    }
+                    console.log(`[writeLocalFirst] Update verified for ${collectionName}:${id}`);
+                    
                     pendingChanges.set(`${collectionName}:${id}`, {
                         id,
                         type: 'update',
@@ -152,6 +172,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                     scheduleSyncToFirestore();
                     return updated;
                 } else {
+                    console.warn(`[writeLocalFirst] Entry not found locally: ${collectionName}:${id}, treating as create`);
                     // If not found locally, treat as create
                     if (data) {
                         await localTable.put(data);
@@ -164,6 +185,8 @@ export async function writeLocalFirst<T extends { id: string }>(
                         });
                         scheduleSyncToFirestore();
                         return data;
+                    } else {
+                        throw new Error(`Entry not found and no data provided for create: ${collectionName}:${id}`);
                     }
                 }
                 break;
@@ -283,7 +306,7 @@ function scheduleSyncToFirestore() {
  * Sync pending local changes to Firestore
  * Only runs when user is actively using the software
  */
-async function syncToFirestore() {
+export async function syncToFirestore() {
     if (!pendingChanges.size || typeof window === 'undefined') return;
 
     const changes = Array.from(pendingChanges.values());

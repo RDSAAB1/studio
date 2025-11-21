@@ -49,6 +49,18 @@ export function formatSrNo(num: number | string, prefix: 'S' | 'C' | 'R' = 'S') 
   return prefix + String(num).padStart(5, '0');
 }
 
+export function formatKantaParchiSrNo(num: number | string): string {
+  const numStr = String(num).replace(/[^0-9]/g, '');
+  const numValue = numStr ? parseInt(numStr, 10) : (typeof num === 'number' ? num : 1);
+  return 'KP' + String(numValue).padStart(5, '0');
+}
+
+export function formatDocumentSrNo(num: number | string): string {
+  const numStr = String(num).replace(/[^0-9]/g, '');
+  const numValue = numStr ? parseInt(numStr, 10) : (typeof num === 'number' ? num : 1);
+  return 'DOC' + String(numValue).padStart(5, '0');
+}
+
 export function formatTransactionId(num: number | string, prefix: 'IN' | 'EX' = 'IN') {
   return prefix + String(num).padStart(5, '0');
 }
