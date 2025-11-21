@@ -2075,28 +2075,62 @@ export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (err
         return stored ? parseInt(stored, 10) : undefined;
     };
 
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    let firestoreLoans: Loan[] = []; // Store all Firestore loans
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            loansCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.loans.orderBy('startDate').reverse().toArray().then((localLoans) => {
+            // Call callback with IndexedDB data to clear loading state quickly
+            callback(localLoans as Loan[]);
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
+    }
+
+    // ✅ Always fetch all loans from Firestore (source of truth)
+    // First do a full fetch to get all loans
+    getDocs(query(loansCollection, orderBy("startDate", "desc"))).then((fullSnapshot) => {
+        const allLoans = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+        firestoreLoans = allLoans;
+        callback(allLoans);
+        
+        // Save to IndexedDB
+        if (db && allLoans.length > 0) {
+            db.loans.bulkPut(allLoans).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:loans', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching loans:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    let q;
+    try {
         q = query(loansCollection, orderBy("startDate", "desc"));
+    } catch (error) {
+        // If orderBy fails, use simple query
+        q = query(loansCollection);
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
-        callback(loans);
+        const newLoans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+        
+        // Update firestoreLoans with latest data
+        firestoreLoans = newLoans;
+        callback(newLoans);
+        
+        // Save to IndexedDB
+        if (db && newLoans.length > 0) {
+            db.loans.bulkPut(newLoans).catch(() => {});
+        }
         
         // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:loans', String(Date.now()));
         }
     }, (err: any) => {
@@ -2121,35 +2155,62 @@ export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) 
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:fundTransactions');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    let firestoreTransactions: FundTransaction[] = []; // Store all Firestore transactions
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            fundTransactionsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.fundTransactions.orderBy('date').reverse().toArray().then((localTransactions) => {
+            // Call callback with IndexedDB data to clear loading state quickly
+            callback(localTransactions as FundTransaction[]);
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
+    }
+
+    // ✅ Always fetch all transactions from Firestore (source of truth)
+    // First do a full fetch to get all transactions
+    getDocs(query(fundTransactionsCollection, orderBy("date", "desc"))).then((fullSnapshot) => {
+        const allTransactions = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+        firestoreTransactions = allTransactions;
+        callback(allTransactions);
+        
+        // Save to IndexedDB
+        if (db && allTransactions.length > 0) {
+            db.fundTransactions.bulkPut(allTransactions).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:fundTransactions', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching fund transactions:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    let q;
+    try {
         q = query(fundTransactionsCollection, orderBy("date", "desc"));
+    } catch (error) {
+        // If orderBy fails, use simple query
+        q = query(fundTransactionsCollection);
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
-        callback(transactions);
+        const newTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+        
+        // Update firestoreTransactions with latest data
+        firestoreTransactions = newTransactions;
+        callback(newTransactions);
+        
+        // Save to IndexedDB
+        if (db && newTransactions.length > 0) {
+            db.fundTransactions.bulkPut(newTransactions).catch(() => {});
+        }
         
         // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:fundTransactions', String(Date.now()));
         }
     }, (err: any) => {
@@ -2381,35 +2442,63 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:bankAccounts');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    let firestoreAccounts: BankAccount[] = []; // Store all Firestore accounts
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            bankAccountsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(bankAccountsCollection);
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.bankAccounts.toArray().then((localAccounts) => {
+            // Call callback with IndexedDB data to clear loading state quickly
+            callback(localAccounts as BankAccount[]);
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
     }
 
-    return onSnapshot(q, (snapshot) => {
-        const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
-        callback(accounts);
+    // ✅ Always fetch all accounts from Firestore (source of truth)
+    // First do a full fetch to get all accounts
+    getDocs(query(bankAccountsCollection)).then((fullSnapshot) => {
+        const allAccounts = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+        firestoreAccounts = allAccounts;
+        callback(allAccounts);
+        
+        // Save to IndexedDB
+        if (db && allAccounts.length > 0) {
+            db.bankAccounts.bulkPut(allAccounts).catch(() => {});
+        }
         
         // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:bankAccounts', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching bank accounts:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    // Use a query without orderBy to avoid errors if updatedAt is missing
+    let q;
+    try {
+        q = query(bankAccountsCollection, orderBy('updatedAt', 'desc'));
+    } catch (error) {
+        // If orderBy fails (no index or missing field), use simple query
+        q = query(bankAccountsCollection);
+    }
+    
+    return onSnapshot(q, (snapshot) => {
+        const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+        
+        // Update firestoreAccounts with latest data
+        firestoreAccounts = newAccounts;
+        callback(newAccounts);
+        
+        // Save to IndexedDB
+        if (db && newAccounts.length > 0) {
+            db.bankAccounts.bulkPut(newAccounts).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:bankAccounts', String(Date.now()));
         }
     }, (err: any) => {
@@ -2671,95 +2760,82 @@ export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (err
 }
 
 export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, onError: (error: Error) => void) {
-    let cachedBranches: BankBranch[] = [];
-    let callbackCalledFromIndexedDB = false;
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.bankBranches.toArray() : [];
+        }, callback);
+    }
+
+    let firestoreBranches: BankBranch[] = []; // Store all Firestore branches
     
     // ✅ Read from local IndexedDB first (immediate response)
     if (db) {
         db.bankBranches.toArray().then((localBranches) => {
-            cachedBranches = localBranches as BankBranch[];
-            callbackCalledFromIndexedDB = true;
-            // Always call callback with IndexedDB results (even if empty) to clear loading state
+            // Call callback with IndexedDB data to clear loading state quickly
             callback(localBranches as BankBranch[]);
         }).catch(() => {
-            // If IndexedDB read fails, ensure Firestore will call callback
-            callbackCalledFromIndexedDB = false;
+            // If IndexedDB read fails, Firestore will call callback
         });
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:bankBranches');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (lastSyncTime) {
-        // Try incremental sync with updatedAt
-        try {
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            q = query(
-                bankBranchesCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-        } catch (error) {
-            // If updatedAt query fails (no index or missing fields), fallback to full sync
-            console.warn('Incremental sync failed for bankBranches, using full sync:', error);
-            q = query(bankBranchesCollection);
-        }
-    } else {
-        // First sync - get all (only once)
-        q = query(bankBranchesCollection);
-    }
-
-    return onSnapshot(q, (snapshot) => {
-        const newBranches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+    // ✅ Always fetch all branches from Firestore (source of truth)
+    // First do a full fetch to get all branches
+    getDocs(query(bankBranchesCollection)).then((fullSnapshot) => {
+        const allBranches = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+        firestoreBranches = allBranches;
+        callback(allBranches);
         
-        // Firestore is the source of truth for bank branches
-        if (lastSyncTime) {
-            if (newBranches.length > 0) {
-                // Incremental sync with new branches - merge with cached from IndexedDB
-                const merged = new Map<string, BankBranch>();
-                cachedBranches.forEach(branch => merged.set(branch.id || `${branch.bankName}_${branch.branchName}`, branch));
-                newBranches.forEach(branch => merged.set(branch.id || `${branch.bankName}_${branch.branchName}`, branch));
-                const allBranches = Array.from(merged.values());
-                cachedBranches = allBranches;
-                callback(allBranches);
-                
-                // Save to IndexedDB
-                if (db) {
-                    db.bankBranches.bulkPut(allBranches).catch(() => {});
-                }
-            } else {
-                // No new branches in incremental sync - use cached from IndexedDB
-                // This ensures we always show branches even if there are no changes
-                if (cachedBranches.length > 0) {
-                    callback(cachedBranches);
-                } else {
-                    // No cached branches - call with empty array to clear loading
-                    callback([]);
-                }
-            }
-        } else {
-            // First sync - Firestore data is the source of truth
-            cachedBranches = newBranches;
-            callback(newBranches);
-            
-            // Save to IndexedDB if there are branches
-            if (newBranches.length > 0 && db) {
-                db.bankBranches.bulkPut(newBranches).catch(() => {});
-            }
+        // Save to IndexedDB
+        if (db && allBranches.length > 0) {
+            db.bankBranches.bulkPut(allBranches).catch(() => {});
         }
         
         // ✅ Save last sync time
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:bankBranches', String(Date.now()));
         }
-    }, onError);
+    }).catch((error) => {
+        console.error('Error fetching bank branches:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    let q;
+    try {
+        // Try to use orderBy if available, otherwise use simple query
+        q = query(bankBranchesCollection);
+    } catch (error) {
+        // If query fails, use simple query
+        q = query(bankBranchesCollection);
+    }
+
+    return onSnapshot(q, (snapshot) => {
+        const newBranches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+        
+        // Update firestoreBranches with latest data
+        firestoreBranches = newBranches;
+        callback(newBranches);
+        
+        // Save to IndexedDB
+        if (db && newBranches.length > 0) {
+            db.bankBranches.bulkPut(newBranches).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:bankBranches', String(Date.now()));
+        }
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                return db ? await db.bankBranches.toArray() : [];
+            }, callback);
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
 }
 
 export function getProjectsRealtime(callback: (data: Project[]) => void, onError: (error: Error) => void) {

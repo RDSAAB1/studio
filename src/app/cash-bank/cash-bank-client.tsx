@@ -160,7 +160,22 @@ export default function CashBankClient() {
         });
         
         allIncomes.forEach(t => {
-            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+            // Handle both Income and CustomerPayment types
+            let balanceKey = '';
+            
+            // Check for bankAccountId first (CustomerPayment or Income with bankAccountId)
+            if ('bankAccountId' in t && t.bankAccountId) {
+                balanceKey = t.bankAccountId;
+            } 
+            // Check for paymentMethod (CustomerPayment has this)
+            else if ('paymentMethod' in t) {
+                balanceKey = t.paymentMethod === 'Cash' ? 'CashInHand' : '';
+            }
+            // For Income type without bankAccountId, check paymentMethod
+            else if ('transactionType' in t && t.transactionType === 'Income' && 'paymentMethod' in t) {
+                balanceKey = t.paymentMethod === 'Cash' ? 'CashInHand' : '';
+            }
+            
             if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
             }
