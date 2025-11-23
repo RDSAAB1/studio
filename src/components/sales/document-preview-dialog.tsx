@@ -40,6 +40,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     const [editableInvoiceDetails, setEditableInvoiceDetails] = useState<Partial<Customer>>({});
     const [isSameAsBilling, setIsSameAsBilling] = useState(true);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [showBagWeightColumns, setShowBagWeightColumns] = useState(true);
     
     const [invoiceDetails, setInvoiceDetails] = useState({
         companyGstin: '',
@@ -185,14 +186,39 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     advanceFreight: newAdvanceAmount,
                 };
                 
+                // Calculate basic fields without payment history (payments are handled separately)
                 const calculated = calculateCustomerEntry(formValuesForCalc, []);
                 
                 const dataToSave: Partial<Customer> = { 
                     ...customer,
-                    ...editableInvoiceDetails,
-                    ...calculated,
+                    // Explicitly set all editable fields to ensure they're saved
+                    name: editableInvoiceDetails.name || customer.name,
+                    companyName: editableInvoiceDetails.companyName || customer.companyName,
+                    address: editableInvoiceDetails.address || customer.address,
+                    contact: editableInvoiceDetails.contact || customer.contact,
+                    gstin: editableInvoiceDetails.gstin || customer.gstin,
+                    stateName: editableInvoiceDetails.stateName || customer.stateName,
+                    stateCode: editableInvoiceDetails.stateCode || customer.stateCode,
+                    shippingName: editableInvoiceDetails.shippingName,
+                    shippingCompanyName: editableInvoiceDetails.shippingCompanyName,
+                    shippingAddress: editableInvoiceDetails.shippingAddress,
+                    shippingContact: editableInvoiceDetails.shippingContact,
+                    shippingGstin: editableInvoiceDetails.shippingGstin,
+                    shippingStateName: editableInvoiceDetails.shippingStateName,
+                    shippingStateCode: editableInvoiceDetails.shippingStateCode,
+                    // Update calculated fields (weight, amount, brokerage, cd, bagAmount, originalNetAmount)
+                    weight: calculated.weight,
+                    netWeight: calculated.netWeight,
+                    amount: calculated.amount,
+                    brokerage: calculated.brokerage,
+                    cd: calculated.cd,
+                    bagAmount: calculated.bagAmount,
+                    originalNetAmount: calculated.originalNetAmount,
+                    // Preserve existing netAmount - don't recalculate it as payments are handled separately
+                    netAmount: customer.netAmount,
                     advanceExpenseId: currentExpenseId,
                     advancePaymentMethod: invoiceDetails.advancePaymentMethod,
+                    advanceFreight: newAdvanceAmount,
                     nineRNo: invoiceDetails.nineRNo,
                     gatePassNo: invoiceDetails.gatePassNo,
                     grNo: invoiceDetails.grNo,
@@ -261,6 +287,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 document.body.removeChild(iframe);
             }, 500);
 
+            toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
+
         } catch (error) {
             console.error("Transaction failed: ", error);
             toast({ title: "Save Failed", description: "The changes could not be saved due to an error.", variant: "destructive" });
@@ -293,6 +321,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         
         const finalInvoiceDetails = {
             ...invoiceDetails,
+            showBagWeightColumns,
         };
 
         switch(documentType) {
@@ -398,6 +427,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                             value={invoiceDetails.advancePaymentMethod}
                                             onChange={(v) => v && setInvoiceDetails(prev => ({ ...prev, advancePaymentMethod: v }))} 
                                         />
+                                    </div>
+                                    <div className="col-span-2 flex items-center space-x-2 pt-2">
+                                        <Switch id="show-bag-weight" checked={showBagWeightColumns} onCheckedChange={setShowBagWeightColumns} />
+                                        <Label htmlFor="show-bag-weight" className="text-xs">Show Bag Wt & Final Wt Columns</Label>
                                     </div>
                                 </CardContent>
                             </Card>

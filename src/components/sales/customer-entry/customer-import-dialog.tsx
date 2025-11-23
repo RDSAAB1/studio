@@ -8,9 +8,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
-import type { KantaParchi, CustomerDocument } from "@/lib/definitions";
-import { toTitleCase, calculateCustomerEntry, formatSrNo, formatKantaParchiSrNo, formatDocumentSrNo } from "@/lib/utils";
-import { addKantaParchi, addCustomerDocument } from "@/lib/firestore";
+import type { Customer, CustomerDocument } from "@/lib/definitions";
+import { toTitleCase, calculateCustomerEntry, formatSrNo, formatDocumentSrNo } from "@/lib/utils";
+import { addCustomer, addCustomerDocument, getAllCustomers } from "@/lib/firestore";
 import { parseISO, format, isValid } from "date-fns";
 
 interface CustomerImportDialogProps {
@@ -21,7 +21,7 @@ interface CustomerImportDialogProps {
   existingDocumentSrNos?: string[];
 }
 
-type ImportVariant = "kanta-parchi" | "parchi-document";
+type ImportVariant = "customer" | "parchi-document";
 
 export function CustomerImportDialog({
   open,
@@ -31,7 +31,7 @@ export function CustomerImportDialog({
   existingDocumentSrNos = [],
 }: CustomerImportDialogProps) {
   const { toast } = useToast();
-  const [importVariant, setImportVariant] = useState<ImportVariant>("kanta-parchi");
+  const [importVariant, setImportVariant] = useState<ImportVariant>("customer");
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,7 +160,7 @@ export function CustomerImportDialog({
           let errorCount = 0;
           const errors: string[] = [];
 
-          if (importVariant === "kanta-parchi") {
+          if (importVariant === "customer") {
             // Helper function to get value from item with multiple possible keys (case-insensitive, trimmed)
             const getValue = (keys: string[], defaultValue: any = '', item: any) => {
               // First try exact match
@@ -182,7 +182,25 @@ export function CustomerImportDialog({
               return defaultValue;
             };
             
-            // Import Kanta Parchi only
+            // Get ALL existing customer entries to check for duplicates
+            const allExistingCustomers = await getAllCustomers();
+            const existingSrNosSet = new Set(allExistingCustomers.map(c => c.srNo));
+            
+            // Get next serial number - use same format as entry (C prefix)
+            let nextSrNum = 1;
+            if (allExistingCustomers && allExistingCustomers.length > 0) {
+              const maxNum = Math.max(...allExistingCustomers.map(c => {
+                // Extract number from C prefix format (C00001 -> 1)
+                const num = parseInt(c.srNo.replace(/[^\d]/g, '')) || 0;
+                return num;
+              }));
+              nextSrNum = maxNum + 1;
+            }
+            
+            // Track serial numbers being imported in this batch to avoid duplicates within import
+            const importedSrNosInBatch = new Set<string>();
+            
+            // Import Customer entries only
             for (let i = 0; i < json.length; i++) {
               const item = json[i];
               setImportProgress({ current: i + 1, total: json.length });
@@ -209,16 +227,6 @@ export function CustomerImportDialog({
                   return defaultValue;
                 };
                 
-                // Get next serial number
-                let nextSrNum = 1;
-                if (existingKantaParchiSrNos.length > 0) {
-                  const maxNum = Math.max(...existingKantaParchiSrNos.map(srNo => {
-                    const num = parseInt(srNo.replace(/[^\d]/g, '')) || 0;
-                    return num;
-                  }));
-                  nextSrNum = maxNum + 1;
-                }
-                
                 // Extract and format serial number (RST column) - use exact value from data
                 let srNoValue = getValue([
                   'RST',
@@ -232,17 +240,28 @@ export function CustomerImportDialog({
                 
                 let formattedSrNo: string;
                 if (srNoValue && String(srNoValue).trim() !== '') {
-                  // If srNo is provided, extract number and format it
+                  // If srNo is provided, extract number and format it using same format as entry (C prefix)
                   const numStr = String(srNoValue).replace(/[^0-9]/g, '');
                   if (numStr) {
-                    formattedSrNo = formatKantaParchiSrNo(parseInt(numStr, 10));
+                    formattedSrNo = formatSrNo(parseInt(numStr, 10), 'C');
                   } else {
-                    // If no number found, use the value as-is (might already be formatted)
-                    formattedSrNo = String(srNoValue).trim();
+                    // If no number found, check if it's already in C format, otherwise use as-is
+                    const strValue = String(srNoValue).trim();
+                    if (strValue.startsWith('C') && /^C\d+$/.test(strValue)) {
+                      formattedSrNo = strValue;
+                    } else {
+                      // Try to extract and format
+                      const extractedNum = strValue.replace(/[^0-9]/g, '');
+                      if (extractedNum) {
+                        formattedSrNo = formatSrNo(parseInt(extractedNum, 10), 'C');
+                      } else {
+                        formattedSrNo = strValue;
+                      }
+                    }
                   }
                 } else {
-                  // Only auto-generate if not found in data
-                  formattedSrNo = formatKantaParchiSrNo(nextSrNum + i);
+                  // Only auto-generate if not found in data - use same format as entry (C prefix)
+                  formattedSrNo = formatSrNo(nextSrNum + i, 'C');
                 }
                 
                 // Log serial number extraction for first row
@@ -414,15 +433,6 @@ export function CustomerImportDialog({
                   });
                 }
                 
-                // Extract kanta from LABOURY column
-                const kanta = Number(getValue([
-                  'LABOURY',
-                  'LABOURY.',
-                  'laboury',
-                  'kanta',
-                  'Kanta'
-                ], 0));
-                
                 // Extract variety from MATERIAL column
                 const variety = getValue([
                   'MATERIAL',
@@ -497,16 +507,24 @@ export function CustomerImportDialog({
                     teirWeight: basicFields.teirWeight,
                     rate: basicFields.rate,
                     bags: basicFields.bags,
-                    kanta: basicFields.kanta,
                   });
                 }
                 
-                // Check if srNo already exists
-                if (existingKantaParchiSrNos.includes(basicFields.srNo)) {
-                  errors.push(`Row ${i + 2}: SR No ${basicFields.srNo} already exists. Skipping.`);
+                // Check if srNo already exists in Customer collection OR in current import batch
+                if (existingSrNosSet.has(basicFields.srNo)) {
+                  errors.push(`Row ${i + 2}: SR No ${basicFields.srNo} already exists in database. Skipping.`);
                   errorCount++;
                   continue;
                 }
+                
+                if (importedSrNosInBatch.has(basicFields.srNo)) {
+                  errors.push(`Row ${i + 2}: SR No ${basicFields.srNo} is duplicate in this import file. Skipping.`);
+                  errorCount++;
+                  continue;
+                }
+                
+                // Mark this serial number as imported in this batch
+                importedSrNosInBatch.add(basicFields.srNo);
                 
                 // Validate required fields
                 if (!basicFields.name && !basicFields.contact && !basicFields.vehicleNo && basicFields.grossWeight === 0) {
@@ -519,12 +537,20 @@ export function CustomerImportDialog({
                 // Calculate all derived fields
                 const calculated = calculateCustomerEntry(basicFields, []);
 
-                const kantaParchiData: KantaParchi = {
+                const customerData: Customer = {
                   id: basicFields.srNo,
                   srNo: basicFields.srNo,
                   date: basicFields.date,
+                  term: '0',
+                  dueDate: basicFields.date,
                   name: toTitleCase(basicFields.name),
+                  companyName: '',
+                  so: '',
+                  address: address || '',
                   contact: basicFields.contact,
+                  gstin: '',
+                  stateName: '',
+                  stateCode: '',
                   vehicleNo: toTitleCase(basicFields.vehicleNo),
                   variety: toTitleCase(basicFields.variety),
                   grossWeight: basicFields.grossWeight,
@@ -538,19 +564,24 @@ export function CustomerImportDialog({
                   bagAmount: calculated.bagAmount || 0,
                   amount: calculated.amount || 0,
                   cdRate: basicFields.cd,
-                  cdAmount: calculated.cd || 0,
+                  cd: calculated.cd || 0,
                   brokerageRate: basicFields.brokerage,
-                  brokerageAmount: calculated.brokerage || 0,
+                  brokerage: calculated.brokerage || 0,
                   isBrokerageIncluded: basicFields.isBrokerageIncluded,
-                  kanta: basicFields.kanta,
-                  advanceFreight: basicFields.advanceFreight,
                   originalNetAmount: calculated.originalNetAmount || 0,
                   netAmount: calculated.netAmount || 0,
                   paymentType: basicFields.paymentType,
                   customerId: `${toTitleCase(basicFields.name).toLowerCase()}|${basicFields.contact.toLowerCase()}`,
+                  kartaPercentage: 0,
+                  kartaWeight: 0,
+                  kartaAmount: 0,
+                  labouryRate: 0,
+                  labouryAmount: 0,
+                  barcode: '',
+                  receiptType: 'Cash'
                 };
 
-                await addKantaParchi(kantaParchiData);
+                await addCustomer(customerData);
                 successCount++;
               } catch (error: any) {
                 console.error(`Error importing row ${i + 2}:`, error);
@@ -586,45 +617,76 @@ export function CustomerImportDialog({
                   return defaultValue;
                 };
                 
-                // Get next Kanta Parchi serial number
-                let nextKpSrNum = 1;
-                if (existingKantaParchiSrNos.length > 0) {
-                  const maxNum = Math.max(...existingKantaParchiSrNos.map(srNo => {
-                    const num = parseInt(srNo.replace(/[^\d]/g, '')) || 0;
+                // Get ALL existing customer entries to check for duplicates
+                const allExistingCustomersForDoc = await getAllCustomers();
+                const existingSrNosSetForDoc = new Set(allExistingCustomersForDoc.map(c => c.srNo));
+                
+                // Get next Customer serial number - use same format as entry (C prefix)
+                let nextSrNum = 1;
+                if (allExistingCustomersForDoc && allExistingCustomersForDoc.length > 0) {
+                  const maxNum = Math.max(...allExistingCustomersForDoc.map(c => {
+                    // Extract number from C prefix format (C00001 -> 1)
+                    const num = parseInt(c.srNo.replace(/[^\d]/g, '')) || 0;
                     return num;
                   }));
-                  nextKpSrNum = maxNum + 1;
+                  nextSrNum = maxNum + 1;
                 }
                 
-                // Extract and format Kanta Parchi serial number (RST column) - use exact value from data
-                let kantaParchiSrNoValue = getValue([
+                // Track serial numbers being imported in this batch to avoid duplicates within import
+                const importedSrNosInBatchForDoc = new Set<string>();
+                
+                // Extract and format Customer serial number (RST column) - use exact value from data
+                let srNoValue = getValue([
                   'RST',
                   'rst',
                   'Rst',
-                  'kantaParchiSrNo',
-                  'Kanta Parchi SR No',
-                  'KP SR No'
+                  'srNo',
+                  'SR No',
+                  'Sr No',
+                  'Serial No'
                 ], '');
                 
-                let kantaParchiSrNo: string;
-                if (kantaParchiSrNoValue && String(kantaParchiSrNoValue).trim() !== '') {
-                  const numStr = String(kantaParchiSrNoValue).replace(/[^0-9]/g, '');
+                let customerSrNo: string;
+                if (srNoValue && String(srNoValue).trim() !== '') {
+                  // If srNo is provided, extract number and format it using same format as entry (C prefix)
+                  const numStr = String(srNoValue).replace(/[^0-9]/g, '');
                   if (numStr) {
-                    kantaParchiSrNo = formatKantaParchiSrNo(parseInt(numStr, 10));
+                    customerSrNo = formatSrNo(parseInt(numStr, 10), 'C');
                   } else {
-                    // If no number found, use the value as-is (might already be formatted)
-                    kantaParchiSrNo = String(kantaParchiSrNoValue).trim();
+                    // If no number found, check if it's already in C format, otherwise use as-is
+                    const strValue = String(srNoValue).trim();
+                    if (strValue.startsWith('C') && /^C\d+$/.test(strValue)) {
+                      customerSrNo = strValue;
+                    } else {
+                      // Try to extract and format
+                      const extractedNum = strValue.replace(/[^0-9]/g, '');
+                      if (extractedNum) {
+                        customerSrNo = formatSrNo(parseInt(extractedNum, 10), 'C');
+                      } else {
+                        customerSrNo = strValue;
+                      }
+                    }
                   }
                 } else {
-                  // Only auto-generate if not found in data
-                  kantaParchiSrNo = formatKantaParchiSrNo(nextKpSrNum + i);
+                  // Only auto-generate if not found in data - use same format as entry (C prefix)
+                  customerSrNo = formatSrNo(nextSrNum + i, 'C');
                 }
                 
-                if (existingKantaParchiSrNos.includes(kantaParchiSrNo)) {
-                  errors.push(`Row ${i + 2}: Kanta Parchi SR No ${kantaParchiSrNo} already exists. Skipping.`);
+                // Check if srNo already exists in Customer collection OR in current import batch
+                if (existingSrNosSetForDoc.has(customerSrNo)) {
+                  errors.push(`Row ${i + 2}: SR No ${customerSrNo} already exists in database. Skipping.`);
                   errorCount++;
                   continue;
                 }
+                
+                if (importedSrNosInBatchForDoc.has(customerSrNo)) {
+                  errors.push(`Row ${i + 2}: SR No ${customerSrNo} is duplicate in this import file. Skipping.`);
+                  errorCount++;
+                  continue;
+                }
+                
+                // Mark this serial number as imported in this batch
+                importedSrNosInBatchForDoc.add(customerSrNo);
 
                 // Extract and parse customer field (CUSTOME FATHER N. ADDRESS)
                 const customerField = getValue([
@@ -724,8 +786,6 @@ export function CustomerImportDialog({
                   ], 0));
                 }
                 
-                // Extract kanta from LABOURY column
-                const kanta = Number(item['LABOURY'] || item.LABOURY || item.laboury || item.kanta || item.Kanta || 0);
                 
                 // Extract variety from MATERIAL column
                 const variety = item.MATERIAL || item['MATERIAL'] || item.variety || item.Variety || '';
@@ -733,8 +793,8 @@ export function CustomerImportDialog({
                 // Extract mobile number (try separate MOBILE NO column first, then MATERIAL MOBILE NO.)
                 const mobileNo = item['MOBILE NO'] || item['MOBILE NO.'] || item['MATERIAL MOBILE NO.'] || item['MATERIAL MOBILE NO'] || item.contact || item.Contact || item.phone || item.Phone || '';
 
-                const kantaParchiFields = {
-                  srNo: kantaParchiSrNo,
+                const customerFields = {
+                  srNo: customerSrNo,
                   date: parseDate(item['GROSS WE DATE'] || item['GROSS WEIGHT DATE'] || item.date || item.Date),
                   name: parsedName || item.name || item.Name || '',
                   so: fatherName || item.so || item.SO || item.fatherName || '',
@@ -748,50 +808,61 @@ export function CustomerImportDialog({
                   bags: bags,
                   bagWeightKg: Number(item.bagWeightKg || item['Bag Weight Kg'] || item['Bag Wt Kg'] || 0),
                   bagRate: Number(item.bagRate || item['Bag Rate'] || 0),
-                  kanta: kanta,
                   cd: Number(item.cd || item.CD || item['Cash Discount'] || 0),
                   brokerage: Number(item.brokerage || item.Brokerage || 0),
                   isBrokerageIncluded: Boolean(item.isBrokerageIncluded ?? item['Is Brokerage Included'] ?? true),
-                  advanceFreight: Number(item.advanceFreight || item['Advance Freight'] || 0),
                   paymentType: item.paymentType || item['Payment Type'] || 'Full',
                 };
 
-                // Calculate Kanta Parchi fields
-                const kantaParchiCalculated = calculateCustomerEntry(kantaParchiFields, []);
+                // Calculate Customer fields
+                const customerCalculated = calculateCustomerEntry(customerFields, []);
 
-                const kantaParchiData: KantaParchi = {
-                  id: kantaParchiFields.srNo,
-                  srNo: kantaParchiFields.srNo,
-                  date: kantaParchiFields.date,
-                  name: toTitleCase(kantaParchiFields.name),
-                  contact: kantaParchiFields.contact,
-                  vehicleNo: toTitleCase(kantaParchiFields.vehicleNo),
-                  variety: toTitleCase(kantaParchiFields.variety),
-                  grossWeight: kantaParchiFields.grossWeight,
-                  teirWeight: kantaParchiFields.teirWeight,
-                  weight: kantaParchiCalculated.weight || 0,
-                  netWeight: kantaParchiCalculated.netWeight || 0,
-                  rate: kantaParchiFields.rate,
-                  bags: kantaParchiFields.bags,
-                  bagWeightKg: kantaParchiFields.bagWeightKg,
-                  bagRate: kantaParchiFields.bagRate,
-                  bagAmount: kantaParchiCalculated.bagAmount || 0,
-                  amount: kantaParchiCalculated.amount || 0,
-                  cdRate: kantaParchiFields.cd,
-                  cdAmount: kantaParchiCalculated.cd || 0,
-                  brokerageRate: kantaParchiFields.brokerage,
-                  brokerageAmount: kantaParchiCalculated.brokerage || 0,
-                  isBrokerageIncluded: kantaParchiFields.isBrokerageIncluded,
-                  kanta: kantaParchiFields.kanta,
-                  advanceFreight: kantaParchiFields.advanceFreight,
-                  originalNetAmount: kantaParchiCalculated.originalNetAmount || 0,
-                  netAmount: kantaParchiCalculated.netAmount || 0,
-                  paymentType: kantaParchiFields.paymentType,
-                  customerId: `${toTitleCase(kantaParchiFields.name).toLowerCase()}|${kantaParchiFields.contact.toLowerCase()}`,
+                const customerDataForDoc: Customer = {
+                  id: customerFields.srNo,
+                  srNo: customerFields.srNo,
+                  date: customerFields.date,
+                  term: '0',
+                  dueDate: customerFields.date,
+                  name: toTitleCase(customerFields.name),
+                  companyName: '',
+                  so: '',
+                  address: address || '',
+                  contact: customerFields.contact,
+                  gstin: '',
+                  stateName: '',
+                  stateCode: '',
+                  vehicleNo: toTitleCase(customerFields.vehicleNo),
+                  variety: toTitleCase(customerFields.variety),
+                  grossWeight: customerFields.grossWeight,
+                  teirWeight: customerFields.teirWeight,
+                  weight: customerCalculated.weight || 0,
+                  netWeight: customerCalculated.netWeight || 0,
+                  rate: customerFields.rate,
+                  bags: customerFields.bags,
+                  bagWeightKg: customerFields.bagWeightKg,
+                  bagRate: customerFields.bagRate,
+                  bagAmount: customerCalculated.bagAmount || 0,
+                  amount: customerCalculated.amount || 0,
+                  cdRate: customerFields.cd,
+                  cd: customerCalculated.cd || 0,
+                  brokerageRate: customerFields.brokerage,
+                  brokerage: customerCalculated.brokerage || 0,
+                  isBrokerageIncluded: customerFields.isBrokerageIncluded,
+                  originalNetAmount: customerCalculated.originalNetAmount || 0,
+                  netAmount: customerCalculated.netAmount || 0,
+                  paymentType: customerFields.paymentType,
+                  customerId: `${toTitleCase(customerFields.name).toLowerCase()}|${customerFields.contact.toLowerCase()}`,
+                  kartaPercentage: 0,
+                  kartaWeight: 0,
+                  kartaAmount: 0,
+                  labouryRate: 0,
+                  labouryAmount: 0,
+                  barcode: '',
+                  receiptType: 'Cash'
                 };
 
-                // Save Kanta Parchi first
-                await addKantaParchi(kantaParchiData);
+                // Save Customer first
+                await addCustomer(customerDataForDoc);
 
                 // Get next Document serial number
                 let nextDocSrNum = 1;
@@ -849,7 +920,7 @@ export function CustomerImportDialog({
                 };
 
                 // Calculate document tax amounts
-                const tableTotalAmount = (kantaParchiCalculated.netWeight || 0) * kantaParchiFields.rate;
+                const tableTotalAmount = (customerCalculated.netWeight || 0) * customerFields.rate;
                 const taxRate = documentFields.taxRate;
                 const isGstIncluded = documentFields.isGstIncluded;
                 
@@ -860,11 +931,11 @@ export function CustomerImportDialog({
                 if (isGstIncluded) {
                   taxableAmount = tableTotalAmount / (1 + (taxRate / 100));
                   totalTaxAmount = tableTotalAmount - taxableAmount;
-                  totalInvoiceValue = tableTotalAmount + (kantaParchiFields.advanceFreight || 0);
+                  totalInvoiceValue = tableTotalAmount;
                 } else {
                   taxableAmount = tableTotalAmount;
                   totalTaxAmount = taxableAmount * (taxRate / 100);
-                  totalInvoiceValue = taxableAmount + totalTaxAmount + (kantaParchiFields.advanceFreight || 0);
+                  totalInvoiceValue = taxableAmount + totalTaxAmount;
                 }
 
                 const cgstAmount = totalTaxAmount / 2;
@@ -873,13 +944,13 @@ export function CustomerImportDialog({
                 const documentData: CustomerDocument = {
                   id: documentSrNo,
                   documentSrNo: documentSrNo,
-                  kantaParchiSrNo: kantaParchiFields.srNo,
+                  kantaParchiSrNo: customerFields.srNo, // Reference to Customer entry
                   documentType: documentFields.documentType,
                   date: documentFields.date,
-                  name: toTitleCase(kantaParchiFields.name),
+                  name: toTitleCase(customerFields.name),
                   companyName: toTitleCase(documentFields.companyName),
-                  address: toTitleCase(documentFields.address || kantaParchiFields.name),
-                  contact: kantaParchiFields.contact,
+                  address: toTitleCase(documentFields.address || customerFields.address),
+                  contact: customerFields.contact,
                   gstin: documentFields.gstin,
                   stateName: documentFields.stateName,
                   stateCode: documentFields.stateCode,
@@ -898,14 +969,12 @@ export function CustomerImportDialog({
                   shippingGstin: documentFields.shippingGstin,
                   shippingStateName: documentFields.shippingStateName,
                   shippingStateCode: documentFields.shippingStateCode,
-                  netWeight: kantaParchiCalculated.netWeight || 0,
-                  rate: kantaParchiFields.rate,
-                  amount: kantaParchiCalculated.amount || 0,
-                  cdAmount: kantaParchiCalculated.cd || 0,
-                  brokerageAmount: kantaParchiCalculated.brokerage || 0,
-                  kanta: kantaParchiFields.kanta,
-                  bagAmount: kantaParchiCalculated.bagAmount || 0,
-                  advanceFreight: kantaParchiFields.advanceFreight,
+                  netWeight: customerCalculated.netWeight || 0,
+                  rate: customerFields.rate,
+                  amount: customerCalculated.amount || 0,
+                  cdAmount: customerCalculated.cd || 0,
+                  brokerageAmount: customerCalculated.brokerage || 0,
+                  bagAmount: customerCalculated.bagAmount || 0,
                   taxableAmount: taxableAmount,
                   cgstAmount: cgstAmount,
                   sgstAmount: sgstAmount,
@@ -987,20 +1056,20 @@ export function CustomerImportDialog({
             <Label>Import Type</Label>
             <RadioGroup value={importVariant} onValueChange={(value) => setImportVariant(value as ImportVariant)}>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="kanta-parchi" id="kanta-parchi" />
-                <Label htmlFor="kanta-parchi" className="font-normal cursor-pointer">
-                  Kanta Parchi Import
+                <RadioGroupItem value="customer" id="customer" />
+                <Label htmlFor="customer" className="font-normal cursor-pointer">
+                  Customer Entry Import
                   <span className="text-xs text-muted-foreground block">
-                    Import kanta parchi with all fields and calculations
+                    Import customer entries with all fields and calculations
                   </span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="parchi-document" id="parchi-document" />
                 <Label htmlFor="parchi-document" className="font-normal cursor-pointer">
-                  Parchi and Document Import
+                  Customer and Document Import
                   <span className="text-xs text-muted-foreground block">
-                    Import both kanta parchi and document with all fields and calculations
+                    Import both customer entry and document with all fields and calculations
                   </span>
                 </Label>
               </div>
@@ -1040,7 +1109,7 @@ export function CustomerImportDialog({
             </p>
           </div>
 
-          {importVariant === "kanta-parchi" && (
+          {importVariant === "customer" && (
             <div className="rounded-md bg-muted p-3 text-sm">
               <p className="font-medium mb-1">Required Fields:</p>
               <p className="text-xs text-muted-foreground">

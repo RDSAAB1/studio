@@ -23,6 +23,7 @@ interface ChallanProps {
         grDate: string;
         transport: string;
         totalAdvance: number;
+        showBagWeightColumns?: boolean;
     };
 }
 
@@ -62,11 +63,20 @@ const formatCurrency = (amount: number): string => {
 export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDetails }) => {
     const taxRate = Number(invoiceDetails.taxRate) || 0;
     const isGstIncluded = invoiceDetails.isGstIncluded;
+    const showBagWeightColumns = invoiceDetails.showBagWeightColumns !== false; // Default to true
     const rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
     const advanceFreight = Number(customer.advanceFreight) || 0;
+    const bags = Number(customer.bags) || 0;
+    const bagWeightKg = Number(customer.bagWeightKg) || 0;
+    const grossWeight = Number(customer.grossWeight) || 0;
+    const teirWeight = Number(customer.teirWeight) || 0;
+    const weight = grossWeight - teirWeight; // Weight before bag deduction
+    const bagWeightQtl = (bags * bagWeightKg) / 100; // Convert kg to quintals
     
-    const tableTotalAmount = netWeight * rate;
+    // If bag weight columns are hidden, use weight directly; otherwise use netWeight
+    const finalWeight = showBagWeightColumns ? netWeight : weight;
+    const tableTotalAmount = finalWeight * rate;
 
     let taxableAmount: number;
     let totalTaxAmount: number;
@@ -156,13 +166,15 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                     <table className="w-full text-left print-table text-base">
                        <thead className="print-bg-gray-800">
                              <tr className="uppercase text-xs text-gray-600">
-                                <th className="p-3 font-semibold text-center w-[5%]">#</th>
-                                <th className="p-3 font-semibold w-[35%]">Item & Description</th>
-                                <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
-                                <th className="p-3 font-semibold text-center w-[10%]">UOM</th>
-                                <th className="p-3 font-semibold text-center w-[15%]">Qty (Qtl)</th>
-                                <th className="p-3 font-semibold text-right w-[10%]">Rate</th>
-                                <th className="p-3 font-semibold text-right w-[15%]">Total</th>
+                                <th className="p-3 font-semibold text-center w-[4%]">#</th>
+                                <th className="p-3 font-semibold w-[25%]">Item & Description</th>
+                                <th className="p-3 font-semibold text-center w-[7%]">HSN/SAC</th>
+                                <th className="p-3 font-semibold text-center w-[7%]">UOM</th>
+                                <th className="p-3 font-semibold text-center w-[9%]">WT (Qtl)</th>
+                                {showBagWeightColumns && <th className="p-3 font-semibold text-center w-[9%]">Bag Wt (Qtl)</th>}
+                                {showBagWeightColumns && <th className="p-3 font-semibold text-center w-[9%]">Final Wt (Qtl)</th>}
+                                <th className="p-3 font-semibold text-right w-[9%]">Rate</th>
+                                <th className="p-3 font-semibold text-right w-[11%]">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -173,7 +185,9 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                                 </td>
                                 <td className="p-3 text-center">{hsnCode}</td>
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
-                                <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
+                                <td className="p-3 text-center">{weight.toFixed(2)}</td>
+                                {showBagWeightColumns && <td className="p-3 text-center">{bagWeightQtl.toFixed(2)}</td>}
+                                {showBagWeightColumns && <td className="p-3 text-center">{netWeight.toFixed(2)}</td>}
                                 <td className="p-3 text-right">{formatCurrency(rate)}</td>
                                 <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(tableTotalAmount))}</td>
                             </tr>
