@@ -321,6 +321,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                             onGoClick();
                         }
                     }}
+                    autoComplete="new-password"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    name={`custom-dropdown-${Math.random().toString(36).substring(7)}`}
                     className={cn("w-full pl-8 h-8 text-sm", showGoButton ? "pr-14" : "pr-8", inputClassName)}
                 />
                 {showGoButton && (
@@ -360,16 +368,16 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
             {isOpen && isMounted && createPortal(
                 <div 
-                    className="fixed z-[9999] bg-popover border border-border rounded-md shadow-lg" 
+                    className="fixed bg-popover border border-border rounded-md shadow-lg" 
                     style={{ 
                         position: 'fixed', 
                         top: dropdownPosition.top, 
                         left: dropdownPosition.left, 
                         width: dropdownPosition.width || 'auto',
-                        zIndex: 9999,
-                        maxHeight: '20rem'
+                        zIndex: 99999,
+                        maxHeight: '20rem',
+                        pointerEvents: 'auto'
                     }}
-                    onMouseDown={(e) => e.preventDefault()}
                 >
                     {filteredItems.length > 100 && searchTerm && (
                         <div className="px-4 py-2 text-xs text-muted-foreground border-b">
@@ -380,7 +388,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         ref={listRef}
                         className="py-1 max-h-80 overflow-y-auto scrollbar-hide"
                         onScroll={handleScroll}
-                        style={{ position: 'relative', minHeight: filteredItems.length === 0 ? 'auto' : '0' }}
+                        style={{ position: 'relative', minHeight: filteredItems.length === 0 ? 'auto' : '0', pointerEvents: 'auto' }}
                     >
                         {/* Spacer for items before visible range */}
                         {virtualItems.startIndex > 0 && (
@@ -393,15 +401,20 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                 return (
                                 <li
                                         key={`${item.value}-${actualIndex}`}
-                                    onMouseDown={(e) => {
+                                    onClick={(e) => {
                                         e.preventDefault();
+                                        e.stopPropagation();
                                         handleSelect(item);
                                     }}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
                                     className={cn(
-                                            "cursor-pointer px-3 py-1.5 text-xs hover:bg-accent",
+                                            "cursor-pointer px-3 py-1.5 text-xs hover:bg-accent transition-colors",
                                         selectedItem?.value === item.value ? 'bg-accent font-medium' : ''
                                     )}
-                                        style={{ height: ITEM_HEIGHT }}
+                                        style={{ height: ITEM_HEIGHT, pointerEvents: 'auto' }}
                                 >
                                     <div className="flex items-center justify-between w-full">
                                         <span className="text-xs truncate">
@@ -422,9 +435,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         
                          {onAdd && searchTerm && !options.some(item => item.label.toLowerCase() === searchTerm.toLowerCase()) && (
                             <li
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAddNew();
+                                }}
                                 onMouseDown={(e) => {
                                     e.preventDefault();
-                                    handleAddNew();
+                                    e.stopPropagation();
                                 }}
                                 className="cursor-pointer px-4 py-2 text-xs hover:bg-accent text-primary font-medium"
                             >

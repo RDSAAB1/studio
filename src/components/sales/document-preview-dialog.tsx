@@ -22,8 +22,9 @@ import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { SmartDatePicker } from "../ui/smart-date-picker";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
-import { runTransaction, doc, collection, getDoc } from 'firebase/firestore';
+import { runTransaction, doc, collection, getDoc, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+import { db } from '@/lib/database';
 
 
 interface DocumentPreviewDialogProps {
@@ -116,21 +117,31 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     };
     
     const handleStateChange = (type: 'billing' | 'shipping', field: 'name' | 'code', value: string | null) => {
+        if (!value) {
+            // Clear both fields if value is null/empty
+            if (type === 'billing') {
+                setEditableInvoiceDetails(prev => ({ ...prev, stateName: '', stateCode: '' }));
+            } else {
+                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateName: '', shippingStateCode: '' }));
+            }
+            return;
+        }
+
         if (type === 'billing') {
             if (field === 'name') {
-                const state = findStateByName(value || '');
-                setEditableInvoiceDetails(prev => ({ ...prev, stateName: value || '', stateCode: state?.code || '' }));
+                const state = findStateByName(value);
+                setEditableInvoiceDetails(prev => ({ ...prev, stateName: value, stateCode: state?.code || '' }));
             } else {
-                const state = findStateByCode(value || '');
-                setEditableInvoiceDetails(prev => ({ ...prev, stateCode: value || '', stateName: state?.name || '' }));
+                const state = findStateByCode(value);
+                setEditableInvoiceDetails(prev => ({ ...prev, stateCode: value, stateName: state?.name || '' }));
             }
         } else { // shipping
              if (field === 'name') {
-                const state = findStateByName(value || '');
-                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateName: value || '', shippingStateCode: state?.code || '' }));
+                const state = findStateByName(value);
+                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateName: value, shippingStateCode: state?.code || '' }));
             } else {
-                const state = findStateByCode(value || '');
-                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateCode: value || '', shippingStateName: state?.name || '' }));
+                const state = findStateByCode(value);
+                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateCode: value, shippingStateName: state?.name || '' }));
             }
         }
     };
@@ -241,8 +252,29 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     delete dataToSave.advanceExpenseId;
                 }
 
-                transaction.update(customerRef, dataToSave);
+                // Add updatedAt timestamp for sync detection
+                const dataWithTimestamp = {
+                    ...dataToSave,
+                    updatedAt: Timestamp.now(),
+                };
+
+                transaction.update(customerRef, dataWithTimestamp);
             });
+
+            // Update local database for immediate sync
+            if (db && customer) {
+                try {
+                    const customerToUpdate: Customer = {
+                        ...customer,
+                        ...dataToSave,
+                        id: customer.id,
+                        updatedAt: Timestamp.now().toMillis() as any,
+                    } as Customer;
+                    await db.customers.put(customerToUpdate);
+                } catch (error) {
+                    console.warn('Failed to update local database:', error);
+                }
+            }
 
             // ----- PRINTING LOGIC -----
             const receiptNode = document.getElementById(id);
@@ -445,11 +477,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="grid grid-cols-2 gap-2">
                                         <div className="space-y-1">
                                             <Label className="text-xs">State Name</Label>
-                                            <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.stateName || ''} onChange={(value) => handleStateChange('billing', 'name', value)} placeholder="State"/>
+                                            <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.stateName || null} onChange={(value) => handleStateChange('billing', 'name', value)} placeholder="State"/>
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">State Code</Label>
-                                            <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.stateCode || ''} onChange={(value) => handleStateChange('billing', 'code', value)} placeholder="Code"/>
+                                            <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.stateCode || null} onChange={(value) => handleStateChange('billing', 'code', value)} placeholder="Code"/>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -466,11 +498,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         <div className="grid grid-cols-2 gap-2">
                                              <div className="space-y-1">
                                                 <Label className="text-xs">State Name</Label>
-                                                <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.shippingStateName || ''} onChange={(value) => handleStateChange('shipping', 'name', value)} placeholder="State"/>
+                                                <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.shippingStateName || null} onChange={(value) => handleStateChange('shipping', 'name', value)} placeholder="State"/>
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">State Code</Label>
-                                                <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.shippingStateCode || ''} onChange={(value) => handleStateChange('shipping', 'code', value)} placeholder="Code"/>
+                                                <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.shippingStateCode || null} onChange={(value) => handleStateChange('shipping', 'code', value)} placeholder="Code"/>
                                             </div>
                                         </div>
                                     </CardContent>
