@@ -17,17 +17,20 @@ import type { BankAccount, Payment } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Trash2, Edit, Download, Save, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, Download, Save, X, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { toTitleCase } from '@/lib/utils';
 import { useMemo } from 'react';
+
+interface SupplierBankAccountsPageProps {
+  embedded?: boolean;
+}
 
 const supplierBankAccountSchema = z.object({
   accountHolderName: z.string().min(1, "Account holder name is required"),
@@ -40,17 +43,18 @@ const supplierBankAccountSchema = z.object({
 type SupplierBankAccountFormData = z.infer<typeof supplierBankAccountSchema>;
 
 
-export default function SupplierBankAccountsPage() {
+export default function SupplierBankAccountsPage({ embedded = false }: SupplierBankAccountsPageProps = {}) {
   const { toast } = useToast();
   const { banks, bankBranches } = useSupplierData();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(true); // Always show form by default
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [searchFilter, setSearchFilter] = useState<string>('all'); // 'all', 'name', 'account', 'bank', 'branch', 'ifsc'
 
   const {
     register,
@@ -160,6 +164,45 @@ export default function SupplierBankAccountsPage() {
       }
     }
   }, [watchedBranchName, branchOptions, setValue]);
+
+  // Filter bank accounts based on search term and selected filter
+  const filteredBankAccounts = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return bankAccounts;
+    }
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return bankAccounts.filter((account) => {
+      const accountHolderName = (account.accountHolderName || '').toLowerCase();
+      const accountNumber = (account.accountNumber || '').toLowerCase();
+      const bankName = (account.bankName || '').toLowerCase();
+      const branchName = (account.branchName || '').toLowerCase();
+      const ifscCode = (account.ifscCode || '').toLowerCase();
+      
+      // Search in specific field based on filter
+      switch (searchFilter) {
+        case 'name':
+          return accountHolderName.includes(searchLower);
+        case 'account':
+          return accountNumber.includes(searchLower);
+        case 'bank':
+          return bankName.includes(searchLower);
+        case 'branch':
+          return branchName.includes(searchLower);
+        case 'ifsc':
+          return ifscCode.includes(searchLower);
+        case 'all':
+        default:
+          return (
+            accountHolderName.includes(searchLower) ||
+            accountNumber.includes(searchLower) ||
+            bankName.includes(searchLower) ||
+            branchName.includes(searchLower) ||
+            ifscCode.includes(searchLower)
+          );
+      }
+    });
+  }, [bankAccounts, searchTerm, searchFilter]);
 
   // Handle account number blur - check if account exists in real-time
   const handleAccountNumberBlur = () => {
@@ -287,14 +330,7 @@ export default function SupplierBankAccountsPage() {
         }
       }
 
-      // Don't close form - keep it open for next entry
-      // Only close dialog if editing (not for inline form)
-      if (editingAccount && !showAddForm) {
-        setIsDialogOpen(false);
-        setEditingAccount(null);
-      }
-      
-      // Reset form but keep it open
+      // Reset form but keep inline form open
       setExistingAccountInfo(null);
       reset({
         accountHolderName: '',
@@ -334,8 +370,7 @@ export default function SupplierBankAccountsPage() {
 
   const handleEdit = (account: BankAccount) => {
     setEditingAccount(account);
-    setShowAddForm(false);
-    setIsDialogOpen(true);
+    setShowAddForm(true); // open inline form for edit instead of popup
   };
 
   const handleAddNew = () => {
@@ -455,110 +490,135 @@ export default function SupplierBankAccountsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
+      <div className={`flex items-center justify-center ${embedded ? "h-40" : "h-[60vh]"}`}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  const containerClass = embedded ? "space-y-4" : "container mx-auto py-4 space-y-4";
+  const tableHeightClass = embedded ? "h-[500px]" : "h-[calc(100vh-250px)]";
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className={containerClass}>
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Supplier/Customer Bank Accounts</CardTitle>
-              <CardDescription>
-                Manage bank accounts for suppliers and customers. These accounts are used in RTGS payments.
-              </CardDescription>
-            </div>
+        <CardContent className="space-y-3 pt-2 pb-3">
+          {/* Top actions row */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex gap-2">
               <Button
                 onClick={handleImportFromRTGS}
                 disabled={isImporting}
                 variant="outline"
+                className="h-8 px-3 text-xs"
               >
                 {isImporting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                     Importing...
                   </>
                 ) : (
                   <>
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-3.5 w-3.5" />
                     Import from RTGS
                   </>
                 )}
               </Button>
-              <Button onClick={handleAddNew}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Account
-              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: 'All Fields' },
+                  { value: 'name', label: 'Account Holder Name' },
+                  { value: 'account', label: 'Account Number' },
+                  { value: 'bank', label: 'Bank Name' },
+                  { value: 'branch', label: 'Branch Name' },
+                  { value: 'ifsc', label: 'IFSC Code' },
+                ]}
+                value={searchFilter}
+                onChange={(value) => setSearchFilter(value || 'all')}
+                placeholder="Filter by"
+                inputClassName="h-8 text-xs min-w-[140px]"
+              />
+              <div className="relative min-w-[250px]">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={
+                    searchFilter === 'all' 
+                      ? "Search by name, account, bank, branch, IFSC..."
+                      : searchFilter === 'name'
+                      ? "Search by account holder name..."
+                      : searchFilter === 'account'
+                      ? "Search by account number..."
+                      : searchFilter === 'bank'
+                      ? "Search by bank name..."
+                      : searchFilter === 'branch'
+                      ? "Search by branch name..."
+                      : "Search by IFSC code..."
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
             </div>
           </div>
+
+          {/* Form + Table side by side on large screens */}
+          <div className="grid gap-3 lg:grid-cols-[28%_72%] items-start">
+            {/* Inline Add/Edit Form - compact, always visible */}
+            <div className={showAddForm ? '' : 'hidden'}>
+              <Card className="border border-primary/30 shadow-sm">
+                <CardHeader className="py-2 px-3">
+                  <CardTitle className="text-sm font-semibold">
+                    {editingAccount ? 'Edit Bank Account' : 'Add New Bank Account'}
+                  </CardTitle>
         </CardHeader>
-        <CardContent>
-          {/* Inline Add Form */}
-          {showAddForm && (
-            <Card className="mb-6 border-2 border-primary/20">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Add New Supplier Bank Account</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancelAdd}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="accountHolderName">
+                <CardContent className="pt-2 pb-3 px-3">
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-xs">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="accountHolderName" className="text-xs">
                         Account Holder Name <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         id="accountHolderName"
                         {...register('accountHolderName')}
-                        placeholder="Enter account holder name"
+                          placeholder="Holder name"
+                          className="h-8 text-xs"
                       />
                       {errors.accountHolderName && (
-                        <p className="text-sm text-destructive">
+                          <p className="text-[11px] text-destructive">
                           {errors.accountHolderName.message}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="accountNumber">
+                      <div className="space-y-1">
+                        <Label htmlFor="accountNumber" className="text-xs">
                         Account Number <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         id="accountNumber"
                         {...register('accountNumber')}
-                        placeholder="Enter account number"
-                        className="font-mono"
+                          placeholder="Account no."
+                          className="h-8 text-xs font-mono"
                         onBlur={handleAccountNumberBlur}
                       />
                       {existingAccountInfo && !editingAccount && (
-                        <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-md">
-                          <p className="text-sm text-blue-700 dark:text-blue-300">
-                            <span className="font-medium">Account exists!</span> Details have been auto-filled.
-                          </p>
+                          <div className="mt-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-300">
+                            <span className="font-medium">Account exists!</span> Details auto-filled.
                         </div>
                       )}
                       {errors.accountNumber && (
-                        <p className="text-sm text-destructive">
+                          <p className="text-[11px] text-destructive">
                           {errors.accountNumber.message}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="bankName">
+                      <div className="space-y-1">
+                        <Label htmlFor="bankName" className="text-xs">
                         Bank Name <span className="text-destructive">*</span>
                       </Label>
                       <CustomDropdown
@@ -567,16 +627,17 @@ export default function SupplierBankAccountsPage() {
                         onChange={handleBankSelect}
                         onAdd={handleAddBank}
                         placeholder="Select or add bank"
+                          inputClassName="h-8 text-xs"
                       />
                       {errors.bankName && (
-                        <p className="text-sm text-destructive">
+                          <p className="text-[11px] text-destructive">
                           {errors.bankName.message}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="branchName">
+                      <div className="space-y-1">
+                        <Label htmlFor="branchName" className="text-xs">
                         Branch Name <span className="text-destructive">*</span>
                       </Label>
                       <CustomDropdown
@@ -585,54 +646,62 @@ export default function SupplierBankAccountsPage() {
                         onChange={handleBranchSelect}
                         onAdd={handleAddBranch}
                         placeholder="Select or add branch"
+                          inputClassName="h-8 text-xs"
                       />
                       {errors.branchName && (
-                        <p className="text-sm text-destructive">
+                          <p className="text-[11px] text-destructive">
                           {errors.branchName.message}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="ifscCode">
+                      <div className="space-y-1">
+                        <Label htmlFor="ifscCode" className="text-xs">
                         IFSC Code <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         id="ifscCode"
                         {...register('ifscCode')}
-                        placeholder="Auto-filled or enter IFSC code"
-                        className="font-mono uppercase"
+                          placeholder="IFSC"
+                          className="h-8 text-xs font-mono uppercase"
                         onChange={(e) => {
                           e.target.value = e.target.value.toUpperCase();
                           register('ifscCode').onChange(e);
                         }}
                       />
                       {errors.ifscCode && (
-                        <p className="text-sm text-destructive">
+                          <p className="text-[11px] text-destructive">
                           {errors.ifscCode.message}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex justify-end gap-2 pt-1">
                     <Button
                       type="button"
                       variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
                       onClick={handleCancelAdd}
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        disabled={isSubmitting}
+                      >
                       {isSubmitting ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                           {existingAccountInfo ? 'Updating...' : 'Saving...'}
                         </>
                       ) : (
                         <>
-                          <Save className="mr-2 h-4 w-4" />
-                          {existingAccountInfo ? 'Update Account' : 'Save Account'}
+                            <Save className="mr-1.5 h-3.5 w-3.5" />
+                            {existingAccountInfo ? 'Update' : 'Save'}
                         </>
                       )}
                     </Button>
@@ -640,54 +709,62 @@ export default function SupplierBankAccountsPage() {
                 </form>
               </CardContent>
             </Card>
-          )}
+            </div>
 
-          <ScrollArea className="h-[calc(100vh-300px)]">
-            <Table>
+            {/* Accounts Table */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <ScrollArea className="h-[420px]">
+                  <div className="overflow-x-auto">
+                    <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Account Holder Name</TableHead>
-                  <TableHead>Account Number</TableHead>
-                  <TableHead>Bank Name</TableHead>
-                  <TableHead>IFSC Code</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Account Holder Name</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[15%]">Account Number</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[25%]">Bank Name</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[12%]">IFSC Code</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Branch</TableHead>
+                          <TableHead className="text-right text-[11px] font-semibold px-2 w-[12%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bankAccounts.length === 0 ? (
+                        {filteredBankAccounts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No supplier bank accounts found. Click "Add Account" to add one or "Import from RTGS" to import from existing RTGS payments.
+                            <TableCell colSpan={6} className="text-center text-[11px] text-muted-foreground py-4">
+                              {searchTerm.trim() 
+                                ? `No accounts found matching "${searchTerm}". Try a different search term.`
+                                : 'No supplier bank accounts found. Use the form to add one or "Import from RTGS" to import from existing RTGS payments.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  bankAccounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">
+                          filteredBankAccounts.map((account) => (
+                            <TableRow key={account.id} className="h-8">
+                              <TableCell className="text-[11px] py-1.5 px-2 truncate">
                         {account.accountHolderName}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                              <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
                         {account.accountNumber}
                       </TableCell>
-                      <TableCell>{account.bankName}</TableCell>
-                      <TableCell className="font-mono text-sm">
+                              <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.bankName}</TableCell>
+                              <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
                         {account.ifscCode}
                       </TableCell>
-                      <TableCell>{account.branchName}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                              <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.branchName}</TableCell>
+                              <TableCell className="text-right py-1.5 px-2">
+                              <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
-                            size="sm"
+                                  size="icon"
+                                  className="h-6 w-6"
                             onClick={() => handleEdit(account)}
+                                  title="Edit"
                           >
-                            <Edit className="h-4 w-4" />
+                                  <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Delete">
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -715,150 +792,13 @@ export default function SupplierBankAccountsPage() {
                 )}
               </TableBody>
             </Table>
+                  </div>
           </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
         </CardContent>
       </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingAccount ? 'Edit Supplier Bank Account' : 'Add Supplier Bank Account'}
-            </DialogTitle>
-            <DialogDescription>
-              Enter the supplier/customer bank account details below.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="accountHolderName">
-                  Account Holder Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="accountHolderName"
-                  {...register('accountHolderName')}
-                  placeholder="Enter account holder name"
-                />
-                {errors.accountHolderName && (
-                  <p className="text-sm text-destructive">
-                    {errors.accountHolderName.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber">
-                  Account Number <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="accountNumber"
-                  {...register('accountNumber')}
-                  placeholder="Enter account number"
-                  className="font-mono"
-                  onBlur={handleAccountNumberBlur}
-                />
-                {existingAccountInfo && !editingAccount && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-md">
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      <span className="font-medium">Account exists!</span> Details have been auto-filled.
-                    </p>
-                  </div>
-                )}
-                {errors.accountNumber && (
-                  <p className="text-sm text-destructive">
-                    {errors.accountNumber.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bankName">
-                  Bank Name <span className="text-destructive">*</span>
-                </Label>
-                <CustomDropdown
-                  options={bankOptions}
-                  value={watchedBankName}
-                  onChange={handleBankSelect}
-                  onAdd={handleAddBank}
-                  placeholder="Select or add bank"
-                />
-                {errors.bankName && (
-                  <p className="text-sm text-destructive">
-                    {errors.bankName.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="branchName">
-                  Branch Name <span className="text-destructive">*</span>
-                </Label>
-                <CustomDropdown
-                  options={branchOptions.map(opt => ({ value: opt.value, label: opt.label }))}
-                  value={watchedBranchName}
-                  onChange={handleBranchSelect}
-                  onAdd={handleAddBranch}
-                  placeholder="Select or add branch"
-                />
-                {errors.branchName && (
-                  <p className="text-sm text-destructive">
-                    {errors.branchName.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ifscCode">
-                  IFSC Code <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="ifscCode"
-                  {...register('ifscCode')}
-                  placeholder="Auto-filled or enter IFSC code"
-                  className="font-mono uppercase"
-                  onChange={(e) => {
-                    e.target.value = e.target.value.toUpperCase();
-                    register('ifscCode').onChange(e);
-                  }}
-                />
-                {errors.ifscCode && (
-                  <p className="text-sm text-destructive">
-                    {errors.ifscCode.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsDialogOpen(false);
-                  setEditingAccount(null);
-                  reset();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {editingAccount || existingAccountInfo ? 'Updating...' : 'Saving...'}
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    {editingAccount || existingAccountInfo ? 'Update' : 'Save'}
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

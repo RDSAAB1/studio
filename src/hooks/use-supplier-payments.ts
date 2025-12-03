@@ -246,22 +246,17 @@ export const useSupplierPayments = () => {
 
     // Use useMemo to derive values instead of useState to avoid infinite loops
     const settleAmountDerived = useMemo(() => {
-        // In Outsider mode, outstanding cap does not apply
-        if (form.rtgsFor === 'Outsider') {
-            return 0;
-        }
         if (form.paymentType === 'Full') {
             return totalOutstandingForSelected;
         }
         // For Partial, this will be overridden by state
         return 0;
-    }, [form.paymentType, form.rtgsFor, totalOutstandingForSelected]);
+    }, [form.paymentType, totalOutstandingForSelected]);
 
     const [settleAmountManual, setSettleAmountManual] = useState(0);
     const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
 
-    // In Outsider mode, allow manual settle amount even in Full mode (no outstanding limit)
-    const settleAmount = (form.paymentType === 'Full' && form.rtgsFor !== 'Outsider') ? settleAmountDerived : settleAmountManual;
+    const settleAmount = (form.paymentType === 'Full') ? settleAmountDerived : settleAmountManual;
 
     // Removed heavy console logs to improve typing performance
 
@@ -386,7 +381,7 @@ export const useSupplierPayments = () => {
     const handleCustomerSelect = (key: string | null) => {
         form.setSelectedCustomerKey(key);
         if (!form.editingPayment) {
-            form.resetPaymentForm(form.rtgsFor === 'Outsider');
+            form.resetPaymentForm();
             handleSettleAmountChange(0);
             handleToBePaidChange(0);
         }
@@ -478,14 +473,9 @@ export const useSupplierPayments = () => {
         setActiveTab('process');
         setIsProcessing(true);
         
-        const paymentMode: 'Supplier' | 'Outsider' = (paymentToEdit as any).rtgsFor === 'Outsider' ? 'Outsider' : 'Supplier';
-        if (form.rtgsFor !== paymentMode) {
-            form.setRtgsFor(paymentMode);
-        }
-        
         try {
             const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            if (paymentMode === 'Supplier' && !firstSrNo) {
+            if (!firstSrNo) {
                  toast({ title: "Cannot Edit", description: "This payment is not linked to any supplier entry.", variant: "destructive" });
                  form.resetPaymentForm();
                  handleSettleAmountChange(0);
@@ -574,7 +564,7 @@ export const useSupplierPayments = () => {
             // if (form.paymentMethod === 'RTGS' && result.payment) {
             //     setRtgsReceiptData(result.payment);
             // }
-            form.resetPaymentForm(form.rtgsFor === 'Outsider');
+            form.resetPaymentForm();
             handleSettleAmountChange(0); 
             handleToBePaidChange(0);
         } catch (error: any) {
@@ -588,7 +578,14 @@ export const useSupplierPayments = () => {
     const handleDeletePayment = async (paymentToDelete: Payment) => {
         setIsProcessing(true);
          try {
-            await handleDeletePaymentLogic(paymentToDelete, data.suppliers); 
+            await handleDeletePaymentLogic({
+                paymentId: paymentToDelete.id,
+                paymentHistory: data.paymentHistory,
+                suppliers: data.suppliers,
+                expenses: data.expenses,
+                incomes: data.incomes,
+                isCustomer: false,
+            }); 
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === paymentToDelete.id) {
               form.resetPaymentForm();

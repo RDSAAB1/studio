@@ -378,13 +378,13 @@ export const SupplierProfileView = ({
                         </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Total Other:</span>
-                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(selectedSupplierData.totalBrokerage || 0)}</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(Math.min(Math.abs(selectedSupplierData.totalOtherCharges || 0), 1000000000))}</span>
                         </div>
                             </div>
                                 <Separator className="my-2"/>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Total Original Amount:</span>
-                                    <span className="font-bold text-primary">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span>
+                                    <span className="font-bold text-primary">{formatCurrency(Math.abs(selectedSupplierData.totalOriginalAmount || 0))}</span>
                             </div>
                 </CardContent>
             </Card>

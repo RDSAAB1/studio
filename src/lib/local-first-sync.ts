@@ -114,11 +114,12 @@ export async function writeLocalFirst<T extends { id: string }>(
         switch (operation) {
             case 'create':
                 if (!data) throw new Error('Data required for create operation');
-                // ✅ Ensure updatedAt field exists
+                // ✅ Ensure updatedAt and createdAt fields exist with current timestamp
+                const now = new Date();
                 const dataWithTimestamp = {
                     ...data,
-                    updatedAt: (data as any).updatedAt || new Date().toISOString(),
-                    createdAt: (data as any).createdAt || new Date().toISOString()
+                    updatedAt: (data as any).updatedAt || now.toISOString(),
+                    createdAt: (data as any).createdAt || now.toISOString()
                 };
                 await localTable.put(dataWithTimestamp);
                 pendingChanges.set(`${collectionName}:${id}`, {
@@ -129,6 +130,8 @@ export async function writeLocalFirst<T extends { id: string }>(
                     timestamp
                 });
                 scheduleSyncToFirestore();
+                // ✅ Force immediate sync for create operations to ensure Firestore is updated
+                await syncToFirestore();
                 return dataWithTimestamp;
 
             case 'update':
@@ -167,24 +170,36 @@ export async function writeLocalFirst<T extends { id: string }>(
                         type: 'update',
                         collection: collectionName,
                         changes: { ...changes, updatedAt: updated.updatedAt },
+                        data: updated,
                         timestamp
                     });
                     scheduleSyncToFirestore();
+                    // ✅ Force immediate sync for update operations to ensure Firestore is updated
+                    await syncToFirestore();
                     return updated;
                 } else {
                     console.warn(`[writeLocalFirst] Entry not found locally: ${collectionName}:${id}, treating as create`);
                     // If not found locally, treat as create
                     if (data) {
-                        await localTable.put(data);
+                        // ✅ Ensure updatedAt and createdAt fields exist with current timestamp
+                        const now = new Date();
+                        const dataWithTimestamp = {
+                            ...data,
+                            updatedAt: (data as any).updatedAt || now.toISOString(),
+                            createdAt: (data as any).createdAt || now.toISOString()
+                        };
+                        await localTable.put(dataWithTimestamp);
                         pendingChanges.set(`${collectionName}:${id}`, {
                             id,
                             type: 'create',
                             collection: collectionName,
-                            data,
+                            data: dataWithTimestamp,
                             timestamp
                         });
                         scheduleSyncToFirestore();
-                        return data;
+                        // ✅ Force immediate sync for create operations to ensure Firestore is updated
+                        await syncToFirestore();
+                        return dataWithTimestamp;
                     } else {
                         throw new Error(`Entry not found and no data provided for create: ${collectionName}:${id}`);
                     }
@@ -200,6 +215,8 @@ export async function writeLocalFirst<T extends { id: string }>(
                     timestamp
                 });
                 scheduleSyncToFirestore();
+                // ✅ Force immediate sync for delete operations to ensure Firestore is updated
+                await syncToFirestore();
                 break;
         }
     } catch (error) {
@@ -306,6 +323,25 @@ function scheduleSyncToFirestore() {
  * Sync pending local changes to Firestore
  * Only runs when user is actively using the software
  */
+/**
+ * Convert ISO string dates to Firestore Timestamps
+ */
+function convertDatesToTimestamps(data: any): any {
+    if (!data || typeof data !== 'object') return data;
+    
+    const converted = { ...data };
+    
+    // Convert updatedAt and createdAt from ISO string to Timestamp
+    if (converted.updatedAt && typeof converted.updatedAt === 'string') {
+        converted.updatedAt = Timestamp.fromDate(new Date(converted.updatedAt));
+    }
+    if (converted.createdAt && typeof converted.createdAt === 'string') {
+        converted.createdAt = Timestamp.fromDate(new Date(converted.createdAt));
+    }
+    
+    return converted;
+}
+
 export async function syncToFirestore() {
     if (!pendingChanges.size || typeof window === 'undefined') return;
 
@@ -321,7 +357,9 @@ export async function syncToFirestore() {
                 case 'create':
                     if (change.data) {
                         try {
-                            await setDoc(docRef, change.data);
+                            // Convert ISO string dates to Firestore Timestamps
+                            const firestoreData = convertDatesToTimestamps(change.data);
+                            await setDoc(docRef, firestoreData);
                         } catch (error: any) {
                             if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
                                 // Queue for later sync
@@ -343,11 +381,14 @@ export async function syncToFirestore() {
                             // Check if document exists
                             const docSnap = await getDoc(docRef);
                             if (docSnap.exists()) {
-                                await updateDoc(docRef, change.changes);
+                                // Convert ISO string dates to Firestore Timestamps
+                                const firestoreChanges = convertDatesToTimestamps(change.changes);
+                                await updateDoc(docRef, firestoreChanges);
                             } else {
                                 // If doesn't exist, create it
                                 if (change.data) {
-                                    await setDoc(docRef, change.data);
+                                    const firestoreData = convertDatesToTimestamps(change.data);
+                                    await setDoc(docRef, firestoreData);
                                 }
                             }
                         } catch (error: any) {

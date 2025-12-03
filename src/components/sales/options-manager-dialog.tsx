@@ -36,17 +36,51 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
 
     const handleSave = () => {
         if (editingOption) {
-            onUpdate(collectionName, editingOption.id, { name: editingOption.name });
-            toast({ title: "Option updated successfully.", variant: "success" });
+            const trimmedName = editingOption.name.trim();
+            if (!trimmedName) {
+                toast({ 
+                    title: "Empty Name", 
+                    description: "Option name cannot be empty.", 
+                    variant: "destructive" 
+                });
+                return;
+            }
+            
+            // Check if name changed
+            const originalOption = options.find(opt => opt.id === editingOption.id);
+            if (originalOption && String(originalOption.name).trim() === trimmedName) {
+                // No change, just cancel editing
+                setEditingOption(null);
+                return;
+            }
+            
+            onUpdate(collectionName, editingOption.id, { name: trimmedName });
+            toast({ 
+                title: "Option updated successfully.", 
+                description: `Updated to "${toTitleCase(trimmedName)}".`,
+                variant: "success" 
+            });
             setEditingOption(null);
         }
     };
     
     const handleAdd = () => {
-        if (newOptionName.trim()) {
-            onAdd(collectionName, { name: toTitleCase(newOptionName.trim()) });
-            setNewOptionName("");
+        const trimmedName = newOptionName.trim();
+        if (!trimmedName) {
+            toast({ 
+                title: "Empty Name", 
+                description: "Please enter a name for the option.", 
+                variant: "destructive" 
+            });
+            return;
         }
+        onAdd(collectionName, { name: toTitleCase(trimmedName) });
+        setNewOptionName("");
+        toast({ 
+            title: "Option Added", 
+            description: `${toTitleCase(trimmedName)} has been added.`, 
+            variant: "success" 
+        });
     };
     
     return (
@@ -83,9 +117,13 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                         <span className="flex-grow">{toTitleCase(String(option.name))}</span>
                                     )}
                                     <div className="flex gap-1">
-                                        <Button size="icon" variant="ghost" onClick={() => {
-                                            toast({title: "Feature Disabled", description: "Please delete and re-add the option to rename it."})
-                                        }} disabled>
+                                        <Button 
+                                            size="icon" 
+                                            variant="ghost" 
+                                            onClick={() => {
+                                                setEditingOption({ id: option.id, name: String(option.name) });
+                                            }}
+                                        >
                                             <Pen className="h-4 w-4" />
                                         </Button>
                                         <AlertDialog>

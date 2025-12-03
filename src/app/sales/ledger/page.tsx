@@ -35,195 +35,12 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import * as XLSX from "xlsx";
+import { LedgerHeader } from "./components/ledger-header";
+import { AccountForm } from "./components/account-form";
+import { EntryForm } from "./components/entry-form";
+import { CACHE_TTL_MS, CASH_DENOMINATIONS, recalculateBalances, sortEntries, generateLinkGroupId, parseAmount, formatStatementDate, formatCurrency } from "./utils";
+import { STATEMENT_PRINT_ID, STATEMENT_PRINT_STYLES, type StatementRow } from "./constants";
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-const CASH_DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1] as const;
-
-const recalculateBalances = (entries: LedgerEntry[]): LedgerEntry[] => {
-  let runningBalance = 0;
-  return entries.map((entry) => {
-    runningBalance = runningBalance + entry.debit - entry.credit;
-    return { ...entry, balance: Math.round(runningBalance * 100) / 100 };
-  });
-};
-
-const sortEntries = (entries: LedgerEntry[]): LedgerEntry[] => {
-  return [...entries].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-};
-
-const generateLinkGroupId = () => {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-};
-
-type StatementRow = {
-  date: string;
-  supplierCash: number;
-  supplierRtgs: number;
-  supplierPayments: number;
-  incomes: number;
-  expenses: number;
-  seCash: number;
-  netTotal: number;
-};
-
-const STATEMENT_PRINT_ID = "statement-print-area";
-
-const STATEMENT_PRINT_STYLES = `
-@page {
-  size: A4 portrait;
-  margin: 18mm;
-}
-
-.print-only {
-  display: none;
-}
-
-@media print {
-  body {
-    background: #ffffff !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-  body * {
-    visibility: hidden !important;
-  }
-  #${STATEMENT_PRINT_ID},
-  #${STATEMENT_PRINT_ID} * {
-    visibility: visible !important;
-  }
-  #${STATEMENT_PRINT_ID} {
-    position: absolute !important;
-    inset: 0 !important;
-    width: 100% !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-    color: #0f172a !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-card {
-    border: none !important;
-    box-shadow: none !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-header {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    border-bottom: 1px solid #cbd5f5 !important;
-    padding-bottom: 12px !important;
-    margin-bottom: 16px !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-header h1 {
-    font-size: 20px !important;
-    font-weight: 600 !important;
-    margin: 0 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-meta-line {
-    margin: 4px 0 0 0 !important;
-    font-size: 11px !important;
-    color: #475569 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-meta {
-    text-align: right !important;
-    font-size: 11px !important;
-    color: #475569 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    margin-bottom: 18px !important;
-    font-size: 12px !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table th {
-    text-align: left !important;
-    font-weight: 600 !important;
-    padding: 6px 8px !important;
-    background: #eef2ff !important;
-    border: 1px solid #cbd5f5 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table td {
-    padding: 6px 8px !important;
-    border: 1px solid #cbd5f5 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table td.amount-cell {
-    text-align: right !important;
-    font-weight: 600 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table tr:nth-child(even) {
-    background: #f8fafc !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-summary-table tr.total-row th,
-  #${STATEMENT_PRINT_ID} .print-summary-table tr.total-row td {
-    background: #1e3a8a !important;
-    color: #ffffff !important;
-    border-color: #1e3a8a !important;
-  }
-  #${STATEMENT_PRINT_ID} table {
-    border-collapse: collapse !important;
-    width: 100% !important;
-    font-size: 12px !important;
-  }
-  #${STATEMENT_PRINT_ID} thead {
-    background: #eef2ff !important;
-    color: #1e293b !important;
-  }
-  #${STATEMENT_PRINT_ID} tbody tr:nth-child(even) {
-    background: #f8fafc !important;
-  }
-  #${STATEMENT_PRINT_ID} th,
-  #${STATEMENT_PRINT_ID} td {
-    border: 1px solid #cbd5f5 !important;
-    padding: 8px 10px !important;
-    text-align: right !important;
-  }
-  #${STATEMENT_PRINT_ID} th:first-child,
-  #${STATEMENT_PRINT_ID} td:first-child {
-    text-align: left !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-footer {
-    display: flex !important;
-    justify-content: space-between !important;
-    margin-top: 24px !important;
-    font-size: 11px !important;
-    color: #475569 !important;
-  }
-  #${STATEMENT_PRINT_ID} .print-signature {
-    margin-top: 28px !important;
-    border-top: 1px solid #cbd5f5 !important;
-    padding-top: 6px !important;
-    text-align: center !important;
-    width: 180px !important;
-  }
-  .print-hidden {
-    display: none !important;
-  }
-  .print-only {
-    display: block !important;
-  }
-}
-`;
-
-const parseAmount = (value: unknown): number => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-  if (typeof value === "string") {
-    const normalized = value.replace(/[^0-9.-]/g, "");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
-
-const formatStatementDate = (value: string) => {
-  try {
-    return format(new Date(`${value}T00:00:00`), "dd MMM yyyy");
-  } catch {
-    return value;
-  }
-};
 
 const LedgerPage: React.FC = () => {
   const { toast } = useToast();
@@ -349,11 +166,15 @@ const LedgerPage: React.FC = () => {
       return true;
     });
 
+    // Sort by date (latest first), then by createdAt if dates are same
     return filtered.sort((a, b) => {
-      if (a.date === b.date) {
-        return a.createdAt.localeCompare(b.createdAt);
+      // First compare by date field (latest first)
+      if (a.date && b.date) {
+        const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
       }
-      return a.date.localeCompare(b.date);
+      // If dates are same or not available, sort by createdAt (latest first)
+      return b.createdAt.localeCompare(a.createdAt);
     });
   }, [activeEntries, dateFrom, dateTo]);
 
@@ -451,6 +272,48 @@ const LedgerPage: React.FC = () => {
     const loadCashAccounts = async () => {
       setLoadingCashAccounts(true);
       try {
+        // ✅ Load from cache first for immediate display
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("ledgerCashAccountsCache");
+          if (cached) {
+            try {
+              const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
+              const normalized = cachedAccounts
+                .map((account) => ({
+                  ...account,
+                  noteGroups: normalizeNoteGroups(account.noteGroups),
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+              
+              if (!cancelled) {
+                setCashAccounts(normalized);
+                if (!activeCashAccountId && normalized.length > 0) {
+                  setActiveCashAccountId(normalized[0].id);
+                }
+              }
+            } catch (e) {
+              console.warn("Failed to parse cached cash accounts", e);
+            }
+          }
+        }
+
+        // Check if we should sync from Firestore
+        if (typeof window === "undefined") {
+          setLoadingCashAccounts(false);
+          return;
+        }
+
+        // ✅ Always sync if cache is empty, otherwise respect TTL
+        const cached = window.localStorage.getItem("ledgerCashAccountsCache");
+        const lastSynced = window.localStorage.getItem("ledgerCashAccountsLastSynced");
+        const shouldSync = !cached || !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
+
+        if (!shouldSync) {
+          setLoadingCashAccounts(false);
+          return;
+        }
+
+        // ✅ Sync from Firestore
         const remoteAccounts = await fetchLedgerCashAccounts();
         if (cancelled) return;
 
@@ -468,6 +331,8 @@ const LedgerPage: React.FC = () => {
           }
           return normalized[0]?.id ?? null;
         });
+
+        window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
       } catch (error) {
         console.error("Failed to load cash accounts", error);
         toast({
@@ -486,7 +351,7 @@ const LedgerPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [toast]);
+  }, [toast, activeCashAccountId]);
 
   // Load accounts from IndexedDB first, then sync from Firestore (with caching)
   useEffect(() => {
@@ -692,10 +557,18 @@ const LedgerPage: React.FC = () => {
         noteGroups: normalizeNoteGroups(created.noteGroups),
       };
 
-      setCashAccounts((prev) => [...prev, normalized].sort((a, b) => a.name.localeCompare(b.name)));
+      const updatedAccounts = [...cashAccounts, normalized].sort((a, b) => a.name.localeCompare(b.name));
+      setCashAccounts(updatedAccounts);
       setActiveCashAccountId(normalized.id);
       setNewCashAccountName("");
       setShowCashAccountForm(false);
+      
+      // ✅ Update cache
+      if (typeof window !== "undefined") {
+        localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(updatedAccounts));
+        window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
+      }
+      
       toast({ title: "Cash account created" });
     } catch (error: any) {
       console.error("Failed to create cash account", error);
@@ -725,8 +598,8 @@ const LedgerPage: React.FC = () => {
 
   const updateCashAccount = (accountId: string, updater: (account: LedgerCashAccount) => LedgerCashAccount) => {
     let updatedAccount: LedgerCashAccount | null = null;
-    setCashAccounts((prev) =>
-      prev.map((account) => {
+    setCashAccounts((prev) => {
+      const next = prev.map((account) => {
         if (account.id !== accountId) {
           return account;
         }
@@ -737,8 +610,16 @@ const LedgerPage: React.FC = () => {
         };
         updatedAccount = normalized;
         return normalized;
-      })
-    );
+      });
+      
+      // ✅ Update cache
+      if (typeof window !== "undefined") {
+        localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
+        window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
+      }
+      
+      return next;
+    });
     if (updatedAccount) {
       persistCashAccount(updatedAccount);
     }
@@ -818,6 +699,13 @@ const LedgerPage: React.FC = () => {
           }
           return previousActive;
         });
+        
+        // ✅ Update cache
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
+          window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
+        }
+        
         return next;
       });
       toast({ title: "Cash account deleted" });
@@ -1814,95 +1702,61 @@ const LedgerPage: React.FC = () => {
         onValueChange={(value) => setActiveTab(value as "ledger" | "statement")}
         className="space-y-6"
       >
-        <TabsList>
-          <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="statement">Generate Statement</TabsTrigger>
-        </TabsList>
+        {/* Header Section - All elements in a card */}
+        <Card className="p-3">
+        <div className="flex items-center gap-3 flex-nowrap w-full overflow-x-auto">
+            <TabsList className="flex-shrink-0 h-10">
+              <TabsTrigger value="ledger" className="h-9">Ledger</TabsTrigger>
+              <TabsTrigger value="statement" className="h-9">Generate Statement</TabsTrigger>
+          </TabsList>
+            {activeTab === "ledger" ? (
+          <LedgerHeader
+            accountDropdownOptions={accountDropdownOptions}
+            activeAccountId={activeAccountId}
+            onAccountChange={(value) => setActiveAccountId(value)}
+            loadingAccounts={loadingAccounts}
+            accountsLength={accounts.length}
+            showAccountForm={showAccountForm}
+            onToggleAccountForm={() => setShowAccountForm((prev) => !prev)}
+            saving={saving}
+            onPrintLedger={handlePrint}
+            activeAccount={activeAccount}
+            loadingEntries={loadingEntries}
+          />
+            ) : (
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <SmartDatePicker
+                  value={statementStart}
+                  onChange={(next) => setStatementStart(next || "")}
+                  inputClassName="h-10 text-sm min-w-[150px]"
+                  buttonClassName="h-10 w-10"
+                />
+                <SmartDatePicker
+                  value={statementEnd}
+                  onChange={(next) => setStatementEnd(next || "")}
+                  inputClassName="h-10 text-sm min-w-[150px]"
+                  buttonClassName="h-10 w-10"
+                />
+                <Button 
+                  onClick={handleGenerateStatement} 
+                  disabled={statementLoading} 
+                  className="h-10 whitespace-nowrap ml-auto flex-shrink-0"
+                >
+                  {statementLoading ? "Generating..." : "Generate Statement"}
+                </Button>
+        </div>
+            )}
+          </div>
+        </Card>
         <TabsContent value="ledger" className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Ledger Accounting</h1>
-          <p className="text-sm text-muted-foreground">
-            Track balances, debit and credit entries for temporary accounts.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap justify-end">
-          <div
-            className={`flex w-full md:w-80 flex-col gap-1 ${
-              loadingAccounts ? "pointer-events-none opacity-60" : accounts.length === 0 ? "opacity-80" : ""
-            }`}
-          >
-            <span className="text-xs font-medium text-muted-foreground">Select Account</span>
-            <CustomDropdown
-              options={accountDropdownOptions}
-              value={activeAccountId}
-              onChange={(value) => setActiveAccountId(value)}
-              placeholder={loadingAccounts ? "Loading accounts…" : "Search account by name, address or contact"}
-              noItemsPlaceholder={accounts.length === 0 ? "No accounts available. Create one to begin." : "No matching account found."}
-            />
-          </div>
-          <Button
-            variant={showAccountForm ? "secondary" : "default"}
-            onClick={() => setShowAccountForm((prev) => !prev)}
-            disabled={saving}
-          >
-            {showAccountForm ? "Close" : "Open New Account"}
-          </Button>
-          <Button onClick={handlePrint} disabled={!activeAccount || loadingEntries} className="disabled:opacity-60">
-            Print Ledger
-          </Button>
-        </div>
-      </div>
-
       {showAccountForm && (
-        <form
+        <AccountForm
+          newAccount={newAccount}
+          onAccountChange={setNewAccount}
           onSubmit={handleCreateAccount}
-          className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-card shadow-sm p-4 md:grid-cols-3"
-        >
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Account Name</Label>
-            <Input
-              type="text"
-              required
-              value={newAccount.name}
-              onChange={(event) =>
-                setNewAccount((prev) => ({ ...prev, name: event.target.value }))
-              }
-              placeholder="Enter account name"
-              disabled={saving}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Address</Label>
-            <Input
-              type="text"
-              value={newAccount.address || ""}
-              onChange={(event) =>
-                setNewAccount((prev) => ({ ...prev, address: event.target.value }))
-              }
-              placeholder="Enter address"
-              disabled={saving}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Contact Number</Label>
-            <Input
-              type="text"
-              value={newAccount.contact || ""}
-              onChange={(event) =>
-                setNewAccount((prev) => ({ ...prev, contact: event.target.value }))
-              }
-              placeholder="Enter contact number"
-              disabled={saving}
-            />
-          </div>
-          <div className="md:col-span-3 flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => setShowAccountForm(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>Create Account</Button>
-          </div>
-        </form>
+          onCancel={() => setShowAccountForm(false)}
+          saving={saving}
+        />
       )}
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -1929,112 +1783,20 @@ const LedgerPage: React.FC = () => {
         </CardHeader>
 
         <CardContent className="space-y-4 p-4">
-          <form
+          <EntryForm
+            entryForm={entryForm}
+            onEntryFormChange={setEntryForm}
             onSubmit={handleAddEntry}
-            className="grid grid-cols-1 gap-3 md:grid-cols-2"
-          >
-            <div className="space-y-1">
-              <Label className="text-[11px] font-medium">Date</Label>
-              <SmartDatePicker
-                value={entryForm.date}
-                onChange={(next) => setEntryForm((prev) => ({ ...prev, date: next }))}
-                disabled={!activeAccount || saving}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label className="text-[11px] font-medium">Particulars</Label>
-              <Input
-                type="text"
-                value={entryForm.particulars}
-                onChange={(event) =>
-                  setEntryForm((prev) => ({
-                    ...prev,
-                    particulars: event.target.value,
-                  }))
-                }
-                placeholder="Narration"
-                disabled={!activeAccount || saving}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-medium">Debit (₹)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={entryForm.debit}
-                onChange={(event) =>
-                  setEntryForm((prev) => ({ ...prev, debit: event.target.value }))
-                }
-                disabled={!activeAccount || saving}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-medium">Credit (₹)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={entryForm.credit}
-                onChange={(event) =>
-                  setEntryForm((prev) => ({ ...prev, credit: event.target.value }))
-                }
-                disabled={!activeAccount || saving}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label className="text-[11px] font-medium">Remarks</Label>
-              <Textarea
-                value={entryForm.remarks}
-                onChange={(event) =>
-                  setEntryForm((prev) => ({ ...prev, remarks: event.target.value }))
-                }
-                placeholder="Optional notes"
-                className="h-8 min-h-[32px] text-sm leading-tight resize-none"
-                disabled={!activeAccount || saving}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label className="text-[11px] font-medium">Linked Account (optional)</Label>
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-                <select
-                  value={linkAccountId}
-                  onChange={(event) => setLinkAccountId(event.target.value)}
-                  disabled={!activeAccount || saving || accounts.length <= 1}
-                  className="w-full md:w-56 rounded border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">None</option>
-                  {accounts
-                    .filter((account) => account.id !== activeAccountId)
-                    .map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                </select>
-
-                {linkAccountId && (
-                  <div className="flex flex-1 items-center justify-between rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
-                    <span>Opposite</span>
-                    <Switch
-                      checked={linkMode === "same"}
-                      onCheckedChange={(checked) => setLinkMode(checked ? "same" : "mirror")}
-                      className="h-4 w-8 data-[state=checked]:bg-primary"
-                    />
-                    <span>Same</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <Button type="submit" disabled={!activeAccount || saving || loadingEntries} className="h-8 px-4 text-sm disabled:opacity-60">
-                Add Entry
-              </Button>
-            </div>
-          </form>
+            activeAccount={activeAccount}
+            saving={saving}
+            loadingEntries={loadingEntries}
+            accounts={accounts}
+            activeAccountId={activeAccountId}
+            linkAccountId={linkAccountId}
+            onLinkAccountChange={setLinkAccountId}
+            linkMode={linkMode}
+            onLinkModeChange={setLinkMode}
+          />
         </CardContent>
         </Card>
 
@@ -2264,11 +2026,6 @@ const LedgerPage: React.FC = () => {
         </CardHeader>
         <CardContent className="p-4">
           <div ref={ledgerRef} className="space-y-3">
-            {activeAccount && (
-              <p className="text-xs text-muted-foreground">
-                Ledger Date: {new Date().toLocaleDateString("en-IN")}
-              </p>
-            )}
             <div className="overflow-hidden border border-border rounded-lg">
               <div className="overflow-x-auto">
                 <div className="max-h-[420px] overflow-y-auto">
@@ -2292,13 +2049,7 @@ const LedgerPage: React.FC = () => {
                         </tr>
                       ) : groupedEntries.length > 0 ? (
                         groupedEntries.flatMap((group) => {
-                          const headerRow = (
-                            <tr key={`group-${group.date}`} className="bg-muted/60 text-muted-foreground">
-                              <td colSpan={6} className="px-3 py-1.5 text-xs font-semibold">
-                                {group.date ? new Date(group.date).toLocaleDateString("en-IN") : "No Date"}
-                              </td>
-                            </tr>
-                          );
+                          // Removed date header row - entries will be displayed without date grouping headers
 
                           const entryRows = group.entries.map((entry) => {
                             const isEditing = editingEntryId === entry.id;
@@ -2446,7 +2197,7 @@ const LedgerPage: React.FC = () => {
                             );
                           });
 
-                          return [headerRow, ...entryRows];
+                          return entryRows;
                         })
                       ) : (
                         <tr>
@@ -2472,50 +2223,11 @@ const LedgerPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="statement" className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-              <h1 className="text-2xl font-semibold text-foreground">Daily Distribution Statement</h1>
-              <p className="text-sm text-muted-foreground">
-                Review supplier payments, expenses, and incomes aggregated per day.
-            </p>
-          </div>
-          </div>
-
-          <Card className="shadow-sm" >
-            <CardHeader>
-              <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground">Start Date</Label>
-                  <SmartDatePicker
-                    value={statementStart}
-                    onChange={(next) => setStatementStart(next || "")}
-                    inputClassName="h-9 text-sm"
-                    buttonClassName="h-9 w-9"
-              />
-            </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground">End Date</Label>
-                  <SmartDatePicker
-                    value={statementEnd}
-                    onChange={(next) => setStatementEnd(next || "")}
-                    inputClassName="h-9 text-sm"
-                    buttonClassName="h-9 w-9"
-                  />
-                </div>
-                <div className="md:col-span-3 flex items-end">
-                  <Button onClick={handleGenerateStatement} disabled={statementLoading} className="h-9">
-                    {statementLoading ? "Generating..." : "Generate Statement"}
-              </Button>
-            </div>
-          </div>
               {statementError && (
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                 <p className="text-sm text-destructive">{statementError}</p>
+            </div>
               )}
-            </CardContent>
-          </Card>
 
           <Card
             ref={statementPrintRef}

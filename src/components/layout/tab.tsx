@@ -18,43 +18,37 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-xs h-[28px] px-2 max-w-[150px] min-w-[80px] flex-1 transition-all duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-sm px-4 h-[28px] flex-1 transition-all duration-300 ease-in-out",
     {
-      'bg-background text-primary-foreground font-medium z-10 rounded-t-md border-x border-t border-border': isActive,
-      'bg-card text-muted-foreground hover:bg-accent/80 rounded-t-md border-b border-border': !isActive,
+      'bg-primary text-primary-foreground font-semibold z-10 rounded-full shadow-md scale-105': isActive,
+      'text-muted-foreground hover:text-foreground': !isActive,
     }
   );
 
   return (
     <div 
-      className="relative flex-shrink-0"
+      className="relative flex-1"
       onClick={onClick}
     >
       <div className={tabClasses}>
-          <div className="flex items-center z-10 overflow-hidden min-w-0">
-          {icon}
-          <span className="whitespace-nowrap ml-2 truncate">{title}</span>
+          <div className="flex items-center gap-2 z-10 overflow-hidden min-w-0 flex-1">
+          {icon && <span className="shrink-0">{icon}</span>}
+          <span className="whitespace-nowrap truncate">{title}</span>
           </div>
           {isClosable && (
               <Button
               variant="ghost"
               size="icon"
               className={cn(
-                  "h-4 w-4 ml-1 rounded-full shrink-0 z-20 transition-colors duration-200",
+                  "h-5 w-5 ml-2 rounded-md shrink-0 z-20 transition-colors duration-200 opacity-0 group-hover:opacity-100",
                   isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
               )}
               onClick={onClose}
               >
-              <X className="h-2.5 w-2.5" />
+              <X className="h-3.5 w-3.5" />
               </Button>
           )}
       </div>
-
-       {isActive && (
-        <div 
-            className="absolute bottom-[-1px] left-0 right-0 h-[1px] bg-background z-20"
-        />
-       )}
     </div>
   );
 };

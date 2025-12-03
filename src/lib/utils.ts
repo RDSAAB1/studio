@@ -14,6 +14,9 @@ interface SupplierFormValues {
     rate?: number;
     labouryRate?: number;
     kanta?: number;
+    brokerage?: number;
+    brokerageRate?: number;
+    isBrokerageIncluded?: boolean;
 }
 
 interface CustomerFormValues {
@@ -125,7 +128,23 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = Math.round(weight * labouryRate);
     const kanta = values.kanta || 0;
-    const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
+    
+    // Brokerage calculation (if provided)
+    const brokerageRate = Number(values.brokerage || values.brokerageRate) || 0;
+    const brokerageAmount = Math.round(netWeight * brokerageRate);
+    
+    // Calculate base amount before brokerage
+    let originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
+    
+    // Brokerage logic: Include = Add, Exclude = Subtract
+    if (brokerageAmount > 0) {
+        if (values.isBrokerageIncluded) {
+            originalNetAmount += brokerageAmount; // Add when included
+        } else {
+            originalNetAmount -= brokerageAmount; // Subtract when excluded
+        }
+    }
+    
     const netAmount = originalNetAmount;
 
     return {
@@ -136,6 +155,8 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
       netWeight,
       amount,
       labouryAmount,
+      brokerage: brokerageAmount,
+      brokerageRate: brokerageRate,
       originalNetAmount,
       netAmount
     };
@@ -242,8 +263,11 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const bagAmount = Math.round(bags * bagRate);
 
     let originalNetAmount = Math.round(amount + bagAmount - cdAmount);
-    if (!values.isBrokerageIncluded) {
-        originalNetAmount -= brokerageAmount;
+    // Brokerage logic: Include = Add, Exclude = Subtract
+    if (values.isBrokerageIncluded) {
+        originalNetAmount += brokerageAmount; // Add when included
+    } else {
+        originalNetAmount -= brokerageAmount; // Subtract when excluded
     }
 
     const paymentsForThisEntry = (paymentHistory || []).filter((p: any) => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));

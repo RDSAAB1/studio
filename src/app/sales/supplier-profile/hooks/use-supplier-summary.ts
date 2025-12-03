@@ -232,15 +232,70 @@ export const useSupplierSummary = (
           acc[variety] = (acc[variety] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
-        totalGrossWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.grossWeight), 0),
-        totalTeirWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.teirWeight), 0),
+        totalGrossWeight: groupSuppliers.reduce((sum, s) => {
+          let grossWeight = 0;
+          const storedGrossWeight = s.grossWeight !== null && s.grossWeight !== undefined ? toNumber(s.grossWeight) : null;
+          const storedTeirWeight = s.teirWeight !== null && s.teirWeight !== undefined ? toNumber(s.teirWeight) : null;
+          const storedWeight = s.weight !== null && s.weight !== undefined ? toNumber(s.weight) : null;
+          
+          // Priority 1: Use stored grossWeight if it's a valid positive number
+          if (storedGrossWeight !== null && !isNaN(storedGrossWeight) && storedGrossWeight > 0) {
+            grossWeight = storedGrossWeight;
+          }
+          // Priority 2: Calculate from weight + teirWeight if both are available
+          else if (storedWeight !== null && storedTeirWeight !== null && !isNaN(storedWeight) && !isNaN(storedTeirWeight)) {
+            grossWeight = storedWeight + storedTeirWeight;
+          }
+          // Priority 3: If grossWeight is 0/null but weight exists, check if it makes sense
+          // If weight > 0 and grossWeight is 0, it's likely missing data, so calculate from weight
+          else if (storedWeight !== null && !isNaN(storedWeight) && storedWeight > 0) {
+            // If teirWeight is available, use it; otherwise assume 0
+            const teirWeight = storedTeirWeight !== null && !isNaN(storedTeirWeight) ? storedTeirWeight : 0;
+            grossWeight = storedWeight + teirWeight;
+          }
+          // Priority 4: Use stored value even if 0 (might be legitimate)
+          else if (storedGrossWeight !== null && !isNaN(storedGrossWeight)) {
+            grossWeight = storedGrossWeight;
+          }
+          
+          return sum + (Number.isFinite(grossWeight) && grossWeight >= 0 ? grossWeight : 0);
+        }, 0),
+        totalTeirWeight: groupSuppliers.reduce((sum, s) => {
+          let teirWeight = 0;
+          const storedGrossWeight = s.grossWeight !== null && s.grossWeight !== undefined ? toNumber(s.grossWeight) : null;
+          const storedTeirWeight = s.teirWeight !== null && s.teirWeight !== undefined ? toNumber(s.teirWeight) : null;
+          const storedWeight = s.weight !== null && s.weight !== undefined ? toNumber(s.weight) : null;
+          
+          // Priority 1: Use stored teirWeight if it's a valid number (including 0)
+          if (storedTeirWeight !== null && !isNaN(storedTeirWeight) && storedTeirWeight >= 0) {
+            teirWeight = storedTeirWeight;
+          }
+          // Priority 2: Calculate from grossWeight - weight if both are available
+          else if (storedGrossWeight !== null && storedWeight !== null && !isNaN(storedGrossWeight) && !isNaN(storedWeight)) {
+            teirWeight = Math.max(0, storedGrossWeight - storedWeight);
+          }
+          // Priority 3: If teirWeight is missing but weight exists, assume 0
+          else if (storedWeight !== null && !isNaN(storedWeight)) {
+            teirWeight = 0; // Default to 0 if not provided
+          }
+          
+          return sum + (Number.isFinite(teirWeight) && teirWeight >= 0 ? teirWeight : 0);
+        }, 0),
         totalFinalWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.weight), 0),
         totalKartaWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kartaWeight), 0),
         totalNetWeight: groupSuppliers.reduce((sum, s) => sum + toNumber(s.netWeight), 0),
         totalKartaAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kartaAmount), 0),
         totalLabouryAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.labouryAmount), 0),
         totalKanta: groupSuppliers.reduce((sum, s) => sum + toNumber(s.kanta), 0),
-        totalOtherCharges: groupSuppliers.reduce((sum, s) => sum + toNumber(s.otherCharges), 0),
+        totalOtherCharges: groupSuppliers.reduce((sum, s) => {
+            const otherCharges = toNumber(s.otherCharges);
+            // Safety check: prevent extremely large values (likely data corruption)
+            if (Math.abs(otherCharges) > 1000000000) { // 1 billion limit
+                console.warn(`Invalid otherCharges value for ${s.srNo}:`, otherCharges);
+                return sum;
+            }
+            return sum + otherCharges;
+        }, 0),
         totalDeductions: groupSuppliers.reduce((sum, s) => sum + toNumber(s.deductions), 0),
         averageRate: 0, // Will be calculated below
         minRate: 0, // Will be calculated below

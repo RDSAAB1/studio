@@ -85,19 +85,117 @@ export default function SupplierProfileClient() {
       allPayments: filteredPayments,
     };
 
-    // Recalculate totals based on filtered data
-    filteredData.totalAmount = filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    filteredData.totalOriginalAmount = filteredTransactions.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
-    filteredData.totalGrossWeight = filteredTransactions.reduce((sum, t) => sum + t.grossWeight, 0);
-    filteredData.totalTeirWeight = filteredTransactions.reduce((sum, t) => sum + t.teirWeight, 0);
-    filteredData.totalFinalWeight = filteredTransactions.reduce((sum, t) => sum + t.weight, 0);
-    filteredData.totalKartaWeight = filteredTransactions.reduce((sum, t) => sum + (t.kartaWeight || 0), 0);
-    filteredData.totalNetWeight = filteredTransactions.reduce((sum, t) => sum + t.netWeight, 0);
-    filteredData.totalKartaAmount = filteredTransactions.reduce((sum, t) => sum + (t.kartaAmount || 0), 0);
-    filteredData.totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
-    filteredData.totalKanta = filteredTransactions.reduce((sum, t) => sum + (t.kanta || 0), 0);
-    filteredData.totalOtherCharges = filteredTransactions.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
-    filteredData.totalDeductions = filteredTransactions.reduce((sum, t) => sum + ((t as any).deductions || 0), 0);
+    // Recalculate totals based on filtered data with proper validation
+    filteredData.totalAmount = filteredTransactions.reduce((sum, t) => {
+      const amount = Number(t.amount) || 0;
+      return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+    
+    filteredData.totalOriginalAmount = filteredTransactions.reduce((sum, t) => {
+      const original = Number(t.originalNetAmount) || 0;
+      return sum + (Number.isFinite(original) ? original : 0);
+    }, 0);
+    
+    filteredData.totalGrossWeight = filteredTransactions.reduce((sum, t) => {
+      let grossWeight = 0;
+      const storedGrossWeight = t.grossWeight !== null && t.grossWeight !== undefined ? Number(t.grossWeight) : null;
+      const storedTeirWeight = t.teirWeight !== null && t.teirWeight !== undefined ? Number(t.teirWeight) : null;
+      const storedWeight = t.weight !== null && t.weight !== undefined ? Number(t.weight) : null;
+      
+      // Priority 1: Use stored grossWeight if it's a valid positive number
+      if (storedGrossWeight !== null && !isNaN(storedGrossWeight) && storedGrossWeight > 0) {
+        grossWeight = storedGrossWeight;
+      }
+      // Priority 2: Calculate from weight + teirWeight if both are available
+      else if (storedWeight !== null && storedTeirWeight !== null && !isNaN(storedWeight) && !isNaN(storedTeirWeight)) {
+        grossWeight = storedWeight + storedTeirWeight;
+      }
+      // Priority 3: If grossWeight is 0/null but weight exists, check if it makes sense
+      // If weight > 0 and grossWeight is 0, it's likely missing data, so calculate from weight
+      else if (storedWeight !== null && !isNaN(storedWeight) && storedWeight > 0) {
+        // If teirWeight is available, use it; otherwise assume 0
+        const teirWeight = storedTeirWeight !== null && !isNaN(storedTeirWeight) ? storedTeirWeight : 0;
+        grossWeight = storedWeight + teirWeight;
+      }
+      // Priority 4: Use stored value even if 0 (might be legitimate)
+      else if (storedGrossWeight !== null && !isNaN(storedGrossWeight)) {
+        grossWeight = storedGrossWeight;
+      }
+      
+      return sum + (Number.isFinite(grossWeight) && grossWeight >= 0 ? grossWeight : 0);
+    }, 0);
+    
+    filteredData.totalTeirWeight = filteredTransactions.reduce((sum, t) => {
+      let teirWeight = 0;
+      const storedGrossWeight = t.grossWeight !== null && t.grossWeight !== undefined ? Number(t.grossWeight) : null;
+      const storedTeirWeight = t.teirWeight !== null && t.teirWeight !== undefined ? Number(t.teirWeight) : null;
+      const storedWeight = t.weight !== null && t.weight !== undefined ? Number(t.weight) : null;
+      
+      // Priority 1: Use stored teirWeight if it's a valid number (including 0)
+      if (storedTeirWeight !== null && !isNaN(storedTeirWeight) && storedTeirWeight >= 0) {
+        teirWeight = storedTeirWeight;
+      }
+      // Priority 2: Calculate from grossWeight - weight if both are available
+      else if (storedGrossWeight !== null && storedWeight !== null && !isNaN(storedGrossWeight) && !isNaN(storedWeight)) {
+        teirWeight = Math.max(0, storedGrossWeight - storedWeight);
+      }
+      // Priority 3: If teirWeight is missing but weight exists, assume 0
+      else if (storedWeight !== null && !isNaN(storedWeight)) {
+        teirWeight = 0; // Default to 0 if not provided
+      }
+      
+      return sum + (Number.isFinite(teirWeight) && teirWeight >= 0 ? teirWeight : 0);
+    }, 0);
+    filteredData.totalFinalWeight = filteredTransactions.reduce((sum, t) => {
+      const weight = Number(t.weight) || 0;
+      return sum + (Number.isFinite(weight) && weight >= 0 ? weight : 0);
+    }, 0);
+    
+    filteredData.totalKartaWeight = filteredTransactions.reduce((sum, t) => {
+      const kartaWeight = Number(t.kartaWeight) || 0;
+      return sum + (Number.isFinite(kartaWeight) && kartaWeight >= 0 ? kartaWeight : 0);
+    }, 0);
+    
+    filteredData.totalNetWeight = filteredTransactions.reduce((sum, t) => {
+      const netWeight = Number(t.netWeight) || 0;
+      return sum + (Number.isFinite(netWeight) && netWeight >= 0 ? netWeight : 0);
+    }, 0);
+    filteredData.totalKartaAmount = filteredTransactions.reduce((sum, t) => {
+      const kartaAmount = Number(t.kartaAmount) || 0;
+      return sum + (Number.isFinite(kartaAmount) ? kartaAmount : 0);
+    }, 0);
+    
+    filteredData.totalLabouryAmount = filteredTransactions.reduce((sum, t) => {
+      const labouryAmount = Number(t.labouryAmount) || 0;
+      return sum + (Number.isFinite(labouryAmount) ? labouryAmount : 0);
+    }, 0);
+    
+    filteredData.totalKanta = filteredTransactions.reduce((sum, t) => {
+      const kanta = Number(t.kanta) || 0;
+      return sum + (Number.isFinite(kanta) ? kanta : 0);
+    }, 0);
+    
+    filteredData.totalOtherCharges = filteredTransactions.reduce((sum, t) => {
+      const otherCharges = Number(t.otherCharges) || 0;
+      // Safety check: prevent extremely large values (likely data corruption)
+      if (Math.abs(otherCharges) > 1000000000) {
+        console.warn(`Invalid otherCharges value for ${t.srNo}:`, otherCharges);
+        return sum;
+      }
+      return sum + (Number.isFinite(otherCharges) ? otherCharges : 0);
+    }, 0);
+    
+    filteredData.totalDeductions = filteredTransactions.reduce((sum, t) => sum + (Number((t as any).deductions) || 0), 0);
+    
+    // Recalculate brokerage with proper validation
+    filteredData.totalBrokerage = filteredTransactions.reduce((sum, t) => {
+      let brokerageAmount = Number(t.brokerageAmount) || 0;
+      if (!brokerageAmount && t.brokerageRate && t.netWeight) {
+        brokerageAmount = Math.round(Number(t.brokerageRate || 0) * Number(t.netWeight || 0) * 100) / 100;
+      }
+      const signedBrokerage = (t.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+      return sum + (Number.isFinite(signedBrokerage) ? signedBrokerage : 0);
+    }, 0);
     
     // Calculate total paid from individual entry allocations (paidFor amounts) for filtered transactions
     let totalPaidForFiltered = 0;
@@ -148,7 +246,7 @@ export default function SupplierProfileClient() {
     // Outstanding = Net Payable - Total Paid - CD
     // Use totalPaid (calculated from paidFor.amount) instead of totalCashPaid + totalRtgsPaid
     // because totalPaid uses the actual paid amount, not rtgsAmount
-    filteredData.totalOutstanding = filteredData.totalOriginalAmount - filteredData.totalPaid - filteredData.totalCdAmount;
+    filteredData.totalOutstanding = Math.round((filteredData.totalOriginalAmount - filteredData.totalPaid - filteredData.totalCdAmount) * 100) / 100;
     filteredData.totalTransactions = filteredTransactions.length;
     filteredData.totalOutstandingTransactions = filteredTransactions.filter(t => {
       const paymentsForEntry = filteredPayments.filter(p => p.paidFor?.some(pf => pf.srNo === t.srNo));

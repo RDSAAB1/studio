@@ -6,6 +6,8 @@ import type { Customer, Payment, ReceiptSettings } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
+import { useCustomerData } from '@/hooks/use-customer-data';
+import { useCustomerPayments } from '@/hooks/use-customer-payments';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-se
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { SupplierEntryEditDialog } from '@/components/sales/supplier-payments/supplier-entry-edit-dialog';
+import { CustomerEntryEditDialog } from '@/components/sales/customer-payments/customer-entry-edit-dialog';
 import { usePaymentCombination } from '@/hooks/use-payment-combination';
 import { PaymentCombinationGenerator, PaymentCombinationResults } from '@/components/sales/supplier-payments/payment-combination-generator';
 import { RtgsForm } from '@/components/sales/supplier-payments/rtgs-form';
@@ -69,13 +72,42 @@ const formatRate = (value: number | string | null | undefined) => {
   return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-export default function SupplierPaymentsClient() {
+interface UnifiedPaymentsClientProps {
+  type?: 'supplier' | 'customer';
+}
+
+export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProps = {}) {
     const { toast } = useToast();
     
-  const hook = useSupplierPayments();
-  const { supplierBankAccounts, banks, bankBranches } = useSupplierData();
+  // Use supplier hooks for supplier, customer hooks for customer
+  const supplierHook = type === 'supplier' ? useSupplierPayments() : null;
+  const customerHook = type === 'customer' ? useCustomerPayments() : null;
+  const supplierData = type === 'supplier' ? useSupplierData() : null;
+  const customerData = type === 'customer' ? useCustomerData() : null;
+  
+  // Use appropriate hook based on type
+  const hook = supplierHook || customerHook || {
+    suppliers: [],
+    paymentHistory: [],
+    customerSummaryMap: new Map(),
+    selectedCustomerKey: null,
+    selectedEntryIds: new Set(),
+    handleCustomerSelect: () => {},
+    handleEditPayment: () => {},
+    calcTargetAmount: () => 0,
+    minRate: 0,
+    maxRate: 0,
+    serialNoSearch: '',
+    activeTab: 'process',
+    setActiveTab: () => {},
+    selectedEntries: [],
+    setParchiNo: () => {},
+  };
+  
+  const { supplierBankAccounts, banks, bankBranches } = supplierData || customerData || { supplierBankAccounts: [], banks: [], bankBranches: [] };
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [supplierDataRefreshKey, setSupplierDataRefreshKey] = useState<number>(0);
+  const [parchiNoRefreshKey, setParchiNoRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
   const [editEntryDialogOpen, setEditEntryDialogOpen] = useState(false);
   const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<Customer | null>(null);
@@ -480,7 +512,20 @@ export default function SupplierPaymentsClient() {
 
   const cashHistoryRows = useMemo(() => {
     const filtered = hook.paymentHistory
-      .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash")
+      .filter((payment: Payment) => {
+        const isCash = (payment.receiptType || "").toLowerCase() === "cash";
+        if (type === 'customer' && isCash) {
+          // Verify we're using customer payments collection
+          console.log('[SupplierPaymentsClient] Customer cash payment:', {
+            id: payment.id,
+            paymentId: payment.paymentId,
+            parchiNo: payment.parchiNo,
+            paidFor: payment.paidFor,
+            receiptType: payment.receiptType
+          });
+        }
+        return isCash;
+      })
       .filter(paymentMatchesSelection);
     // Sort by ID (descending - high to low)
     return [...filtered].sort((a, b) => {
@@ -495,7 +540,20 @@ export default function SupplierPaymentsClient() {
 
   const rtgsHistoryRows = useMemo(() => {
     const filtered = hook.paymentHistory
-      .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "rtgs")
+      .filter((payment: Payment) => {
+        const isRtgs = (payment.receiptType || "").toLowerCase() === "rtgs";
+        if (type === 'customer' && isRtgs) {
+          // Verify we're using customer payments collection
+          console.log('[SupplierPaymentsClient] Customer RTGS payment:', {
+            id: payment.id,
+            paymentId: payment.paymentId,
+            parchiNo: payment.parchiNo,
+            paidFor: payment.paidFor,
+            receiptType: payment.receiptType
+          });
+        }
+        return isRtgs;
+      })
       .filter(paymentMatchesSelection);
     // Sort by ID (descending - high to low)
     return [...filtered].sort((a, b) => {
@@ -669,15 +727,24 @@ export default function SupplierPaymentsClient() {
                                   </div>
                                 </PopoverContent>
                               </Popover>
-                                <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm}>Clear</Button>
-                                <Button size="sm" className="h-7 text-[11px]" onClick={hook.processPayment}>Finalize</Button>
+                                <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm} disabled={hook.isProcessing}>Clear</Button>
+                                <Button size="sm" className="h-7 text-[11px]" onClick={hook.processPayment} disabled={hook.isProcessing}>
+                                    {hook.isProcessing ? (
+                                        <>
+                                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        "Finalize"
+                                    )}
+                                </Button>
                                                         </div>
                                                         </div>
                                                     </div>
                                                 </div>
                 <TabsContent value="process" className="space-y-2">
                             {/* Tab Section (Left) and Name Section (Right) Row - Full Width, Custom Proportions */}
-                            {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && selectedSupplierSummary && (
+                            {hook.selectedCustomerKey && selectedSupplierSummary && (
                               <div className="grid grid-cols-[36%_64%] gap-2 mb-2">
                                 {/* Tab Section - Left (35%) */}
                                 <Card className="text-[10px]">
@@ -799,7 +866,7 @@ export default function SupplierPaymentsClient() {
                                 />
                               </div>
                               <div className="space-y-2 min-w-0 w-full h-[250px]">
-                                {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && (
+                                {hook.selectedCustomerKey && (
                                   <PaymentHistoryCompact
                                     payments={selectedSupplierPayments}
                                     onEdit={hook.handleEditPayment}
@@ -808,9 +875,10 @@ export default function SupplierPaymentsClient() {
                                 )}
                               </div>
                               <div className="space-y-2 min-w-0 w-full max-w-full overflow-hidden h-[250px]">
-                                {((hook.selectedCustomerKey) || hook.rtgsFor === 'Outsider') && (
+                                {hook.selectedCustomerKey && (
                                   <div className="w-full max-w-full overflow-hidden h-full">
                                   <PaymentForm
+                                    key={`payment-form-${parchiNoRefreshKey}`}
                                     {...hook}
                                     bankAccounts={hook.bankAccounts}
                                     bankBranches={hook.bankBranches}
@@ -949,6 +1017,46 @@ export default function SupplierPaymentsClient() {
                         onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
                         title="Cash Payment History"
                         suppliers={hook.suppliers}
+                        onParchiSelect={(parchiNo: string) => {
+                            console.log('[SupplierPaymentsClient] onParchiSelect called with:', parchiNo);
+                            console.log('[SupplierPaymentsClient] hook type:', type);
+                            console.log('[SupplierPaymentsClient] Collection:', type === 'customer' ? 'customer_payments' : 'payments');
+                            
+                            // Method 1: From customerHook or supplierHook directly (most reliable)
+                            const directHook = type === 'customer' ? customerHook : supplierHook;
+                            if (directHook && directHook.setParchiNo && typeof directHook.setParchiNo === 'function') {
+                                directHook.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 1: setParchiNo called via directHook');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            // Method 2: Direct from hook
+                            if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
+                                hook.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 2: setParchiNo called via hook');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            // Method 3: Force update via form if available
+                            if ((hook as any).form && (hook as any).form.setParchiNo) {
+                                (hook as any).form.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 3: setParchiNo called via hook.form');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            console.error('[SupplierPaymentsClient] ❌ FAILED: setParchiNo not available', {
+                                hookType: type,
+                                hasHookSetParchiNo: !!hook.setParchiNo,
+                                hasCustomerHook: !!customerHook,
+                                hasSupplierHook: !!supplierHook,
+                                customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
+                                supplierHookSetParchiNo: !!(supplierHook && supplierHook.setParchiNo),
+                                hookKeys: Object.keys(hook).filter(k => k.toLowerCase().includes('parchi') || k.toLowerCase().includes('form'))
+                            });
+                        }}
                     />
                 </TabsContent>
                 <TabsContent value="rtgs" className="mt-4 space-y-2">
@@ -967,6 +1075,46 @@ export default function SupplierPaymentsClient() {
                         onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
                         title="RTGS Payment History"
                         suppliers={hook.suppliers}
+                        onParchiSelect={(parchiNo: string) => {
+                            console.log('[SupplierPaymentsClient] onParchiSelect called with:', parchiNo);
+                            console.log('[SupplierPaymentsClient] hook type:', type);
+                            console.log('[SupplierPaymentsClient] Collection:', type === 'customer' ? 'customer_payments' : 'payments');
+                            
+                            // Method 1: From customerHook or supplierHook directly (most reliable)
+                            const directHook = type === 'customer' ? customerHook : supplierHook;
+                            if (directHook && directHook.setParchiNo && typeof directHook.setParchiNo === 'function') {
+                                directHook.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 1: setParchiNo called via directHook');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            // Method 2: Direct from hook
+                            if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
+                                hook.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 2: setParchiNo called via hook');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            // Method 3: Force update via form if available
+                            if ((hook as any).form && (hook as any).form.setParchiNo) {
+                                (hook as any).form.setParchiNo(parchiNo);
+                                console.log('[SupplierPaymentsClient] ✅ Method 3: setParchiNo called via hook.form');
+                                setParchiNoRefreshKey(Date.now());
+                                return;
+                            }
+                            
+                            console.error('[SupplierPaymentsClient] ❌ FAILED: setParchiNo not available', {
+                                hookType: type,
+                                hasHookSetParchiNo: !!hook.setParchiNo,
+                                hasCustomerHook: !!customerHook,
+                                hasSupplierHook: !!supplierHook,
+                                customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
+                                supplierHookSetParchiNo: !!(supplierHook && supplierHook.setParchiNo),
+                                hookKeys: Object.keys(hook).filter(k => k.toLowerCase().includes('parchi') || k.toLowerCase().includes('form'))
+                            });
+                        }}
                     />
                 </TabsContent>
             </Tabs>
@@ -1152,30 +1300,64 @@ export default function SupplierPaymentsClient() {
             </div>
           )}
 
-          <SupplierEntryEditDialog
-            open={editEntryDialogOpen}
-            onOpenChange={setEditEntryDialogOpen}
-            entry={selectedEntryForEdit}
-            onSuccess={async () => {
-              // Force refresh of supplier data and summary
-              setRefreshKey(Date.now());
-              setSupplierDataRefreshKey(Date.now());
-              
-              // Wait a bit for the local update to propagate to IndexedDB
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // Force a recalculation by temporarily clearing and resetting the selected supplier
-              const currentKey = hook.selectedCustomerKey;
-              if (currentKey) {
-                // Temporarily clear to force summary recalculation
-                hook.handleCustomerSelect(null);
-                // Reset immediately to trigger recalculation with updated data
-                setTimeout(() => {
-                  hook.handleCustomerSelect(currentKey);
-                }, 50);
-              }
-            }}
-          />
+          {type === 'supplier' ? (
+            <SupplierEntryEditDialog
+              open={editEntryDialogOpen}
+              onOpenChange={setEditEntryDialogOpen}
+              entry={selectedEntryForEdit}
+              onSuccess={async () => {
+                // Force refresh of supplier data and summary
+                setRefreshKey(Date.now());
+                setSupplierDataRefreshKey(Date.now());
+                
+                // Wait a bit for the local update to propagate to IndexedDB
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                // Force a recalculation by temporarily clearing and resetting the selected supplier
+                const currentKey = hook.selectedCustomerKey;
+                if (currentKey) {
+                  // Temporarily clear to force summary recalculation
+                  hook.handleCustomerSelect(null);
+                  // Reset immediately to trigger recalculation with updated data
+                  setTimeout(() => {
+                    hook.handleCustomerSelect(currentKey);
+                  }, 50);
+                }
+              }}
+            />
+          ) : (
+            <CustomerEntryEditDialog
+              open={editEntryDialogOpen}
+              onOpenChange={setEditEntryDialogOpen}
+              entry={selectedEntryForEdit}
+              onSuccess={async () => {
+                // Force immediate refresh of customer data and summary for hand-to-hand update
+                setRefreshKey(Date.now());
+                setSupplierDataRefreshKey(Date.now());
+                
+                // Wait for local update to complete and sync to Firestore
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                // Force a recalculation by temporarily clearing and resetting the selected customer
+                const currentKey = hook.selectedCustomerKey;
+                if (currentKey) {
+                  // Temporarily clear to force summary recalculation
+                  hook.handleCustomerSelect(null);
+                  // Reset immediately to trigger recalculation with updated data
+                  setTimeout(() => {
+                    hook.handleCustomerSelect(currentKey);
+                  }, 50);
+                }
+                
+                // If using customer hook, force refresh of customer data
+                if (type === 'customer' && customerHook) {
+                  // The hook will automatically refresh via realtime listeners
+                  // But we can trigger a manual refresh if needed
+                  console.log('[CustomerEntryEdit] Entry updated, customer data will refresh via realtime listener');
+                }
+              }}
+            />
+          )}
 
           <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
             <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 printable-statement-container bg-card">

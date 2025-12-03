@@ -28,6 +28,7 @@ import {
   Briefcase,
   ClipboardCheck,
   ChevronRight,
+  FilePlus,
   Banknote,
   FileText,
   Settings,
@@ -65,24 +66,24 @@ export const allMenuItems: MenuItem[] = [
     icon: LayoutDashboard,
   },
   {
-    id: "supplier",
-    name: "Supplier",
-    icon: ShoppingCart,
+    id: "entry",
+    name: "Entry",
+    icon: FilePlus,
     subMenus: [
-      { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
-      { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
-      { id: "sales/supplier-profile", name: "Supplier Profile", icon: UserCircle },
-      { id: "sales/supplier-bank-accounts", name: "Supplier Bank Accounts", icon: Landmark },
+      { id: "entry-supplier", name: "Supplier Entry", icon: Truck, href: "/sales/entry?tab=supplier" },
+      { id: "entry-customer", name: "Customer Entry", icon: Users, href: "/sales/entry?tab=customer" },
     ],
   },
-    {
-    id: "customer",
-    name: "Customer",
-    icon: TrendingUp,
+  {
+    id: "payments",
+    name: "Payments",
+    icon: Wallet,
     subMenus: [
-      { id: "sales/customer-entry", name: "Customer Entry", icon: UserPlus },
-      { id: "sales/customer-payments", name: "Customer Payments", icon: Wallet },
-      { id: "sales/customer-profile", name: "Customer Profile", icon: UserCircle },
+      { id: "payments-supplier", name: "Supplier Payments", icon: Truck, href: "/sales/payments-supplier" },
+      { id: "payments-customer", name: "Customer Payments", icon: Users, href: "/sales/payments-customer" },
+      { id: "payments-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales/payments-outsider" },
+      { id: "expense-tracker", name: "Income & Expense", icon: Calculator, href: "/expense-tracker" },
+      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen, href: "/sales/ledger" },
     ],
   },
   {
@@ -95,9 +96,7 @@ export const allMenuItems: MenuItem[] = [
     name: "Income & Expense", 
     icon: Scale, 
     subMenus: [
-      { id: "expense-tracker", name: "I/E Tracker", icon: Calculator },
       { id: "expense-tracker/payee-profile", name: "Payee Profile", icon: UserCircle },
-      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen },
     ],
   },
   {

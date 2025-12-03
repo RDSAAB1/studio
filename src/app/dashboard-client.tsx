@@ -7,7 +7,7 @@ import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTr
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PaddyCostingSection } from '@/components/dashboard/paddy-costing-section';
+import { ManufacturingCosting } from '@/components/dashboard/manufacturing-costing';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -132,7 +132,33 @@ export default function DashboardClient() {
     const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived, expenseBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
-        const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + (item.cdAmount || 0), 0);
+        // Calculate CD received - check both payment.cdAmount and paidFor[].cdAmount
+        const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, payment) => {
+            let paymentCd = 0;
+            
+            // First check if CD is stored in paidFor array (new format - more accurate)
+            if (payment.paidFor && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
+                const totalCdFromPaidFor = payment.paidFor.reduce((cdSum: number, pf: any) => {
+                    // Check if cdAmount is directly stored in paidFor (new format)
+                    if ('cdAmount' in pf && pf.cdAmount !== undefined && pf.cdAmount !== null) {
+                        return cdSum + Number(pf.cdAmount || 0);
+                    }
+                    return cdSum;
+                }, 0);
+                
+                if (totalCdFromPaidFor > 0) {
+                    paymentCd = totalCdFromPaidFor;
+                } else if (payment.cdAmount) {
+                    // Fallback to payment.cdAmount if not in paidFor (old format)
+                    paymentCd = Number(payment.cdAmount || 0);
+                }
+            } else if (payment.cdAmount) {
+                // Old format: CD stored directly in payment
+                paymentCd = Number(payment.cdAmount || 0);
+            }
+            
+            return sum + paymentCd;
+        }, 0);
         
         const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
         
@@ -634,8 +660,8 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
 
-            {/* Paddy Costing Section */}
-            <PaddyCostingSection suppliers={suppliers} expenses={expenses} />
+            {/* Manufacturing Costing */}
+            <ManufacturingCosting />
         </div>
     );
 }

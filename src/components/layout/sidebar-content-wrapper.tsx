@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Header } from "./header";
 import type { PageLayoutProps } from "@/app/types";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Sidebar,
   SidebarHeader,
@@ -36,24 +36,24 @@ const menuItems = [
     href: "/sales/dashboard-overview",
   },
   {
-    id: "MainSupplier",
-    name: "Supplier",
-    icon: <Truck className="h-5 w-5" />,
+    id: "MainEntry",
+    name: "Entry",
+    icon: <FilePlus className="h-5 w-5" />,
     subMenus: [
-      { id: "Supplier-Entry", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Supplier-Payments", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Supplier-Profile", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
-      { id: "Supplier-Bank-Accounts", name: "Supplier Bank Accounts", href: "/sales/supplier-bank-accounts", icon: <Landmark className="h-5 w-5" /> },
+      { id: "entry-supplier", name: "Supplier Entry", href: "/sales/entry?tab=supplier", icon: <Truck className="h-5 w-5" /> },
+      { id: "entry-customer", name: "Customer Entry", href: "/sales/entry?tab=customer", icon: <Users className="h-5 w-5" /> },
     ],
   },
   {
-    id: "MainCustomer",
-    name: "Customer",
-    icon: <Users className="h-5 w-5" />,
+    id: "MainPayments",
+    name: "Payments",
+    icon: <Wallet className="h-5 w-5" />,
     subMenus: [
-      { id: "Customer-Entry", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Customer-Payments", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Customer-Profile", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
+      { id: "payments-supplier", name: "Supplier Payments", href: "/sales/payments-supplier", icon: <Truck className="h-5 w-5" /> },
+      { id: "payments-customer", name: "Customer Payments", href: "/sales/payments-customer", icon: <Users className="h-5 w-5" /> },
+      { id: "payments-outsider", name: "RTGS Outsider", href: "/sales/payments-outsider", icon: <Banknote className="h-5 w-5" /> },
+      { id: "Sub6-1", name: "Income & Expense", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
+      { id: "Sub6-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {
@@ -74,15 +74,6 @@ const menuItems = [
     subMenus: [
       { id: "CashBank-Management", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
       { id: "CashBank-RTGS", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
-    ],
-  },
-  {
-    id: "Main6",
-    name: "Income & Expense",
-    icon: <Scale className="h-5 w-5" />,
-    subMenus: [
-      { id: "Sub6-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
-      { id: "Sub6-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {
@@ -135,14 +126,36 @@ const menuItems = [
   },
 ];
 
+// Type guard for submenu items with href
+const hasHref = (item: { href?: string }): item is { href: string } & typeof item => {
+  return !!item.href;
+};
+
 export default function SidebarContentWrapper({ children, pageMeta }: PageLayoutProps) {
   const pathname = usePathname();
-  const { isMobile, state: sidebarState } = useSidebar();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isMobile, state: sidebarState, toggleSidebar } = useSidebar();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   useEffect(() => {
     setOpenSubMenu(null);
   }, [pathname, sidebarState]);
+  
+  // Check if a menu item is active (handles query parameters)
+  const isMenuItemActive = (href: string) => {
+    if (!href) return false;
+    const [path, query] = href.split('?');
+    if (pathname !== path) return false;
+    if (!query) return pathname === href;
+    // Check if query parameters match
+    const urlParams = new URLSearchParams(query);
+    const currentParams = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of urlParams.entries()) {
+      if (currentParams.get(key) !== value) return false;
+    }
+    return true;
+  };
 
   const handleSubMenuToggle = (id: string) => {
     if (isMobile || sidebarState === "expanded") {
@@ -180,9 +193,12 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
             {menuItems.map((item) => (
               <React.Fragment key={item.id}>
                 {item.href ? (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
-                      <Link href={item.href}>
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={pathname === item.href || pathname?.startsWith(item.href)}
+                    >
+                      <Link href={item.href} prefetch={true} scroll={true}>
                         {item.icon}
                         <span>{item.name}</span>
                       </Link>
@@ -209,16 +225,23 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
                     </SidebarMenuButton>
                     {item.subMenus && openSubMenu === item.id && (
                       <SidebarMenuSub>
-                        {item.subMenus.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.id}>
-                            <SidebarMenuSubButton asChild isActive={pathname === subItem.href} tooltip={subItem.name}>
-                              <Link href={subItem.href}>
-                                {subItem.icon}
-                                <span>{subItem.name}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
+                        {item.subMenus.filter(hasHref).map((subItem) => {
+                          const href = subItem.href;
+                          return (
+                            <SidebarMenuSubItem key={subItem.id}>
+                              {/* @ts-ignore - href is provided via Link child when asChild is true */}
+                              <SidebarMenuSubButton 
+                                isActive={isMenuItemActive(href)}
+                                asChild
+                              >
+                                <Link href={href}>
+                                  {subItem.icon}
+                                  <span>{subItem.name}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
                       </SidebarMenuSub>
                     )}
                   </SidebarMenuItem>
@@ -237,7 +260,7 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <Header pageMeta={pageMeta} />
+        <Header toggleSidebar={toggleSidebar} />
         <main className="flex-1 container mx-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>

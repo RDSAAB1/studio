@@ -1,8 +1,8 @@
 
 "use client";
 
-import SupplierPaymentsClient from './supplier-payments-client';
+import SupplierPaymentsClient from './unified-payments-client';
 
 export default function SupplierPaymentsPage() {
-  return <SupplierPaymentsClient />;
+  return <SupplierPaymentsClient type="supplier" />;
 }

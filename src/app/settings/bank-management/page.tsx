@@ -17,7 +17,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Loader2, Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import SupplierBankAccountsPage from '@/app/sales/supplier-bank-accounts/page';
 import { toTitleCase } from '@/lib/utils';
 
 
@@ -174,75 +176,133 @@ export default function BankManagementPage() {
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
 
     return (
-        <div className="space-y-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Bank & Branch Management</CardTitle>
-                    <CardDescription>Manage all banks and their corresponding branches here.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="lg:col-span-2 flex flex-wrap gap-2">
-                             <Button asChild variant="outline" size="sm">
-                                <label htmlFor="import-file" className="cursor-pointer"><Upload className="mr-2 h-4 w-4"/> Import</label>
-                            </Button>
-                            <Input id="import-file" type="file" className="hidden" onChange={handleImport} accept=".xlsx, .xls" />
-                            <Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export All</Button>
-                            <Button size="sm" onClick={() => setIsBankDialogOpen(true)}><Plus className="mr-2 h-4 w-4"/> Add Bank</Button>
-                            <Button size="sm" onClick={() => { setCurrentBranch({}); setIsBranchDialogOpen(true); }}><Plus className="mr-2 h-4 w-4"/> Add Branch</Button>
-                        </div>
-                        <div className="space-y-1">
-                             <Label>Filter by Bank</Label>
-                             <CustomDropdown 
-                                options={bankOptions}
-                                value={filterBank}
-                                onChange={(value) => setFilterBank(value || 'all')}
-                                placeholder="Filter by bank..."
-                            />
-                        </div>
-                        <div className="space-y-1">
-                             <Label>Search Branch / IFSC</Label>
-                             <Input placeholder="Type to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-             <Card>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-[calc(100vh-350px)]">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-muted z-10">
-                                <TableRow>
-                                    <TableHead className="w-[40%]">Bank Name</TableHead>
-                                    <TableHead className="w-[30%]">Branch Name</TableHead>
-                                    <TableHead className="w-[20%]">IFSC Code</TableHead>
-                                    <TableHead className="text-right w-[10%]">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredBranches.map(branch => (
-                                    <TableRow key={branch.id}>
-                                        <TableCell className="truncate">{branch.bankName}</TableCell>
-                                        <TableCell className="truncate">{branch.branchName}</TableCell>
-                                        <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+        <div className="space-y-3">
+            <Tabs defaultValue="branches" className="w-full space-y-3">
+                <TabsList className="h-8">
+                    <TabsTrigger value="branches" className="h-7 px-3 text-xs">
+                        Banks & Branches
+                    </TabsTrigger>
+                    <TabsTrigger value="accounts" className="h-7 px-3 text-xs">
+                        Bank Accounts
+                    </TabsTrigger>
+                </TabsList>
 
+                <TabsContent value="branches" className="space-y-3">
+                    <Card>
+                        <CardContent className="pt-2 pb-2">
+                            <div className="flex flex-wrap items-end gap-2">
+                                {/* Left: action buttons */}
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 px-3 text-xs"
+                                    >
+                                        <label htmlFor="import-file" className="cursor-pointer flex items-center gap-1">
+                                            <Upload className="h-3.5 w-3.5" />
+                                            <span>Import</span>
+                                        </label>
+                                    </Button>
+                                    <Input
+                                        id="import-file"
+                                        type="file"
+                                        className="hidden"
+                                        onChange={handleImport}
+                                        accept=".xlsx, .xls"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleExport}
+                                        className="h-8 px-3 text-xs"
+                                    >
+                                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                                        Export All
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setIsBankDialogOpen(true)}
+                                        className="h-8 px-3 text-xs"
+                                    >
+                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                        Add Bank
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setCurrentBranch({});
+                                            setIsBranchDialogOpen(true);
+                                        }}
+                                        className="h-8 px-3 text-xs"
+                                    >
+                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                        Add Branch
+                                    </Button>
+                                </div>
+
+                                {/* Right: filter + search */}
+                                <div className="flex flex-1 items-end justify-end gap-2 min-w-[220px]">
+                                    <CustomDropdown
+                                        options={bankOptions}
+                                        value={filterBank}
+                                        onChange={(value) => setFilterBank(value || 'all')}
+                                        placeholder="All Banks"
+                                        inputClassName="h-8 text-xs"
+                                    />
+                                    <Input
+                                        placeholder="Search Branch / IFSC"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="h-8 text-xs max-w-[220px]"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[calc(100vh-350px)]">
+                                <Table>
+                                    <TableHeader className="sticky top-0 bg-muted z-10">
+                                        <TableRow>
+                                            <TableHead className="w-[40%]">Bank Name</TableHead>
+                                            <TableHead className="w-[30%]">Branch Name</TableHead>
+                                            <TableHead className="w-[20%]">IFSC Code</TableHead>
+                                            <TableHead className="text-right w-[10%]">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredBranches.map(branch => (
+                                            <TableRow key={branch.id}>
+                                                <TableCell className="truncate">{branch.bankName}</TableCell>
+                                                <TableCell className="truncate">{branch.branchName}</TableCell>
+                                                <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
+                                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="accounts" className="space-y-3">
+                    {/* Embedded supplier bank accounts manager */}
+                    <SupplierBankAccountsPage embedded />
+                </TabsContent>
+            </Tabs>
+            
             <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader><DialogTitle>Add New Bank</DialogTitle></DialogHeader>

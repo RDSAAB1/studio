@@ -11,6 +11,7 @@ const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
 const incomesCollection = collection(firestoreDB, "incomes");
 const paymentsCollection = collection(firestoreDB, "payments");
+const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
 const settingsCollection = collection(firestoreDB, "settings");
 const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
 
@@ -23,30 +24,31 @@ interface ProcessPaymentResult {
 
 export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
     const {
-        rtgsFor, selectedCustomerKey, selectedEntries: incomingSelectedEntries, editingPayment,
+        selectedCustomerKey, selectedEntries: incomingSelectedEntries, editingPayment,
         paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, settleAmount, totalOutstandingForSelected,
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, rtgsAmount, supplierDetails, bankDetails,
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
+        isCustomer = false, // Flag to determine if this is a customer payment
     } = context;
 
 
-    if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
+    if (!selectedCustomerKey) {
         return { success: false, message: "No supplier selected" };
     }
     
     // Build selected entries for edit mode if not provided
     let selectedEntries = incomingSelectedEntries || [];
-    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0) && editingPayment?.paidFor?.length) {
+    if ((!selectedEntries || selectedEntries.length === 0) && editingPayment?.paidFor?.length) {
         const suppliers: Customer[] = Array.isArray((context as any).suppliers) ? (context as any).suppliers : [];
         selectedEntries = editingPayment.paidFor
             .map((pf: any) => suppliers.find(s => s.srNo === pf.srNo))
             .filter(Boolean) as Customer[];
     }
 
-    if (rtgsFor === 'Supplier' && (!selectedEntries || selectedEntries.length === 0)) {
+    if ((!selectedEntries || selectedEntries.length === 0)) {
         if (paymentMethod !== 'RTGS') {
             return { success: false, message: "Please select entries to pay" };
         } else if (rtgsAmount <= 0) {
@@ -56,7 +58,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
     // finalAmountToPay = "To Be Paid" amount (actual payment amount, WITHOUT CD)
     // settleAmount = "To Be Paid" + CD (total settlement amount, for validation/display only)
-    const finalAmountToPay = rtgsFor === 'Outsider' ? rtgsAmount : paymentAmount;
+    const finalAmountToPay = paymentAmount;
     
     const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
@@ -64,17 +66,18 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         return { success: false, message: "Please select an account to pay from for RTGS." };
     }
     
-    // VALIDATION: Check if settlement amount (to be paid + CD) exceeds total outstanding (skip for Outsider mode or negative outstanding)
-    // Allow payments even if outstanding is 0 or negative (for overpayment scenarios)
-    if (rtgsFor !== 'Outsider' && totalOutstandingForSelected > 0 && settleAmount > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
-        return { success: false, message: `Settlement amount (${formatCurrency(settleAmount)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
-    }
-
     // Only apply CD if cdEnabled is true
     const effectiveCdAmount = cdEnabled ? calculatedCdAmount : 0;
     
     // Total to settle = actual payment amount + CD (for validation only, not saved)
     const totalToSettle = finalAmountToPay + effectiveCdAmount;
+
+    // VALIDATION: Check if settlement amount (to be paid + CD) exceeds total outstanding (skip for Outsider mode or negative outstanding)
+    // Allow payments even if outstanding is 0 or negative (for overpayment scenarios)
+    // When CD is disabled, settleAmount should equal finalAmountToPay, so we validate totalToSettle
+    if (totalOutstandingForSelected > 0 && totalToSettle > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
+        return { success: false, message: `Settlement amount (${formatCurrency(totalToSettle)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
+    }
 
     if (finalAmountToPay <= 0 && effectiveCdAmount <= 0) {
         return { success: false, message: "Payment and CD amount cannot both be zero." };
@@ -85,7 +88,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
-            const oldPaymentRef = doc(firestoreDB, "payments", editingPayment.id);
+            const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+            const oldPaymentRef = doc(paymentCollection, editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
 
             if(oldPaymentDoc.exists()) {
@@ -94,7 +98,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
 
         let paidForDetails: PaidFor[] = [];
-        if (rtgsFor === 'Supplier' && selectedEntries && selectedEntries.length > 0) {
+        if (selectedEntries && selectedEntries.length > 0) {
             /**
              * ============================================================
              * MULTI-PURCHASE PAYMENT DISTRIBUTION LOGIC
@@ -338,19 +342,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // STEP 3: Distribute CD (if enabled)
             // ============================================================
             const cdToDistribute = cdEnabled && calculatedCdAmount ? Math.round(calculatedCdAmount * 100) / 100 : 0;
-            // Ensure CD is only applied when enabled
-            if (!cdEnabled) {
-                // If CD is disabled, set all CD allocations to 0
-                for (const { entry } of entryOutstandings) {
-                    cdAllocations[entry.srNo] = 0;
-                }
-            }
+            // Initialize CD allocations object first
             const cdAllocations: { [srNo: string]: number } = {};
             
             // Initialize all CD allocations to 0
             for (const { entry } of entryOutstandings) {
                 cdAllocations[entry.srNo] = 0;
             }
+            
+            // If CD is disabled, allocations are already 0, so we can skip distribution
             
             // CD Distribution Rules:
             // 1. CD can only be applied to purchases that haven't received CD before
@@ -1616,7 +1616,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // ============================================================
         }
         // If still empty (e.g., partial edit without changing selection), fallback to previous mapping
-        if (rtgsFor === 'Supplier' && paidForDetails.length === 0 && editingPayment?.paidFor?.length) {
+        if (paidForDetails.length === 0 && editingPayment?.paidFor?.length) {
             paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
         }
         
@@ -1624,7 +1624,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
         
         const paymentDataBase: Omit<Payment, 'id'> = {
-            paymentId: finalPaymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+            paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
             date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             // amount = "To Be Paid" amount (actual payment, WITHOUT CD)
             // cdAmount = CD amount (separate field)
@@ -1640,14 +1640,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierFatherName: toTitleCase(supplierDetails.fatherName),
             supplierAddress: toTitleCase(supplierDetails.address),
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-            rtgsFor,
         };
         if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
         if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
         const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
-        const newPaymentRef = doc(firestoreDB, "payments", paymentIdToUse);
+        const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        const newPaymentRef = doc(paymentCollection, paymentIdToUse);
         const now = Timestamp.now();
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id, updatedAt: now });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase, updatedAt: now } as Payment;
@@ -1660,14 +1660,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             markFirestoreDisabled();
             // Rebuild payment data base (mirror above without transaction context)
             let paidForDetails: PaidFor[] = [];
-            if (rtgsFor === 'Supplier' && incomingSelectedEntries && incomingSelectedEntries.length > 0) {
+            if (incomingSelectedEntries && incomingSelectedEntries.length > 0) {
                 paidForDetails = incomingSelectedEntries.map((e: Customer) => ({ srNo: e.srNo, amount: 0 } as any)); // amounts already embedded via distribution above; safe placeholder
             } else if (editingPayment?.paidFor?.length) {
                 paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
             }
             const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
             const paymentDataBase: Omit<Payment, 'id'> = {
-                paymentId: finalPaymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+                paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
                 cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
@@ -1681,7 +1681,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 supplierFatherName: toTitleCase(supplierDetails.fatherName),
                 supplierAddress: toTitleCase(supplierDetails.address),
                 bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-                rtgsFor,
             };
             if (paymentMethod === 'RTGS') (paymentDataBase as any).rtgsSrNo = rtgsSrNo; else delete (paymentDataBase as any).rtgsSrNo;
             if (paymentMethod !== 'Cash') (paymentDataBase as any).bankAccountId = accountIdForPayment;
@@ -1691,18 +1690,28 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             try {
                 if (db && finalPaymentData) {
                     if (editingPayment?.id) {
-                        await db.payments.delete(editingPayment.id);
+                        if (isCustomer) {
+                            await db.customerPayments.delete(editingPayment.id);
+                        } else {
+                            await db.payments.delete(editingPayment.id);
+                        }
                     }
-                    await db.payments.put(finalPaymentData);
+                    if (isCustomer) {
+                        await db.customerPayments.put(finalPaymentData as any);
+                    } else {
+                        await db.payments.put(finalPaymentData);
+                    }
                 }
             } catch {}
             // enqueue sync
             try {
                 const { enqueueSyncTask } = await import('./sync-queue');
                 if (editingPayment?.id) {
-                    await enqueueSyncTask('delete:payment', { id: editingPayment.id }, { attemptImmediate: true, dedupeKey: `payment:delete:${editingPayment.id}` });
+                    const deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
+                    await enqueueSyncTask(deleteTaskType, { id: editingPayment.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${editingPayment.id}` });
                 }
-                await enqueueSyncTask('upsert:payment', finalPaymentData, { attemptImmediate: true, dedupeKey: `payment:${finalPaymentData.id}` });
+                const upsertTaskType = isCustomer ? 'upsert:customerPayment' : 'upsert:payment';
+                await enqueueSyncTask(upsertTaskType, finalPaymentData, { attemptImmediate: true, dedupeKey: `${upsertTaskType}:${finalPaymentData.id}` });
             } catch {}
         } else {
             throw err;
@@ -1711,7 +1720,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     // Ensure local IndexedDB reflects the latest payment so UI updates instantly
     try {
         if (db && finalPaymentData) {
-            await db.payments.put(finalPaymentData);
+            if (isCustomer) {
+                await db.customerPayments.put(finalPaymentData as any);
+            } else {
+                await db.payments.put(finalPaymentData);
+            }
         }
     } catch {}
     if (!finalPaymentData) {
@@ -1721,13 +1734,22 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 };
 
 
-export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSuppliers: Customer[], transaction?: any) => {
-    if (!paymentToDelete || !paymentToDelete.id) {
+export const handleDeletePaymentLogic = async (context: { paymentId: string; paymentHistory?: Payment[]; suppliers?: Customer[]; expenses?: Expense[]; incomes?: Income[]; isCustomer?: boolean }) => {
+    const { paymentId, paymentHistory, suppliers, expenses, incomes, isCustomer = false } = context;
+    
+    if (!paymentId) {
         throw new Error("Payment ID is missing for deletion.");
     }
 
+    // Find the payment to delete
+    const paymentToDelete = paymentHistory?.find(p => p.id === paymentId);
+    if (!paymentToDelete) {
+        throw new Error("Payment not found.");
+    }
+
     const performDelete = async (transOrBatch: any) => {
-        const paymentDocRef = doc(firestoreDB, "payments", paymentToDelete.id);
+        const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        const paymentDocRef = doc(paymentCollection, paymentToDelete.id);
         const paymentDoc = await transOrBatch.get(paymentDocRef);
         
         if (!paymentDoc.exists()) {
@@ -1738,16 +1760,16 @@ export const handleDeletePaymentLogic = async (paymentToDelete: Payment, allSupp
         transOrBatch.delete(paymentDocRef);
     };
     
-    if (transaction) {
-        await performDelete(transaction);
-    } else {
-        await runTransaction(firestoreDB, async (t) => {
-            await performDelete(t);
-        });
-    }
+    await runTransaction(firestoreDB, async (t) => {
+        await performDelete(t);
+    });
 
     if (db) {
-        await db.payments.delete(paymentToDelete.id);
+        if (isCustomer) {
+            await db.customerPayments.delete(paymentToDelete.id);
+        } else {
+            await db.payments.delete(paymentToDelete.id);
+        }
     }
 };
 

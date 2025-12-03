@@ -6,7 +6,7 @@ import { generateReadableId } from '@/lib/utils';
 import type { Payment, Expense, BankAccount } from '@/lib/definitions';
 import { format } from 'date-fns';
 
-export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void) => {
+export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void, paymentCategory: 'supplier' | 'customer' = 'supplier') => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [serialNoSearch, setSerialNoSearch] = useState('');
@@ -31,7 +31,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [rtgsQuantity, setRtgsQuantity] = useState(0);
     const [rtgsRate, setRtgsRate] = useState(0);
     const [rtgsAmount, setRtgsAmount] = useState(0);
-    const [rtgsFor, setRtgsFor] = useState<'Supplier' | 'Outsider'>('Supplier');
 
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
@@ -142,10 +141,12 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     
         // For Cash payment
-        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash' && p.paymentId.startsWith('EX'));
+        const cashPrefix = paymentCategory === 'customer' ? 'IX' : 'EX';
+        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash' && (p.paymentId.startsWith('EX') || p.paymentId.startsWith('IX')));
         const lastCashNum = cashPayments.reduce((max, p) => {
-            const numMatch = p.paymentId.match(/^EX(\d+)$/);
-            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+            const exMatch = p.paymentId.match(/^EX(\d+)$/);
+            const ixMatch = p.paymentId.match(/^IX(\d+)$/);
+            const num = exMatch ? parseInt(exMatch[1], 10) : (ixMatch ? parseInt(ixMatch[1], 10) : 0);
             return num > max ? num : max;
         }, 0);
         
@@ -156,7 +157,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }, 0);
     
         const lastNum = Math.max(lastCashNum, lastExpenseNum);
-        return generateReadableId('EX', lastNum, 5);
+        return generateReadableId(cashPrefix, lastNum, 5);
 
     }, [paymentHistory, expenses]);
     
@@ -181,7 +182,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const value = e.target.value.trim().toUpperCase();
         if (!value) return;
 
-        const prefix = paymentMethod === 'Cash' ? 'EX' : 'P';
+        const prefix = paymentMethod === 'Cash' ? (paymentCategory === 'customer' ? 'IX' : 'EX') : 'P';
         let formattedId = value;
 
         // Auto-format if it's just a number
@@ -210,8 +211,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     }, [paymentHistory, expenses, editingPayment, paymentMethod]);
     
 
-    const resetPaymentForm = useCallback((isOutsider: boolean = false) => {
-        if (!isOutsider) setSelectedEntryIds(new Set());
+    const resetPaymentForm = useCallback(() => {
+        setSelectedEntryIds(new Set());
         setPaymentAmount(0);
         setEditingPayment(null);
         setIsBeingEdited(false); // Reset edit state
@@ -220,11 +221,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
         setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
-        if (isOutsider) {
-            setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
-            setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
-            setPaymentType('Full');
-        }
     }, [getNextPaymentId, paymentMethod]);
     
     const handleFullReset = useCallback(() => {
@@ -254,7 +250,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         rtgsQuantity, setRtgsQuantity,
         rtgsRate, setRtgsRate,
         rtgsAmount, setRtgsAmount,
-        rtgsFor, setRtgsFor,
         editingPayment, setEditingPayment,
         isBeingEdited, setIsBeingEdited,
         calcTargetAmount, setCalcTargetAmount,

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import BankManagementPage from '@/app/settings/bank-management/page';
 
 interface BankSettingsDialogProps {
@@ -13,12 +13,12 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange }: BankSettingsDialogP
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
-                 <DialogHeader className="p-4 border-b">
+            <DialogContent className="w-full max-w-5xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                {/* Visually minimal header just to satisfy accessibility requirements */}
+                <DialogHeader className="sr-only">
                     <DialogTitle>Bank & Branch Management</DialogTitle>
-                    <DialogDescription>Add, edit, or manage banks and their branches here.</DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow min-h-0 p-4">
+                <div className="flex-grow min-h-0 overflow-auto p-4">
                     <BankManagementPage />
                 </div>
             </DialogContent>

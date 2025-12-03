@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo } from "@/lib/firestore";
+import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo, getSuppliersRealtime } from "@/lib/firestore";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import SimpleSupplierFormAllFields from "@/components/sales/simple-supplier-form-all-fields";
@@ -395,6 +395,19 @@ export default function SimpleSupplierEntryAllFields() {
     useEffect(() => {
         if (!isClient) return;
         
+        // ✅ Setup realtime listener to sync suppliers from Firestore to IndexedDB
+        // This ensures that suppliers saved on other devices appear on this device
+        const unsubSuppliers = getSuppliersRealtime(
+            (suppliers) => {
+                // The realtime listener automatically updates IndexedDB via bulkPut
+                // useLiveQuery will automatically react to IndexedDB changes
+                console.log('Realtime suppliers updated:', suppliers.length);
+            },
+            (error) => {
+                console.error('Error in suppliers realtime listener:', error);
+            }
+        );
+        
         const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
         const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
@@ -444,6 +457,7 @@ export default function SimpleSupplierEntryAllFields() {
         setReceiptSettings(defaultSettings);
 
         return () => {
+            unsubSuppliers();
             unsubVarieties();
             unsubPaymentTypes();
         };
@@ -632,21 +646,47 @@ export default function SimpleSupplierEntryAllFields() {
         }
     };
 
-    const handleAddOption = useCallback(async (collectionName: string, name: string) => {
+    const handleAddOption = useCallback(async (collectionName: string, optionData: { name: string } | string) => {
         try {
-            await addOption(collectionName, { name });
+            // Handle both string and object formats
+            const name = typeof optionData === 'string' ? optionData : optionData.name;
+            if (!name || !name.trim()) {
+                toast({ title: "Error", description: "Option name cannot be empty", variant: "destructive" });
+                return;
+            }
+            await addOption(collectionName, { name: toTitleCase(name.trim()) });
             toast({ title: "Option added successfully!" });
-        } catch (error) {
-            toast({ title: "Error adding option", variant: "destructive" });
+        } catch (error: any) {
+            console.error('Error adding option:', error);
+            toast({ title: "Error adding option", description: error?.message || "Please try again", variant: "destructive" });
         }
     }, [toast]);
     
-    const handleUpdateOption = useCallback(async (collectionName: string, id: string, name: string) => {
+    const handleUpdateOption = useCallback(async (collectionName: string, id: string, optionData: { name: string }) => {
         try {
+            if (!optionData || !optionData.name || !optionData.name.trim()) {
+                toast({ 
+                    title: "Error", 
+                    description: "Option name cannot be empty", 
+                    variant: "destructive" 
+                });
+                return;
+            }
+            const name = toTitleCase(optionData.name.trim());
+            console.log('Updating option:', { collectionName, id, name });
             await updateOption(collectionName, id, { name });
-            toast({ title: "Option updated successfully!" });
-        } catch (error) {
-            toast({ title: "Error updating option", variant: "destructive" });
+            toast({ 
+                title: "Option updated successfully!", 
+                description: `Updated to "${name}".`,
+                variant: "success"
+            });
+        } catch (error: any) {
+            console.error('Error updating option:', error);
+            toast({ 
+                title: "Error updating option", 
+                description: error?.message || "Please try again", 
+                variant: "destructive" 
+            });
         }
     }, [toast]);
     
@@ -1354,13 +1394,24 @@ export default function SimpleSupplierEntryAllFields() {
                                             
                                             calculateSummary();
                                             
-                                            // Get form values and submit
-                                            const values = form.getValues();
-                                            console.log('Form values:', values);
-                                            console.log('Is editing:', isEditing);
-                                            console.log('Current supplier ID:', currentSupplier.id);
-                                            
-                                            await onSubmit(values);
+                                            // Use form.handleSubmit to ensure proper validation and value extraction
+                                            form.handleSubmit(async (values) => {
+                                                console.log('Form values from handleSubmit:', values);
+                                                console.log('Is editing:', isEditing);
+                                                console.log('Current supplier ID:', currentSupplier.id);
+                                                
+                                                // Validate that required fields are not empty
+                                                if (!values.srNo || !values.name || !values.variety || !values.rate || !values.grossWeight) {
+                                                    toast({ 
+                                                        title: "Missing Required Fields", 
+                                                        description: "Please fill in all required fields (Sr No, Name, Variety, Rate, Gross Weight).", 
+                                                        variant: "destructive" 
+                                                    });
+                                                    return;
+                                                }
+                                                
+                                                await onSubmit(values);
+                                            })();
                                         } catch (error: any) {
                                             console.error('Error in button onClick:', error);
                                             toast({ 

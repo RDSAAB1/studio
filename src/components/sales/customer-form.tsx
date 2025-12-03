@@ -13,13 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { OptionsManagerDialog } from "./options-manager-dialog";
 import { Separator } from "../ui/separator";
-import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, Hash, Percent, Weight, Boxes, Settings, PlusCircle } from "lucide-react";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { User, Phone, Home, Truck, Wheat, Banknote, Landmark, Hash, Percent, Weight, Boxes, Settings, PlusCircle } from "lucide-react";
 
 const SectionCard = ({ icon, children, className }: { icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
     <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
@@ -289,17 +288,14 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <Controller name="date" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
                                     <Label className="text-xs">Date</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-7 text-xs px-2",!field.value && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0 z-[51]">
-                                        <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus/>
-                                        </PopoverContent>
-                                    </Popover>
+                                    <SmartDatePicker
+                                        value={field.value}
+                                        onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                                        placeholder="Pick a date"
+                                        inputClassName="h-7 text-xs"
+                                        buttonClassName="h-7 w-7"
+                                        returnDate={true}
+                                    />
                                 </div>
                             )} />
                             <div className="space-y-0.5 relative z-[9999]">

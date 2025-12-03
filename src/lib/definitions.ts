@@ -276,7 +276,6 @@ export type SupplierPayment = {
     bankBranch?: string;
     bankAcNo?: string;
     bankIfsc?: string;
-    rtgsFor?: 'Supplier' | 'Outsider';
     rtgsSrNo?: string; 
     expenseTransactionId?: string;
     bankAccountId?: string; 

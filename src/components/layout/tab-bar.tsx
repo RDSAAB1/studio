@@ -14,16 +14,9 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
   );
 
   return (
-    <div className="tab-bar-container h-7 bg-card border-b border-border flex items-end -mb-px">
+    <div className="tab-bar-container h-[34px] bg-card border-b border-border flex items-center -mb-px w-full px-2">
       <div 
-        className="flex items-end pl-2 overflow-x-auto overflow-y-hidden scrollbar-hide" 
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        onWheel={(e) => {
-          if (e.deltaY !== 0) {
-            e.currentTarget.scrollLeft += e.deltaY;
-            e.preventDefault();
-          }
-        }}
+        className="flex items-center w-full gap-1"
       >
         {uniqueTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;

@@ -21,6 +21,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   Timestamp,
+  DocumentChangeType,
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
@@ -59,6 +60,7 @@ const mandiReportsCollection = collection(firestoreDB, 'mandiReports');
 const mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
 const kantaParchiCollection = collection(firestoreDB, 'kantaParchi');
 const customerDocumentsCollection = collection(firestoreDB, 'customerDocuments');
+const manufacturingCostingCollection = collection(firestoreDB, 'manufacturingCosting');
 
 function stripUndefined<T extends Record<string, any>>(data: T): T {
     const cleanedEntries = Object.entries(data).filter(
@@ -120,15 +122,100 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
 }
 
 export async function addOption(collectionName: string, optionData: { name: string }): Promise<void> {
+    if (!optionData || !optionData.name || !optionData.name.trim()) {
+        throw new Error('Option name cannot be empty');
+    }
+    
+    const name = toTitleCase(optionData.name.trim());
+    console.log('addOption called:', { collectionName, name });
+    
     const docRef = doc(optionsCollection, collectionName);
+    
+    // Get current items first
+    const docSnap = await getDoc(docRef);
+    const currentItems = docSnap.exists() ? (docSnap.data().items || []) : [];
+    
+    // Check if item already exists
+    if (currentItems.includes(name)) {
+        throw new Error(`Option "${name}" already exists`);
+    }
+    
+    // Add new item
     await setDoc(docRef, {
-        items: arrayUnion(toTitleCase(optionData.name))
+        items: arrayUnion(name)
     }, { merge: true });
+    
+    // Also update local IndexedDB immediately
+    if (db) {
+        const optionItem = { id: name.toLowerCase(), name, type: collectionName };
+        await db.options.put(optionItem);
+    }
+    
+    console.log('addOption completed:', { collectionName, name });
 }
 
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
-    console.warn("Updating option names is not directly supported via this function. Please implement rename logic carefully.");
+    if (!optionData || !optionData.name || !optionData.name.trim()) {
+        throw new Error('Option name cannot be empty');
+    }
+    
+    const newName = toTitleCase(optionData.name.trim());
+    const docRef = doc(optionsCollection, collectionName);
+    
+    // Get current items
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+        throw new Error(`Collection ${collectionName} does not exist`);
+    }
+    
+    const currentItems = docSnap.data().items || [];
+    
+    // Find the old name by id (id is usually the lowercase name)
+    const oldName = currentItems.find((item: string) => item.toLowerCase() === id.toLowerCase());
+    
+    if (!oldName) {
+        throw new Error(`Option with id "${id}" not found`);
+    }
+    
+    // Check if new name already exists (and it's not the same as old name)
+    if (currentItems.includes(newName) && oldName !== newName) {
+        throw new Error(`Option "${newName}" already exists`);
+    }
+    
+    // Update: remove old name and add new name
+    const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
+    
+    await setDoc(docRef, {
+        items: updatedItems
+    }, { merge: true });
+    
+    // Update local IndexedDB
+    if (db) {
+        // Find old option by type and id (id is lowercase name)
+        const oldOptions = await db.options.where('type').equals(collectionName).toArray();
+        const oldOption = oldOptions.find(opt => {
+            // Check both id field and name field (id might be auto-increment or lowercase name)
+            const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);
+            const optName = String(opt.name || '').toLowerCase();
+            return optId === id.toLowerCase() || optName === id.toLowerCase() || optName === oldName.toLowerCase();
+        });
+        
+        if (oldOption) {
+            // Delete old option (use the actual id from the found option)
+            await db.options.delete(oldOption.id);
+        }
+        
+        // Add new option with lowercase name as id
+        const optionItem = { 
+            id: newName.toLowerCase(), 
+            name: newName, 
+            type: collectionName 
+        };
+        await db.options.put(optionItem);
+    }
+    
+    console.log('updateOption completed:', { collectionName, oldName, newName });
 }
 
 export async function deleteOption(collectionName: string, id: string, name: string): Promise<void> {
@@ -1730,6 +1817,19 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const newSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         
+        // ✅ Handle deletions - remove deleted documents from IndexedDB
+        const deletedIds: string[] = [];
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'removed') {
+                deletedIds.push(change.doc.id);
+            }
+        });
+        
+        // Remove deleted documents from IndexedDB
+        if (db && deletedIds.length > 0) {
+            await Promise.all(deletedIds.map(id => db.suppliers.delete(id)));
+        }
+        
         // Track Firestore read
         firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', newSuppliers.length);
         
@@ -1738,6 +1838,8 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
             const mergedMap = new Map<string, Customer>();
             // Add all local suppliers
             localSuppliers.forEach(s => mergedMap.set(s.id, s));
+            // Remove deleted suppliers
+            deletedIds.forEach(id => mergedMap.delete(id));
             // Update/add new suppliers from Firestore
             newSuppliers.forEach(s => mergedMap.set(s.id, s));
             const merged = Array.from(mergedMap.values()).sort((a, b) => {
@@ -1827,6 +1929,19 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const newCustomers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         
+        // ✅ Handle deletions - remove deleted documents from IndexedDB
+        const deletedIds: string[] = [];
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'removed') {
+                deletedIds.push(change.doc.id);
+            }
+        });
+        
+        // Remove deleted documents from IndexedDB
+        if (db && deletedIds.length > 0) {
+            await Promise.all(deletedIds.map(id => db.customers.delete(id)));
+        }
+        
         // Track Firestore read
         firestoreMonitor.logRead('customers', 'getCustomersRealtime', newCustomers.length);
         
@@ -1834,6 +1949,8 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
         if (callbackCalledFromIndexedDB && localCustomers.length > 0) {
             const mergedMap = new Map<string, Customer>();
             localCustomers.forEach(c => mergedMap.set(c.id, c));
+            // Remove deleted customers
+            deletedIds.forEach(id => mergedMap.delete(id));
             newCustomers.forEach(c => mergedMap.set(c.id, c));
             const merged = Array.from(mergedMap.values()).sort((a, b) => {
                 const aSrNo = parseInt(a.srNo || '0') || 0;
@@ -1924,6 +2041,19 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         
+        // ✅ Handle deletions - remove deleted documents from IndexedDB
+        const deletedIds: string[] = [];
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'removed') {
+                deletedIds.push(change.doc.id);
+            }
+        });
+        
+        // Remove deleted documents from IndexedDB
+        if (db && deletedIds.length > 0) {
+            await Promise.all(deletedIds.map(id => db.payments.delete(id)));
+        }
+        
         // Track Firestore read
         firestoreMonitor.logRead('payments', 'getPaymentsRealtime', newPayments.length);
         
@@ -1932,6 +2062,8 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             const mergedMap = new Map<string, Payment>();
             // Add all local payments first
             localPayments.forEach(p => mergedMap.set(p.id, p));
+            // Remove deleted payments
+            deletedIds.forEach(id => mergedMap.delete(id));
             // Update/add new payments from Firestore
             newPayments.forEach(p => mergedMap.set(p.id, p));
             const merged = Array.from(mergedMap.values()).sort((a, b) => {
@@ -2019,6 +2151,19 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
         
+        // ✅ Handle deletions - remove deleted documents from IndexedDB
+        const deletedIds: string[] = [];
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'removed') {
+                deletedIds.push(change.doc.id);
+            }
+        });
+        
+        // Remove deleted documents from IndexedDB
+        if (db && deletedIds.length > 0) {
+            await Promise.all(deletedIds.map(id => db.customerPayments.delete(id)));
+        }
+        
         // Track Firestore read
         firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', newPayments.length);
         
@@ -2026,6 +2171,8 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
         if (callbackCalledFromIndexedDB && localPayments.length > 0) {
             const mergedMap = new Map<string, CustomerPayment>();
             localPayments.forEach(p => mergedMap.set(p.id, p));
+            // Remove deleted payments
+            deletedIds.forEach(id => mergedMap.delete(id));
             newPayments.forEach(p => mergedMap.set(p.id, p));
             const merged = Array.from(mergedMap.values()).sort((a, b) => {
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -2435,6 +2582,163 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
     }
 }
 
+// Helper function to remove duplicate bank accounts by accountNumber
+function removeDuplicateBankAccounts(accounts: BankAccount[]): BankAccount[] {
+    const uniqueMap = new Map<string, BankAccount>();
+    
+    accounts.forEach((account) => {
+        const accountNumber = account.accountNumber?.trim() || '';
+        if (accountNumber) {
+            const existing = uniqueMap.get(accountNumber);
+            if (!existing) {
+                uniqueMap.set(accountNumber, account);
+            } else {
+                // Keep the one with more recent updatedAt or createdAt
+                const existingTime = existing.updatedAt || existing.createdAt || '';
+                const currentTime = account.updatedAt || account.createdAt || '';
+                if (currentTime > existingTime) {
+                    uniqueMap.set(accountNumber, account);
+                }
+            }
+        } else {
+            // Accounts without account number - keep them but they won't cause duplicate errors
+            uniqueMap.set(account.id || `no-account-${Date.now()}`, account);
+        }
+    });
+    
+    return Array.from(uniqueMap.values());
+}
+
+// Helper function to clean up existing duplicate bank accounts in IndexedDB and merge with incoming data
+async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): Promise<BankAccount[]> {
+    if (!db) return incomingAccounts;
+    
+    try {
+        const existingAccounts = await db.bankAccounts.toArray();
+        const accountMap = new Map<string, any[]>();
+        
+        // Group existing accounts by account number
+        existingAccounts.forEach((account: any) => {
+            const accountNumber = account.accountNumber?.trim() || '';
+            if (accountNumber) {
+                if (!accountMap.has(accountNumber)) {
+                    accountMap.set(accountNumber, []);
+                }
+                accountMap.get(accountNumber)!.push(account);
+            }
+        });
+        
+        // Remove duplicate existing records (keep the most recent one)
+        const toDelete: string[] = [];
+        for (const [accountNumber, accounts] of accountMap.entries()) {
+            if (accounts.length > 1) {
+                // Sort by updatedAt/createdAt, keep the most recent
+                accounts.sort((a, b) => {
+                    const timeA = a.updatedAt || a.createdAt || '';
+                    const timeB = b.updatedAt || b.createdAt || '';
+                    return timeB.localeCompare(timeA);
+                });
+                
+                // Delete all except the first (most recent)
+                const deleteIds = accounts.slice(1).map((a: any) => a.id).filter((id: any) => id !== undefined);
+                toDelete.push(...deleteIds);
+            }
+        }
+        
+        if (toDelete.length > 0) {
+            await db.bankAccounts.bulkDelete(toDelete);
+            console.warn(`Cleaned up ${toDelete.length} duplicate bank accounts from IndexedDB`);
+            // Re-fetch existing accounts after deletion to get clean data
+            const cleanExistingAccounts = await db.bankAccounts.toArray();
+            existingAccounts.length = 0;
+            existingAccounts.push(...cleanExistingAccounts);
+        }
+        
+        // Now merge incoming data with existing (non-duplicate) data
+        // Create a map of final accounts, starting with existing (already deduplicated)
+        const finalAccounts = new Map<string, BankAccount>();
+        
+        // First add existing accounts (already deduplicated in database)
+        // But deduplicate again in memory to be safe
+        const existingUnique = new Map<string, BankAccount>();
+        existingAccounts.forEach((account: any) => {
+            const accountNumber = account.accountNumber?.trim() || '';
+            if (accountNumber) {
+                const existing = existingUnique.get(accountNumber);
+                if (!existing) {
+                    existingUnique.set(accountNumber, account);
+                } else {
+                    // Keep the most recent
+                    const existingTime = existing.updatedAt || existing.createdAt || '';
+                    const currentTime = account.updatedAt || account.createdAt || '';
+                    if (currentTime > existingTime) {
+                        existingUnique.set(accountNumber, account);
+                    }
+                }
+            }
+        });
+        
+        // Add deduplicated existing accounts to final map
+        existingUnique.forEach((account, accountNumber) => {
+            finalAccounts.set(accountNumber, account);
+        });
+        
+        // Then merge incoming accounts, keeping the most recent
+        incomingAccounts.forEach((account) => {
+            const accountNumber = account.accountNumber?.trim() || '';
+            if (accountNumber) {
+                const existing = finalAccounts.get(accountNumber);
+                if (!existing) {
+                    finalAccounts.set(accountNumber, account);
+                } else {
+                    // Keep the one with more recent updatedAt or createdAt
+                    const existingTime = existing.updatedAt || existing.createdAt || '';
+                    const currentTime = account.updatedAt || account.createdAt || '';
+                    if (currentTime > existingTime) {
+                        finalAccounts.set(accountNumber, account);
+                    }
+                }
+            } else {
+                // Accounts without account number - add with unique key
+                finalAccounts.set(account.id || `no-account-${Date.now()}-${Math.random()}`, account);
+            }
+        });
+        
+        return Array.from(finalAccounts.values());
+    } catch (error) {
+        console.warn('Error cleaning up and preparing bank accounts:', error);
+        // Fallback: just return deduplicated incoming data
+        return removeDuplicateBankAccounts(incomingAccounts);
+    }
+}
+
+// Helper function to remove duplicate bank branches by ifscCode
+function removeDuplicateBankBranches(branches: BankBranch[]): BankBranch[] {
+    const uniqueMap = new Map<string, BankBranch>();
+    
+    branches.forEach((branch) => {
+        const ifscCode = branch.ifscCode?.trim() || '';
+        if (ifscCode) {
+            const existing = uniqueMap.get(ifscCode);
+            if (!existing) {
+                uniqueMap.set(ifscCode, branch);
+            } else {
+                // Keep the one with more recent updatedAt or createdAt
+                const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                const currentTime = (branch as any).updatedAt || (branch as any).createdAt || '';
+                if (currentTime > existingTime) {
+                    uniqueMap.set(ifscCode, branch);
+                }
+            }
+        } else {
+            // Branches without IFSC code - keep them but they won't cause duplicate errors
+            uniqueMap.set(branch.id || `no-ifsc-${Date.now()}`, branch);
+        }
+    });
+    
+    return Array.from(uniqueMap.values());
+}
+
 export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
@@ -2458,12 +2762,19 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
     // First do a full fetch to get all accounts
     getDocs(query(bankAccountsCollection)).then((fullSnapshot) => {
         const allAccounts = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
-        firestoreAccounts = allAccounts;
-        callback(allAccounts);
+        // Remove duplicates before saving
+        const uniqueAccounts = removeDuplicateBankAccounts(allAccounts);
+        firestoreAccounts = uniqueAccounts;
+        callback(uniqueAccounts);
         
-        // Save to IndexedDB
-        if (db && allAccounts.length > 0) {
-            db.bankAccounts.bulkPut(allAccounts).catch(() => {});
+        // Save to IndexedDB (duplicates already removed)
+        // Clean up existing duplicates and merge with incoming data
+        if (db && uniqueAccounts.length > 0) {
+            cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
+                await db.bankAccounts.bulkPut(finalAccounts);
+            }).catch((err) => {
+                console.warn('Error saving bank accounts to IndexedDB:', err);
+            });
         }
         
         // ✅ Save last sync time
@@ -2487,14 +2798,21 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
     
     return onSnapshot(q, (snapshot) => {
         const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+        // Remove duplicates before processing
+        const uniqueAccounts = removeDuplicateBankAccounts(newAccounts);
         
         // Update firestoreAccounts with latest data
-        firestoreAccounts = newAccounts;
-        callback(newAccounts);
+        firestoreAccounts = uniqueAccounts;
+        callback(uniqueAccounts);
         
-        // Save to IndexedDB
-        if (db && newAccounts.length > 0) {
-            db.bankAccounts.bulkPut(newAccounts).catch(() => {});
+        // Save to IndexedDB (duplicates already removed)
+        // Clean up existing duplicates and merge with incoming data
+        if (db && uniqueAccounts.length > 0) {
+            cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
+                await db.bankAccounts.bulkPut(finalAccounts);
+            }).catch((err) => {
+                console.warn('Error saving bank accounts to IndexedDB:', err);
+            });
         }
         
         // ✅ Save last sync time
@@ -2592,13 +2910,20 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
                 firestoreAccounts.forEach(acc => merged.set(acc.id, acc));
                 newAccounts.forEach(acc => merged.set(acc.id, acc));
                 const allAccounts = Array.from(merged.values());
-                firestoreAccounts = allAccounts;
+                // Remove duplicates before processing
+                const uniqueAccounts = removeDuplicateBankAccounts(allAccounts);
+                firestoreAccounts = uniqueAccounts;
                 // Always call callback with merged accounts from Firestore
-                callback(allAccounts);
+                callback(uniqueAccounts);
                 
-                // Save to IndexedDB
+                // Save to IndexedDB (duplicates already removed)
+                // Clean up existing duplicates and merge with incoming data
                 if (db) {
-                    db.bankAccounts.bulkPut(allAccounts).catch(() => {});
+                    cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
+                        await db.bankAccounts.bulkPut(finalAccounts);
+                    }).catch((err) => {
+                        console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+                    });
                 }
             } else {
                 // No new accounts in incremental sync - use previous Firestore snapshot data
@@ -2610,23 +2935,37 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
                     // For now, fetch all to ensure we have complete data
                     getDocs(query(supplierBankAccountsCollection)).then((fullSnapshot) => {
                         const allAccounts = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
-                        firestoreAccounts = allAccounts;
-                        callback(allAccounts);
-                        if (db && allAccounts.length > 0) {
-                            db.bankAccounts.bulkPut(allAccounts).catch(() => {});
+                        // Remove duplicates before processing
+                        const uniqueAccounts = removeDuplicateBankAccounts(allAccounts);
+                        firestoreAccounts = uniqueAccounts;
+                        callback(uniqueAccounts);
+                        if (db && uniqueAccounts.length > 0) {
+                            // Clean up existing duplicates and merge with incoming data
+                            cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
+                                await db.bankAccounts.bulkPut(finalAccounts);
+                            }).catch((err) => {
+                                console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+                            });
                         }
                     }).catch(onError);
                 }
             }
         } else {
             // First sync - Firestore data is the source of truth
-            firestoreAccounts = newAccounts;
+            // Remove duplicates before processing
+            const uniqueAccounts = removeDuplicateBankAccounts(newAccounts);
+            firestoreAccounts = uniqueAccounts;
             // Always call callback with Firestore data to ensure correct state
-            callback(newAccounts);
+            callback(uniqueAccounts);
             
-            // Save to IndexedDB if there are accounts
-            if (newAccounts.length > 0 && db) {
-                db.bankAccounts.bulkPut(newAccounts).catch(() => {});
+            // Save to IndexedDB if there are accounts (duplicates already removed)
+            if (uniqueAccounts.length > 0 && db) {
+                // Clean up existing duplicates and merge with incoming data
+                cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
+                    await db.bankAccounts.bulkPut(finalAccounts);
+                }).catch((err) => {
+                    console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+                });
             }
         }
         
@@ -2782,12 +3121,16 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
     // First do a full fetch to get all branches
     getDocs(query(bankBranchesCollection)).then((fullSnapshot) => {
         const allBranches = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
-        firestoreBranches = allBranches;
-        callback(allBranches);
+        // Remove duplicates before processing
+        const uniqueBranches = removeDuplicateBankBranches(allBranches);
+        firestoreBranches = uniqueBranches;
+        callback(uniqueBranches);
         
-        // Save to IndexedDB
-        if (db && allBranches.length > 0) {
-            db.bankBranches.bulkPut(allBranches).catch(() => {});
+        // Save to IndexedDB (duplicates already removed)
+        if (db && uniqueBranches.length > 0) {
+            db.bankBranches.bulkPut(uniqueBranches).catch((err) => {
+                console.warn('Error saving bank branches to IndexedDB:', err);
+            });
         }
         
         // ✅ Save last sync time
@@ -2811,14 +3154,18 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
 
     return onSnapshot(q, (snapshot) => {
         const newBranches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+        // Remove duplicates before processing
+        const uniqueBranches = removeDuplicateBankBranches(newBranches);
         
         // Update firestoreBranches with latest data
-        firestoreBranches = newBranches;
-        callback(newBranches);
+        firestoreBranches = uniqueBranches;
+        callback(uniqueBranches);
         
-        // Save to IndexedDB
-        if (db && newBranches.length > 0) {
-            db.bankBranches.bulkPut(newBranches).catch(() => {});
+        // Save to IndexedDB (duplicates already removed)
+        if (db && uniqueBranches.length > 0) {
+            db.bankBranches.bulkPut(uniqueBranches).catch((err) => {
+                console.warn('Error saving bank branches to IndexedDB:', err);
+            });
         }
         
         // ✅ Save last sync time
@@ -3262,52 +3609,106 @@ export async function deleteLedgerAccount(id: string): Promise<void> {
 
 export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
     // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads
-    // Note: LedgerCashAccounts might not be in IndexedDB, adjust if needed
+    // Note: LedgerCashAccounts are stored in a separate collection, but we can cache them
+    // For now, we'll fetch from Firestore and cache in localStorage or a separate store
     
-    // ✅ Use incremental sync - only get changed accounts
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:ledgerCashAccounts');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (lastSyncTime) {
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            ledgerCashAccountsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        q = query(ledgerCashAccountsCollection, orderBy('name'));
-    }
-
-    const snapshot = await getDocs(q);
-    
-    // Save last sync time
-    if (snapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
-    }
-    
-    return snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
-        const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
-            acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
-            return acc;
-        }, {});
-
-        return {
-            id: docSnap.id,
-            name: data.name || '',
-            noteGroups: normalizedNoteGroups,
-            createdAt: data.createdAt || '',
-            updatedAt: data.updatedAt || data.createdAt || '',
+    try {
+        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
+        
+        // ✅ Use incremental sync - only get changed accounts
+        const getLastSyncTime = (): number | undefined => {
+            if (typeof window === 'undefined') return undefined;
+            const stored = localStorage.getItem('lastSync:ledgerCashAccounts');
+            return stored ? parseInt(stored, 10) : undefined;
         };
-    });
+
+        const lastSyncTime = getLastSyncTime();
+        let q;
+        let useIncremental = false;
+        
+        if (lastSyncTime) {
+            // Check if we have cached data - if not, fetch all
+            const cached = typeof window !== 'undefined' ? localStorage.getItem('ledgerCashAccountsCache') : null;
+            if (cached) {
+                // Use incremental sync - only get changed accounts
+                useIncremental = true;
+                const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+                q = query(
+                    ledgerCashAccountsCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+            } else {
+                // No cache - fetch all accounts
+                q = query(ledgerCashAccountsCollection, orderBy('name'));
+            }
+        } else {
+            // First sync - get all accounts
+            q = query(ledgerCashAccountsCollection, orderBy('name'));
+        }
+
+        const snapshot = await getDocs(q);
+        const newAccounts = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
+            const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
+                acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
+                return acc;
+            }, {});
+
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                noteGroups: normalizedNoteGroups,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerCashAccount;
+        });
+
+        // ✅ Merge with cached data if using incremental sync
+        let accounts: LedgerCashAccount[];
+        if (useIncremental && typeof window !== 'undefined') {
+            const cached = localStorage.getItem('ledgerCashAccountsCache');
+            if (cached) {
+                try {
+                    const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
+                    const accountMap = new Map<string, LedgerCashAccount>();
+                    // Add all cached accounts
+                    cachedAccounts.forEach(acc => accountMap.set(acc.id, acc));
+                    // Update/add new accounts from Firestore
+                    newAccounts.forEach(acc => accountMap.set(acc.id, acc));
+                    accounts = Array.from(accountMap.values());
+                } catch {
+                    accounts = newAccounts;
+                }
+            } else {
+                accounts = newAccounts;
+            }
+        } else {
+            accounts = newAccounts;
+        }
+
+        // ✅ Save to localStorage cache and update last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(accounts));
+            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
+        }
+        
+        return accounts;
+    } catch (error) {
+        // If Firestore fails, try to return cached data
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem('ledgerCashAccountsCache');
+            if (cached) {
+                try {
+                    return JSON.parse(cached) as LedgerCashAccount[];
+                } catch {
+                    // If cache is invalid, return empty array
+                }
+            }
+        }
+        throw error;
+    }
 }
 
 export async function createLedgerCashAccount(account: LedgerCashAccountInput): Promise<LedgerCashAccount> {
@@ -3738,4 +4139,74 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
     }
     
     return reports;
+}
+
+// --- Manufacturing Costing Functions ---
+
+export interface ManufacturingCostingData {
+    id?: string;
+    buyingRate: number;
+    expense: number;
+    quantity: number;
+    extraCost?: number; // Extra cost for waste products (products that cannot be sold)
+    products: Array<{
+        id: string;
+        name: string;
+        percentage: number;
+        sellingPrice?: number;
+        soldPercentage?: number;
+        targetProfit?: number;
+    }>;
+    costAllocationMethod?: 'percentage' | 'value';
+    overallTargetProfit?: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export function getManufacturingCostingRealtime(
+    callback: (data: ManufacturingCostingData | null) => void,
+    onError: (error: Error) => void
+): () => void {
+    // Use a single document for manufacturing costing
+    const docRef = doc(manufacturingCostingCollection, 'current');
+    
+    return onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data() as ManufacturingCostingData;
+            callback({ id: docSnap.id, ...data });
+        } else {
+            callback(null);
+        }
+    }, (err: any) => {
+        onError(err);
+    });
+}
+
+export async function saveManufacturingCosting(data: Omit<ManufacturingCostingData, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+    const docRef = doc(manufacturingCostingCollection, 'current');
+    const now = new Date().toISOString();
+    
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        // Update existing document
+        await updateDoc(docRef, {
+            ...data,
+            updatedAt: now
+        });
+    } else {
+        // Create new document
+        await setDoc(docRef, {
+            ...data,
+            createdAt: now,
+            updatedAt: now
+        });
+    }
+}
+
+export async function updateManufacturingCosting(data: Partial<Omit<ManufacturingCostingData, 'id' | 'createdAt'>>): Promise<void> {
+    const docRef = doc(manufacturingCostingCollection, 'current');
+    await updateDoc(docRef, {
+        ...data,
+        updatedAt: new Date().toISOString()
+    });
 }

@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 
-export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers }: any) => {
+export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers, onParchiSelect }: any) => {
     // Helper: normalize payment id for sorting
     const getIdForSort = React.useCallback((payment: any): string => {
         const rawId = payment?.id || payment?.paymentId || '';
@@ -67,10 +67,18 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
 
     // Helper function to get receipt numbers from paidFor array
     const getReceiptNumbers = React.useCallback((payment: any) => {
-        if (payment.paidFor && payment.paidFor.length > 0) {
-            return payment.paidFor.map((pf: any) => pf.srNo).join(', ');
+        // First check if parchiNo exists directly
+        if (payment.parchiNo) {
+            return payment.parchiNo;
         }
-        return payment.parchiNo || '';
+        // Then check paidFor array
+        if (payment.paidFor && payment.paidFor.length > 0) {
+            const srNos = payment.paidFor.map((pf: any) => pf.srNo).filter(Boolean);
+            if (srNos.length > 0) {
+                return srNos.join(', ');
+            }
+        }
+        return '';
     }, []);
 
     // Helper function to check if receipt numbers should be on new line
@@ -109,7 +117,17 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                 </TableHeader>
                                 <TableBody>
                                     {visiblePayments.map((p: any) => (
-                                    <TableRow key={p.id} className="hover:bg-muted/50">
+                                    <TableRow 
+                                        key={p.id} 
+                                        className="hover:bg-muted/50"
+                                        onClick={(e) => {
+                                            // Prevent row click from interfering with button click
+                                            const target = e.target as HTMLElement;
+                                            if (target.tagName === 'BUTTON' || target.closest('button')) {
+                                                return;
+                                            }
+                                        }}
+                                    >
                                         <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
                                             <div className="text-foreground font-semibold text-[11px] break-words">
                                                 {p.paymentId || p.rtgsSrNo}
@@ -124,17 +142,74 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                         <TableCell className="p-1 text-[11px] w-20">
                                             <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-40" title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)}`}>
+                                        <TableCell 
+                                            className="p-1 text-[11px] w-40 cursor-pointer" 
+                                            title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)} | Click receipt number to use as reference`}
+                                            onClick={(e) => {
+                                                // Make the entire cell clickable for receipt numbers
+                                                const target = e.target as HTMLElement;
+                                                // Only trigger if clicking on the receipt number area (not on other elements)
+                                                if (target.closest('.receipt-number-area') || target.classList.contains('receipt-number-area')) {
+                                                    console.log('[PaymentHistory] CELL CLICKED!', p.id);
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    
+                                                    if (onParchiSelect) {
+                                                        const receiptNumbers = getReceiptNumbers(p);
+                                                        const parchiValue = p.parchiNo || receiptNumbers;
+                                                        
+                                                        console.log('[PaymentHistory] Cell click - Values:', {
+                                                            paymentId: p.id,
+                                                            paymentParchiNo: p.parchiNo,
+                                                            receiptNumbers: receiptNumbers,
+                                                            finalValue: parchiValue
+                                                        });
+                                                        
+                                                        if (parchiValue) {
+                                                            console.log('[PaymentHistory] Calling onParchiSelect from cell click');
+                                                            onParchiSelect(parchiValue);
+                                                        }
+                                                    }
+                                                }
+                                            }}
+                                        >
                                             <div className="break-words font-bold text-foreground text-[11px]">
                                                 {p.supplierName || ''}
                                             </div>
                                             <div className="text-foreground/90 text-[11px] mt-0.5 break-words font-semibold">
                                                 {getReceiptHolderName(p)}
                                             </div>
-                                            <div className="text-muted-foreground text-[11px] mt-0.5">
-                                                <div className="break-words font-medium">
-                                                    {getReceiptNumbers(p)}
-                                                </div>
+                                            <div 
+                                                className="text-muted-foreground text-[11px] mt-0.5 receipt-number-area hover:text-primary hover:underline cursor-pointer"
+                                                onClick={(e) => {
+                                                    console.log('[PaymentHistory] RECEIPT NUMBER CLICKED!', p.id);
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    
+                                                    if (onParchiSelect) {
+                                                        const receiptNumbers = getReceiptNumbers(p);
+                                                        const parchiValue = p.parchiNo || receiptNumbers;
+                                                        
+                                                        console.log('[PaymentHistory] Receipt number click - Values:', {
+                                                            paymentId: p.id,
+                                                            paymentParchiNo: p.parchiNo,
+                                                            receiptNumbers: receiptNumbers,
+                                                            finalValue: parchiValue
+                                                        });
+                                                        
+                                                        if (parchiValue) {
+                                                            console.log('[PaymentHistory] Calling onParchiSelect from receipt number click');
+                                                            onParchiSelect(parchiValue);
+                                                        } else {
+                                                            console.warn('[PaymentHistory] No parchi value found');
+                                                        }
+                                                    } else {
+                                                        console.error('[PaymentHistory] onParchiSelect not provided!');
+                                                    }
+                                                }}
+                                                title="Click to use as reference"
+                                            >
+                                                {getReceiptNumbers(p)}
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>

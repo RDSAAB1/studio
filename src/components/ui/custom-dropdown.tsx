@@ -50,6 +50,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [scrollTop, setScrollTop] = useState(0);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
@@ -123,6 +124,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             // This ensures users can see all available options when they click
             setSearchTerm('');
             // Debounced search term will be cleared by the debounce effect
+            setHighlightedIndex(-1); // Reset highlighted index when opening
         }
     }, [isOpen]);
 
@@ -229,6 +231,13 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         };
     }, [scrollTop, filteredItems]);
 
+    // Reset highlighted index if it's out of bounds
+    useEffect(() => {
+        if (highlightedIndex >= filteredItems.length) {
+            setHighlightedIndex(filteredItems.length > 0 ? 0 : -1);
+        }
+    }, [filteredItems.length, highlightedIndex]);
+
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
@@ -275,6 +284,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         setSearchTerm(newSearchTerm);
         setIsOpen(true);
         setScrollTop(0); // Reset scroll when searching
+        setHighlightedIndex(-1); // Reset highlighted index when searching
     };
 
     const handleScroll = useCallback((e: React.UIEvent<HTMLUListElement>) => {
@@ -304,7 +314,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
 
     return (
-        <div className="relative w-full z-[9999]" ref={dropdownRef}>
+        <div className="relative w-full" ref={dropdownRef}>
             <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -316,9 +326,58 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     onClick={handleInputClick}
                     onFocus={handleInputClick}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter" && showGoButton && onGoClick) {
+                        if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                            // Open dropdown on arrow key press
                             e.preventDefault();
+                            setIsOpen(true);
+                            setHighlightedIndex(0);
+                            return;
+                        }
+
+                        if (!isOpen) {
+                        if (e.key === "Enter" && showGoButton && onGoClick) {
+                                e.preventDefault();
+                                onGoClick();
+                            }
+                            return;
+                        }
+
+                        // Handle keyboard navigation when dropdown is open
+                        if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            const nextIndex = highlightedIndex < filteredItems.length - 1 
+                                ? highlightedIndex + 1 
+                                : 0;
+                            setHighlightedIndex(nextIndex);
+                            // Scroll to highlighted item
+                            if (listRef.current) {
+                                const targetScrollTop = nextIndex * ITEM_HEIGHT;
+                                listRef.current.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+                            }
+                        } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            const prevIndex = highlightedIndex > 0 
+                                ? highlightedIndex - 1 
+                                : filteredItems.length - 1;
+                            setHighlightedIndex(prevIndex);
+                            // Scroll to highlighted item
+                            if (listRef.current) {
+                                const targetScrollTop = prevIndex * ITEM_HEIGHT;
+                                listRef.current.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+                            }
+                        } else if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
+                                handleSelect(filteredItems[highlightedIndex]);
+                            } else if (showGoButton && onGoClick) {
                             onGoClick();
+                            }
+                        } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            setIsOpen(false);
+                            if (selectedItem) {
+                                setSearchTerm(selectedItem.displayValue || selectedItem.label);
+                            }
                         }
                     }}
                     autoComplete="new-password"
@@ -368,13 +427,12 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
             {isOpen && isMounted && createPortal(
                 <div 
-                    className="fixed bg-popover border border-border rounded-md shadow-lg" 
+                    className="fixed bg-popover border border-border rounded-md shadow-lg z-50" 
                     style={{ 
                         position: 'fixed', 
                         top: dropdownPosition.top, 
                         left: dropdownPosition.left, 
                         width: dropdownPosition.width || 'auto',
-                        zIndex: 99999,
                         maxHeight: '20rem',
                         pointerEvents: 'auto'
                     }}
@@ -398,6 +456,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         {filteredItems.length > 0 ? (
                             virtualItems.visibleItems.map((item, relativeIndex) => {
                                 const actualIndex = virtualItems.startIndex + relativeIndex;
+                                const isHighlighted = actualIndex === highlightedIndex;
+                                const isSelected = selectedItem?.value === item.value;
                                 return (
                                 <li
                                         key={`${item.value}-${actualIndex}`}
@@ -406,13 +466,15 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                         e.stopPropagation();
                                         handleSelect(item);
                                     }}
+                                    onMouseEnter={() => setHighlightedIndex(actualIndex)}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                     }}
                                     className={cn(
-                                            "cursor-pointer px-3 py-1.5 text-xs hover:bg-accent transition-colors",
-                                        selectedItem?.value === item.value ? 'bg-accent font-medium' : ''
+                                            "cursor-pointer px-3 py-1.5 text-xs transition-colors",
+                                        isHighlighted ? 'bg-accent' : 'hover:bg-accent',
+                                        isSelected ? 'font-medium' : ''
                                     )}
                                         style={{ height: ITEM_HEIGHT, pointerEvents: 'auto' }}
                                 >

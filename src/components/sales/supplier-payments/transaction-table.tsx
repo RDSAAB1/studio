@@ -23,10 +23,21 @@ interface TransactionTableProps {
     onEditEntry?: (entry: any) => void;
     activeTab?: string;
     onTabChange?: (tab: string) => void;
+    type?: 'supplier' | 'customer' | 'outsider'; // Add type prop to explicitly prevent rendering for outsider
 }
 
 export const TransactionTable = React.memo(
-    ({ suppliers, onShowDetails, selectedIds, onSelectionChange, embed = false, onEditEntry, activeTab: externalActiveTab, onTabChange }: TransactionTableProps) => {
+    ({ suppliers, onShowDetails, selectedIds, onSelectionChange, embed = false, onEditEntry, activeTab: externalActiveTab, onTabChange, type }: TransactionTableProps) => {
+        // Never render for outsider type - this table shows outstanding entries which are not needed for outsider
+        if (type === 'outsider') {
+            return null;
+        }
+        
+        // Don't render if suppliers array is empty
+        if (!suppliers || suppliers.length === 0) {
+            return null;
+        }
+        
         const [internalActiveTab, setInternalActiveTab] = useState("outstanding");
         const activeTab = externalActiveTab ?? internalActiveTab;
         const setActiveTab = onTabChange ?? setInternalActiveTab;

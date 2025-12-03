@@ -89,31 +89,25 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete }: PaymentHis
   }, []);
 
   return (
-    <Card className="text-[10px] flex flex-col h-full">
-      <CardContent className="p-0 flex flex-col flex-1 min-h-0">
-        <div className="text-[10px] border border-b-0 rounded-t-lg overflow-hidden flex-shrink-0">
-          <div className="overflow-x-auto border-b">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b-0 h-6 bg-transparent">
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold align-middle">ID / Date</TableHead>
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold align-middle">Account Holder</TableHead>
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold align-middle">Paid For</TableHead>
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-right align-middle">Paid</TableHead>
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-right align-middle">CD</TableHead>
-                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-center w-[80px] align-middle">Actions</TableHead>
+    <Card className="text-[10px] flex flex-col h-full overflow-hidden">
+      <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="overflow-x-auto overflow-y-hidden">
+            <Table className="table-fixed w-full">
+              <TableHeader className="sticky top-0 bg-muted z-10">
+                <TableRow className="h-6">
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold w-[18%]">ID / Date</TableHead>
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold w-[20%]">Account Holder</TableHead>
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold w-[20%]">Paid For</TableHead>
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-right w-[12%]">Paid</TableHead>
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-right w-[12%]">CD</TableHead>
+                  <TableHead className="text-[10px] px-1 py-0.5 font-bold text-center w-[18%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-            </Table>
-          </div>
-        </div>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="overflow-x-auto">
-            <Table>
               <TableBody>
                 {sortedPayments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-[10px] text-muted-foreground py-4 align-middle">
+                    <TableCell colSpan={6} className="text-center text-[10px] text-muted-foreground py-4">
                       No payments found
                     </TableCell>
                   </TableRow>
@@ -126,25 +120,25 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete }: PaymentHis
                     
                     return (
                       <TableRow key={payment.id || payment.paymentId} className="h-6">
-                        <TableCell className="text-[10px] px-1 py-0.5 align-middle">
-                          <div className="flex flex-col">
-                            <span className="font-mono">{payment.paymentId || payment.id}</span>
-                            <span className="text-muted-foreground text-[9px]">{paymentDate}</span>
+                        <TableCell className="text-[10px] px-1 py-0.5 w-[18%] overflow-hidden">
+                          <div className="flex flex-col truncate">
+                            <span className="font-mono truncate">{payment.paymentId || payment.id}</span>
+                            <span className="text-muted-foreground text-[9px] truncate">{paymentDate}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-[10px] px-1 py-0.5 align-middle">
-                          <span className="text-muted-foreground">{accountHolderName}</span>
+                        <TableCell className="text-[10px] px-1 py-0.5 w-[20%] overflow-hidden">
+                          <span className="text-muted-foreground truncate block">{accountHolderName}</span>
                         </TableCell>
-                        <TableCell className="text-[10px] px-1 py-0.5 align-middle">
-                          {receiptNumbers || '-'}
+                        <TableCell className="text-[10px] px-1 py-0.5 w-[20%] overflow-hidden truncate">
+                          <span className="truncate block">{receiptNumbers || '-'}</span>
                         </TableCell>
-                        <TableCell className="text-[10px] px-1 py-0.5 text-right font-medium align-middle">
-                          {formatCurrency(payment.amount || 0)}
+                        <TableCell className="text-[10px] px-1 py-0.5 text-right font-medium w-[12%] overflow-hidden">
+                          <span className="truncate block">{formatCurrency(payment.amount || 0)}</span>
                         </TableCell>
-                        <TableCell className="text-[10px] px-1 py-0.5 text-right font-medium align-middle">
-                          {cdAmount > 0 ? formatCurrency(cdAmount) : '-'}
+                        <TableCell className="text-[10px] px-1 py-0.5 text-right font-medium w-[12%] overflow-hidden">
+                          <span className="truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
                         </TableCell>
-                        <TableCell className="text-center px-1 py-0.5 align-middle">
+                        <TableCell className="text-center px-1 py-0.5 w-[18%]">
                           <div className="flex items-center justify-center gap-1">
                             {onEdit && (
                               <Button

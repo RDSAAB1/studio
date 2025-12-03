@@ -4,11 +4,10 @@ import React from 'react';
 import { format, startOfYear, endOfYear, subDays } from 'date-fns';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { SmartDatePicker } from '@/components/ui/smart-date-picker';
 import { Input } from '@/components/ui/input';
-import { Users, Calendar as CalendarIcon, X, Search } from "lucide-react";
+import { Users, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { formatSerialNumber, parseSerialNumber } from '../utils/fuzzy-matching';
@@ -180,29 +179,20 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
    
           {/* Date and Serial Number Row */}
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
-              </PopoverContent>
-            </Popover>
-   
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "PPP") : <span>End Date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
-              </PopoverContent>
-            </Popover>
+            <SmartDatePicker
+              value={startDate}
+              onChange={(val) => setStartDate(val instanceof Date ? val : (val ? new Date(val) : undefined))}
+              placeholder="Start Date"
+              inputClassName="h-9 w-full sm:w-[200px]"
+              returnDate={true}
+            />
+            <SmartDatePicker
+              value={endDate}
+              onChange={(val) => setEndDate(val instanceof Date ? val : (val ? new Date(val) : undefined))}
+              placeholder="End Date"
+              inputClassName="h-9 w-full sm:w-[200px]"
+              returnDate={true}
+            />
 
             {/* Serial Number Search - In same row as dates */}
             <div className="w-full sm:w-[200px]">

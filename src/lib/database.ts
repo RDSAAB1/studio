@@ -352,6 +352,45 @@ export async function syncAllDataWithDetails(
             } catch (cleanupError) {
               console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
             }
+          } else if (config.name === 'bankBranches') {
+            // First, clean up existing duplicates in local database
+            try {
+              const existingBranches = await localTable.toArray();
+              const ifscMap = new Map<string, any[]>();
+              
+              // Group existing branches by IFSC code
+              existingBranches.forEach((branch: any) => {
+                const ifscCode = branch.ifscCode?.trim() || '';
+                if (ifscCode) {
+                  if (!ifscMap.has(ifscCode)) {
+                    ifscMap.set(ifscCode, []);
+                  }
+                  ifscMap.get(ifscCode)!.push(branch);
+                }
+              });
+              
+              // Remove duplicate existing records (keep the most recent one)
+              for (const [ifscCode, branches] of ifscMap.entries()) {
+                if (branches.length > 1) {
+                  // Sort by updatedAt/createdAt, keep the most recent
+                  branches.sort((a, b) => {
+                    const timeA = a.updatedAt || a.createdAt || '';
+                    const timeB = b.updatedAt || b.createdAt || '';
+                    return timeB.localeCompare(timeA);
+                  });
+                  
+                  // Delete all except the first (most recent)
+                  const toDelete = branches.slice(1);
+                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  if (deleteIds.length > 0) {
+                    await localTable.bulkDelete(deleteIds);
+                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with IFSC code: ${ifscCode}`);
+                  }
+                }
+              }
+            } catch (cleanupError) {
+              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+            }
             
             // Remove duplicates from incoming data, keep the most recent one
             const uniqueMap = new Map<string, any>();
@@ -380,6 +419,73 @@ export async function syncAllDataWithDetails(
             dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutAccount];
             if (dataToSync.length < allData.length) {
               console.warn(`Removed ${allData.length - dataToSync.length} duplicate ${config.name} from Firestore data based on account number`);
+            }
+          } else if (config.name === 'bankBranches') {
+            // First, clean up existing duplicates in local database
+            try {
+              const existingBranches = await localTable.toArray();
+              const ifscMap = new Map<string, any[]>();
+              
+              // Group existing branches by IFSC code
+              existingBranches.forEach((branch: any) => {
+                const ifscCode = branch.ifscCode?.trim() || '';
+                if (ifscCode) {
+                  if (!ifscMap.has(ifscCode)) {
+                    ifscMap.set(ifscCode, []);
+                  }
+                  ifscMap.get(ifscCode)!.push(branch);
+                }
+              });
+              
+              // Remove duplicate existing records (keep the most recent one)
+              for (const [ifscCode, branches] of ifscMap.entries()) {
+                if (branches.length > 1) {
+                  // Sort by updatedAt/createdAt, keep the most recent
+                  branches.sort((a, b) => {
+                    const timeA = a.updatedAt || a.createdAt || '';
+                    const timeB = b.updatedAt || b.createdAt || '';
+                    return timeB.localeCompare(timeA);
+                  });
+                  
+                  // Delete all except the first (most recent)
+                  const toDelete = branches.slice(1);
+                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  if (deleteIds.length > 0) {
+                    await localTable.bulkDelete(deleteIds);
+                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with IFSC code: ${ifscCode}`);
+                  }
+                }
+              }
+            } catch (cleanupError) {
+              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+            }
+            
+            // Remove duplicates from incoming data, keep the most recent one
+            const uniqueMap = new Map<string, any>();
+            
+            allData.forEach((item: any) => {
+              const ifscCode = item.ifscCode?.trim() || '';
+              if (ifscCode) {
+                const existing = uniqueMap.get(ifscCode);
+                if (!existing) {
+                  uniqueMap.set(ifscCode, item);
+                } else {
+                  // Keep the one with more recent updatedAt or createdAt
+                  const existingTime = existing.updatedAt || existing.createdAt || '';
+                  const currentTime = item.updatedAt || item.createdAt || '';
+                  if (currentTime > existingTime) {
+                    uniqueMap.set(ifscCode, item);
+                  }
+                }
+              } else {
+                // Items without IFSC code - add them with unique key
+                uniqueMap.set(item.id || `no-ifsc-${Date.now()}-${Math.random()}`, item);
+              }
+            });
+            
+            dataToSync = Array.from(uniqueMap.values());
+            if (dataToSync.length < allData.length) {
+              console.warn(`Removed ${allData.length - dataToSync.length} duplicate ${config.name} from Firestore data based on IFSC code`);
             }
           }
           

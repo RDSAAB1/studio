@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, startTransition } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getSupplierBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
@@ -35,27 +35,120 @@ export const useSupplierData = () => {
         if (!isClient) return;
 
         let isSubscribed = true;
+        let dataLoadCount = 0;
+        const totalListeners = 10; // 9 realtime + 1 receipt settings
+        
+        const checkAllLoaded = () => {
+            dataLoadCount++;
+            if (dataLoadCount >= totalListeners && isSubscribed) {
+                startTransition(() => {
+                    setLoading(false);
+                });
+            }
+        };
         
         const unsubFunctions = [
-            getSuppliersRealtime(data => { if (isSubscribed) setSuppliers(data); }, error => console.error("Suppliers fetch error:", error)),
-            getPaymentsRealtime(data => { if (isSubscribed) setPaymentHistory(data); }, error => console.error("Payments fetch error:", error)),
-            getCustomerPaymentsRealtime(data => { if (isSubscribed) setCustomerPayments(data); }, error => console.error("Customer Payments fetch error:", error)),
-            getIncomeRealtime(data => { if (isSubscribed) setIncomes(data); }, error => console.error("Incomes fetch error:", error)),
-            getExpensesRealtime(data => { if (isSubscribed) setExpenses(data); }, error => console.error("Expenses fetch error:", error)),
-            getFundTransactionsRealtime(data => { if (isSubscribed) setFundTransactions(data); }, error => console.error("Fund Transactions fetch error:", error)),
-            getBanksRealtime(data => { if (isSubscribed) setBanks(data); }, error => console.error("Banks fetch error:", error)),
-            getBankBranchesRealtime(data => { if (isSubscribed) setBankBranches(data); }, error => console.error("Bank Branches fetch error:", error)),
-            getBankAccountsRealtime(data => { if (isSubscribed) setBankAccounts(data); }, error => console.error("Bank Accounts fetch error:", error)),
-            getSupplierBankAccountsRealtime(data => { if (isSubscribed) setSupplierBankAccounts(data); }, error => console.error("Supplier Bank Accounts fetch error:", error)),
+            getSuppliersRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setSuppliers(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Suppliers fetch error:", error);
+                checkAllLoaded();
+            }),
+            getPaymentsRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setPaymentHistory(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Payments fetch error:", error);
+                checkAllLoaded();
+            }),
+            getCustomerPaymentsRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setCustomerPayments(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Customer Payments fetch error:", error);
+                checkAllLoaded();
+            }),
+            getIncomeRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setIncomes(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Incomes fetch error:", error);
+                checkAllLoaded();
+            }),
+            getExpensesRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setExpenses(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Expenses fetch error:", error);
+                checkAllLoaded();
+            }),
+            getFundTransactionsRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setFundTransactions(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Fund Transactions fetch error:", error);
+                checkAllLoaded();
+            }),
+            getBanksRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setBanks(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Banks fetch error:", error);
+                checkAllLoaded();
+            }),
+            getBankBranchesRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setBankBranches(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Bank Branches fetch error:", error);
+                checkAllLoaded();
+            }),
+            getBankAccountsRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setBankAccounts(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Bank Accounts fetch error:", error);
+                checkAllLoaded();
+            }),
+            getSupplierBankAccountsRealtime(data => { 
+                if (isSubscribed) {
+                    startTransition(() => setSupplierBankAccounts(data));
+                    checkAllLoaded();
+                }
+            }, error => {
+                console.error("Supplier Bank Accounts fetch error:", error);
+                checkAllLoaded();
+            }),
         ];
 
         getReceiptSettings().then(settings => {
-            if (isSubscribed) setReceiptSettings(settings);
+            if (isSubscribed) {
+                startTransition(() => setReceiptSettings(settings));
+                checkAllLoaded();
+            }
         }).catch(error => {
             console.error("Receipt settings fetch error:", error);
+            checkAllLoaded();
         });
-
-        setLoading(false);
 
         return () => {
             isSubscribed = false;

@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument, getCustomersRealtime } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -100,7 +100,7 @@ export default function CustomerEntryClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start with false - don't block UI
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
@@ -162,6 +162,7 @@ export default function CustomerEntryClient() {
   }, []);
 
   const loadInitialData = useCallback(async () => {
+    // Don't block UI - load data in background, only show loading in table area
     setIsLoading(true);
     try {
         const [custResult, paymentResult] = await Promise.all([
@@ -184,8 +185,9 @@ export default function CustomerEntryClient() {
     } catch (error) {
         console.error("Error loading initial data:", error);
         toast({ title: 'Error', description: 'Could not load initial data.', variant: 'destructive' });
+    } finally {
+        setIsLoading(false);
     }
-    setIsLoading(false);
     // Removed toast from dependencies - it's stable from useToast hook
     // form reference is stable, only need to include if form instance changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,6 +195,7 @@ export default function CustomerEntryClient() {
 
   useEffect(() => {
     if (isClient) {
+      // Load data in background - UI shows immediately, only table shows loading
       loadInitialData();
     }
   }, [isClient, loadInitialData]);
@@ -228,6 +231,20 @@ export default function CustomerEntryClient() {
     fetchSettings();
 
 
+    // ✅ Setup realtime listener to sync customers from Firestore to IndexedDB
+    // This ensures that customers saved on other devices appear on this device
+    const unsubCustomers = getCustomersRealtime(
+      (customers) => {
+        // The realtime listener automatically updates IndexedDB via bulkPut
+        // This will keep the local data in sync with Firestore
+        console.log('Realtime customers updated:', customers.length);
+        // Update local state if needed (but getInitialCustomers should handle this)
+      },
+      (error) => {
+        console.error('Error in customers realtime listener:', error);
+      }
+    );
+
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
@@ -246,6 +263,7 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
+      unsubCustomers();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -663,14 +681,6 @@ export default function CustomerEntryClient() {
     return null;
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
-        <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
@@ -703,6 +713,13 @@ export default function CustomerEntryClient() {
         </form>
       </FormProvider>      
       
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <p className="text-muted-foreground flex items-center">
+            <Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...
+          </p>
+        </div>
+      ) : (
       <EntryTable
         entries={filteredCustomers} 
         onEdit={handleEdit} 
@@ -714,6 +731,7 @@ export default function CustomerEntryClient() {
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
+      )}
       {hasMoreCustomers && (
         <div className="text-center">
             <Button onClick={loadMoreData} disabled={isLoadingMore}>

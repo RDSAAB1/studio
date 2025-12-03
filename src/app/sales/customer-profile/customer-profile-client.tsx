@@ -15,9 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { SmartDatePicker } from '@/components/ui/smart-date-picker';
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { StatementPreview } from "@/components/print-formats/statement-preview";
@@ -25,7 +24,7 @@ import { DetailsDialog } from '@/components/sales/details-dialog';
 
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
+import { Users, Download, Printer, Loader2 } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -268,14 +267,20 @@ export default function CustomerProfileClient() {
                 <h3 className="text-base font-semibold">Select Profile</h3>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                 <Popover>
-                    <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{startDate ? format(startDate, "PPP") : <span>Start Date</span>}</Button></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
-                </Popover>
-                 <Popover>
-                    <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{endDate ? format(endDate, "PPP") : <span>End Date</span>}</Button></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} /></PopoverContent>
-                </Popover>
+                <SmartDatePicker
+                    value={startDate}
+                    onChange={(val) => setStartDate(val instanceof Date ? val : (val ? new Date(val) : undefined))}
+                    placeholder="Start Date"
+                    inputClassName="h-9 w-full sm:w-[200px]"
+                    returnDate={true}
+                />
+                <SmartDatePicker
+                    value={endDate}
+                    onChange={(val) => setEndDate(val instanceof Date ? val : (val ? new Date(val) : undefined))}
+                    placeholder="End Date"
+                    inputClassName="h-9 w-full sm:w-[200px]"
+                    returnDate={true}
+                />
                 <div className="w-full sm:flex-1">
                     <CustomDropdown
                         options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.companyName ? `(${data.companyName})` : ''}`.trim() }))}
