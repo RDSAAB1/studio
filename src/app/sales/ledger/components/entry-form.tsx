@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import type { LedgerAccount } from "@/lib/definitions";
 
@@ -132,14 +132,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </select>
 
           {linkAccountId && (
-            <div className="flex flex-1 items-center justify-between rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
-              <span>Opposite</span>
-              <Switch
+            <div className="flex flex-1 items-center justify-center gap-2 rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px]">
+              <SegmentedSwitch
                 checked={linkMode === "same"}
                 onCheckedChange={(checked) => onLinkModeChange(checked ? "same" : "mirror")}
-                className="h-4 w-8 data-[state=checked]:bg-primary"
+                leftLabel="Opposite"
+                rightLabel="Same"
+                className="w-32"
               />
-              <span>Same</span>
             </div>
           )}
         </div>

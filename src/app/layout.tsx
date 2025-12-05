@@ -175,7 +175,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="en" suppressHydrationWarning className="dark">
             <head>
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>

@@ -191,6 +191,7 @@ export type Transaction = {
   paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS' | 'Other';
   status: 'Paid' | 'Pending' | 'Cancelled';
   taxAmount?: number;
+  cdAmount?: number;
   expenseType?: 'Personal' | 'Business';
   isRecurring: boolean;
   recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';

@@ -40,6 +40,7 @@ import { usePaymentCombination } from '@/hooks/use-payment-combination';
 import { PaymentCombinationGenerator, PaymentCombinationResults } from '@/components/sales/supplier-payments/payment-combination-generator';
 import { RtgsForm } from '@/components/sales/supplier-payments/rtgs-form';
 import { RtgsFormOutsider } from '@/components/sales/supplier-payments/rtgs-form-outsider';
+import { GovForm } from '@/components/sales/supplier-payments/gov-form';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
 import { useSupplierData } from "@/hooks/use-supplier-data";
@@ -130,11 +131,13 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
   const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
   const [filterVariety, setFilterVariety] = useState<string>("all");
+  const [rsValue, setRsValue] = useState<number>(0);
 
   const paymentCombination = usePaymentCombination({
     calcTargetAmount: hook?.calcTargetAmount || (() => 0),
     minRate: hook?.minRate || 0,
     maxRate: hook?.maxRate || 0,
+    rsValue: rsValue,
   });
 
   // Use the same supplier summary and filtering as supplier profile (skip for outsider)
@@ -582,7 +585,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
 
 
     const handlePaymentMethodChange = useCallback(
-      (method: 'Cash' | 'Online' | 'RTGS') => {
+      (method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
         // Call the setPaymentMethod directly from the hook
         // It's already handleSetPaymentMethod which has all the logic
         if (hook.setPaymentMethod) {
@@ -594,13 +597,62 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   
     return (
         <div className="space-y-3 text-[12px]">
-             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <div className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 border-b">
-                    <div className="w-full px-3 md:px-5 py-1 flex flex-wrap gap-2 md:gap-3 items-center text-[12px]">
-                         <TabsList className="flex flex-none rounded-full border bg-background px-1 text-[12px]">
-                            <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="process">Payment</TabsTrigger>
-                            <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="cash">Cash History</TabsTrigger>
-                            <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="rtgs">RTGS History</TabsTrigger>
+             {type === 'outsider' ? (
+                // For outsider: No tabs, just show payment content directly
+                <>
+                    <div className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 border-b">
+                        <div className="w-full px-3 md:px-5 py-1 flex flex-wrap gap-2 md:gap-3 items-center text-[12px]">
+                            <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                                <div className="flex items-center gap-2 md:pl-3">
+                                    <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm} disabled={hook.isProcessing}>Clear</Button>
+                                    <Button size="sm" className="h-7 text-[11px]" onClick={hook.processPayment} disabled={hook.isProcessing}>
+                                        {hook.isProcessing ? (
+                                            <>
+                                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            "Finalize"
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {(() => {
+                        // Get outsider payments (where customerId === 'OUTSIDER')
+                        const outsiderPayments = hook.paymentHistory.filter((payment: Payment) => 
+                          payment.customerId === 'OUTSIDER' && 
+                          (payment.receiptType || "").toLowerCase() === "rtgs"
+                        );
+                        
+                        return (
+                          <div className="w-full max-w-full overflow-hidden space-y-3">
+                            <div className="flex flex-col gap-3">
+                              <div className="w-full">
+                                <RtgsFormOutsider {...hook} bankAccounts={outsiderData?.bankAccounts || []} banks={outsiderData?.banks || []} bankBranches={outsiderData?.bankBranches || []} />
+                              </div>
+                              <div className="w-full h-[310px] overflow-hidden">
+                                <PaymentHistoryCompact
+                                  payments={outsiderPayments}
+                                  onEdit={hook.handleEditPayment}
+                                  onDelete={hook.handleDeletePayment}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                    })()}
+                </>
+             ) : (
+                // For non-outsider: Show tabs
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <div className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 border-b">
+                        <div className="w-full px-3 md:px-5 py-1 flex flex-wrap gap-2 md:gap-3 items-center text-[12px]">
+                             <TabsList className="flex flex-none rounded-full border bg-background px-1 text-[12px]">
+                                <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="process">Payment</TabsTrigger>
+                                <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="cash">Cash History</TabsTrigger>
+                                <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="rtgs">RTGS History</TabsTrigger>
                 </TabsList>
                         <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                             {type !== 'outsider' && (
@@ -755,38 +807,6 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                                     </div>
                                                 </div>
                 <TabsContent value="process" className="space-y-2">
-                            {/* For outsider type: Skip all supplier-related UI, only show RTGS form */}
-                            {/* CRITICAL: Never show TransactionTable or summary stats for outsider - they show outstanding entries */}
-                            {/* EXPLICIT GUARD: If outsider type, render ONLY RTGS form and return early - no other UI */}
-                            {(() => {
-                              // Double check: If outsider, return RTGS form and history table
-                              if (type === 'outsider') {
-                                // Get outsider payments (where customerId === 'OUTSIDER')
-                                const outsiderPayments = hook.paymentHistory.filter((payment: Payment) => 
-                                  payment.customerId === 'OUTSIDER' && 
-                                  (payment.receiptType || "").toLowerCase() === "rtgs"
-                                );
-                                
-                                return (
-                                  <div className="w-full max-w-full overflow-hidden space-y-3">
-                                    <div className="flex flex-col gap-3">
-                                      <div className="w-full">
-                                        <RtgsFormOutsider {...hook} bankAccounts={outsiderData?.bankAccounts || []} banks={outsiderData?.banks || []} bankBranches={outsiderData?.bankBranches || []} />
-                                      </div>
-                                      <div className="w-full h-[310px] overflow-hidden">
-                                        <PaymentHistoryCompact
-                                          payments={outsiderPayments}
-                                          onEdit={hook.handleEditPayment}
-                                          onDelete={hook.handleDeletePayment}
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              // For non-outsider: Show supplier-related UI
-                              return (
-                                <>
                             {/* Tab Section (Left) and Name Section (Right) Row - Full Width, Custom Proportions */}
                                   {hook.selectedCustomerKey && selectedSupplierSummary && (
                               <div className="grid grid-cols-[36%_64%] gap-2 mb-2">
@@ -898,7 +918,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                             {/* EXPLICITLY CHECK: Never render this entire grid section for outsider type */}
                             {/* CRITICAL: This section is INSIDE the IIFE, so it will NOT execute for outsider type */}
                             {transactionsForSelectedSupplier && Array.isArray(transactionsForSelectedSupplier) && transactionsForSelectedSupplier.length > 0 && (
-                            <div className="grid gap-2 lg:grid-cols-[36%_36%_28%] w-full">
+                            <div className="grid gap-2 md:grid-cols-[1.2fr_1fr_1fr] w-full">
                               <div className="space-y-2 min-w-0 w-full h-[250px]">
                                 {/* Never render TransactionTable for outsider - shows outstanding entries table */}
                                 <TransactionTable
@@ -916,15 +936,16 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                   type={type}
                                 />
                               </div>
-                              <div className="space-y-2 min-w-0 w-full h-[250px]">
-                                {type !== 'outsider' && hook.selectedCustomerKey && (
+                              {/* Payment History - Between table and form */}
+                              {type !== 'outsider' && hook.selectedCustomerKey && (
+                                <div className="space-y-2 min-w-0 w-full h-[250px]">
                                   <PaymentHistoryCompact
                                     payments={selectedSupplierPayments}
                                     onEdit={hook.handleEditPayment}
                                     onDelete={hook.handleDeletePayment}
                                   />
-                                )}
-                              </div>
+                                </div>
+                              )}
                               <div className="space-y-2 min-w-0 w-full max-w-full overflow-hidden h-[250px]">
                                 {hook.selectedCustomerKey && (
                                   <div className="w-full max-w-full overflow-hidden h-full">
@@ -1045,6 +1066,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                         setMinRate={hook.setMinRate}
                                         maxRate={hook.maxRate}
                                         setMaxRate={hook.setMaxRate}
+                                        rsValue={rsValue}
+                                        setRsValue={setRsValue}
                                         selectPaymentAmount={hook.selectPaymentAmount}
                                         combination={paymentCombination}
                                         showResults={false}
@@ -1053,87 +1076,161 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                   </Card>
                               </div>
                                 )}
-                                </>
-                              );
-                            })()}
-                </TabsContent>
-                <TabsContent value="cash" className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-muted-foreground">Cash Payments</h2>
-                        <Badge variant="outline" className="text-xs font-medium">
-                            {cashHistoryRows.length} {cashHistoryRows.length === 1 ? "entry" : "entries"}
-                        </Badge>
-                    </div>
-                    <PaymentHistory
-                        key={`cash-${refreshKey}`}
-                        payments={cashHistoryRows}
-                        onShowDetails={hook.setSelectedPaymentForDetails}
-                        onPrintRtgs={hook.setRtgsReceiptData}
-                        onEdit={hook.handleEditPayment}
-                        onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
-                        title="Cash Payment History"
-                        suppliers={hook.suppliers}
-                        onParchiSelect={type === 'customer' ? (parchiNo: string) => {
-                            console.log('[CustomerPayments] onParchiSelect called with:', parchiNo);
-                            
-                            if (customerHook && customerHook.setParchiNo && typeof customerHook.setParchiNo === 'function') {
-                                customerHook.setParchiNo(parchiNo);
-                                console.log('[CustomerPayments] ✅ setParchiNo called via customerHook');
-                                setParchiNoRefreshKey(Date.now());
-                            } else if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
-                                hook.setParchiNo(parchiNo);
-                                console.log('[CustomerPayments] ✅ setParchiNo called via hook');
-                                setParchiNoRefreshKey(Date.now());
-                            } else {
-                                console.error('[CustomerPayments] ❌ setParchiNo not available', {
-                                    hasCustomerHook: !!customerHook,
-                                    customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
-                                    hasHookSetParchiNo: !!hook.setParchiNo
-                                });
-                            }
-                        } : undefined}
-                    />
-                </TabsContent>
-                <TabsContent value="rtgs" className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-muted-foreground">RTGS Payments</h2>
-                        <Badge variant="outline" className="text-xs font-medium">
-                            {rtgsHistoryRows.length} {rtgsHistoryRows.length === 1 ? "entry" : "entries"}
-                        </Badge>
-                    </div>
-                    <PaymentHistory
-                        key={`rtgs-${refreshKey}`}
-                        payments={rtgsHistoryRows}
-                        onShowDetails={hook.setSelectedPaymentForDetails}
-                        onPrintRtgs={hook.setRtgsReceiptData}
-                        onEdit={hook.handleEditPayment}
-                        onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
-                        title="RTGS Payment History"
-                        suppliers={hook.suppliers}
-                        onParchiSelect={type === 'customer' ? (parchiNo: string) => {
-                            console.log('[CustomerPayments] onParchiSelect called with:', parchiNo);
-                            
-                            if (customerHook && customerHook.setParchiNo && typeof customerHook.setParchiNo === 'function') {
-                                customerHook.setParchiNo(parchiNo);
-                                console.log('[CustomerPayments] ✅ setParchiNo called via customerHook');
-                                setParchiNoRefreshKey(Date.now());
-                            } else if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
-                                hook.setParchiNo(parchiNo);
-                                console.log('[CustomerPayments] ✅ setParchiNo called via hook');
-                                setParchiNoRefreshKey(Date.now());
-                            } else {
-                                console.error('[CustomerPayments] ❌ setParchiNo not available', {
-                                    hasCustomerHook: !!customerHook,
-                                    customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
-                                    hasHookSetParchiNo: !!hook.setParchiNo
-                                });
-                            }
-                        } : undefined}
-                    />
-                </TabsContent>
-            </Tabs>
 
-            {type === 'supplier' && hook.paymentMethod === 'RTGS' && paymentCombination.sortedPaymentOptions.length > 0 && (
+                            {/* Gov. Payment Form - Similar to RTGS but without bank details */}
+                                {type === 'supplier' && hook.paymentMethod === 'Gov.' && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                {/* Gov. Details Section - Left Half */}
+                                <Card className="text-[10px]">
+                                  <CardContent className="p-2">
+                                    <GovForm 
+                                      govQuantity={hook.govQuantity}
+                                      setGovQuantity={hook.setGovQuantity}
+                                      govRate={hook.govRate}
+                                      setGovRate={hook.setGovRate}
+                                      govAmount={hook.govAmount}
+                                      setGovAmount={hook.setGovAmount}
+                                      calcTargetAmount={hook.calcTargetAmount}
+                                      minRate={hook.minRate}
+                                      selectedPaymentOption={hook.selectedPaymentOption}
+                                    />
+                                  </CardContent>
+                                </Card>
+                                {/* Generate Payment Options Section - Right Half */}
+                                <Card className="text-[10px]">
+                                  <CardHeader className="pb-1 px-2 pt-2">
+                                    <CardTitle className="text-[11px] font-semibold text-muted-foreground">Generate Payment Options</CardTitle>
+                                    </CardHeader>
+                                  <CardContent className="space-y-2 p-2">
+                                    {/* Row 1 */}
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[10px]">Quantity</Label>
+                                          <Input
+                                            type="number"
+                                            step="0.10"
+                                            value={hook.govQuantity}
+                                            onChange={(e) => hook.setGovQuantity(Number(e.target.value) || 0)}
+                                          className="h-7 text-[10px]"
+                                          />
+                                        </div>
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[10px]">Rate</Label>
+                                          <Input
+                                            type="number"
+                                            value={hook.govRate}
+                                            onChange={(e) => hook.setGovRate(Number(e.target.value) || 0)}
+                                          className="h-7 text-[10px]"
+                                          />
+                                        </div>
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[10px]">Amount</Label>
+                                          <Input
+                                            type="number"
+                                            value={hook.govAmount}
+                                            onChange={(e) => hook.setGovAmount(Number(e.target.value) || 0)}
+                                          className="h-7 text-[10px]"
+                                            placeholder="Auto-filled from To Be Paid"
+                                          />
+                                        </div>
+                                      </div>
+                                    {/* Row 2 */}
+                                      <PaymentCombinationGenerator
+                                        calcTargetAmount={hook.calcTargetAmount}
+                                        setCalcTargetAmount={hook.setCalcTargetAmount}
+                                        minRate={hook.minRate}
+                                        setMinRate={hook.setMinRate}
+                                        maxRate={hook.maxRate}
+                                        setMaxRate={hook.setMaxRate}
+                                        rsValue={rsValue}
+                                        setRsValue={setRsValue}
+                                        selectPaymentAmount={hook.selectPaymentAmount}
+                                        combination={paymentCombination}
+                                        showResults={false}
+                                      />
+                                    </CardContent>
+                                  </Card>
+                              </div>
+                                )}
+                </TabsContent>
+                    <TabsContent value="cash" className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-muted-foreground">Cash Payments</h2>
+                            <Badge variant="outline" className="text-xs font-medium">
+                                {cashHistoryRows.length} {cashHistoryRows.length === 1 ? "entry" : "entries"}
+                            </Badge>
+                        </div>
+                        <PaymentHistory
+                            key={`cash-${refreshKey}`}
+                            payments={cashHistoryRows}
+                            onShowDetails={hook.setSelectedPaymentForDetails}
+                            onPrintRtgs={hook.setRtgsReceiptData}
+                            onEdit={hook.handleEditPayment}
+                            onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
+                            title="Cash Payment History"
+                            suppliers={hook.suppliers}
+                            onParchiSelect={type === 'customer' ? (parchiNo: string) => {
+                                console.log('[CustomerPayments] onParchiSelect called with:', parchiNo);
+                                
+                                if (customerHook && customerHook.setParchiNo && typeof customerHook.setParchiNo === 'function') {
+                                    customerHook.setParchiNo(parchiNo);
+                                    console.log('[CustomerPayments] ✅ setParchiNo called via customerHook');
+                                    setParchiNoRefreshKey(Date.now());
+                                } else if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
+                                    hook.setParchiNo(parchiNo);
+                                    console.log('[CustomerPayments] ✅ setParchiNo called via hook');
+                                    setParchiNoRefreshKey(Date.now());
+                                } else {
+                                    console.error('[CustomerPayments] ❌ setParchiNo not available', {
+                                        hasCustomerHook: !!customerHook,
+                                        customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
+                                        hasHookSetParchiNo: !!hook.setParchiNo
+                                    });
+                                }
+                            } : undefined}
+                        />
+                    </TabsContent>
+                    <TabsContent value="rtgs" className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-muted-foreground">RTGS Payments</h2>
+                            <Badge variant="outline" className="text-xs font-medium">
+                                {rtgsHistoryRows.length} {rtgsHistoryRows.length === 1 ? "entry" : "entries"}
+                            </Badge>
+                        </div>
+                        <PaymentHistory
+                            key={`rtgs-${refreshKey}`}
+                            payments={rtgsHistoryRows}
+                            onShowDetails={hook.setSelectedPaymentForDetails}
+                            onPrintRtgs={hook.setRtgsReceiptData}
+                            onEdit={hook.handleEditPayment}
+                            onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
+                            title="RTGS Payment History"
+                            suppliers={hook.suppliers}
+                            onParchiSelect={type === 'customer' ? (parchiNo: string) => {
+                                console.log('[CustomerPayments] onParchiSelect called with:', parchiNo);
+                                
+                                if (customerHook && customerHook.setParchiNo && typeof customerHook.setParchiNo === 'function') {
+                                    customerHook.setParchiNo(parchiNo);
+                                    console.log('[CustomerPayments] ✅ setParchiNo called via customerHook');
+                                    setParchiNoRefreshKey(Date.now());
+                                } else if (hook.setParchiNo && typeof hook.setParchiNo === 'function') {
+                                    hook.setParchiNo(parchiNo);
+                                    console.log('[CustomerPayments] ✅ setParchiNo called via hook');
+                                    setParchiNoRefreshKey(Date.now());
+                                } else {
+                                    console.error('[CustomerPayments] ❌ setParchiNo not available', {
+                                        hasCustomerHook: !!customerHook,
+                                        customerHookSetParchiNo: !!(customerHook && customerHook.setParchiNo),
+                                        hasHookSetParchiNo: !!hook.setParchiNo
+                                    });
+                                }
+                            } : undefined}
+                        />
+                    </TabsContent>
+            </Tabs>
+             )}
+
+            {(type === 'supplier' && (hook.paymentMethod === 'RTGS' || hook.paymentMethod === 'Gov.') && paymentCombination.sortedPaymentOptions.length > 0) && (
               <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-muted-foreground">Generated Payment Options</h3>

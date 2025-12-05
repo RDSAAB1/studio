@@ -50,7 +50,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
     };
 
     return (
-        <Card>
+        <Card variant="default-light" shape="organic-lg">
             <CardContent className="p-0">
                 <ScrollArea ref={scrollRef} className="h-[60vh]">
                     <div className="overflow-x-auto">

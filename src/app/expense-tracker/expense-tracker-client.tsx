@@ -20,10 +20,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller, useWatch } from "react-hook-form";
-import { Switch } from "@/components/ui/switch";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes, getAllExpenses } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes, getAllExpenses } from "@/lib/firestore";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
@@ -52,6 +52,7 @@ const transactionFormSchema = z.object({
   status: z.string().min(1, "Status is required."),
   description: z.string().optional(),
   taxAmount: z.coerce.number().optional(),
+  cdAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
   recurringFrequency: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
@@ -94,6 +95,7 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
     status: 'Paid',
     transactionId: nextTxId,
     taxAmount: 0,
+    cdAmount: 0,
     expenseType: 'Business',
     isRecurring: false,
     recurringFrequency: 'monthly',
@@ -175,7 +177,7 @@ const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
       <ScrollArea ref={scrollRef} className="h-[380px]">
         <div className="overflow-x-auto">
           <Table className="min-w-[600px]">
-            <TableBody>
+          <TableBody>
           {visibleTransactions.map((transaction) => (
             <TableRow key={transaction.id}>
               <TableCell className="text-center py-1.5">
@@ -230,10 +232,10 @@ const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
               </TableCell>
             </TableRow>
           )}
-            </TableBody>
-          </Table>
-        </div>
-      </ScrollArea>
+          </TableBody>
+        </Table>
+      </div>
+    </ScrollArea>
     </div>
   );
 });
@@ -744,6 +746,7 @@ export default function IncomeExpenseClient() {
         ...transaction,
         date: new Date(transaction.date),
         taxAmount: transaction.taxAmount || 0,
+        cdAmount: (transaction as any).cdAmount || 0,
         quantity: transaction.quantity || 0,
         rate: transaction.rate || 0,
         isCalculated: transaction.isCalculated || false,
@@ -770,7 +773,7 @@ export default function IncomeExpenseClient() {
         }, 50);
     }, 50);
     
-    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
+    setIsAdvanced(!!(transaction.status || transaction.taxAmount || (transaction as any).cdAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
   }, [editingTransaction, loans, setValue, reset]);
@@ -848,8 +851,38 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, availableCategories, loans]);
 
   useEffect(() => {
-    const unsubIncomeCats = getIncomeCategories(setIncomeCategories, console.error);
-    const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
+    // Load all categories initially
+    const loadAllCategories = async () => {
+      try {
+        const [incomeCats, expenseCats] = await Promise.all([
+          getAllIncomeCategories(),
+          getAllExpenseCategories()
+        ]);
+        setIncomeCategories(incomeCats);
+        setExpenseCategories(expenseCats);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    loadAllCategories();
+
+    // Then set up realtime listeners for updates
+    const unsubIncomeCats = getIncomeCategories((newCats) => {
+      setIncomeCategories(prev => {
+        // Merge new categories with existing ones
+        const existingMap = new Map(prev.map(c => [c.id, c]));
+        newCats.forEach(cat => existingMap.set(cat.id, cat));
+        return Array.from(existingMap.values());
+      });
+    }, console.error);
+    const unsubExpenseCats = getExpenseCategories((newCats) => {
+      setExpenseCategories(prev => {
+        // Merge new categories with existing ones
+        const existingMap = new Map(prev.map(c => [c.id, c]));
+        newCats.forEach(cat => existingMap.set(cat.id, cat));
+        return Array.from(existingMap.values());
+      });
+    }, console.error);
     
     return () => {
       unsubIncomeCats();
@@ -1364,6 +1397,10 @@ export default function IncomeExpenseClient() {
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add New Account
               </Button>
+              <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="whitespace-nowrap" title="Manage Categories & Subcategories">
+                <Settings className="mr-2 h-4 w-4" />
+                Categories
+              </Button>
             </div>
             {selectedAccount && (
               <Button
@@ -1394,49 +1431,49 @@ export default function IncomeExpenseClient() {
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Net Balance</span>
                 <span className={cn("text-xs font-semibold", netProfitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                  {formatCurrency(netProfitLoss)}
-                </span>
-              </div>
+                {formatCurrency(netProfitLoss)}
+              </span>
+            </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Transactions</span>
                 <span className="text-xs font-semibold text-indigo-600">{totalTransactions}</span>
-              </div>
             </div>
+          </div>
 
             <div className="border-t pt-2 mt-2">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
-                <input type="hidden" {...register('payee')} />
+              <input type="hidden" {...register('payee')} />
 
                 <div className="grid grid-cols-2 gap-2">
-                  <Controller
-                    name="date"
-                    control={control}
-                    render={({ field }) => (
+                <Controller
+                  name="date"
+                  control={control}
+                  render={({ field }) => (
                       <div className="space-y-0.5">
-                        <Label className="text-xs">Date</Label>
-                        <SmartDatePicker
-                          value={field.value}
-                          onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                          placeholder="Pick a date"
+                      <Label className="text-xs">Date</Label>
+                      <SmartDatePicker
+                        value={field.value}
+                        onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                        placeholder="Pick a date"
                           inputClassName="h-7 text-xs"
-                          returnDate={true}
-                        />
-                      </div>
-                    )}
-                  />
+                        returnDate={true}
+                      />
+                    </div>
+                  )}
+                />
 
                   <div className="space-y-0.5">
-                    <Label htmlFor="transactionId" className="text-xs">
-                      Transaction ID
-                    </Label>
+                  <Label htmlFor="transactionId" className="text-xs">
+                    Transaction ID
+                  </Label>
                     <InputWithIcon icon={<FileText className="h-3 w-3 text-muted-foreground" />}>
-                      <Input
-                        id="transactionId"
-                        {...register("transactionId")}
-                        onBlur={handleTransactionIdBlur}
+                    <Input
+                      id="transactionId"
+                      {...register("transactionId")}
+                      onBlur={handleTransactionIdBlur}
                         className="h-7 text-xs pl-8"
-                      />
-                    </InputWithIcon>
+                    />
+                  </InputWithIcon>
                   </div>
                 </div>
 
@@ -1464,49 +1501,49 @@ export default function IncomeExpenseClient() {
                 )}
 
                 <div className="grid grid-cols-2 gap-2">
-                  <Controller
-                    name="incomeAmount"
-                    control={control}
-                    render={({ field }) => (
+                <Controller
+                  name="incomeAmount"
+                  control={control}
+                  render={({ field }) => (
                       <div className="space-y-0.5">
-                        <Label className="text-xs text-emerald-700">Credit Amount (Income)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            setLastAmountSource('income');
-                            const value = e.target.value;
-                            field.onChange(value === '' ? '' : Number(value));
-                          }}
+                      <Label className="text-xs text-emerald-700">Credit Amount (Income)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
+                        onChange={(e) => {
+                          setLastAmountSource('income');
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
                           className="h-7 text-xs border-emerald-200 focus-visible:ring-emerald-500"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    )}
-                  />
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                />
 
-                  <Controller
-                    name="expenseAmount"
-                    control={control}
-                    render={({ field }) => (
+                <Controller
+                  name="expenseAmount"
+                  control={control}
+                  render={({ field }) => (
                       <div className="space-y-0.5">
-                        <Label className="text-xs text-rose-700">Debit Amount (Expense)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            setLastAmountSource('expense');
-                            const value = e.target.value;
-                            field.onChange(value === '' ? '' : Number(value));
-                          }}
+                      <Label className="text-xs text-rose-700">Debit Amount (Expense)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
+                        onChange={(e) => {
+                          setLastAmountSource('expense');
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
                           className="h-7 text-xs border-rose-200 focus-visible:ring-rose-500"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    )}
-                  />
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                />
                 </div>
 
                 <Controller
@@ -1553,187 +1590,221 @@ export default function IncomeExpenseClient() {
                   </div>
                 )}
 
-                <input type="hidden" {...register('amount', { valueAsNumber: true })} />
+              <input type="hidden" {...register('amount', { valueAsNumber: true })} />
 
-                {isAdvanced && (
+              {isAdvanced && (
                   <div className="border-t pt-2 mt-2">
                     <h3 className="text-xs font-semibold mb-1">Advanced Options</h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-0.5">
-                        <Label htmlFor="status" className="text-xs">Status</Label>
-                        <Controller
-                          name="status"
-                          control={control}
-                          render={({ field }) => (
+                      <Label htmlFor="status" className="text-xs">Status</Label>
+                      <Controller
+                        name="status"
+                        control={control}
+                        render={({ field }) => (
+                          <CustomDropdown
+                            options={[
+                              { value: "Paid", label: "Paid" },
+                              { value: "Pending", label: "Pending" },
+                              { value: "Overdue", label: "Overdue" }
+                            ]}
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select Status"
+                              inputClassName="h-7 text-xs"
+                          />
+                        )}
+                      />
+                    </div>
+
+                      <div className="space-y-0.5">
+                      <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
+                      <Controller
+                        name="taxAmount"
+                        control={control}
+                        render={({ field }) => (
+                            <InputWithIcon icon={<Percent className="h-3 w-3 text-muted-foreground" />}>
+                              <Input id="taxAmount" type="number" {...field} className="h-7 text-xs pl-8" />
+                          </InputWithIcon>
+                        )}
+                      />
+                    </div>
+
+                      <div className="space-y-0.5">
+                      <Label htmlFor="cdAmount" className="text-xs">CD Amount</Label>
+                      <Controller
+                        name="cdAmount"
+                        control={control}
+                        render={({ field }) => (
+                            <InputWithIcon icon={<Percent className="h-3 w-3 text-muted-foreground" />}>
+                              <Input id="cdAmount" type="number" {...field} className="h-7 text-xs pl-8" />
+                          </InputWithIcon>
+                        )}
+                      />
+                    </div>
+
+                    {selectedTransactionType === 'Expense' && (
+                      <Controller
+                        name="expenseType"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-0.5">
+                            <Label className="text-xs">Expense Type</Label>
                             <CustomDropdown
                               options={[
-                                { value: "Paid", label: "Paid" },
-                                { value: "Pending", label: "Pending" },
-                                { value: "Overdue", label: "Overdue" }
+                                { value: "Personal", label: "Personal" },
+                                { value: "Business", label: "Business" }
                               ]}
                               value={field.value}
                               onChange={field.onChange}
-                              placeholder="Select Status"
-                              inputClassName="h-7 text-xs"
-                            />
-                          )}
-                        />
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                        <Controller
-                          name="taxAmount"
-                          control={control}
-                          render={({ field }) => (
-                            <InputWithIcon icon={<Percent className="h-3 w-3 text-muted-foreground" />}>
-                              <Input id="taxAmount" type="number" {...field} className="h-7 text-xs pl-8" />
-                            </InputWithIcon>
-                          )}
-                        />
-                      </div>
-
-                      {selectedTransactionType === 'Expense' && (
-                        <Controller
-                          name="expenseType"
-                          control={control}
-                          render={({ field }) => (
-                            <div className="space-y-0.5">
-                              <Label className="text-xs">Expense Type</Label>
-                              <CustomDropdown
-                                options={[
-                                  { value: "Personal", label: "Personal" },
-                                  { value: "Business", label: "Business" }
-                                ]}
-                                value={field.value}
-                                onChange={field.onChange}
-                                placeholder="Select Expense Type"
+                              placeholder="Select Expense Type"
                                 inputClassName="h-7 text-xs"
-                              />
-                            </div>
-                          )}
-                        />
-                      )}
+                            />
+                          </div>
+                        )}
+                      />
+                    )}
 
                       <div className="space-y-0.5">
-                        <Label htmlFor="mill" className="text-xs">Mill</Label>
-                        <Controller
-                          name="mill"
-                          control={control}
-                          render={({ field }) => (
+                      <Label htmlFor="mill" className="text-xs">Mill</Label>
+                      <Controller
+                        name="mill"
+                        control={control}
+                        render={({ field }) => (
                             <InputWithIcon icon={<Landmark className="h-3 w-3 text-muted-foreground" />}>
                               <Input id="mill" {...field} className="h-7 text-xs pl-8" />
-                            </InputWithIcon>
-                          )}
-                        />
-                      </div>
-                      
+                          </InputWithIcon>
+                        )}
+                      />
+                    </div>
+                    
                       <div className="space-y-0.5">
-                        <Label className="text-xs">Project</Label>
-                        <Controller
-                          name="projectId"
-                          control={control}
-                          render={({ field }) => (
-                            <CustomDropdown
-                              options={[
-                                { value: 'none', label: 'None' },
-                                ...projects.map(project => ({ value: project.id, label: project.name }))
-                              ]}
-                              value={field.value || 'none'}
-                              onChange={field.onChange}
-                              placeholder="Select Project"
+                      <Label className="text-xs">Project</Label>
+                      <Controller
+                        name="projectId"
+                        control={control}
+                        render={({ field }) => (
+                          <CustomDropdown
+                            options={[
+                              { value: 'none', label: 'None' },
+                              ...projects.map(project => ({ value: project.id, label: project.name }))
+                            ]}
+                            value={field.value || 'none'}
+                            onChange={field.onChange}
+                            placeholder="Select Project"
                               inputClassName="h-7 text-xs"
-                            />
-                          )}
-                        />
-                      </div>
+                          />
+                        )}
+                      />
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {isCalculated && (
+              {isCalculated && (
                   <div className="border-t pt-2 mt-2">
                     <h3 className="text-xs font-semibold mb-1">Calculation</h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-0.5">
-                        <Label htmlFor="quantity" className="text-xs">Quantity</Label>
+                      <Label htmlFor="quantity" className="text-xs">Quantity</Label>
                         <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-7 text-xs" />} />
-                      </div>
+                    </div>
 
                       <div className="space-y-0.5">
-                        <Label htmlFor="rate" className="text-xs">Rate</Label>
+                      <Label htmlFor="rate" className="text-xs">Rate</Label>
                         <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-7 text-xs" />} />
-                      </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {isRecurring && (
+              {isRecurring && (
                   <div className="border-t pt-2 mt-2">
                     <h3 className="text-xs font-semibold mb-1">Recurring Details</h3>
                     <div className="grid grid-cols-2 gap-2">
-                      <Controller name="recurringFrequency" control={control} render={({ field }) => (
+                    <Controller name="recurringFrequency" control={control} render={({ field }) => (
                         <div className="space-y-0.5">
-                          <Label className="text-xs">Frequency</Label>
-                          <CustomDropdown
-                            options={[
-                              { value: "daily", label: "Daily" },
-                              { value: "weekly", label: "Weekly" },
-                              { value: "monthly", label: "Monthly" },
-                              { value: "yearly", label: "Yearly" }
-                            ]}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select Frequency"
+                        <Label className="text-xs">Frequency</Label>
+                        <CustomDropdown
+                          options={[
+                            { value: "daily", label: "Daily" },
+                            { value: "weekly", label: "Weekly" },
+                            { value: "monthly", label: "Monthly" },
+                            { value: "yearly", label: "Yearly" }
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Frequency"
                             inputClassName="h-7 text-xs"
-                          />
-                        </div>
-                      )} />
+                        />
+                      </div>
+                    )} />
 
-                      <Controller name="nextDueDate" control={control} render={({ field }) => (
+                    <Controller name="nextDueDate" control={control} render={({ field }) => (
                         <div className="space-y-0.5">
-                          <Label className="text-xs">Next Due Date</Label>
-                          <SmartDatePicker
-                            value={field.value}
-                            onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                            placeholder="Pick a date"
+                        <Label className="text-xs">Next Due Date</Label>
+                        <SmartDatePicker
+                          value={field.value}
+                          onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                          placeholder="Pick a date"
                             inputClassName="h-7 text-xs"
-                            returnDate={true}
-                          />
-                        </div>
-                      )} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Switch id="isAdvanced" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
-                    <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                        Advanced
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch id="isCalculated" checked={isCalculated} onCheckedChange={setIsCalculated} />
-                    <Label htmlFor="isCalculated" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                        Calculate
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch id="isRecurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
-                    <Label htmlFor="isRecurring" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                        Recurring
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        {editingTransaction ? 'Update' : 'Save'}
-                    </Button>
+                          returnDate={true}
+                        />
+                      </div>
+                    )} />
                   </div>
                 </div>
-              </form>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <SegmentedSwitch 
+                    id="isAdvanced" 
+                    checked={isAdvanced} 
+                    onCheckedChange={setIsAdvanced}
+                    leftLabel="Off"
+                    rightLabel="On"
+                    className="w-32"
+                  />
+                  <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none">
+                      Advanced
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SegmentedSwitch 
+                    id="isCalculated" 
+                    checked={isCalculated} 
+                    onCheckedChange={setIsCalculated}
+                    leftLabel="Off"
+                    rightLabel="On"
+                    className="w-32"
+                  />
+                  <Label htmlFor="isCalculated" className="text-sm font-medium leading-none">
+                      Calculate
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SegmentedSwitch 
+                    id="isRecurring" 
+                    checked={isRecurring} 
+                    onCheckedChange={setIsRecurring}
+                    leftLabel="Off"
+                    rightLabel="On"
+                    className="w-32"
+                  />
+                  <Label htmlFor="isRecurring" className="text-sm font-medium leading-none">
+                      Recurring
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {editingTransaction ? 'Update' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            </form>
             </div>
           </CardContent>
         </Card>
@@ -1850,6 +1921,61 @@ export default function IncomeExpenseClient() {
         onOpenChange={setIsCategoryManagerOpen}
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
+        onAddCategory={async (collection, category) => {
+          await addCategory(collection, category);
+          // Immediately refresh categories
+          const [incomeCats, expenseCats] = await Promise.all([
+            getAllIncomeCategories(),
+            getAllExpenseCategories()
+          ]);
+          setIncomeCategories(incomeCats);
+          setExpenseCategories(expenseCats);
+          toast({ title: 'Category added', variant: 'success' });
+        }}
+        onUpdateCategoryName={async (collection, id, name) => {
+          await updateCategoryName(collection, id, name);
+          // Immediately refresh categories
+          const [incomeCats, expenseCats] = await Promise.all([
+            getAllIncomeCategories(),
+            getAllExpenseCategories()
+          ]);
+          setIncomeCategories(incomeCats);
+          setExpenseCategories(expenseCats);
+          toast({ title: 'Category updated', variant: 'success' });
+        }}
+        onDeleteCategory={async (collection, id) => {
+          await deleteCategory(collection, id);
+          // Immediately refresh categories
+          const [incomeCats, expenseCats] = await Promise.all([
+            getAllIncomeCategories(),
+            getAllExpenseCategories()
+          ]);
+          setIncomeCategories(incomeCats);
+          setExpenseCategories(expenseCats);
+          toast({ title: 'Category deleted', variant: 'success' });
+        }}
+        onAddSubCategory={async (collection, categoryId, subCategoryName) => {
+          await addSubCategory(collection, categoryId, subCategoryName);
+          // Immediately refresh categories
+          const [incomeCats, expenseCats] = await Promise.all([
+            getAllIncomeCategories(),
+            getAllExpenseCategories()
+          ]);
+          setIncomeCategories(incomeCats);
+          setExpenseCategories(expenseCats);
+          toast({ title: 'Subcategory added', variant: 'success' });
+        }}
+        onDeleteSubCategory={async (collection, categoryId, subCategoryName) => {
+          await deleteSubCategory(collection, categoryId, subCategoryName);
+          // Immediately refresh categories
+          const [incomeCats, expenseCats] = await Promise.all([
+            getAllIncomeCategories(),
+            getAllExpenseCategories()
+          ]);
+          setIncomeCategories(incomeCats);
+          setExpenseCategories(expenseCats);
+          toast({ title: 'Subcategory deleted', variant: 'success' });
+        }}
       />
     </div>
   );

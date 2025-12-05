@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CustomerSummary, Payment } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +74,13 @@ const SupplierHubPaymentSection = ({
   } = hook as any;
 
   const { supplierBankAccounts } = useSupplierData();
+  const [rsValue, setRsValue] = useState<number>(0);
 
   const paymentCombination = usePaymentCombination({
     calcTargetAmount,
     minRate,
     maxRate,
+    rsValue: rsValue,
   });
 
   // Sync Supplier Hub's selectedSupplierKey with payment hook's selectedCustomerKey
@@ -306,6 +308,8 @@ const SupplierHubPaymentSection = ({
                       setMinRate={setMinRate}
                       maxRate={maxRate}
                       setMaxRate={setMaxRate}
+                      rsValue={rsValue}
+                      setRsValue={setRsValue}
                       selectPaymentAmount={selectPaymentAmount}
                       combination={paymentCombination}
                       showResults={false}

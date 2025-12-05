@@ -11,7 +11,7 @@ import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Downloa
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
-import { Switch } from "../ui/switch";
+import { SegmentedSwitch } from "../ui/segmented-switch";
 import { Label } from "../ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -205,7 +205,14 @@ export const CalculatedSummary = ({
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         {isCustomerForm && onBrokerageToggle && (
                             <div className="flex items-center space-x-2">
-                                <Switch id="brokerage-toggle" checked={isBrokerageIncluded} onCheckedChange={onBrokerageToggle} />
+                                <SegmentedSwitch 
+                                    id="brokerage-toggle" 
+                                    checked={isBrokerageIncluded} 
+                                    onCheckedChange={onBrokerageToggle}
+                                    leftLabel="Off"
+                                    rightLabel="On"
+                                    className="w-32"
+                                />
                                 <Label htmlFor="brokerage-toggle" className="text-xs">Include Brokerage</Label>
                             </div>
                         )}

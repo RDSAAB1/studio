@@ -14,7 +14,7 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
   );
 
   return (
-    <div className="tab-bar-container h-[34px] bg-card border-b border-border flex items-center -mb-px w-full px-2">
+    <div className="tab-bar-container h-[42px] bg-card border-b border-border flex items-center -mb-px w-full px-2" style={{ borderRadius: 0 }}>
       <div 
         className="flex items-center w-full gap-1"
       >
@@ -64,7 +64,7 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
                   e.preventDefault();
                   closeTab(tab.id);
                 }}
-                isClosable={tab.id !== 'dashboard-overview'} // Dashboard is not closable
+                isClosable={false} // Remove close button from all tabs
               />
             )
         })}

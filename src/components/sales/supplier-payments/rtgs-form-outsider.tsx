@@ -293,33 +293,33 @@ export const RtgsFormOutsider = (props: any) => {
                                 placeholder="Enter IFSC code"
                             />
                         </div>
-                        <div className="space-y-0.5">
-                            <Label className="text-[10px]">A/C No.</Label>
-                            <CustomDropdown
-                                options={React.useMemo(() => {
-                                    if (!Array.isArray(filteredBankAccounts)) return [];
-                                    return filteredBankAccounts.map((acc: any) => ({
-                                        value: acc.accountNumber,
-                                        label: acc.accountNumber
-                                    }));
-                                }, [filteredBankAccounts])}
-                                value={bankDetails.acNo || ''}
-                                onChange={handleAccountSelect}
-                                placeholder="Select or enter account number"
-                                allowCustomInput={true}
-                            />
-                        </div>
-                        <div className="space-y-0.5">
-                            <Label className="text-[10px]">Amount</Label>
-                            <Input
-                                type="number"
-                                value={rtgsAmount || ''}
-                                onChange={(e) => setRtgsAmount?.(Number(e.target.value) || 0)}
-                                placeholder="Enter amount"
-                                className="h-7 text-[10px]"
-                                min="0"
-                                step="0.01"
-                            />
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">A/C No.</Label>
+                        <CustomDropdown
+                            options={React.useMemo(() => {
+                                if (!Array.isArray(filteredBankAccounts)) return [];
+                                return filteredBankAccounts.map((acc: any) => ({
+                                    value: acc.accountNumber,
+                                    label: acc.accountNumber
+                                }));
+                            }, [filteredBankAccounts])}
+                            value={bankDetails.acNo || ''}
+                            onChange={handleAccountSelect}
+                            placeholder="Select or enter account number"
+                            allowCustomInput={true}
+                        />
+                    </div>
+                    <div className="space-y-0.5">
+                        <Label className="text-[10px]">Amount</Label>
+                        <Input
+                            type="number"
+                            value={rtgsAmount || ''}
+                            onChange={(e) => setRtgsAmount?.(Number(e.target.value) || 0)}
+                            placeholder="Enter amount"
+                            className="h-7 text-[10px]"
+                            min="0"
+                            step="0.01"
+                        />
                         </div>
                     </div>
                     {/* Row 5: Finalize Button */}

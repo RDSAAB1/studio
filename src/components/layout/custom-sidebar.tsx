@@ -72,7 +72,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                         <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
                         <span className="text">{item.name}</span>
                     </div>
-                    <ChevronDown className={cn("fas fa-angle-right dropdown transition-transform", isOpen && 'rotate-90')} />
+                    <ChevronDown className={cn("fas fa-angle-right dropdown", isOpen && 'rotate-90')} />
                 </button>
                  {isOpen && (
                     <ul className="sub_menu">
@@ -94,9 +94,15 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
         return (
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+                    <button 
+                        onClick={() => handleLinkClick(item)} 
+                    className={cn(
+                        "w-full h-12 flex items-center justify-center cursor-pointer border-none bg-transparent p-0",
+                        isActive && "bg-accent/60"
+                    )}
+                    >
                         <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
-                    </Button>
+                    </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
                     <p>{item.name}</p>
@@ -108,8 +114,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
     return (
         <DropdownMenu open={isOpen} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)}>
             <DropdownMenuTrigger asChild>
-                <Button 
-                    variant="ghost" 
+                <button 
                     onClick={() => {
                         // When parent menu is clicked, open all its sub-menus as tabs
                         if (item.subMenus && item.subMenus.length > 0) {
@@ -119,16 +124,19 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                     }}
                     onPointerEnter={() => setOpenMenuId(item.id)}
                     onPointerLeave={scheduleClose}
-                    className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
+                    className={cn(
+                        "w-full h-12 flex items-center justify-center cursor-pointer border-none bg-transparent p-0",
+                        (isSubMenuActive || isOpen) && "bg-accent/60"
+                    )}
                  >
                     <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
-                </Button>
+                </button>
             </DropdownMenuTrigger>
              <DropdownMenuContent 
                 side="right" 
                 align="start"
                 sideOffset={4}
-                className="w-[var(--sidebar-width-icon)] animate-in slide-in-from-left-1 fade-in-0 duration-150"
+                className="w-[var(--sidebar-width-icon)] rounded-none"
                 onPointerEnter={() => setOpenMenuId(item.id)}
                 onPointerLeave={scheduleClose}
              >
@@ -138,7 +146,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                         key={subItem.id} 
                         onClick={() => handleLinkClick(subItem)} 
                         className={cn(
-                            "cursor-pointer transition-colors duration-200",
+                            "cursor-pointer",
                             `/${subItem.id}` === activePath && "bg-accent"
                         )}
                     >

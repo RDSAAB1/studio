@@ -86,7 +86,7 @@ export const PaymentForm = (props: any) => {
                           <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                                 {!hideRtgsToggle && (
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                    {(['Cash', 'Online', 'RTGS'] as const).map((method) => (
+                                    {(['Cash', 'Online', 'RTGS', 'Gov.'] as const).map((method) => (
                                         <Button
                                             key={method}
                                             type="button"
@@ -144,7 +144,7 @@ export const PaymentForm = (props: any) => {
                                 </div>
                             )}
                              
-                            {(paymentMethod === 'Cash' || paymentMethod === 'RTGS') && (
+                            {(paymentMethod === 'Cash' || paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
                                 <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
                                     <Label className="text-[10px]">Parchi No. (SR#)</Label>
                                     <Input 
@@ -171,6 +171,13 @@ export const PaymentForm = (props: any) => {
                              {paymentMethod === 'RTGS' && (
                                 <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
                                     <Label className="text-[10px]">RTGS SR No.</Label>
+                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono" />
+                                </div>
+                            )}
+
+                             {paymentMethod === 'Gov.' && (
+                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
+                                    <Label className="text-[10px]">Gov. SR No.</Label>
                                     <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono" />
                                 </div>
                             )}

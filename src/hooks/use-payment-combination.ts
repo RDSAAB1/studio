@@ -10,6 +10,8 @@ export type PaymentOption = {
     rate: number;
     calculatedAmount: number;
     amountRemaining: number;
+    // Optional: number of bags (when bag size constraint is used)
+    bags?: number | null;
 };
 
 type SortConfig = {
@@ -21,18 +23,24 @@ interface UsePaymentCombinationProps {
     calcTargetAmount: number;
     minRate: number;
     maxRate: number;
+    rsValue?: number;
 }
 
 export const usePaymentCombination = ({ 
     calcTargetAmount,
     minRate,
     maxRate,
+    rsValue = 0,
 }: UsePaymentCombinationProps) => {
     const { toast } = useToast();
     const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
     const [roundFigureToggle, setRoundFigureToggle] = useState(false);
+    // New toggle: allow amount in paise (non-integer), otherwise force whole-rupee amounts only
+    const [allowPaiseAmount, setAllowPaiseAmount] = useState(false);
     const [rateStep, setRateStep] = useState<1 | 5>(1);
+    // New: bag size for quantity (e.g. 50 kg per bag) to ensure qty / bagSize is whole number
+    const [bagSize, setBagSize] = useState<number | undefined>(undefined);
 
     const handleGeneratePaymentOptions = () => {
         if (isNaN(calcTargetAmount) || isNaN(minRate) || isNaN(maxRate) || minRate > maxRate) {
@@ -40,45 +48,125 @@ export const usePaymentCombination = ({
             return;
         }
 
-        const rawOptions: PaymentOption[] = [];
-        const step = roundFigureToggle ? 100 : 1; // finer granularity for better minimal remaining
+        // If Rs value is provided, adjust the targeted amount
+        // Process: targeted amount / min rate = quantity, then original target + (quantity * rsValue) = new targeted amount
+        let adjustedTargetAmount = calcTargetAmount;
+        if (rsValue && rsValue > 0 && minRate > 0) {
+            const quantity = calcTargetAmount / minRate;
+            adjustedTargetAmount = calcTargetAmount + (quantity * rsValue);
+        }
 
-        // Generate more combinations with finer quantity increments
-        // Use smaller quantity steps to generate more combinations
-        const qtyStep = 0.05; // Reduced from 0.10 to 0.05 for more combinations
-        const maxQty = Math.min(2000, calcTargetAmount / Math.max(minRate, 1) * 1.5); // Dynamic max based on target
+        const rawOptions: PaymentOption[] = [];
+        const step = roundFigureToggle ? 100 : 1; // round-figure step in rupees (used when RF toggle is ON)
+
+        // Generate combinations with quantity divisible by 0.10
+        const qtyStep = 0.10; // Quantity should be divisible by 0.10
+        // Significantly increase max quantity to generate many more options
+        // Calculate based on target amount and minimum rate, but allow much larger range
+        const baseMaxQty = adjustedTargetAmount / Math.max(minRate, 1);
+        const maxQty = Math.min(20000, baseMaxQty * 10); // Much larger multiplier and max for many more combinations
 
         const normalizedMinRate = Math.ceil(Math.max(minRate, 0) / rateStep) * rateStep;
         const normalizedMaxRate = Math.floor(Math.max(maxRate, normalizedMinRate) / rateStep) * rateStep;
 
-        for (let q = 0.05; q <= maxQty; q = parseFloat((q + qtyStep).toFixed(2))) {
+        // Start from 0.10 and increment by 0.10 (quantity divisible by 0.10)
+        // Use integer-based loop to avoid floating point precision issues and generate many more options
+        const qtyMultiplier = 10; // Multiply by 10 to work with integers (0.10 = 1, 0.20 = 2, etc.)
+        const maxQtyInt = Math.floor(maxQty * qtyMultiplier);
+        
+        // Generate all combinations where quantity is divisible by 0.10
+        for (let qtyInt = 1; qtyInt <= maxQtyInt; qtyInt++) {
+            // Convert back to decimal (divisible by 0.10)
+            const q = qtyInt / qtyMultiplier;
+            
+            // For quantity q, amount = q * rate will be whole number if rate makes it so
+            // We'll check all rates and only include where q * rate is valid as per toggles
             for (let currentRate = normalizedMinRate; currentRate <= normalizedMaxRate; currentRate += rateStep) {
 
                 const rawAmount = q * currentRate;
-                // Round to step for round figure toggle
-                const calculatedAmount = roundFigureToggle ? Math.round(rawAmount / step) * step : Math.round(rawAmount * 100) / 100;
 
-                // Allow combinations up to target (no strict filtering)
-                if (calculatedAmount > calcTargetAmount) continue;
+                let calculatedAmount: number;
+                let bags: number | null = null;
 
-                const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
+                // If bagSize is provided, enforce that q / bagSize is a whole number
+                if (bagSize && bagSize > 0) {
+                    const approxBags = q / bagSize;
+                    const epsilonBags = 0.0000001;
+                    const roundedBags = Math.round(approxBags);
+                    const isWholeBags = Math.abs(approxBags - roundedBags) < epsilonBags;
+                    if (!isWholeBags) continue;
+                    bags = roundedBags;
+                }
+
+                if (allowPaiseAmount) {
+                    // Allow paise: keep amount up to 2 decimal places (₹ + paise)
+                    calculatedAmount = Math.round(rawAmount * 100) / 100; // 2 decimal places
+
+                    // Still respect target amount bounds (use adjusted target amount)
+                    if (calculatedAmount > adjustedTargetAmount) continue;
+                    if (calculatedAmount <= 0) continue;
+
+                    // If round-figure toggle is ON, enforce that the rounded rupee amount is divisible by step (100 or 1)
+                    if (roundFigureToggle) {
+                        const rupeeOnly = Math.round(calculatedAmount); // nearest whole rupee
+                        if (rupeeOnly % step !== 0) continue;
+                    }
+                } else {
+                    // Old behaviour: only accept exact whole-rupee amounts (no paise)
+                    // Check if the amount is exactly a whole number (no rounding, exact match only)
+                    // Use a small epsilon to handle floating point precision issues
+                    const epsilon = 0.0000001;
+                    const roundedAmount = Math.round(rawAmount);
+                    const isWholeNumber = Math.abs(rawAmount - roundedAmount) < epsilon;
+                    
+                    // Only include if amount is naturally a whole number (exact, no rounding)
+                    if (!isWholeNumber) continue;
+                    
+                    // Get the exact whole number amount
+                    calculatedAmount = roundedAmount;
+                    
+                    // If round figure toggle is on, check if it's divisible by 100 (exact, no rounding)
+                    if (roundFigureToggle) {
+                        if (calculatedAmount % step !== 0) continue; // Only include if exactly divisible by step
+                    }
+
+                    // Ensure it's a proper integer
+                    if (!Number.isInteger(calculatedAmount)) continue;
+                    
+                    // Allow combinations up to target (no strict filtering - allow all valid combinations)
+                    // Use adjusted target amount
+                    if (calculatedAmount > adjustedTargetAmount) continue;
+                    if (calculatedAmount <= 0) continue;
+                }
+
+                // Calculate remaining amount (can be decimal when paise is allowed)
+                // Use adjusted target amount
+                const amountRemaining = adjustedTargetAmount - calculatedAmount;
                 if (amountRemaining < 0) continue;
                 
                 rawOptions.push({
-                    quantity: q,
+                    quantity: parseFloat(q.toFixed(2)), // Ensure 2 decimal places (0.10, 0.20, etc.)
                     rate: currentRate,
                     calculatedAmount: calculatedAmount,
-                    amountRemaining: amountRemaining
+                    amountRemaining: Math.round(amountRemaining * 100) / 100,
+                    bags,
                 });
             }
         }
         
         // Ensure combinations are unique by (rate, quantity); allow duplicate remaining amounts
+        // When paise is not allowed, all amounts are already exact whole numbers (no rounding was done beyond integer)
         const pairToOption = new Map<string, PaymentOption>();
         for (const opt of rawOptions) {
+            // If paise is not allowed, verify it's still a proper integer (should already be, but double-check)
+            if (!allowPaiseAmount && !Number.isInteger(opt.calculatedAmount)) continue;
+            
             const key = `${opt.rate}-${opt.quantity}`;
-            if (!pairToOption.has(key)) pairToOption.set(key, opt);
+            if (!pairToOption.has(key)) {
+                pairToOption.set(key, opt);
+            }
         }
+        // All options are already exact whole numbers, no conversion needed
         const uniqueOptions = Array.from(pairToOption.values());
         // Sort by: minimal remaining, then lower rate (kam rate), then higher quantity (zyada qty), then higher calculated amount
         const sortedOptions = uniqueOptions.sort((a, b) => {
@@ -88,11 +176,12 @@ export const usePaymentCombination = ({
             return b.calculatedAmount - a.calculatedAmount;
         });
 
-        // Take top 500 combinations sorted by priority
-        const targetTotal = 500;
+        // Take top combinations sorted by priority
+        // Increase limit to show more options
+        const targetTotal = 2000; // Increased from 500 to 2000 for more options
         
-        // If we have enough options, take top 500
-        // If less than 500, take all available
+        // If we have enough options, take top 2000
+        // If less than 2000, take all available
         const limitedOptions = sortedOptions.length >= targetTotal 
             ? sortedOptions.slice(0, targetTotal)
             : sortedOptions;
@@ -131,6 +220,10 @@ export const usePaymentCombination = ({
         paymentOptions,
         roundFigureToggle,
         setRoundFigureToggle,
+        allowPaiseAmount,
+        setAllowPaiseAmount,
+        bagSize,
+        setBagSize,
         rateStep,
         setRateStep,
         handleGeneratePaymentOptions,

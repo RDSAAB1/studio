@@ -32,6 +32,10 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [rtgsRate, setRtgsRate] = useState(0);
     const [rtgsAmount, setRtgsAmount] = useState(0);
 
+    const [govQuantity, setGovQuantity] = useState(0);
+    const [govRate, setGovRate] = useState(0);
+    const [govAmount, setGovAmount] = useState(0);
+
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
     
@@ -87,7 +91,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     };
     
-    const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS') => {
+    const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
         // Always allow switching to the selected method
         setPaymentMethod(method);
         
@@ -114,7 +118,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
 
 
-    const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
+    const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
         if (!paymentHistory || !expenses) return '';
     
         if (method === 'RTGS') {
@@ -128,6 +132,19 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             }, 0);
             // Always generate RT##### format (not R#####)
             return generateReadableId('RT', lastNum, 5);
+        }
+    
+        if (method === 'Gov.') {
+            const govPayments = paymentHistory.filter(p => p.receiptType === 'Gov.' && p.paymentId.startsWith('GV'));
+            const lastGovNum = govPayments.reduce((max, p) => {
+                const numMatch = p.paymentId.match(/^GV(\d+)$/);
+                if (numMatch && numMatch[1]) {
+                    const num = parseInt(numMatch[1], 10);
+                    return Math.max(max, num);
+                }
+                return max;
+            }, 0);
+            return generateReadableId('GV', lastGovNum, 5);
         }
     
         if (method === 'Online') {
@@ -205,7 +222,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     useEffect(() => {
         if (!editingPayment) {
              setRtgsSrNo(getNextPaymentId('RTGS'));
-             setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
+             if (paymentMethod === 'Online') {
+                 setPaymentId(getNextPaymentId('Online'));
+             } else if (paymentMethod === 'Gov.') {
+                 setPaymentId(getNextPaymentId('Gov.'));
+             } else {
+                 setPaymentId(getNextPaymentId('Cash'));
+             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentHistory, expenses, editingPayment, paymentMethod]);
@@ -219,8 +242,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setIsPayeeEditing(false); // Reset payee editing state
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
+        setGovQuantity(0); setGovRate(0); setGovAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
-        setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : getNextPaymentId('Cash'));
+        setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : paymentMethod === 'Gov.' ? getNextPaymentId('Gov.') : getNextPaymentId('Cash'));
     }, [getNextPaymentId, paymentMethod]);
     
     const handleFullReset = useCallback(() => {
@@ -250,6 +274,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         rtgsQuantity, setRtgsQuantity,
         rtgsRate, setRtgsRate,
         rtgsAmount, setRtgsAmount,
+        govQuantity, setGovQuantity,
+        govRate, setGovRate,
+        govAmount, setGovAmount,
         editingPayment, setEditingPayment,
         isBeingEdited, setIsBeingEdited,
         calcTargetAmount, setCalcTargetAmount,

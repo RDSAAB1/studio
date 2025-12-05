@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { Printer, ChevronsUpDown, Trash2, Plus } from "lucide-react";
 import { TaxInvoice } from "@/components/print-formats/tax-invoice";
 import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
@@ -461,7 +461,14 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         />
                                     </div>
                                     <div className="col-span-2 flex items-center space-x-2 pt-2">
-                                        <Switch id="show-bag-weight" checked={showBagWeightColumns} onCheckedChange={setShowBagWeightColumns} />
+                                        <SegmentedSwitch 
+                                            id="show-bag-weight" 
+                                            checked={showBagWeightColumns} 
+                                            onCheckedChange={setShowBagWeightColumns}
+                                            leftLabel="Off"
+                                            rightLabel="On"
+                                            className="w-32"
+                                        />
                                         <Label htmlFor="show-bag-weight" className="text-xs">Show Bag Wt & Final Wt Columns</Label>
                                     </div>
                                 </CardContent>
@@ -487,7 +494,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardHeader className="p-3 flex items-center justify-between"><CardTitle className="text-base">Ship To Details</CardTitle><div className="flex items-center space-x-2"><Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} /><Label htmlFor="same-as-billing" className="text-xs">Same as Bill To</Label></div></CardHeader>
+                                <CardHeader className="p-3 flex items-center justify-between"><CardTitle className="text-base">Ship To Details</CardTitle><div className="flex items-center space-x-2"><SegmentedSwitch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} leftLabel="Off" rightLabel="On" className="w-32" /><Label htmlFor="same-as-billing" className="text-xs">Same as Bill To</Label></div></CardHeader>
                                 {!isSameAsBilling && (
                                     <CardContent className="p-3 space-y-3">
                                         <div className="space-y-1"><Label className="text-xs">Name</Label><Input name="shippingName" value={editableInvoiceDetails.shippingName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>

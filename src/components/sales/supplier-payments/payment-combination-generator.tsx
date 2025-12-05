@@ -18,12 +18,18 @@ interface PaymentCombinationGeneratorProps {
     setMinRate: (value: number) => void;
     maxRate: number;
     setMaxRate: (value: number) => void;
+    rsValue?: number;
+    setRsValue?: (value: number) => void;
     selectPaymentAmount: (option: PaymentOption) => void;
     combination: {
         paymentOptions: PaymentOption[];
         sortedPaymentOptions: PaymentOption[];
         roundFigureToggle: boolean;
         setRoundFigureToggle: (value: boolean) => void;
+        allowPaiseAmount: boolean;
+        setAllowPaiseAmount: (value: boolean) => void;
+        bagSize?: number;
+        setBagSize: (value: number | undefined) => void;
         rateStep: 1 | 5;
         setRateStep: (value: 1 | 5) => void;
         handleGeneratePaymentOptions: () => void;
@@ -39,6 +45,8 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
     setMinRate,
     maxRate,
     setMaxRate,
+    rsValue = 0,
+    setRsValue,
     selectPaymentAmount,
     combination,
     showResults = true,
@@ -48,6 +56,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
         sortedPaymentOptions,
         roundFigureToggle,
         setRoundFigureToggle,
+        allowPaiseAmount,
+        setAllowPaiseAmount,
+        bagSize,
+        setBagSize,
         rateStep,
         setRateStep,
         handleGeneratePaymentOptions,
@@ -60,7 +72,7 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
 
     return (
         <div className="space-y-3 text-[11px]">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
                 <div className="space-y-1">
                     <Label className="text-[11px] whitespace-nowrap">Target Amt</Label>
                     <Input
@@ -88,6 +100,35 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         className="h-8 text-[11px]"
                     />
                 </div>
+                {setRsValue && (
+                    <div className="space-y-1">
+                        <Label className="text-[11px] whitespace-nowrap">Rs</Label>
+                        <Input
+                            type="number"
+                            value={rsValue || ''}
+                            onChange={(e) => setRsValue(Number(e.target.value) || 0)}
+                            className="h-8 text-[11px]"
+                            placeholder="Rs value"
+                        />
+                    </div>
+                )}
+                <div className="space-y-1">
+                    <Label className="text-[11px] whitespace-nowrap">Bag Qty</Label>
+                    <Input
+                        type="number"
+                        value={bagSize ?? ''}
+                        onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (!e.target.value || isNaN(v) || v <= 0) {
+                                setBagSize(undefined);
+                            } else {
+                                setBagSize(v);
+                            }
+                        }}
+                        className="h-8 text-[11px]"
+                        placeholder="Per bag qty"
+                    />
+                </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -95,42 +136,99 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         type="button"
                         onClick={() => setRoundFigureToggle(!roundFigureToggle)}
                         className={cn(
-                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
-                            roundFigureToggle ? "bg-primary/20" : "bg-secondary/20"
+                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
                         )}
                     >
-                        <span className={cn("absolute left-4 text-[10px] font-semibold transition-colors", !roundFigureToggle ? "text-primary" : "text-muted-foreground")}>Off</span>
-                        <span className={cn("absolute right-4 text-[10px] font-semibold transition-colors", roundFigureToggle ? "text-primary" : "text-muted-foreground")}>On</span>
+                        {/* Background labels - always visible */}
+                        <span className={cn(
+                            "absolute left-4 text-[10px] font-semibold transition-colors z-0",
+                            !roundFigureToggle ? "text-muted-foreground/70" : "text-foreground"
+                        )}>Off</span>
+                        <span className={cn(
+                            "absolute right-4 text-[10px] font-semibold transition-colors z-0",
+                            roundFigureToggle ? "text-muted-foreground/70" : "text-foreground"
+                        )}>On</span>
+                        
+                        {/* Sliding indicator */}
                         <div
                             className={cn(
-                                "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card",
-                                roundFigureToggle ? "translate-x-[calc(100%-26px)]" : "-translate-x-[4px]"
+                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                roundFigureToggle ? "left-[calc(50%+2px)]" : "left-[2px]"
                             )}
+                            style={{
+                                transform: roundFigureToggle ? 'translateX(0)' : 'translateX(0)',
+                            }}
                         >
-                            <div className="h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 bg-primary text-primary-foreground text-[10px] font-bold">
-                                RF
-                            </div>
+                            <span className="text-[10px] font-bold text-primary-foreground">RF</span>
+                        </div>
+                    </button>
+                    {/* Toggle: Amount in rupees only vs rupees + paise */}
+                    <button
+                        type="button"
+                        onClick={() => setAllowPaiseAmount(!allowPaiseAmount)}
+                        className={cn(
+                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                        )}
+                    >
+                        {/* Background labels - always visible */}
+                        <span className={cn(
+                            "absolute left-4 text-[10px] font-semibold transition-colors z-0",
+                            !allowPaiseAmount ? "text-muted-foreground/70" : "text-foreground"
+                        )}>
+                            ₹ Only
+                        </span>
+                        <span className={cn(
+                            "absolute right-4 text-[10px] font-semibold transition-colors z-0",
+                            allowPaiseAmount ? "text-muted-foreground/70" : "text-foreground"
+                        )}>
+                            ₹ + Paise
+                        </span>
+                        
+                        {/* Sliding indicator */}
+                        <div
+                            className={cn(
+                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                allowPaiseAmount ? "left-[calc(50%+2px)]" : "left-[2px]"
+                            )}
+                            style={{
+                                transform: allowPaiseAmount ? 'translateX(0)' : 'translateX(0)',
+                            }}
+                        >
+                            <span className="text-[10px] font-bold text-primary-foreground">
+                                {allowPaiseAmount ? "₹.ps" : "₹"}
+                            </span>
                         </div>
                     </button>
                     <button
                         type="button"
                         onClick={() => setRateStep(rateStep === 1 ? 5 : 1)}
                         className={cn(
-                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
-                            rateStep === 5 ? "bg-primary/20" : "bg-secondary/20"
+                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
                         )}
                     >
-                        <span className={cn("absolute left-4 text-[10px] font-semibold transition-colors", rateStep === 1 ? "text-primary" : "text-muted-foreground")}>÷1</span>
-                        <span className={cn("absolute right-4 text-[10px] font-semibold transition-colors", rateStep === 5 ? "text-primary" : "text-muted-foreground")}>÷5</span>
+                        {/* Background labels - always visible on base bar */}
+                        <span className={cn(
+                            "absolute left-4 text-[10px] font-semibold transition-colors z-0",
+                            rateStep === 1 ? "text-muted-foreground/70" : "text-foreground"
+                        )}>÷1</span>
+                        <span className={cn(
+                            "absolute right-4 text-[10px] font-semibold transition-colors z-0",
+                            rateStep === 5 ? "text-muted-foreground/70" : "text-foreground"
+                        )}>÷5</span>
+                        
+                        {/* Sliding indicator - moves based on selection */}
                         <div
                             className={cn(
-                                "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card",
-                                rateStep === 5 ? "translate-x-[calc(100%-26px)]" : "-translate-x-[4px]"
+                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                rateStep === 5 ? "left-[calc(50%+2px)]" : "left-[2px]"
                             )}
+                            style={{
+                                transform: rateStep === 5 ? 'translateX(0)' : 'translateX(0)',
+                            }}
                         >
-                            <div className="h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 bg-primary text-primary-foreground text-[10px] font-bold">
+                            <span className="text-[10px] font-bold text-primary-foreground">
                                 ÷{rateStep}
-                            </div>
+                            </span>
                         </div>
                     </button>
                 </div>
@@ -170,6 +268,9 @@ export const PaymentCombinationResults: React.FC<PaymentCombinationResultsProps>
                             </Button>
                         </TableHead>
                         <TableHead className="h-8 p-2">
+                            Bags
+                        </TableHead>
+                        <TableHead className="h-8 p-2">
                             <Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="p-1 text-[11px]">
                                 Rate <ArrowUpDown className="inline h-3 w-3" />
                             </Button>
@@ -191,8 +292,11 @@ export const PaymentCombinationResults: React.FC<PaymentCombinationResultsProps>
                     {options.map((option, index) => (
                         <TableRow key={index}>
                             <TableCell className="p-2 text-[11px]">{option.quantity.toFixed(2)}</TableCell>
+                            <TableCell className="p-2 text-[11px]">
+                                {option.bags != null ? option.bags : '-'}
+                            </TableCell>
                             <TableCell className="p-2 text-[11px]">{option.rate}</TableCell>
-                            <TableCell className="p-2 text-[11px]">{formatCurrency(option.calculatedAmount)}</TableCell>
+                            <TableCell className="p-2 text-[11px]">{formatCurrency(Math.round(option.calculatedAmount))}</TableCell>
                             <TableCell className="p-2 text-[11px]">{formatCurrency(option.amountRemaining)}</TableCell>
                             <TableCell className="p-2 text-[11px]">
                                 <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => onSelect(option)}>

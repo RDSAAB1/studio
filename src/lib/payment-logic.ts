@@ -29,7 +29,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         cdEnabled, calculatedCdAmount, settleAmount, totalOutstandingForSelected,
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
-        rtgsQuantity, rtgsRate, rtgsAmount, supplierDetails, bankDetails,
+        rtgsQuantity, rtgsRate, rtgsAmount, govQuantity, govRate, govAmount,
+        supplierDetails, bankDetails,
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
         isCustomer = false, // Flag to determine if this is a customer payment
     } = context;
@@ -49,10 +50,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     }
 
     if ((!selectedEntries || selectedEntries.length === 0)) {
-        if (paymentMethod !== 'RTGS') {
+        if (paymentMethod !== 'RTGS' && paymentMethod !== 'Gov.') {
             return { success: false, message: "Please select entries to pay" };
-        } else if (rtgsAmount <= 0) {
+        } else if (paymentMethod === 'RTGS' && rtgsAmount <= 0) {
              return { success: false, message: "Please enter an amount for RTGS payment" };
+        } else if (paymentMethod === 'Gov.' && govAmount <= 0) {
+             return { success: false, message: "Please enter quantity and rate for Gov. payment" };
         }
     }
 
@@ -1620,8 +1623,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
         }
         
-        // For RTGS, paymentId should be rtgsSrNo
-        const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
+        // For RTGS and Gov., paymentId should be rtgsSrNo
+        const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
         
         const paymentDataBase: Omit<Payment, 'id'> = {
             paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
@@ -1641,11 +1644,19 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             supplierAddress: toTitleCase(supplierDetails.address),
             bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
         };
-        if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
-        else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
-        if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
+        if (paymentMethod === 'RTGS') {
+            paymentDataBase.rtgsSrNo = rtgsSrNo;
+        } else if (paymentMethod === 'Gov.') {
+            (paymentDataBase as any).rtgsSrNo = rtgsSrNo;
+            (paymentDataBase as any).govQuantity = govQuantity || 0;
+            (paymentDataBase as any).govRate = govRate || 0;
+            (paymentDataBase as any).govAmount = govAmount || 0;
+        } else {
+            delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
+        }
+        if (paymentMethod !== 'Cash' && paymentMethod !== 'Gov.') paymentDataBase.bankAccountId = accountIdForPayment;
 
-        const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
+        const paymentIdToUse = editingPayment ? editingPayment.id : ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId);
         const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
         const newPaymentRef = doc(paymentCollection, paymentIdToUse);
         const now = Timestamp.now();
@@ -1665,7 +1676,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             } else if (editingPayment?.paidFor?.length) {
                 paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
             }
-            const finalPaymentId = paymentMethod === 'RTGS' ? rtgsSrNo : paymentId;
+            const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
                 date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
@@ -1682,9 +1693,18 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 supplierAddress: toTitleCase(supplierDetails.address),
                 bankName: bankDetails.bank, bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
             };
-            if (paymentMethod === 'RTGS') (paymentDataBase as any).rtgsSrNo = rtgsSrNo; else delete (paymentDataBase as any).rtgsSrNo;
+            if (paymentMethod === 'RTGS') {
+                (paymentDataBase as any).rtgsSrNo = rtgsSrNo;
+            } else if (paymentMethod === 'Gov.') {
+                (paymentDataBase as any).rtgsSrNo = rtgsSrNo;
+                (paymentDataBase as any).govQuantity = govQuantity || 0;
+                (paymentDataBase as any).govRate = govRate || 0;
+                (paymentDataBase as any).govAmount = govAmount || 0;
+            } else {
+                delete (paymentDataBase as any).rtgsSrNo;
+            }
             if (paymentMethod !== 'Cash') (paymentDataBase as any).bankAccountId = accountIdForPayment;
-            const paymentIdToUse = editingPayment ? editingPayment.id : (paymentMethod === 'RTGS' ? rtgsSrNo : paymentId);
+            const paymentIdToUse = editingPayment ? editingPayment.id : ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId);
             const now = Timestamp.now();
             finalPaymentData = { id: paymentIdToUse, ...paymentDataBase, updatedAt: now } as Payment;
             try {

@@ -4,35 +4,82 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 15%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 259 96% 67%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217 33% 30%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 20%;
-  --muted-foreground: 215 20% 65%;
-  --accent: 217 33% 30%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 63% 31%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217 33% 25%;
-  --input: 217 33% 22%;
-  --ring: var(--primary);
+  /* Professional Teal/Green Theme - Natural & Calming */
+  /* Color Palette from Image */
+  /* #051F20 = 180 60% 8% - Very dark teal (background) */
+  /* #0B2B26 = 170 50% 11% - Dark teal-green */
+  /* #163832 = 160 40% 18% - Dark muted green (cards) */
+  /* #235347 = 160 35% 25% - Medium-dark teal-green */
+  /* #8EB69B = 140 25% 65% - Light sage green (accents) */
+  /* #DAF1DE = 130 50% 92% - Very light mint (text) */
+  
+  --background: 180 60% 6%; /* #051F20 - Very dark teal - Main background */
+  --foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Main text */
+  --card: 160 40% 18% / 0.7; /* Transparent dark muted green - Card background (glass effect) */
+  --card-foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Card text */
+  --popover: 160 35% 25% / 0.85; /* Transparent medium-dark teal-green - Popover background */
+  --popover-foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Popover text */
+  --primary: 160 40% 30% / 0.8; /* Transparent teal-green - Primary buttons (glass effect) */
+  --primary-foreground: 130 50% 98%; /* Brighter mint - Text on primary (better contrast) */
+  --secondary: 140 30% 70% / 0.6; /* Transparent sage green - Secondary backgrounds (glass effect) */
+  --secondary-foreground: 180 60% 10%; /* Darker teal - Text on secondary (better contrast) */
+  --muted: 170 50% 13% / 0.5; /* Transparent teal-green - Muted backgrounds (glass effect) */
+  --muted-foreground: 140 25% 75%; /* Brighter sage green - Muted text (more readable) */
+  --accent: 140 30% 70% / 0.7; /* Transparent sage green - Accent elements (glass effect) */
+  --accent-foreground: 180 60% 10%; /* Darker teal - Text on accent (better contrast) */
+  --destructive: 0 84% 60% / 0.8; /* Transparent Red - Error states */
+  --destructive-foreground: 0 0% 100%; /* Pure White - Text on destructive */
+  --border: 170 50% 18% / 0.4; /* Transparent teal-green - Borders (glass effect) */
+  --input: 160 40% 20% / 0.6; /* Transparent green - Input backgrounds (glass effect) */
+  --ring: 140 30% 70% / 0.6; /* Transparent sage green - Focus rings (glass effect) */
   --radius: 0.75rem;
-  --chart-1: hsl(205 90% 40%);
-  --chart-2: hsl(30 90% 50%);
-  --chart-3: hsl(160 80% 35%);
-  --chart-4: hsl(45 95% 55%);
-  --chart-5: hsl(340 85% 60%);
+  --chart-1: 140 25% 65%; /* #8EB69B - Light sage green */
+  --chart-2: 160 35% 25%; /* #235347 - Medium-dark teal-green */
+  --chart-3: 160 40% 18%; /* #163832 - Dark muted green */
+  --chart-4: 170 50% 11%; /* #0B2B26 - Dark teal-green */
+  --chart-5: 130 50% 92%; /* #DAF1DE - Very light mint */
+}
+
+.dark {
+  /* Professional Teal/Green Theme - Enhanced Dark Mode */
+  /* Color Palette from Image - Deeper Variants */
+  /* #051F20 = 180 60% 8% - Very dark teal */
+  /* #0B2B26 = 170 50% 11% - Dark teal-green */
+  /* #163832 = 160 40% 18% - Dark muted green */
+  /* #235347 = 160 35% 25% - Medium-dark teal-green */
+  /* #8EB69B = 140 25% 65% - Light sage green */
+  /* #DAF1DE = 130 50% 92% - Very light mint */
+  
+  --background: 180 60% 4%; /* Ultra dark teal - Main background (deepest) */
+  --foreground: 130 50% 96%; /* Very light mint - Main text (maximum contrast) */
+  --card: 160 40% 18% / 0.7; /* Transparent dark muted green - Card background (glass effect) */
+  --card-foreground: 130 50% 96%; /* Very light mint - Card text */
+  --popover: 160 35% 25% / 0.85; /* Transparent medium-dark teal-green - Popover */
+  --popover-foreground: 130 50% 96%; /* Very light mint - Popover text */
+  --primary: 160 40% 30%; /* Enhanced teal-green - Primary (more visible) */
+  --primary-foreground: 130 50% 98%; /* Brighter mint - Text on primary (better contrast) */
+  --secondary: 140 30% 70%; /* Enhanced sage green - Secondary (more vibrant) */
+  --secondary-foreground: 180 60% 10%; /* Darker teal - Text on secondary (better contrast) */
+  --muted: 170 50% 13%; /* Slightly lighter teal-green - Muted backgrounds */
+  --muted-foreground: 140 25% 75%; /* Brighter sage green - Muted text (more readable) */
+  --accent: 140 30% 70%; /* Enhanced sage green - Accent elements (more vibrant) */
+  --accent-foreground: 180 60% 10%; /* Darker teal - Text on accent (better contrast) */
+  --destructive: 0 84% 60%; /* Bright Red - Error states */
+  --destructive-foreground: 0 0% 100%; /* Pure White - Text on destructive */
+  --border: 170 50% 18%; /* Lighter teal-green - Borders (more visible) */
+  --input: 160 40% 20%; /* Slightly lighter green - Input backgrounds (better visibility) */
+  --ring: 140 30% 70%; /* Enhanced sage green - Focus rings (more visible) */
+  --chart-1: 140 25% 65%; /* #8EB69B - Light sage green */
+  --chart-2: 160 35% 25%; /* #235347 - Medium-dark teal-green */
+  --chart-3: 160 40% 18%; /* #163832 - Dark muted green */
+  --chart-4: 170 50% 11%; /* #0B2B26 - Dark teal-green */
+  --chart-5: 130 50% 92%; /* #DAF1DE - Very light mint */
 }
 
 body {
   font-family: 'Inter', sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 @layer base {
@@ -41,6 +88,388 @@ body {
   }
   body {
     @apply bg-background text-foreground font-sans;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  
+  /* Professional Dark Theme - Clean & Modern */
+  h1, h2, h3, h4, h5, h6 {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+  
+  /* Light text on dark backgrounds */
+  p, span, div, label {
+    color: hsl(var(--foreground));
+  }
+  
+  /* Inputs with optimized blurry glass effect */
+  input, textarea, select {
+    background-color: hsl(var(--input));
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    border-radius: calc(var(--radius) - 2px);
+    will-change: backdrop-filter;
+  }
+  
+  /* Cards with optimized blurry glass effect */
+  .card, [class*="card"] {
+    background-color: hsl(var(--card));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    color: hsl(var(--card-foreground));
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 8px 32px 0 rgba(5, 31, 32, 0.37);
+    will-change: transform, backdrop-filter;
+    transform: translateZ(0);
+  }
+  
+  /* Dark theme specific styles */
+  .dark body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+  
+  .dark p, .dark span, .dark div, .dark label {
+    color: hsl(var(--foreground));
+  }
+  
+  .dark input, .dark textarea, .dark select {
+    background-color: hsl(var(--input));
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    border-radius: calc(var(--radius) - 2px);
+    will-change: backdrop-filter;
+  }
+  
+  .dark .card, .dark [class*="card"] {
+    background-color: hsl(var(--card));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    color: hsl(var(--card-foreground));
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 8px 32px 0 rgba(5, 31, 32, 0.37);
+    will-change: transform, backdrop-filter;
+    transform: translateZ(0);
+  }
+  
+  /* Enhanced Teal/Green Theme Styling with Optimized Blur */
+  button {
+    border-radius: calc(var(--radius) - 2px);
+    transition: none;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  
+  button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.3), transparent);
+    transition: none;
+  }
+  
+  button:hover::before {
+    left: 100%;
+  }
+  
+  button:hover {
+    transform: translateY(-2px) translateZ(0);
+    box-shadow: 0 6px 20px hsl(var(--primary) / 0.4),
+                0 3px 10px hsl(var(--primary) / 0.3),
+                0 0 0 1px hsl(var(--primary) / 0.3),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+  
+  button:active {
+    transform: translateY(0) translateZ(0);
+    box-shadow: 0 2px 8px hsl(var(--primary) / 0.3);
+  }
+  
+  /* Enhanced table styling with teal theme */
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  th {
+    background: linear-gradient(to bottom, hsl(var(--muted)), hsl(var(--muted) / 0.8));
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border-color: hsl(var(--border));
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
+  
+  td {
+    border-color: hsl(var(--border));
+    transition: none;
+    background-color: hsl(var(--card) / 0.3);
+    backdrop-filter: blur(8px) saturate(130%);
+    -webkit-backdrop-filter: blur(8px) saturate(130%);
+  }
+  
+  /* Enhanced table row hover - more visible */
+  tr:hover td {
+    background-color: hsl(var(--accent) / 0.4) !important;
+    backdrop-filter: blur(12px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+    border-color: hsl(var(--primary) / 0.3) !important;
+    box-shadow: inset 0 1px 0 0 hsl(var(--primary) / 0.2),
+                0 2px 4px hsl(var(--accent) / 0.2) !important;
+  }
+  
+  /* Table row hover with better contrast */
+  tbody tr:hover {
+    background-color: hsl(var(--accent) / 0.4) !important;
+  }
+  
+  /* Specific hover for table rows */
+  [role="row"]:hover,
+  [role="row"]:hover td,
+  tbody tr:hover td {
+    background-color: hsl(var(--accent) / 0.4) !important;
+    backdrop-filter: blur(12px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+  }
+  
+  /* Optimized blurry glass card shadows */
+  .card, [class*="Card"] {
+    box-shadow: 0 4px 20px hsl(var(--background) / 0.8),
+                0 2px 10px hsl(var(--background) / 0.6),
+                0 1px 3px hsl(var(--primary) / 0.1),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    transition: none;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  
+  .card:hover, [class*="Card"]:hover {
+    box-shadow: 0 8px 30px hsl(var(--background) / 0.9),
+                0 4px 15px hsl(var(--primary) / 0.2),
+                0 2px 5px hsl(var(--primary) / 0.15),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+    transform: translateY(-2px) translateZ(0);
+    border-color: hsl(var(--primary) / 0.5);
+  }
+  
+  /* Optimized input focus states */
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: hsl(var(--ring));
+    ring-offset: 2px;
+    ring-offset-color: hsl(var(--background));
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.25),
+                0 0 0 1px hsl(var(--ring)),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    background-color: hsl(var(--input));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+  
+  /* Enhanced scrollbar styling with teal theme */
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, 
+      hsl(var(--primary) / 0.6), 
+      hsl(var(--accent) / 0.6));
+    border-radius: 10px;
+    border: 2px solid hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, 
+      hsl(var(--primary) / 0.8), 
+      hsl(var(--accent) / 0.8));
+  }
+  
+  /* Optimized smooth color transitions */
+  * {
+    transition: none;
+  }
+  
+  /* Hardware acceleration for better performance */
+  .card, button, input, textarea, select, th, td {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  
+  /* Exclude switch root from hardware acceleration */
+  [data-radix-switch-root] {
+    -webkit-backface-visibility: visible !important;
+    backface-visibility: visible !important;
+  }
+  
+  /* Thumb needs transform - don't block it */
+  [data-radix-switch-thumb] {
+    -webkit-backface-visibility: visible !important;
+    backface-visibility: visible !important;
+    /* NO transform: none here - let JavaScript control it */
+  }
+  
+  /* Switch/Toggle - ensure proper functionality */
+  [data-radix-switch-root] {
+    pointer-events: auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  /* Unchecked state - darker/muted background */
+  [data-radix-switch-root][data-state="unchecked"] {
+    background-color: hsl(var(--muted)) !important;
+  }
+  
+  /* Checked state - bright primary color */
+  [data-radix-switch-root][data-state="checked"] {
+    background-color: hsl(var(--primary)) !important;
+  }
+  
+  /* Switch thumb - ensure it's visible and can move */
+  /* DO NOT set transform here - let JavaScript control it via inline styles */
+  [data-radix-switch-thumb] {
+    pointer-events: none !important;
+    /* Background and shadow set by JavaScript for consistency */
+    transition: none !important;
+    will-change: transform !important;
+  }
+  
+  /* NEVER override inline styles - they have highest priority */
+  [data-radix-switch-thumb][style*="transform"] {
+    /* Inline styles take absolute precedence - don't override */
+  }
+  
+  /* Enhanced link styling */
+  a {
+    color: hsl(var(--accent));
+    transition: none;
+  }
+  
+  a:hover {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+  
+  /* Optimized blurry glass effect for all dropdowns, popovers and dialogs */
+  [role="dialog"], 
+  [data-radix-popper-content-wrapper], 
+  [data-radix-popover-content], 
+  [data-radix-dropdown-content],
+  [data-radix-select-content],
+  [data-radix-select-viewport],
+  [role="menu"],
+  [role="listbox"] {
+    backdrop-filter: blur(12px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+    background-color: hsl(var(--popover)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 8px 32px hsl(var(--background) / 0.6),
+                0 4px 16px hsl(var(--background) / 0.4),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1) !important;
+    will-change: backdrop-filter;
+    transform: translateZ(0);
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+  }
+  
+  /* Custom dropdown menu styling */
+  .fixed.bg-popover {
+    backdrop-filter: blur(12px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+    background-color: hsl(var(--popover)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 8px 32px hsl(var(--background) / 0.6),
+                0 4px 16px hsl(var(--background) / 0.4),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1) !important;
+  }
+  
+  /* Dropdown menu items */
+  [role="menuitem"],
+  [role="option"],
+  [data-radix-dropdown-menu-item],
+  [data-radix-select-item] {
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    transition: none;
+  }
+  
+  [role="menuitem"]:hover,
+  [role="option"]:hover,
+  [data-radix-dropdown-menu-item]:hover,
+  [data-radix-select-item]:hover {
+    background-color: hsl(var(--accent) / 0.3) !important;
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+  }
+  
+  /* Optimized blur for all overlay elements */
+  [data-radix-portal] > * {
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    transform: translateZ(0);
+  }
+  
+  /* Optimized blur for modals */
+  [role="dialog"] > * {
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+  
+  /* Enhanced visibility for calculation fields and value boxes */
+  .bg-secondary,
+  .bg-accent\/40,
+  .bg-primary\/30,
+  .bg-primary\/10,
+  .bg-muted {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Ensure labels are visible */
+  label.text-muted-foreground,
+  .text-muted-foreground {
+    color: hsl(var(--foreground)) !important;
+    opacity: 0.9;
+  }
+  
+  /* Calculation field boxes - enhanced visibility */
+  div[class*="bg-secondary"],
+  div[class*="bg-accent"],
+  div[class*="bg-primary"] {
+    color: hsl(var(--foreground)) !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Ensure text in value boxes is bold and visible */
+  .h-8, .h-9 {
+    font-weight: 700 !important;
+    letter-spacing: 0.01em;
   }
 }
 
@@ -63,14 +492,54 @@ body {
     width: 60px; /* Always collapsed */
     height: 100%;
     background: hsl(var(--card));
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
     border-right: 1px solid hsl(var(--border));
     padding: 10px 0;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: none !important;
+    animation: none !important;
     display: flex;
     flex-direction: column;
     z-index: 50;
     overflow-y: auto;
     overflow-x: hidden;
+    box-shadow: 4px 0 16px hsl(var(--background) / 0.5),
+                inset -1px 0 0 hsl(var(--border) / 0.3);
+    transform: translateZ(0);
+    will-change: backdrop-filter;
+}
+
+/* Disable all animations in sidebar */
+.side_bar *,
+.side_bar *::before,
+.side_bar *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Remove button boxes from sidebar icons - icons directly on bar */
+.side_bar_bottom button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+}
+
+.side_bar_bottom button:hover {
+    background: hsl(var(--accent) / 0.4) !important;
+    box-shadow: none !important;
+}
+
+.side_bar_bottom button:active {
+    background: hsl(var(--accent) / 0.5) !important;
+    box-shadow: none !important;
+}
+
+/* Keep selected icon highlighted */
+.side_bar_bottom button.bg-accent\/60 {
+    background: hsl(var(--accent) / 0.6) !important;
 }
 
 .side_bar_top{
@@ -124,13 +593,23 @@ body {
     color: hsl(var(--muted-foreground));
     margin-bottom: 5px;
     white-space: nowrap;
+    border-radius: calc(var(--radius) - 4px);
+    margin-left: 8px;
+    margin-right: 8px;
+    transition: none;
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
 }
 
 .side_bar_bottom .item .link:hover,
 .side_bar_bottom .item.active > .link,
 .side_bar_bottom .item .link.active{
-    background: hsl(var(--accent));
+    background: hsl(var(--accent) / 0.6);
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
     color: hsl(var(--accent-foreground));
+    box-shadow: 0 2px 8px hsl(var(--accent) / 0.3),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
 }
 
 .side_bar_bottom .item .link .icon{
@@ -138,9 +617,20 @@ body {
 }
 
 .side_bar_bottom .item .sub_menu{
-    background: hsl(var(--muted) / 0.5);
+    background: hsl(var(--muted) / 0.6);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
     padding-left: 20px;
     display: none;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border: 1px solid hsl(var(--border) / 0.3);
+    border-top: none;
+    box-shadow: 0 4px 12px hsl(var(--background) / 0.5),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    margin: 0 10px 5px 10px;
+    transform: translateZ(0);
+    will-change: backdrop-filter;
 }
 
 .side_bar_bottom .item.active .sub_menu{
@@ -150,6 +640,15 @@ body {
 .side_bar_bottom .item .sub_menu .link{
     padding: 10px 20px;
     font-size: 14px;
+    transition: none;
+    border-radius: calc(var(--radius) - 4px);
+    margin: 2px 4px;
+}
+
+.side_bar_bottom .item .sub_menu .link:hover {
+    background: hsl(var(--accent) / 0.3);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
 }
 
 
@@ -164,7 +663,7 @@ body {
     flex-grow: 1;
     min-width: 0; 
     margin-left: 60px; /* Always use collapsed sidebar width */
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: none;
     position: relative;
     z-index: 40;
 }
@@ -240,7 +739,99 @@ body {
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    background-color: hsl(var(--card)) !important;
+    border-bottom: 1px solid hsl(var(--border));
+    box-shadow: 0 2px 8px hsl(var(--background) / 0.4),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.05);
+    transform: translateZ(0);
+    will-change: backdrop-filter;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }
 .tab-bar-container::-webkit-scrollbar {
   display: none;
+}
+
+/* Force rectangular tabs - override all rounded corners */
+.tab-bar-container * {
+  border-radius: 0 !important;
+  -webkit-border-radius: 0 !important;
+}
+
+.tab-bar-container .relative.flex-1,
+.tab-bar-container .relative.flex-1 > div,
+.tab-bar-container .relative.flex-1 > div > div {
+  border-radius: 0 !important;
+  -webkit-border-radius: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Tab styling with glass effect - rectangular for end-to-end tabs */
+.tab-bar-container .relative.flex-1 > div {
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    transition: none;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* Hover effect for inactive tabs */
+.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) {
+    background-color: hsl(var(--accent) / 0.3) !important;
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    color: hsl(var(--foreground)) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px hsl(var(--accent) / 0.2),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+}
+
+/* Active tab styling */
+.tab-bar-container .relative.flex-1 > div.bg-primary {
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    box-shadow: 0 2px 8px hsl(var(--primary) / 0.3),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+}
+
+/* Active tab hover effect */
+.tab-bar-container .relative.flex-1 > div.bg-primary:hover {
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.4),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.3);
+    transform: translateY(-1px) scale(1.05);
+}
+
+/* Header bar glass effect - rectangular corners */
+.sticky.top-0.bg-card,
+header.bg-card,
+.sticky.top-0.z-30.flex-shrink-0.bg-card {
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    background-color: hsl(var(--card)) !important;
+    border-bottom: 1px solid hsl(var(--border));
+    box-shadow: 0 2px 8px hsl(var(--background) / 0.4),
+                inset 0 1px 0 0 hsl(var(--accent) / 0.05);
+    transform: translateZ(0);
+    will-change: backdrop-filter;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }

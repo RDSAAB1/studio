@@ -1034,14 +1034,34 @@ export default function VoucherImportTool() {
       id: formState.id || createReportId(formState.voucherNo),
     });
 
+    // Validate payload before saving
+    if (!payload.id || payload.id.trim() === '') {
+      console.error('[handleSaveEntry] Invalid payload ID:', payload);
+      toast({
+        title: "Save Failed",
+        description: "Entry ID is missing or invalid. Please check the voucher number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('[handleSaveEntry] Attempting to save entry:', {
+      id: payload.id,
+      voucherNo: payload.voucherNo,
+      exists: entries.some((entry) => entry.id === payload.id),
+    });
+
     try {
       setIsSaving(true);
       const exists = entries.some((entry) => entry.id === payload.id);
       if (exists) {
+        console.log('[handleSaveEntry] Updating existing entry:', payload.id);
         await updateMandiReport(payload.id, payload);
       } else {
+        console.log('[handleSaveEntry] Adding new entry:', payload.id);
         await addMandiReport(payload);
       }
+      
       setEntries((prev) => {
         const next = [...prev];
         const idx = next.findIndex((entry) => entry.id === payload.id);
@@ -1055,16 +1075,18 @@ export default function VoucherImportTool() {
       setFormState(payload);
       setActiveId(payload.id);
 
+      console.log('[handleSaveEntry] Successfully saved entry:', payload.id);
       toast({
         title: exists ? "Entry Updated" : "Entry Saved",
         description: "Entry stored in the mandi report collection.",
         variant: "success",
       });
     } catch (error) {
-      console.error("Failed to save entry:", error);
+      console.error("[handleSaveEntry] Failed to save entry:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast({
         title: "Save Failed",
-        description: "Unable to persist the entry. Please try again.",
+        description: `Unable to persist the entry: ${errorMessage}. Please check the console for details.`,
         variant: "destructive",
       });
     } finally {

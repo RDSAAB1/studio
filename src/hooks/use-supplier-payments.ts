@@ -52,6 +52,7 @@ export const useSupplierPayments = () => {
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('process');
+    const [selectedPaymentOption, setSelectedPaymentOption] = useState<{ quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; bags?: number | null } | null>(null);
     
     const selectedEntries = useMemo(() => {
         if (!Array.isArray(data.suppliers)) return [];
@@ -398,6 +399,7 @@ export const useSupplierPayments = () => {
                 setPaymentMethod, setSelectedAccountId,
                 setUtrNo, setCheckNo, setSixRNo, setSixRDate,
                 setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
+                setGovQuantity, setGovRate, setGovAmount,
                 setSupplierDetails, setBankDetails, setPaymentDate, setIsBeingEdited
             } = form;
     
@@ -417,7 +419,7 @@ export const useSupplierPayments = () => {
 
             handleToBePaidChange(paymentData.amount);
     
-            setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS');
+            setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'RTGS'|'Gov.');
             setSelectedAccountId(paymentData.bankAccountId || 'CashInHand');
             
             setUtrNo(paymentData.utrNo || '');
@@ -434,6 +436,13 @@ export const useSupplierPayments = () => {
             setRtgsQuantity(paymentData.quantity || 0);
             setRtgsRate(paymentData.rate || 0);
             setRtgsAmount(paymentData.rtgsAmount || 0);
+            
+            // Load Gov. fields if payment type is Gov.
+            if (paymentData.receiptType === 'Gov.') {
+                form.setGovQuantity((paymentData as any).govQuantity || 0);
+                form.setGovRate((paymentData as any).govRate || 0);
+                form.setGovAmount((paymentData as any).govAmount || 0);
+            }
             
             // Preserve contact number from payment data or find from supplier entry
             let contactNumber = (paymentData as any).supplierContact || '';
@@ -484,13 +493,6 @@ export const useSupplierPayments = () => {
                  return;
             }
             
-            if (paymentMode === 'Outsider') {
-                handlePaySelectedOutstanding(paymentToEdit);
-                toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
-                setIsProcessing(false);
-                return;
-            }
-            
             const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
             if (!originalEntry) {
                 throw new Error(`Supplier entry for SR# ${firstSrNo} not found.`);
@@ -534,16 +536,33 @@ export const useSupplierPayments = () => {
     }, [data.suppliers, data.customerSummaryMap, form, toast, handlePaySelectedOutstanding]);
     
 
-    const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
-        form.setRtgsQuantity(option.quantity);
-        form.setRtgsRate(option.rate);
-        form.setRtgsAmount(option.calculatedAmount);
+    const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; bags?: number | null }) => {
+        // Store the full selected option for calculations
+        setSelectedPaymentOption(option);
+        
+        // Ensure calculatedAmount is a whole number (no paise, divisible by 1)
+        // Always round to nearest whole number for amount field
+        const roundedAmount = Math.round(option.calculatedAmount);
+        
+        // Set RTGS fields if payment method is RTGS
+        if (form.paymentMethod === 'RTGS') {
+            form.setRtgsQuantity(option.quantity);
+            form.setRtgsRate(option.rate);
+            form.setRtgsAmount(roundedAmount);
+        }
+        // Set Gov. fields if payment method is Gov.
+        if (form.paymentMethod === 'Gov.') {
+            form.setGovQuantity(option.quantity);
+            form.setGovRate(option.rate);
+            form.setGovAmount(roundedAmount);
+        }
         form.setPaymentType('Partial'); // Set to Partial first
         
-        // For Partial mode, manually set the amounts
-        setToBePaidAmountManual(option.calculatedAmount);
-        setSettleAmountManual(option.calculatedAmount);
-        form.setCalcTargetAmount(Math.round(option.calculatedAmount));
+        // For Partial mode, manually set the amounts (always use rounded amount)
+        setToBePaidAmountManual(roundedAmount);
+        setSettleAmountManual(roundedAmount);
+        // Don't change calcTargetAmount - keep original targeted amount
+        // form.setCalcTargetAmount(roundedAmount);
         
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
@@ -695,5 +714,6 @@ export const useSupplierPayments = () => {
         parchiNo: form.parchiNo,
         bankAccounts: data.bankAccounts,
         bankBranches: data.bankBranches,
+        selectedPaymentOption,
     };
 };

@@ -941,12 +941,42 @@ export function getExpenseCategories(callback: (data: ExpenseCategory[]) => void
     }, onError);
 }
 
+// Fetch ALL categories without incremental sync (for category manager)
+export async function getAllIncomeCategories(): Promise<IncomeCategory[]> {
+    try {
+        const q = query(collection(firestoreDB, "incomeCategories"), orderBy("name"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeCategory));
+    } catch (error) {
+        console.error('[getAllIncomeCategories] Error fetching from Firestore:', error);
+        throw error;
+    }
+}
+
+export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
+    try {
+        const q = query(collection(firestoreDB, "expenseCategories"), orderBy("name"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseCategory));
+    } catch (error) {
+        console.error('[getAllExpenseCategories] Error fetching from Firestore:', error);
+        throw error;
+    }
+}
+
 export async function addCategory(collectionName: "incomeCategories" | "expenseCategories", category: { name: string; nature?: string }) {
-    await addDoc(collection(firestoreDB, collectionName), { ...category, subCategories: [] });
+    await addDoc(collection(firestoreDB, collectionName), { 
+        ...category, 
+        subCategories: [],
+        updatedAt: Timestamp.now()
+    });
 }
 
 export async function updateCategoryName(collectionName: "incomeCategories" | "expenseCategories", id: string, name: string) {
-    await updateDoc(doc(firestoreDB, collectionName, id), { name });
+    await updateDoc(doc(firestoreDB, collectionName, id), { 
+        name,
+        updatedAt: Timestamp.now()
+    });
 }
 
 export async function deleteCategory(collectionName: "incomeCategories" | "expenseCategories", id: string) {
@@ -955,13 +985,15 @@ export async function deleteCategory(collectionName: "incomeCategories" | "expen
 
 export async function addSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
     await updateDoc(doc(firestoreDB, collectionName, categoryId), {
-        subCategories: arrayUnion(subCategoryName)
+        subCategories: arrayUnion(subCategoryName),
+        updatedAt: Timestamp.now()
     });
 }
 
 export async function deleteSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
     await updateDoc(doc(firestoreDB, collectionName, categoryId), {
-        subCategories: arrayRemove(subCategoryName)
+        subCategories: arrayRemove(subCategoryName),
+        updatedAt: Timestamp.now()
     });
 }
 
@@ -4056,10 +4088,24 @@ export async function addMandiReport(report: MandiReport): Promise<MandiReport> 
         createdAt: report.createdAt || timestamp,
         updatedAt: timestamp,
     });
-    const docRef = doc(mandiReportsCollection, payload.id);
-    await setDoc(docRef, payload, { merge: true });
+    
+    try {
+        const docRef = doc(mandiReportsCollection, payload.id);
+        await setDoc(docRef, payload, { merge: true });
+        console.log('[addMandiReport] Successfully saved to Firestore:', payload.id);
+    } catch (error) {
+        console.error('[addMandiReport] Firestore save failed:', error);
+        throw error;
+    }
+    
     if (db) {
-        await db.mandiReports.put(payload);
+        try {
+            await db.mandiReports.put(payload);
+            console.log('[addMandiReport] Successfully saved to IndexedDB:', payload.id);
+        } catch (error) {
+            console.error('[addMandiReport] IndexedDB save failed:', error);
+            // Don't throw here - Firestore save succeeded, IndexedDB is just cache
+        }
     }
     return payload;
 }
@@ -4073,10 +4119,24 @@ export async function updateMandiReport(id: string, updates: Partial<MandiReport
         ...updates,
         updatedAt: new Date().toISOString(),
     });
-    await setDoc(docRef, updatePayload, { merge: true });
+    
+    try {
+        await setDoc(docRef, updatePayload, { merge: true });
+        console.log('[updateMandiReport] Successfully updated in Firestore:', id);
+    } catch (error) {
+        console.error('[updateMandiReport] Firestore update failed:', error);
+        throw error;
+    }
+    
     if (db) {
-        const existing = await db.mandiReports.get(id);
-        await db.mandiReports.put({ ...(existing || { id }), ...updates, updatedAt: updatePayload.updatedAt });
+        try {
+            const existing = await db.mandiReports.get(id);
+            await db.mandiReports.put({ ...(existing || { id }), ...updates, updatedAt: updatePayload.updatedAt });
+            console.log('[updateMandiReport] Successfully updated in IndexedDB:', id);
+        } catch (error) {
+            console.error('[updateMandiReport] IndexedDB update failed:', error);
+            // Don't throw here - Firestore update succeeded, IndexedDB is just cache
+        }
     }
 }
 

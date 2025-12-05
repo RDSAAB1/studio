@@ -116,11 +116,13 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
   const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
   const [filterVariety, setFilterVariety] = useState<string>("all");
+  const [rsValue, setRsValue] = useState<number>(0);
 
   const paymentCombination = usePaymentCombination({
     calcTargetAmount: hook?.calcTargetAmount || (() => 0),
     minRate: hook?.minRate || 0,
     maxRate: hook?.maxRate || 0,
+    rsValue: rsValue,
   });
 
   // Use the same supplier summary and filtering as supplier profile
@@ -992,6 +994,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                         setMinRate={hook.setMinRate}
                                         maxRate={hook.maxRate}
                                         setMaxRate={hook.setMaxRate}
+                                        rsValue={rsValue}
+                                        setRsValue={setRsValue}
                                         selectPaymentAmount={hook.selectPaymentAmount}
                                         combination={paymentCombination}
                                         showResults={false}

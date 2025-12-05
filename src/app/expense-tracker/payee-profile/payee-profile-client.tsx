@@ -4,8 +4,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Transaction } from "@/lib/definitions";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
-import { getIncomeAndExpensesRealtime, updateExpensePayee, deleteExpensesForPayee, updateIncomePayee, deleteIncomesForPayee, deleteIncome, deleteExpense, getPayeeProfilesRealtime, upsertPayeeProfile, deletePayeeProfile } from '@/lib/firestore';
-import type { PayeeProfile } from '@/lib/firestore';
+import { getIncomeAndExpensesRealtime, updateExpensePayee, deleteExpensesForPayee, updateIncomePayee, deleteIncomesForPayee, deleteIncome, deleteExpense, getPayeeProfilesRealtime, upsertPayeeProfile, deletePayeeProfile, getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory } from '@/lib/firestore';
+import type { PayeeProfile, IncomeCategory, ExpenseCategory } from '@/lib/firestore';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { CategoryManagerDialog } from '../category-manager-dialog';
 
 type PayeeTransaction = Transaction & {
     runningBalance: number;
@@ -185,6 +186,9 @@ export default function PayeeProfileClient({
     const [editingPayeeSubCategory, setEditingPayeeSubCategory] = useState('');
     const [payeeProfiles, setPayeeProfiles] = useState<Map<string, PayeeProfile>>(new Map());
     const [editingAccountBaselineName, setEditingAccountBaselineName] = useState<string | null>(null);
+    const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+    const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -203,6 +207,45 @@ export default function PayeeProfileClient({
             setPayeeProfiles(map);
         }, console.error);
         return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        // Load all categories initially
+        const loadAllCategories = async () => {
+            try {
+                const [incomeCats, expenseCats] = await Promise.all([
+                    getAllIncomeCategories(),
+                    getAllExpenseCategories()
+                ]);
+                setIncomeCategories(incomeCats);
+                setExpenseCategories(expenseCats);
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        };
+        loadAllCategories();
+
+        // Then set up realtime listeners for updates
+        const unsubIncomeCats = getIncomeCategories((newCats) => {
+            setIncomeCategories(prev => {
+                // Merge new categories with existing ones
+                const existingMap = new Map(prev.map(c => [c.id, c]));
+                newCats.forEach(cat => existingMap.set(cat.id, cat));
+                return Array.from(existingMap.values());
+            });
+        }, console.error);
+        const unsubExpenseCats = getExpenseCategories((newCats) => {
+            setExpenseCategories(prev => {
+                // Merge new categories with existing ones
+                const existingMap = new Map(prev.map(c => [c.id, c]));
+                newCats.forEach(cat => existingMap.set(cat.id, cat));
+                return Array.from(existingMap.values());
+            });
+        }, console.error);
+        return () => {
+            unsubIncomeCats();
+            unsubExpenseCats();
+        };
     }, []);
 
     useEffect(() => {
@@ -299,43 +342,77 @@ export default function PayeeProfileClient({
 
     const natureOptions = useMemo(() => {
         const set = new Set<string>();
+        // Add natures from expense categories
+        expenseCategories.forEach(cat => {
+            if (cat.nature) set.add(toTitleCase(cat.nature));
+        });
+        // Add natures from transactions
         transactions.forEach(tx => {
             const nature = (tx as any).expenseNature;
             if (nature) set.add(toTitleCase(nature));
         });
+        // Add natures from payee profiles
         payeeProfiles.forEach(profile => {
             if (profile.nature) set.add(toTitleCase(profile.nature));
         });
         return Array.from(set).sort().map(value => ({ value, label: value }));
-    }, [transactions, payeeProfiles]);
+    }, [transactions, payeeProfiles, expenseCategories]);
 
     const categoryOptions = useMemo(() => {
         const set = new Set<string>();
+        // Add categories from income categories
+        incomeCategories.forEach(cat => {
+            if (cat.name) set.add(toTitleCase(cat.name));
+        });
+        // Add categories from expense categories
+        expenseCategories.forEach(cat => {
+            if (cat.name) set.add(toTitleCase(cat.name));
+        });
+        // Add categories from transactions
         transactions.forEach(tx => {
             if (tx.category) set.add(toTitleCase(tx.category));
         });
+        // Add categories from payee profiles
         payeeProfiles.forEach(profile => {
             if (profile.category) set.add(toTitleCase(profile.category));
         });
         return Array.from(set).sort().map(value => ({ value, label: value }));
-    }, [transactions, payeeProfiles]);
+    }, [transactions, payeeProfiles, incomeCategories, expenseCategories]);
 
     const subCategoryOptions = useMemo(() => {
         const normalizedCategory = toTitleCase(editingPayeeCategory || '');
         if (!normalizedCategory) return [];
         const set = new Set<string>();
+        // Add subcategories from income categories
+        incomeCategories.forEach(cat => {
+            if (toTitleCase(cat.name) === normalizedCategory && cat.subCategories) {
+                cat.subCategories.forEach(subCat => {
+                    if (subCat) set.add(toTitleCase(subCat));
+                });
+            }
+        });
+        // Add subcategories from expense categories
+        expenseCategories.forEach(cat => {
+            if (toTitleCase(cat.name) === normalizedCategory && cat.subCategories) {
+                cat.subCategories.forEach(subCat => {
+                    if (subCat) set.add(toTitleCase(subCat));
+                });
+            }
+        });
+        // Add subcategories from transactions
         transactions.forEach(tx => {
             if (toTitleCase(tx.category) === normalizedCategory && tx.subCategory) {
                 set.add(toTitleCase(tx.subCategory));
             }
         });
+        // Add subcategories from payee profiles
         payeeProfiles.forEach(profile => {
             if (profile.category && toTitleCase(profile.category) === normalizedCategory && profile.subCategory) {
                 set.add(toTitleCase(profile.subCategory));
             }
         });
         return Array.from(set).sort().map(value => ({ value, label: value }));
-    }, [transactions, payeeProfiles, editingPayeeCategory]);
+    }, [transactions, payeeProfiles, editingPayeeCategory, incomeCategories, expenseCategories]);
     const handleEditTransaction = (tx: Transaction) => {
         toast({
             title: 'Edit Transaction',
@@ -824,7 +901,19 @@ const resolveDescription = (tx: Transaction) => {
                                 />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <Label>Category</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Category</Label>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setIsCategoryManagerOpen(true)}
+                                        className="h-6 w-6 p-0"
+                                        title="Manage Categories & Subcategories"
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                    </Button>
+                                </div>
                                 <CustomDropdown
                                     options={categoryOptions}
                                     value={editingPayeeCategory ? toTitleCase(editingPayeeCategory) : null}
@@ -859,6 +948,68 @@ const resolveDescription = (tx: Transaction) => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CategoryManagerDialog
+                isOpen={isCategoryManagerOpen}
+                onOpenChange={setIsCategoryManagerOpen}
+                incomeCategories={incomeCategories}
+                expenseCategories={expenseCategories}
+                onAddCategory={async (collection, category) => {
+                    await addCategory(collection, category);
+                    // Immediately refresh categories
+                    const [incomeCats, expenseCats] = await Promise.all([
+                        getAllIncomeCategories(),
+                        getAllExpenseCategories()
+                    ]);
+                    setIncomeCategories(incomeCats);
+                    setExpenseCategories(expenseCats);
+                    toast({ title: 'Category added', variant: 'success' });
+                }}
+                onUpdateCategoryName={async (collection, id, name) => {
+                    await updateCategoryName(collection, id, name);
+                    // Immediately refresh categories
+                    const [incomeCats, expenseCats] = await Promise.all([
+                        getAllIncomeCategories(),
+                        getAllExpenseCategories()
+                    ]);
+                    setIncomeCategories(incomeCats);
+                    setExpenseCategories(expenseCats);
+                    toast({ title: 'Category updated', variant: 'success' });
+                }}
+                onDeleteCategory={async (collection, id) => {
+                    await deleteCategory(collection, id);
+                    // Immediately refresh categories
+                    const [incomeCats, expenseCats] = await Promise.all([
+                        getAllIncomeCategories(),
+                        getAllExpenseCategories()
+                    ]);
+                    setIncomeCategories(incomeCats);
+                    setExpenseCategories(expenseCats);
+                    toast({ title: 'Category deleted', variant: 'success' });
+                }}
+                onAddSubCategory={async (collection, categoryId, subCategoryName) => {
+                    await addSubCategory(collection, categoryId, subCategoryName);
+                    // Immediately refresh categories
+                    const [incomeCats, expenseCats] = await Promise.all([
+                        getAllIncomeCategories(),
+                        getAllExpenseCategories()
+                    ]);
+                    setIncomeCategories(incomeCats);
+                    setExpenseCategories(expenseCats);
+                    toast({ title: 'Subcategory added', variant: 'success' });
+                }}
+                onDeleteSubCategory={async (collection, categoryId, subCategoryName) => {
+                    await deleteSubCategory(collection, categoryId, subCategoryName);
+                    // Immediately refresh categories
+                    const [incomeCats, expenseCats] = await Promise.all([
+                        getAllIncomeCategories(),
+                        getAllExpenseCategories()
+                    ]);
+                    setIncomeCategories(incomeCats);
+                    setExpenseCategories(expenseCats);
+                    toast({ title: 'Subcategory deleted', variant: 'success' });
+                }}
+            />
 
         </div>
     );

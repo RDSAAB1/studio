@@ -215,12 +215,35 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     // Navigate in a transition to keep UI responsive and guard against transient errors
     startTransition(() => {
       try {
-        router.push(targetPath);
+        // Check if we're already on this path to avoid unnecessary navigation
+        const currentPath = pathname.split('?')[0];
+        const targetPathBase = targetPath.split('?')[0];
+        
+        if (currentPath === targetPathBase) {
+          // Already on this page, just update the active tab
+          return;
+        }
+        
+        // Use router.push with error handling
+        const pushPromise = router.push(targetPath);
+        
+        // Handle promise rejection (prefetch failures)
+        if (pushPromise && typeof pushPromise.catch === 'function') {
+          pushPromise.catch((err: any) => {
+            // Prefetch failures are often non-critical - try direct navigation
+            console.warn('Router push failed, using fallback:', err);
+            if (typeof window !== 'undefined') {
+              // Use replace to avoid adding to history
+              window.location.href = targetPath;
+            }
+          });
+        }
       } catch (err) {
+        console.warn('Navigation error:', err);
         // As a resilience fallback (e.g., dev server hiccup), force a hard navigation
         try {
           if (typeof window !== 'undefined') {
-            window.location.assign(targetPath);
+            window.location.href = targetPath;
           }
         } catch (_) {
           // noop
@@ -346,7 +369,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
-              <div className="sticky top-0 z-30 flex-shrink-0 bg-card">
+              <div className="sticky top-0 z-30 flex-shrink-0 bg-card" style={{ borderRadius: 0 }}>
               <Header toggleSidebar={toggleSidebar} />
               <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={(tabId: string) => {
                 const menuItem = openTabs.find(tab => tab.id === tabId) || allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === tabId);
