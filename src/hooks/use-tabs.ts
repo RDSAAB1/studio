@@ -110,6 +110,7 @@ export const allMenuItems: MenuItem[] = [
         { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
         { id: "sales/6r-report", name: "6R Report", icon: FileText },
         { id: "tools/voucher-import", name: "Mandi Report Import", icon: FileSpreadsheet },
+        { id: "tools/mandi-report-history", name: "Mandi Report History", icon: FileText, href: "/tools/mandi-report-history" },
         { id: "admin/firestore-monitor", name: "Firestore Monitor", icon: Activity },
     ]
   },

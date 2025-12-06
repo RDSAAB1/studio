@@ -205,9 +205,29 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       }
     }
     
-    if (pathname === targetPath.split('?')[0] && pathname.includes(targetPath)) {
-      setActiveTabId(menuItem.id);
-      return;
+    // Check if we're already on the target path (including query params)
+    const currentPathWithQuery = typeof window !== 'undefined' ? window.location.pathname + window.location.search : pathname;
+    const targetPathBase = targetPath.split('?')[0];
+    
+    if (pathname === targetPathBase) {
+      // Same base path - check if query params match or need update
+      if (targetPath.includes('?')) {
+        // Has query params - navigate to update them
+        setActiveTabId(menuItem.id);
+        startTransition(() => {
+          try {
+            router.push(targetPath, { scroll: false });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = targetPath;
+          }
+        });
+        return;
+      } else {
+        // No query params needed, just update active tab
+        setActiveTabId(menuItem.id);
+        return;
+      }
     }
 
     setActiveTabId(menuItem.id);
@@ -217,10 +237,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       try {
         // Check if we're already on this path to avoid unnecessary navigation
         const currentPath = pathname.split('?')[0];
-        const targetPathBase = targetPath.split('?')[0];
         
-        if (currentPath === targetPathBase) {
-          // Already on this page, just update the active tab
+        if (currentPath === targetPathBase && !targetPath.includes('?')) {
+          // Already on this page without query params, just update the active tab
           return;
         }
         

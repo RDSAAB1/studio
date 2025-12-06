@@ -22,12 +22,13 @@ import {
   DocumentData,
   Timestamp,
   DocumentChangeType,
+  collectionGroup,
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, PayeeProfile } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
 
@@ -1776,6 +1777,66 @@ export async function getAllLoans(): Promise<Loan[]> {
 export async function getAllFundTransactions(): Promise<FundTransaction[]> {
   const snapshot = await getDocs(fundTransactionsCollection);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+}
+
+// Fetch ALL employees
+export async function getAllEmployees(): Promise<Employee[]> {
+  const snapshot = await getDocs(employeesCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+}
+
+// Fetch ALL payroll entries
+export async function getAllPayroll(): Promise<PayrollEntry[]> {
+  const snapshot = await getDocs(payrollCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollEntry));
+}
+
+// Fetch ALL attendance entries
+export async function getAllAttendance(): Promise<AttendanceEntry[]> {
+  const snapshot = await getDocs(attendanceCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
+}
+
+// Fetch ALL inventory items
+export async function getAllInventoryItems(): Promise<InventoryItem[]> {
+  const snapshot = await getDocs(inventoryItemsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+}
+
+// Fetch ALL expense templates
+export async function getAllExpenseTemplates(): Promise<any[]> {
+  const snapshot = await getDocs(expenseTemplatesCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+// Fetch ALL ledger accounts
+export async function getAllLedgerAccounts(): Promise<LedgerAccount[]> {
+  const snapshot = await getDocs(ledgerAccountsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LedgerAccount));
+}
+
+// Fetch ALL ledger cash accounts
+export async function getAllLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
+  const snapshot = await getDocs(ledgerCashAccountsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LedgerCashAccount));
+}
+
+// Fetch ALL kanta parchi
+export async function getAllKantaParchi(): Promise<KantaParchi[]> {
+  const snapshot = await getDocs(kantaParchiCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KantaParchi));
+}
+
+// Fetch ALL customer documents
+export async function getAllCustomerDocuments(): Promise<CustomerDocument[]> {
+  const snapshot = await getDocs(customerDocumentsCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerDocument));
+}
+
+// Fetch ALL manufacturing costing
+export async function getAllManufacturingCosting(): Promise<any[]> {
+  const snapshot = await getDocs(manufacturingCostingCollection);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 export async function getInitialCustomerPayments(count = 100) {
@@ -4089,21 +4150,38 @@ export async function addMandiReport(report: MandiReport): Promise<MandiReport> 
         updatedAt: timestamp,
     });
     
+    console.log('[addMandiReport] Saving report:', {
+        id: payload.id,
+        voucherNo: payload.voucherNo,
+        sellerName: payload.sellerName,
+        collectionPath: 'mandiReports'
+    });
+    
     try {
         const docRef = doc(mandiReportsCollection, payload.id);
+        console.log('[addMandiReport] Firestore document path:', docRef.path);
         await setDoc(docRef, payload, { merge: true });
-        console.log('[addMandiReport] Successfully saved to Firestore:', payload.id);
-    } catch (error) {
-        console.error('[addMandiReport] Firestore save failed:', error);
+        console.log('[addMandiReport] ✅ Successfully saved to Firestore:', {
+            id: payload.id,
+            path: docRef.path,
+            voucherNo: payload.voucherNo
+        });
+    } catch (error: any) {
+        console.error('[addMandiReport] ❌ Firestore save failed:', error);
+        console.error('[addMandiReport] Error details:', {
+            code: error.code,
+            message: error.message,
+            id: payload.id
+        });
         throw error;
     }
     
     if (db) {
         try {
             await db.mandiReports.put(payload);
-            console.log('[addMandiReport] Successfully saved to IndexedDB:', payload.id);
+            console.log('[addMandiReport] ✅ Successfully saved to IndexedDB:', payload.id);
         } catch (error) {
-            console.error('[addMandiReport] IndexedDB save failed:', error);
+            console.error('[addMandiReport] ❌ IndexedDB save failed:', error);
             // Don't throw here - Firestore save succeeded, IndexedDB is just cache
         }
     }
@@ -4150,55 +4228,218 @@ export async function deleteMandiReport(id: string): Promise<void> {
 }
 
 export async function fetchMandiReports(): Promise<MandiReport[]> {
+    console.log('[fetchMandiReports] Starting fetch...');
+    
     // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads
     if (db) {
         try {
             const localReports = await db.mandiReports.toArray();
             if (localReports.length > 0) {
+                console.log(`[fetchMandiReports] Returning ${localReports.length} reports from IndexedDB`);
                 return localReports;
             }
         } catch (error) {
+            console.error('[fetchMandiReports] IndexedDB read failed:', error);
             // If local read fails, continue with Firestore
         }
     }
 
-    // ✅ Use incremental sync - only get changed reports
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:mandiReports');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    let allReports: MandiReport[] = [];
+    const reportMap = new Map<string, MandiReport>();
     
-    if (lastSyncTime) {
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            mandiReportsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        q = query(mandiReportsCollection, orderBy("purchaseDate", "desc"));
+    try {
+        // Data structure: /mandiReports/{voucherNo}/6P/{docId}
+        // So we need to:
+        // 1. Fetch all parent documents from mandiReports collection
+        // 2. For each parent, query the 6P subcollection
+        // 3. Also try collectionGroup for '6P' subcollection (gets all 6P subcollections regardless of parent)
+        
+        console.log('[fetchMandiReports] Data structure: /mandiReports/{voucherNo}/6P/{docId}');
+        console.log('[fetchMandiReports] Fetching from 6P subcollections...');
+        
+        // Method 1: Use collectionGroup to get ALL '6P' subcollections
+        try {
+            console.log('[fetchMandiReports] Method 1: Using collectionGroup for "6P" subcollections...');
+            const collectionGroup6P = collectionGroup(firestoreDB, '6P');
+            const group6PSnapshot = await getDocs(collectionGroup6P);
+            
+            console.log(`[fetchMandiReports] collectionGroup("6P") found ${group6PSnapshot.size} total documents`);
+            
+            if (group6PSnapshot.size > 0) {
+                group6PSnapshot.docs.forEach((docSnap, index) => {
+                    const data = docSnap.data() as MandiReport;
+                    const fullPath = docSnap.ref.path;
+                    const pathParts = fullPath.split('/');
+                    
+                    // Path format: mandiReports/{voucherNo}/6P/{docId}
+                    // Extract voucherNo (parent doc) and docId
+                    let docId = pathParts[pathParts.length - 1];
+                    let voucherNo = pathParts.length >= 2 ? pathParts[pathParts.length - 3] : undefined;
+                    
+                    const finalId = data.id || docId;
+                    
+                    if (index < 5) {
+                        console.log(`[fetchMandiReports] Document ${index + 1}: path="${fullPath}", voucherNo="${voucherNo}", docId="${docId}", data.id="${data.id}", finalId="${finalId}"`);
+                    }
+                    
+                    // Use finalId as key to avoid duplicates
+                    if (!reportMap.has(finalId)) {
+                        reportMap.set(finalId, { ...data, id: finalId });
+                    }
+                });
+                
+                console.log(`[fetchMandiReports] ✅ Processed ${group6PSnapshot.size} documents from 6P subcollections, unique reports: ${reportMap.size}`);
+            } else {
+                console.warn('[fetchMandiReports] collectionGroup("6P") returned 0 documents.');
+            }
+        } catch (collectionGroup6PError: any) {
+            console.error('[fetchMandiReports] collectionGroup("6P") query failed:', collectionGroup6PError);
+            console.log('[fetchMandiReports] Falling back to manual subcollection queries...');
+        }
+        
+        // Method 2: Manually query each parent document's 6P subcollection
+        try {
+            console.log('[fetchMandiReports] Method 2: Fetching parent documents and querying 6P subcollections...');
+            const parentDocsSnapshot = await getDocs(mandiReportsCollection);
+            console.log(`[fetchMandiReports] Found ${parentDocsSnapshot.size} parent documents in mandiReports collection`);
+            
+            let subcollectionCount = 0;
+            for (const parentDoc of parentDocsSnapshot.docs) {
+                try {
+                    // Query the 6P subcollection under this parent document
+                    const subcollectionRef = collection(parentDoc.ref, '6P');
+                    const subcollectionSnapshot = await getDocs(subcollectionRef);
+                    
+                    if (subcollectionSnapshot.size > 0) {
+                        subcollectionCount += subcollectionSnapshot.size;
+                        console.log(`[fetchMandiReports] Parent "${parentDoc.id}" has ${subcollectionSnapshot.size} documents in 6P subcollection`);
+                        
+                        subcollectionSnapshot.docs.forEach((docSnap) => {
+                            const data = docSnap.data() as MandiReport;
+                            const docId = docSnap.id;
+                            const finalId = data.id || docId;
+                            
+                            // Only add if not already in map
+                            if (!reportMap.has(finalId)) {
+                                reportMap.set(finalId, { ...data, id: finalId });
+                                console.log(`[fetchMandiReports] Added from subcollection: parent="${parentDoc.id}", docId="${docId}", voucherNo="${data.voucherNo}"`);
+                            }
+                        });
+                    }
+                } catch (subcollectionError: any) {
+                    console.warn(`[fetchMandiReports] Error querying 6P subcollection for parent "${parentDoc.id}":`, subcollectionError.message);
+                }
+            }
+            
+            console.log(`[fetchMandiReports] ✅ Method 2: Found ${subcollectionCount} total documents in 6P subcollections`);
+        } catch (manualQueryError: any) {
+            console.error('[fetchMandiReports] Manual subcollection query failed:', manualQueryError);
+        }
+        
+        // Method 3: Also try direct collection query (in case some data is at root level)
+        try {
+            console.log('[fetchMandiReports] Method 3: Checking direct mandiReports collection...');
+            const directQuery = query(mandiReportsCollection);
+            const directSnapshot = await getDocs(directQuery);
+            console.log(`[fetchMandiReports] Direct collection query found ${directSnapshot.size} documents`);
+            
+            directSnapshot.docs.forEach((docSnap) => {
+                const data = docSnap.data() as MandiReport;
+                // Only add if it looks like a MandiReport (has voucherNo or sellerName)
+                if (data.voucherNo || data.sellerName) {
+                    const docId = docSnap.id;
+                    const finalId = data.id || docId;
+                    
+                    // Only add if not already in map
+                    if (!reportMap.has(finalId)) {
+                        reportMap.set(finalId, { ...data, id: finalId });
+                        console.log(`[fetchMandiReports] Added from direct query: docId="${docId}", voucherNo="${data.voucherNo}"`);
+                    }
+                }
+            });
+        } catch (directError: any) {
+            console.error('[fetchMandiReports] Direct collection query failed:', directError);
+        }
+        
+        // Convert map to array
+        allReports = Array.from(reportMap.values());
+        console.log(`[fetchMandiReports] Total unique reports: ${allReports.length}`);
+        
+        // Log sample document IDs for debugging
+        if (allReports.length > 0) {
+            console.log('[fetchMandiReports] Sample reports:', allReports.slice(0, 3).map(r => ({ 
+                id: r.id, 
+                voucherNo: r.voucherNo,
+                sellerName: r.sellerName,
+                purchaseDate: r.purchaseDate
+            })));
+        } else {
+            console.warn('[fetchMandiReports] ⚠️ No reports found!');
+            console.warn('[fetchMandiReports] Check Firestore console: Collection should be "mandiReports"');
+            console.warn('[fetchMandiReports] Document path format: /mandiReports/{documentId}');
+        }
+        
+        // Sort by purchaseDate in memory (newest first)
+        allReports.sort((a, b) => {
+            const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+            const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+            return dateB - dateA;
+        });
+        
+        console.log(`[fetchMandiReports] ✅ Final sorted reports: ${allReports.length}`);
+        
+        if (db && allReports.length > 0) {
+            try {
+                await db.mandiReports.bulkPut(allReports);
+                console.log(`[fetchMandiReports] ✅ Synced ${allReports.length} reports to IndexedDB`);
+            } catch (error) {
+                console.error('[fetchMandiReports] ❌ IndexedDB sync failed:', error);
+            }
+        }
+        
+        // Save last sync time
+        if (allReports.length > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:mandiReports', String(Date.now()));
+        }
+        
+        return allReports;
+    } catch (error: any) {
+        console.error('[fetchMandiReports] ❌ Firestore query failed:', error);
+        console.error('[fetchMandiReports] Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        // Try a simple direct query as last resort
+        try {
+            console.log('[fetchMandiReports] Attempting simple direct query as fallback...');
+            const snapshot = await getDocs(mandiReportsCollection);
+            console.log(`[fetchMandiReports] Direct query found ${snapshot.size} documents`);
+            
+            const reports = snapshot.docs.map((docSnap) => {
+                const data = docSnap.data() as MandiReport;
+                console.log(`[fetchMandiReports] Direct query doc: id="${docSnap.id}", path="${docSnap.ref.path}"`);
+                return { ...data, id: data.id || docSnap.id };
+            });
+            
+            reports.sort((a, b) => {
+                const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+                const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+                return dateB - dateA;
+            });
+            
+            if (db && reports.length > 0) {
+                await db.mandiReports.bulkPut(reports);
+                console.log(`[fetchMandiReports] ✅ Fallback: Synced ${reports.length} reports to IndexedDB`);
+            }
+            
+            return reports;
+        } catch (fallbackError: any) {
+            console.error('[fetchMandiReports] ❌ Fallback query also failed:', fallbackError);
+            return [];
+        }
     }
-
-    const snapshot = await getDocs(q);
-    const reports = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as MandiReport;
-        return { ...data, id: data.id || docSnap.id };
-    });
-    
-    if (db && reports.length) {
-        await db.mandiReports.bulkPut(reports);
-    }
-    
-    // Save last sync time
-    if (snapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:mandiReports', String(Date.now()));
-    }
-    
-    return reports;
 }
 
 // --- Manufacturing Costing Functions ---

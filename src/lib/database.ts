@@ -1,7 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions } from './firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllPayeeProfiles, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -92,7 +92,7 @@ export class AppDatabase extends Dexie {
             inventoryItems: '++id, sku, name',
             ledgerAccounts: '&id, name',
             ledgerEntries: '&id, accountId, date',
-            mandiReports: '&id, voucherNo, sellerName',
+            mandiReports: '&id, voucherNo, sellerName, purchaseDate',
             syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
         });
     }
@@ -192,6 +192,8 @@ export async function syncAllDataWithDetails(
     { name: 'customers', displayName: 'Customers', getAllFn: getAllCustomers, localTable: () => db.customers },
     { name: 'payments', displayName: 'Payments', getAllFn: getAllPayments, localTable: () => db.payments },
     { name: 'customerPayments', displayName: 'Customer Payments', getAllFn: getAllCustomerPayments, localTable: () => db.customerPayments },
+    { name: 'incomes', displayName: 'Incomes', getAllFn: getAllIncomes, localTable: () => db.transactions, isSpecial: true },
+    { name: 'expenses', displayName: 'Expenses', getAllFn: getAllExpenses, localTable: () => db.transactions, isSpecial: true },
     { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', getAllFn: getAllSupplierBankAccounts, localTable: () => db.bankAccounts, isSpecial: true },
     { name: 'banks', displayName: 'Banks', getAllFn: getAllBanks, localTable: () => db.banks },
     { name: 'bankBranches', displayName: 'Bank Branches', getAllFn: getAllBankBranches, localTable: () => db.bankBranches },
@@ -199,6 +201,21 @@ export async function syncAllDataWithDetails(
     { name: 'projects', displayName: 'Projects', getAllFn: getAllProjects, localTable: () => db.projects },
     { name: 'loans', displayName: 'Loans', getAllFn: getAllLoans, localTable: () => db.loans },
     { name: 'fundTransactions', displayName: 'Fund Transactions', getAllFn: getAllFundTransactions, localTable: () => db.fundTransactions },
+    { name: 'mandiReports', displayName: 'Mandi Reports', getAllFn: fetchMandiReports, localTable: () => db.mandiReports },
+    { name: 'payeeProfiles', displayName: 'Payee Profiles', getAllFn: getAllPayeeProfiles, localTable: () => db.options, isSpecial: true },
+    { name: 'incomeCategories', displayName: 'Income Categories', getAllFn: getAllIncomeCategories, localTable: () => db.options, isSpecial: true },
+    { name: 'expenseCategories', displayName: 'Expense Categories', getAllFn: getAllExpenseCategories, localTable: () => db.options, isSpecial: true },
+    { name: 'employees', displayName: 'Employees', getAllFn: getAllEmployees, localTable: () => db.employees },
+    { name: 'payroll', displayName: 'Payroll', getAllFn: getAllPayroll, localTable: () => db.payroll },
+    { name: 'attendance', displayName: 'Attendance', getAllFn: getAllAttendance, localTable: () => db.attendance },
+    { name: 'inventoryItems', displayName: 'Inventory Items', getAllFn: getAllInventoryItems, localTable: () => db.inventoryItems },
+    { name: 'expenseTemplates', displayName: 'Expense Templates', getAllFn: getAllExpenseTemplates, localTable: () => db.options, isSpecial: true },
+    { name: 'ledgerAccounts', displayName: 'Ledger Accounts', getAllFn: getAllLedgerAccounts, localTable: () => db.ledgerAccounts },
+    { name: 'ledgerEntries', displayName: 'Ledger Entries', getAllFn: fetchAllLedgerEntries, localTable: () => db.ledgerEntries },
+    { name: 'ledgerCashAccounts', displayName: 'Ledger Cash Accounts', getAllFn: getAllLedgerCashAccounts, localTable: () => db.ledgerAccounts, isSpecial: true },
+    { name: 'kantaParchi', displayName: 'Kanta Parchi', getAllFn: getAllKantaParchi, localTable: () => db.options, isSpecial: true },
+    { name: 'customerDocuments', displayName: 'Customer Documents', getAllFn: getAllCustomerDocuments, localTable: () => db.options, isSpecial: true },
+    { name: 'manufacturingCosting', displayName: 'Manufacturing Costing', getAllFn: getAllManufacturingCosting, localTable: () => db.options, isSpecial: true },
   ];
 
   // Filter collections based on selection
@@ -489,6 +506,16 @@ export async function syncAllDataWithDetails(
             }
           }
           
+          // Handle special collections (incomes, expenses) that need type conversion
+          if (config.name === 'incomes' || config.name === 'expenses') {
+            // Convert to transactions with type field
+            const transactions = dataToSync.map(item => ({
+              ...item,
+              type: config.name === 'incomes' ? 'income' : 'expense'
+            } as Transaction));
+            dataToSync = transactions;
+          }
+          
           // Use bulkPut to update/insert with error handling
           let actualFetched = dataToSync.length;
           info.error = `Syncing ${dataToSync.length} ${config.displayName} records...`;
@@ -591,86 +618,8 @@ export async function syncAllDataWithDetails(
     }
   }
 
-  // Handle incomes and expenses separately (stored in transactions table)
-  const incomeInfo: SyncCollectionInfo = {
-    collectionName: 'incomes',
-    displayName: 'Incomes',
-    totalInFirestore: 0,
-    fetched: 0,
-    sent: 0,
-    status: 'syncing',
-  };
-  collections.push(incomeInfo);
-
-  try {
-    const incomes = await getAllIncomes();
-    incomeInfo.totalInFirestore = incomes.length;
-    if (incomes.length > 0) {
-      const allTransactions = incomes.map(inc => ({ ...inc, type: 'income' } as Transaction));
-      await db.transactions.bulkPut(allTransactions);
-      incomeInfo.fetched = incomes.length;
-    }
-    // Check for pending sync tasks
-    if (db) {
-      try {
-        const allPendingTasks = await db.syncQueue
-          .where('status')
-          .anyOf(['pending', 'failed'])
-          .toArray();
-        const pendingTasks = allPendingTasks.filter(task => {
-          const taskType = (task as any).type || '';
-          return taskType.includes('incomes') || taskType.includes('income');
-        });
-        incomeInfo.sent = pendingTasks.length;
-      } catch {
-        incomeInfo.sent = 0;
-      }
-    }
-    incomeInfo.status = 'success';
-  } catch (error: any) {
-    incomeInfo.status = 'error';
-    incomeInfo.error = error.message || 'Unknown error';
-  }
-
-  const expenseInfo: SyncCollectionInfo = {
-    collectionName: 'expenses',
-    displayName: 'Expenses',
-    totalInFirestore: 0,
-    fetched: 0,
-    sent: 0,
-    status: 'syncing',
-  };
-  collections.push(expenseInfo);
-
-  try {
-    const expenses = await getAllExpenses();
-    expenseInfo.totalInFirestore = expenses.length;
-    if (expenses.length > 0) {
-      const allTransactions = expenses.map(exp => ({ ...exp, type: 'expense' } as Transaction));
-      await db.transactions.bulkPut(allTransactions);
-      expenseInfo.fetched = expenses.length;
-    }
-    // Check for pending sync tasks
-    if (db) {
-      try {
-        const allPendingTasks = await db.syncQueue
-          .where('status')
-          .anyOf(['pending', 'failed'])
-          .toArray();
-        const pendingTasks = allPendingTasks.filter(task => {
-          const taskType = (task as any).type || '';
-          return taskType.includes('expenses') || taskType.includes('expense');
-        });
-        expenseInfo.sent = pendingTasks.length;
-      } catch {
-        expenseInfo.sent = 0;
-      }
-    }
-    expenseInfo.status = 'success';
-  } catch (error: any) {
-    expenseInfo.status = 'error';
-    expenseInfo.error = error.message || 'Unknown error';
-  }
+  // Note: incomes and expenses are already handled in the main loop above
+  // No need to add them again here - they're already in allCollectionConfigs
 
   // Update lastSync times
   if (typeof window !== 'undefined') {
