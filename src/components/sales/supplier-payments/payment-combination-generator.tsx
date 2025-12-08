@@ -36,6 +36,7 @@ interface PaymentCombinationGeneratorProps {
         requestSort: (key: keyof PaymentOption) => void;
     };
     showResults?: boolean;
+    paymentMethod?: 'Cash' | 'Online' | 'RTGS' | 'Gov.';
 }
 
 export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorProps> = ({
@@ -50,6 +51,7 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
     selectPaymentAmount,
     combination,
     showResults = true,
+    paymentMethod,
 }) => {
     const {
         paymentOptions,
@@ -70,9 +72,12 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
         selectPaymentAmount(option);
     }
 
+    // Show Rs and Bag Qty fields only for Gov. payment method
+    const showRsAndBagFields = paymentMethod === 'Gov.';
+
     return (
         <div className="space-y-3 text-[11px]">
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+            <div className={cn("grid grid-cols-1 gap-2", showRsAndBagFields ? "sm:grid-cols-5" : "sm:grid-cols-3")}>
                 <div className="space-y-1">
                     <Label className="text-[11px] whitespace-nowrap">Target Amt</Label>
                     <Input
@@ -100,7 +105,8 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         className="h-8 text-[11px]"
                     />
                 </div>
-                {setRsValue && (
+                {/* Rs and Bag Qty fields - only show for Gov. payment */}
+                {showRsAndBagFields && setRsValue && (
                     <div className="space-y-1">
                         <Label className="text-[11px] whitespace-nowrap">Rs</Label>
                         <Input
@@ -112,23 +118,25 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         />
                     </div>
                 )}
-                <div className="space-y-1">
-                    <Label className="text-[11px] whitespace-nowrap">Bag Qty</Label>
-                    <Input
-                        type="number"
-                        value={bagSize ?? ''}
-                        onChange={(e) => {
-                            const v = Number(e.target.value);
-                            if (!e.target.value || isNaN(v) || v <= 0) {
-                                setBagSize(undefined);
-                            } else {
-                                setBagSize(v);
-                            }
-                        }}
-                        className="h-8 text-[11px]"
-                        placeholder="Per bag qty"
-                    />
-                </div>
+                {showRsAndBagFields && (
+                    <div className="space-y-1">
+                        <Label className="text-[11px] whitespace-nowrap">Bag Qty</Label>
+                        <Input
+                            type="number"
+                            value={bagSize ?? ''}
+                            onChange={(e) => {
+                                const v = Number(e.target.value);
+                                if (!e.target.value || isNaN(v) || v <= 0) {
+                                    setBagSize(undefined);
+                                } else {
+                                    setBagSize(v);
+                                }
+                            }}
+                            className="h-8 text-[11px]"
+                            placeholder="Per bag qty"
+                        />
+                    </div>
+                )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-wrap">

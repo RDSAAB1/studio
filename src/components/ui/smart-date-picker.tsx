@@ -546,7 +546,7 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
           </div>
           <Calendar
             mode="single"
-            selected={liveSelectedDate}
+            selected={selectedDate || liveSelectedDate}
             onSelect={handleCalendarSelect}
             month={calendarMonthView}
             onMonthChange={(date) => {

@@ -1,4 +1,4 @@
-export type StatementRow = {
+﻿export type StatementRow = {
   date: string;
   supplierCash: number;
   supplierRtgs: number;

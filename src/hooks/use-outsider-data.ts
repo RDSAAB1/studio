@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, startTransition } from 'react';
+import { useState, useEffect, useMemo, startTransition, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { getPaymentsRealtime, getBanksRealtime, getSupplierBankAccountsRealtime, getBankBranchesRealtime, getReceiptSettings } from "@/lib/firestore";
 import type { Payment, Bank, BankAccount, BankBranch, ReceiptSettings } from "@/lib/definitions";
@@ -14,6 +14,15 @@ export const useOutsiderData = () => {
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [isClient, setIsClient] = useState(false);
+
+    // Function to remove a payment from state immediately (for immediate UI feedback)
+    const removePaymentFromState = useCallback((paymentId: string) => {
+        setPaymentHistory(prev => prev.filter(p => 
+            p.id !== paymentId && 
+            p.paymentId !== paymentId && 
+            (p as any).rtgsSrNo !== paymentId
+        ));
+    }, []);
     
     useEffect(() => {
         setIsClient(true);
@@ -105,6 +114,7 @@ export const useOutsiderData = () => {
         isClient,
         suppliers: [], // Empty for outsider
         customerSummaryMap: new Map(), // Empty for outsider
+        removePaymentFromState, // Function to immediately remove payment from state
     };
 };
 

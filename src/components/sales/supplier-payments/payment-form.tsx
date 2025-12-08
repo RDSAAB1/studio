@@ -125,17 +125,20 @@ export const PaymentForm = (props: any) => {
                             </div>
                           <div className="flex flex-wrap items-end gap-x-2 gap-y-1.5 w-full">
                             {/* Payment Details */}
-                            <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
-                                <Label className="text-[10px]">Payment Date</Label>
-                                <SmartDatePicker
-                                    value={paymentDate}
-                                    onChange={(val) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                                    placeholder="Pick a date"
-                                    inputClassName="h-7 text-[10px]"
-                                    buttonClassName="h-7 w-7"
-                                    returnDate={true}
-                                />
-                            </div>
+                            {/* Payment Date - Hidden for RTGS (will be filled from RTGS Report) */}
+                            {paymentMethod !== 'RTGS' && (
+                                <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
+                                    <Label className="text-[10px]">Payment Date</Label>
+                                    <SmartDatePicker
+                                        value={paymentDate}
+                                        onChange={(val) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                                        placeholder="Pick a date"
+                                        inputClassName="h-7 text-[10px]"
+                                        buttonClassName="h-7 w-7"
+                                        returnDate={true}
+                                    />
+                                </div>
+                            )}
                             
                             {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
                                 <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">

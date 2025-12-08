@@ -7,12 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
-import { Loader2, Edit, Save, X, Printer, Mail, Download } from 'lucide-react';
+import { Loader2, Edit, Save, X, Printer, Mail, Download, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
+import { doc, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { firestoreDB } from '@/lib/firebase';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
@@ -23,6 +26,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 interface RtgsReportRow {
@@ -59,6 +63,12 @@ export default function RtgsReportClient() {
     const [isBankMailFormat2Open, setIsBankMailFormat2Open] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
 
+    // State for multi-select and bulk update
+    const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
+    const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+    const [updateDate, setUpdateDate] = useState<Date | undefined>(undefined);
+    const [updateCheckNo, setUpdateCheckNo] = useState('');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     // State for search filters
     const [searchSrNo, setSearchSrNo] = useState('');
@@ -91,31 +101,34 @@ export default function RtgsReportClient() {
     const reportRows = useMemo(() => {
         if (!settings || !payments) return [];
         const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
-        const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
-            const srNo = p.rtgsSrNo || p.paymentId || '';
-            return {
-                paymentId: p.paymentId,
-                date: p.date,
-                checkNo: p.checkNo || '',
-                type: p.type || (settings?.type || 'SB'),
-                srNo: srNo,
-                supplierName: toTitleCase(p.supplierName || ''),
-                fatherName: toTitleCase(p.supplierFatherName || ''),
-                contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
-                acNo: p.bankAcNo || '',
-                ifscCode: p.bankIfsc || '',
-                branch: toTitleCase(p.bankBranch || ''),
-                bank: p.bankName || '',
-                amount: p.rtgsAmount || p.amount || 0,
-                rate: p.rate || 0,
-                weight: p.quantity || 0,
-                sixRNo: p.sixRNo || '',
-                sixRDate: p.sixRDate || '',
-                parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
-                utrNo: p.utrNo || '',
-                supplierAddress: p.supplierAddress || ''
-            };
-        });
+        const newReportRows: RtgsReportRow[] = rtgsPayments
+            .map(p => {
+                const srNo = p.rtgsSrNo || p.paymentId || '';
+                const amount = p.rtgsAmount || p.amount || 0;
+                return {
+                    paymentId: p.paymentId,
+                    date: p.date,
+                    checkNo: p.checkNo || '',
+                    type: p.type || (settings?.type || 'SB'),
+                    srNo: srNo,
+                    supplierName: toTitleCase(p.supplierName || ''),
+                    fatherName: toTitleCase(p.supplierFatherName || ''),
+                    contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                    acNo: p.bankAcNo || '',
+                    ifscCode: p.bankIfsc || '',
+                    branch: toTitleCase(p.bankBranch || ''),
+                    bank: p.bankName || '',
+                    amount: amount,
+                    rate: p.rate || 0,
+                    weight: p.quantity || 0,
+                    sixRNo: p.sixRNo || '',
+                    sixRDate: p.sixRDate || '',
+                    parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
+                    utrNo: p.utrNo || '',
+                    supplierAddress: p.supplierAddress || ''
+                };
+            })
+            .filter(row => row.amount > 0); // Filter out negative amounts
         return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [payments, settings]);
 
@@ -152,6 +165,44 @@ export default function RtgsReportClient() {
         }
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
+
+    // Separate rows into completed (with date and checkNo) and pending (without)
+    const completedRows = useMemo(() => {
+        return filteredReportRows.filter(row => {
+            // Check if date exists and is valid (try to parse it)
+            let hasDate = false;
+            try {
+                if (row.date) {
+                    const dateObj = new Date(row.date);
+                    hasDate = !isNaN(dateObj.getTime()) && row.date.trim() !== '';
+                }
+            } catch (e) {
+                hasDate = false;
+            }
+            // Check if checkNo exists and is not empty
+            const hasCheckNo = row.checkNo && row.checkNo.trim() !== '';
+            return hasDate && hasCheckNo;
+        });
+    }, [filteredReportRows]);
+
+    const pendingRows = useMemo(() => {
+        return filteredReportRows.filter(row => {
+            // Check if date exists and is valid (try to parse it)
+            let hasDate = false;
+            try {
+                if (row.date) {
+                    const dateObj = new Date(row.date);
+                    hasDate = !isNaN(dateObj.getTime()) && row.date.trim() !== '';
+                }
+            } catch (e) {
+                hasDate = false;
+            }
+            // Check if checkNo exists and is not empty
+            const hasCheckNo = row.checkNo && row.checkNo.trim() !== '';
+            // Pending if either date or checkNo is missing
+            return !hasDate || !hasCheckNo;
+        });
+    }, [filteredReportRows]);
     
     const handlePrint = (_printRef: React.RefObject<HTMLDivElement>) => {
         if (!settings) {
@@ -354,6 +405,132 @@ export default function RtgsReportClient() {
         XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     };
 
+    // Multi-select handlers
+    const handleSelectAll = () => {
+        // This is for the old single table - now we have separate select all for pending and completed
+        // Keep this for backward compatibility but it's not used in the new UI
+        if (selectedPaymentIds.size === filteredReportRows.length) {
+            setSelectedPaymentIds(new Set());
+        } else {
+            setSelectedPaymentIds(new Set(filteredReportRows.map(row => row.paymentId)));
+        }
+    };
+
+    const handleSelectRow = (paymentId: string) => {
+        const newSelected = new Set(selectedPaymentIds);
+        if (newSelected.has(paymentId)) {
+            newSelected.delete(paymentId);
+        } else {
+            newSelected.add(paymentId);
+        }
+        setSelectedPaymentIds(newSelected);
+    };
+
+    const handleOpenUpdateDialog = () => {
+        if (selectedPaymentIds.size === 0) {
+            toast({ 
+                title: "No selection", 
+                description: "Please select at least one payment to update.", 
+                variant: "destructive" 
+            });
+            return;
+        }
+        setUpdateDate(undefined);
+        setUpdateCheckNo('');
+        setIsUpdateDialogOpen(true);
+    };
+
+    const handleBulkUpdate = async () => {
+        if (selectedPaymentIds.size === 0) {
+            toast({ 
+                title: "No selection", 
+                description: "Please select at least one payment to update.", 
+                variant: "destructive" 
+            });
+            return;
+        }
+
+        if (!updateDate && !updateCheckNo.trim()) {
+            toast({ 
+                title: "Invalid input", 
+                description: "Please provide at least a date or check number.", 
+                variant: "destructive" 
+            });
+            return;
+        }
+
+        setIsUpdating(true);
+        try {
+            const batch = writeBatch(firestoreDB);
+            const updateData: any = {
+                updatedAt: Timestamp.now()
+            };
+
+            if (updateDate) {
+                updateData.date = updateDate.toISOString();
+            }
+
+            if (updateCheckNo.trim()) {
+                updateData.checkNo = updateCheckNo.trim();
+            }
+
+            let updateCount = 0;
+            for (const paymentId of selectedPaymentIds) {
+                const paymentRef = doc(firestoreDB, 'payments', paymentId);
+                batch.update(paymentRef, updateData);
+                updateCount++;
+            }
+
+            await batch.commit();
+
+            // Also update local IndexedDB if available
+            if (typeof window !== 'undefined') {
+                try {
+                    const { db } = await import('@/lib/database');
+                    if (db) {
+                        for (const paymentId of selectedPaymentIds) {
+                            try {
+                                const existing = await db.payments.get(paymentId);
+                                if (existing) {
+                                    await db.payments.put({ 
+                                        ...existing, 
+                                        ...updateData,
+                                        date: updateDate ? updateDate.toISOString() : existing.date,
+                                        checkNo: updateCheckNo.trim() || existing.checkNo
+                                    });
+                                }
+                            } catch (localError) {
+                                console.warn(`Failed to update local IndexedDB for ${paymentId}:`, localError);
+                            }
+                        }
+                    }
+                } catch (dbError) {
+                    console.warn('Failed to update local IndexedDB:', dbError);
+                }
+            }
+
+            toast({ 
+                title: "Success", 
+                description: `Updated ${updateCount} payment(s) successfully.`, 
+                variant: "default" 
+            });
+
+            setSelectedPaymentIds(new Set());
+            setIsUpdateDialogOpen(false);
+            setUpdateDate(undefined);
+            setUpdateCheckNo('');
+        } catch (error: any) {
+            console.error('Error updating payments:', error);
+            toast({ 
+                title: "Error", 
+                description: `Failed to update payments: ${error.message}`, 
+                variant: "destructive" 
+            });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
     }
@@ -422,36 +599,86 @@ export default function RtgsReportClient() {
                 </CardContent>
             </Card>
 
+            {/* RTGS Payments Tables with Tabs */}
             <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <CardHeader>
+                    <CardTitle>RTGS Payment Report</CardTitle>
+                    <CardDescription>Manage RTGS payments - fill date & check number for pending payments or update completed ones.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Tabs defaultValue="completed" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="completed">
+                                Completed ({completedRows.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="pending">
+                                Pending ({pendingRows.length})
+                            </TabsTrigger>
+                        </TabsList>
+                        
+                        {/* Completed Payments Tab */}
+                        <TabsContent value="completed" className="mt-4 space-y-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <CardTitle>RTGS Payment Report</CardTitle>
-                        <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
+                                    <h3 className="text-sm font-semibold">Completed Payments (Date & Check No. Filled)</h3>
+                                    <p className="text-xs text-muted-foreground">Payments with date and check number already filled. Select to update if check is damaged or date needs to be changed.</p>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        {filteredReportRows.length > 0 && settings && (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                {completedRows.length > 0 && settings && (
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        {selectedPaymentIds.size > 0 && (
+                                            <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
+                                                <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
+                                            </Button>
+                                        )}
+                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
                             </Button>
-                             <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
                             </Button>
-                            <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
                         )}
                     </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="overflow-auto h-[60vh] border rounded-md">
+                            <div className="overflow-auto h-[50vh] border rounded-md">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                            <TableHead className="w-12">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0"
+                                                    onClick={() => {
+                                                        const completedIds = new Set(completedRows.map(r => r.paymentId));
+                                                        if (selectedPaymentIds.size === completedIds.size && completedRows.length > 0 && 
+                                                            Array.from(selectedPaymentIds).every(id => completedIds.has(id))) {
+                                                            // Deselect all completed
+                                                            const newSelected = new Set(selectedPaymentIds);
+                                                            completedIds.forEach(id => newSelected.delete(id));
+                                                            setSelectedPaymentIds(newSelected);
+                                                        } else {
+                                                            // Select all completed (keep pending selected if any)
+                                                            const newSelected = new Set(selectedPaymentIds);
+                                                            completedIds.forEach(id => newSelected.add(id));
+                                                            setSelectedPaymentIds(newSelected);
+                                                        }
+                                                    }}
+                                                    title="Select All Completed"
+                                                >
+                                                    {selectedPaymentIds.size > 0 && completedRows.length > 0 && 
+                                                     completedRows.every(r => selectedPaymentIds.has(r.paymentId)) ? (
+                                                        <CheckSquare className="h-4 w-4" />
+                                                    ) : (
+                                                        <Square className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            </TableHead>
                                     <TableHead>Date / SR No.</TableHead>
                                     <TableHead>Payee / Father's Name</TableHead>
                                     <TableHead>Bank / Branch / IFSC</TableHead>
@@ -463,9 +690,15 @@ export default function RtgsReportClient() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredReportRows.length > 0 ? (
-                                    filteredReportRows.map((row, index) => (
-                                        <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                        {completedRows.length > 0 ? (
+                                            completedRows.map((row, index) => (
+                                                <TableRow key={`completed-${row.paymentId}-${row.srNo}-${index}`}>
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            checked={selectedPaymentIds.has(row.paymentId)}
+                                                            onCheckedChange={() => handleSelectRow(row.paymentId)}
+                                                        />
+                                                    </TableCell>
                                             <TableCell>
                                                 <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
                                                 <div className="text-xs text-muted-foreground">{row.srNo}</div>
@@ -502,14 +735,121 @@ export default function RtgsReportClient() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-24 text-center">
-                                            No RTGS reports found.
+                                                <TableCell colSpan={9} className="h-24 text-center">
+                                                    No completed payments found.
                                         </TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </div>
+                        </TabsContent>
+
+                        {/* Pending Payments Tab */}
+                        <TabsContent value="pending" className="mt-4 space-y-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="text-sm font-semibold">Pending Payments (Date & Check No. Required)</h3>
+                                    <p className="text-xs text-muted-foreground">Select payments and fill date & check number to complete them.</p>
+                                </div>
+                                {pendingRows.length > 0 && selectedPaymentIds.size > 0 && (
+                                    <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
+                                        <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="overflow-auto h-[50vh] border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-12">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0"
+                                                    onClick={() => {
+                                                        const pendingIds = new Set(pendingRows.map(r => r.paymentId));
+                                                        if (selectedPaymentIds.size === pendingIds.size && pendingRows.length > 0 && 
+                                                            Array.from(selectedPaymentIds).every(id => pendingIds.has(id))) {
+                                                            setSelectedPaymentIds(new Set());
+                                                        } else {
+                                                            setSelectedPaymentIds(new Set(pendingIds));
+                                                        }
+                                                    }}
+                                                    title="Select All Pending"
+                                                >
+                                                    {selectedPaymentIds.size === pendingRows.length && pendingRows.length > 0 && 
+                                                     Array.from(selectedPaymentIds).every(id => pendingRows.some(r => r.paymentId === id)) ? (
+                                                        <CheckSquare className="h-4 w-4" />
+                                                    ) : (
+                                                        <Square className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            </TableHead>
+                                            <TableHead>SR No.</TableHead>
+                                            <TableHead>Payee / Father's Name</TableHead>
+                                            <TableHead>Bank / Branch / IFSC</TableHead>
+                                            <TableHead>A/C No. / Mobile</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Parchi No.</TableHead>
+                                            <TableHead>6R No. / Date</TableHead>
+                                            <TableHead>UTR No.</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pendingRows.length > 0 ? (
+                                            pendingRows.map((row, index) => (
+                                                <TableRow key={`pending-${row.paymentId}-${row.srNo}-${index}`}>
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            checked={selectedPaymentIds.has(row.paymentId)}
+                                                            onCheckedChange={() => handleSelectRow(row.paymentId)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.srNo}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.bank}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.acNo}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
+                                                        <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.utrNo || '-'}</div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={9} className="h-24 text-center">
+                                                    No pending payments. All payments have date and check number.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
 
@@ -611,6 +951,67 @@ export default function RtgsReportClient() {
                 payments={filteredReportRows}
                 settings={settings}
             />
+
+            {/* Bulk Update Dialog */}
+            <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Update Selected Payments</DialogTitle>
+                        <DialogDescription>
+                            Update date and/or check number for {selectedPaymentIds.size} selected payment(s).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="updateDate">Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !updateDate && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {updateDate ? format(updateDate, "PPP") : <span>Select date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={updateDate} onSelect={setUpdateDate} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="updateCheckNo">Check No.</Label>
+                            <Input
+                                id="updateCheckNo"
+                                value={updateCheckNo}
+                                onChange={(e) => setUpdateCheckNo(e.target.value)}
+                                placeholder="Enter check number"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)} disabled={isUpdating}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleBulkUpdate} disabled={isUpdating || (!updateDate && !updateCheckNo.trim())}>
+                            {isUpdating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Updating...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="mr-2 h-4 w-4" />
+                                    Update
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
         </div>
     );

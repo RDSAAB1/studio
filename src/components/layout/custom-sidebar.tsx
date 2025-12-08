@@ -33,9 +33,36 @@ interface CustomSidebarProps {
 const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarActive, toggleSidebar, openMenuId, setOpenMenuId, scheduleClose }: { item: MenuItemType, activePath: string, onTabSelect: (menuItem: MenuItemType) => void, isMobile: boolean, isSidebarActive: boolean, toggleSidebar: () => void, openMenuId: string | null, setOpenMenuId: (id: string | null) => void, scheduleClose: () => void }) => {
     const isOpen = openMenuId === item.id;
     
-    // Check if the item itself is active or if any of its sub-items are active
-    const isSubMenuActive = item.subMenus?.some(sub => sub.id === activePath.substring(1)) ?? false;
-    const isActive = item.id === (activePath === '/' ? 'dashboard-overview' : activePath.substring(1));
+    // Normalize activePath - remove leading slash
+    const normalizedPath = activePath === '/' ? '/' : activePath;
+    const pathWithoutSlash = normalizedPath.substring(1);
+    
+    // Check if any sub-menu is active by comparing href or id
+    const isSubMenuActive = item.subMenus?.some(sub => {
+        if (sub.href) {
+            // Check if href matches (including query params)
+            const [hrefPath] = sub.href.split('?');
+            const [currentPath] = normalizedPath.split('?');
+            return currentPath === hrefPath || currentPath.startsWith(hrefPath + '/');
+        }
+        // Fallback to id matching
+        return sub.id === pathWithoutSlash || pathWithoutSlash.includes(sub.id);
+    }) ?? false;
+    
+    // Check if the item itself is active
+    let isActive = false;
+    if (normalizedPath === '/') {
+        isActive = item.id === 'dashboard-overview';
+    } else {
+        // Check if path matches item id or href
+        if (item.href) {
+            const [hrefPath] = item.href.split('?');
+            const [currentPath] = normalizedPath.split('?');
+            isActive = currentPath === hrefPath || currentPath.startsWith(hrefPath + '/');
+        } else {
+            isActive = pathWithoutSlash === item.id || pathWithoutSlash.startsWith(item.id + '/');
+        }
+    }
 
     const handleLinkClick = (menuItem: MenuItemType) => {
         onTabSelect(menuItem);
@@ -76,13 +103,24 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                 </button>
                  {isOpen && (
                     <ul className="sub_menu">
-                        {item.subMenus.map(subItem => (
-                            <li key={subItem.id}>
-                                <button onClick={() => handleLinkClick(subItem)} className={cn("link", `/${subItem.id}` === activePath && "active")}>
-                                     <span className="text">{subItem.name}</span>
-                                </button>
-                            </li>
-                        ))}
+                        {item.subMenus.map(subItem => {
+                            // Check if this sub-menu is active
+                            let isSubActive = false;
+                            if (subItem.href) {
+                                const [hrefPath] = subItem.href.split('?');
+                                const [currentPath] = normalizedPath.split('?');
+                                isSubActive = currentPath === hrefPath || currentPath.startsWith(hrefPath + '/');
+                            } else {
+                                isSubActive = pathWithoutSlash === subItem.id || pathWithoutSlash.startsWith(subItem.id + '/');
+                            }
+                            return (
+                                <li key={subItem.id}>
+                                    <button onClick={() => handleLinkClick(subItem)} className={cn("link", isSubActive && "active")}>
+                                         <span className="text">{subItem.name}</span>
+                                    </button>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </li>
@@ -132,7 +170,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                     <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
                 </button>
             </DropdownMenuTrigger>
-             <DropdownMenuContent 
+                    <DropdownMenuContent 
                 side="right" 
                 align="start"
                 sideOffset={4}
@@ -141,18 +179,29 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                 onPointerLeave={scheduleClose}
              >
                 <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
-                {item.subMenus.map(subItem => (
-                    <DropdownMenuItem 
-                        key={subItem.id} 
-                        onClick={() => handleLinkClick(subItem)} 
-                        className={cn(
-                            "cursor-pointer",
-                            `/${subItem.id}` === activePath && "bg-accent"
-                        )}
-                    >
-                        {subItem.name}
-                    </DropdownMenuItem>
-                ))}
+                {item.subMenus.map(subItem => {
+                    // Check if this sub-menu is active
+                    let isSubActive = false;
+                    if (subItem.href) {
+                        const [hrefPath] = subItem.href.split('?');
+                        const [currentPath] = normalizedPath.split('?');
+                        isSubActive = currentPath === hrefPath || currentPath.startsWith(hrefPath + '/');
+                    } else {
+                        isSubActive = pathWithoutSlash === subItem.id || pathWithoutSlash.startsWith(subItem.id + '/');
+                    }
+                    return (
+                        <DropdownMenuItem 
+                            key={subItem.id} 
+                            onClick={() => handleLinkClick(subItem)} 
+                            className={cn(
+                                "cursor-pointer",
+                                isSubActive && "bg-accent"
+                            )}
+                        >
+                            {subItem.name}
+                        </DropdownMenuItem>
+                    );
+                })}
             </DropdownMenuContent>
         </DropdownMenu>
     )

@@ -106,7 +106,6 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "sales/daily-payments", name: "Daily Payments", icon: CalendarClock },
         { id: "sales/rtgs-report", name: "RTGS Report", icon: Banknote },
-        { id: "sales/rtgs-report/negative-balance", name: "RTGS Negative", icon: Banknote },
         { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
         { id: "sales/6r-report", name: "6R Report", icon: FileText },
         { id: "tools/voucher-import", name: "Mandi Report Import", icon: FileSpreadsheet },

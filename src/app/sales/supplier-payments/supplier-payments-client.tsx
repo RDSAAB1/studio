@@ -999,6 +999,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                         selectPaymentAmount={hook.selectPaymentAmount}
                                         combination={paymentCombination}
                                         showResults={false}
+                                        paymentMethod={hook.paymentMethod}
                                       />
                                     </CardContent>
                                   </Card>

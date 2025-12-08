@@ -16,7 +16,6 @@ export const RtgsForm = (props: any) => {
     const { toast } = useToast();
     const {
         bankDetails, setBankDetails,
-        checkNo, setCheckNo,
         editingPayment, setIsBankSettingsOpen,
         supplierDetails = {},
         setSupplierDetails,
@@ -189,13 +188,6 @@ export const RtgsForm = (props: any) => {
         handleBranchSelect(newBranchName);
     };
 
-    const formatCheckNo = (e: React.FocusEvent<HTMLInputElement>) => {
-        const value = e.target.value.trim();
-        if (value && !isNaN(parseInt(value))) {
-            setCheckNo(String(parseInt(value)).padStart(6, '0'));
-        }
-    };
-
     return (
         <div className="space-y-2 text-[10px]">
             <div className="flex items-center justify-between">
@@ -338,10 +330,7 @@ export const RtgsForm = (props: any) => {
                             allowCustomInput={true}
                         />
                     </div>
-                    <div className="space-y-0.5">
-                        <Label className="text-[10px]">Check No.</Label>
-                        <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-7 text-[10px]"/>
-                    </div>
+                    {/* Check No. field removed - will be filled from RTGS Report */}
                 </div>
             </div>
         </div>

@@ -1786,9 +1786,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         // For RTGS and Gov., paymentId should be rtgsSrNo
         const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
         
+        // Validate paymentDate before formatting
+        let formattedDate: string;
+        if (paymentDate && paymentDate instanceof Date && !isNaN(paymentDate.getTime())) {
+            formattedDate = format(paymentDate, 'yyyy-MM-dd');
+        } else {
+            formattedDate = format(new Date(), 'yyyy-MM-dd');
+        }
+        
         const paymentDataBase: Omit<Payment, 'id'> = {
             paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
-            date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+            date: formattedDate,
             // amount = "To Be Paid" amount (actual payment, WITHOUT CD)
             // cdAmount = CD amount (separate field)
             amount: Math.round(finalAmountToPay), cdAmount: Math.round(effectiveCdAmount),
@@ -1864,22 +1872,23 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             
             // Calculate Gov. payment extra amount for offline fallback (if not already calculated)
             // If main block didn't run, calculate basic values
+            let fallbackGovRequiredAmount = 0;
+            let fallbackTotalExtraAmount = 0;
             if (paymentMethod === 'Gov.' && govAmount > 0) {
-                if (govRequiredAmount === 0) {
-                    govRequiredAmount = govAmount; // Use govAmount as govRequiredAmount
-                }
+                fallbackGovRequiredAmount = govAmount; // Use govAmount as govRequiredAmount
                 // totalExtraAmount will be 0 if not calculated (will be recalculated on sync)
+                fallbackTotalExtraAmount = 0;
             }
             
             const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
-                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                date: (paymentDate && paymentDate instanceof Date && !isNaN(paymentDate.getTime())) ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
                 cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
                 notes: paymentMethod === 'Gov.' ? '' : `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                 paidFor: paidForDetails,
-                sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                sixRDate: (sixRDate && sixRDate instanceof Date && !isNaN(sixRDate.getTime())) ? format(sixRDate, 'yyyy-MM-dd') : '',
                 parchiNo: parchiNo,
                 supplierName: toTitleCase(supplierDetails.name),
                 supplierFatherName: toTitleCase(supplierDetails.fatherName),
@@ -1904,8 +1913,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 (paymentDataBase as any).govQuantity = govQuantity || 0;
                 (paymentDataBase as any).govRate = govRate || 0;
                 (paymentDataBase as any).govAmount = govAmount || 0;
-                (paymentDataBase as any).govRequiredAmount = govRequiredAmount || 0;
-                (paymentDataBase as any).extraAmount = totalExtraAmount || 0;
+                (paymentDataBase as any).govRequiredAmount = fallbackGovRequiredAmount || 0;
+                (paymentDataBase as any).extraAmount = fallbackTotalExtraAmount || 0;
                 // Do NOT set bank fields, utrNo, checkNo, quantity, rate, rtgsAmount for Gov.
             } else if (paymentMethod === 'Cash') {
                 paymentDataBase.utrNo = utrNo;
@@ -1976,8 +1985,12 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
         throw new Error("Payment ID is missing for deletion.");
     }
 
-    // Find the payment to delete
-    const paymentToDelete = paymentHistory?.find(p => p.id === paymentId);
+    // Find the payment to delete - check id, paymentId, and rtgsSrNo for RTGS payments
+    const paymentToDelete = paymentHistory?.find(p => 
+        p.id === paymentId || 
+        p.paymentId === paymentId || 
+        (p as any).rtgsSrNo === paymentId
+    );
     if (!paymentToDelete) {
         throw new Error("Payment not found.");
     }

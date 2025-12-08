@@ -4360,21 +4360,13 @@ export function getLedgerEntriesRealtime(
     
     if (accountId) {
         // Filter by accountId
-        if (lastSyncTime) {
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            q = query(
-                ledgerEntriesCollection,
-                where('accountId', '==', accountId),
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-        } else {
-            q = query(
-                ledgerEntriesCollection,
-                where('accountId', '==', accountId),
-                orderBy('createdAt')
-            );
-        }
+        // Avoid composite index requirement by using simpler query
+        // Client-side filtering can filter by updatedAt if needed
+        q = query(
+            ledgerEntriesCollection,
+            where('accountId', '==', accountId),
+            orderBy('createdAt')
+        );
     } else {
         // Get all entries
         if (lastSyncTime) {

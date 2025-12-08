@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ interface EntryFormData {
 interface EntryFormProps {
   entryForm: EntryFormData;
   onEntryFormChange: (form: EntryFormData) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   activeAccount: LedgerAccount | null;
   saving: boolean;
   loadingEntries: boolean;

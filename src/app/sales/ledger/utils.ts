@@ -1,4 +1,4 @@
-import type { LedgerEntry } from "@/lib/definitions";
+﻿import type { LedgerEntry } from "@/lib/definitions";
 import { format } from "date-fns";
 
 export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes

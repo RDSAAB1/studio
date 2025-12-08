@@ -521,7 +521,7 @@ body {
     border-radius: 0 !important;
     -webkit-border-radius: 0 !important;
   }
-
+  
   /* Text color adjustments for popovers to ensure visibility */
   [data-radix-popover-content],
   [data-radix-dropdown-content],

@@ -5,16 +5,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
-import { formatCurrency, toTitleCase } from "@/lib/utils";
+import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { Banknote, Percent, Calendar as CalendarIcon, Receipt, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Info } from "lucide-react";
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
-    <div className="flex items-start gap-3">
+    <div className={cn("flex items-start gap-3 min-h-[60px]", className)}>
         {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
-        <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
+        <div className="flex-1">
+            <p className="text-xs text-muted-foreground mb-1">{label}</p>
             <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
         </div>
     </div>
@@ -39,6 +39,20 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
                 <DetailItem icon={<Hash size={14} />} label="CD Applied" value={payment.cdApplied ? "Yes" : "No"} />
+                
+                {/* Gov. Payment Specific Fields */}
+                {payment.receiptType === 'Gov.' && (
+                  <>
+                    <DetailItem icon={<Hash size={14} />} label="Gov. Quantity" value={(payment as any).govQuantity || 0} />
+                    <DetailItem icon={<Hash size={14} />} label="Gov. Rate" value={formatCurrency((payment as any).govRate || 0)} />
+                    <DetailItem icon={<Hash size={14} />} label="Gov. Amount" value={formatCurrency((payment as any).govAmount || 0)} />
+                    <DetailItem icon={<Hash size={14} />} label="Gov. Required Amount" value={formatCurrency((payment as any).govRequiredAmount || 0)} />
+                    <DetailItem icon={<Hash size={14} />} label="Extra Amount" value={formatCurrency((payment as any).extraAmount || 0)} />
+                    {(payment as any).rtgsSrNo && (
+                      <DetailItem icon={<Hash size={14} />} label="Gov. SR No" value={(payment as any).rtgsSrNo} />
+                    )}
+                  </>
+                )}
               </div>
               <h4 className="font-semibold text-sm">Entries Paid in this Transaction</h4>
               <div className="max-h-64 overflow-y-auto border rounded-md">

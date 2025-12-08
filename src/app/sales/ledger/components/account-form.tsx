@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import type { LedgerAccountInput } from "@/lib/definitions";
 interface AccountFormProps {
   newAccount: LedgerAccountInput;
   onAccountChange: (account: LedgerAccountInput) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   onCancel: () => void;
   saving: boolean;
 }

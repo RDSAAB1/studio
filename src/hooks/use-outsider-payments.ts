@@ -72,21 +72,37 @@ export const useOutsiderPayments = (data: any) => {
     }, [form]);
 
     const handleDeletePayment = useCallback(async (payment: Payment) => {
-        if (!confirm(`Are you sure you want to delete payment ${payment.paymentId || payment.rtgsSrNo}?`)) {
+        if (!confirm(`Are you sure you want to delete payment ${payment.paymentId || payment.rtgsSrNo || payment.id}?`)) {
             return;
         }
 
         try {
             setIsProcessing(true);
+            // Get paymentId - for RTGS payments, id is usually rtgsSrNo or paymentId
+            const paymentId = payment.id || payment.paymentId || payment.rtgsSrNo;
+            
+            if (!paymentId) {
+                throw new Error("Payment ID is missing. Cannot delete payment.");
+            }
+
+            // Immediately remove from local state for instant UI feedback
+            if (data?.removePaymentFromState) {
+                data.removePaymentFromState(paymentId);
+            }
+
             await handleDeletePaymentLogic({
-                payment,
+                paymentId: paymentId,
+                paymentHistory: data?.paymentHistory || [],
                 isCustomer: false,
             });
+            
             toast({
                 title: "Payment Deleted",
-                description: `Payment ${payment.paymentId || payment.rtgsSrNo} has been deleted.`,
+                description: `Payment ${payment.paymentId || payment.rtgsSrNo || payment.id} has been deleted.`,
             });
         } catch (error: any) {
+            // If delete failed, the realtime listener will restore the payment
+            // So we don't need to manually restore it here
             toast({
                 title: "Error",
                 description: error.message || "Failed to delete payment",
@@ -95,7 +111,7 @@ export const useOutsiderPayments = (data: any) => {
         } finally {
             setIsProcessing(false);
         }
-    }, [toast]);
+    }, [toast, data]);
 
     const handleProcessPayment = useCallback(async () => {
         if (!form.paymentId && !form.rtgsSrNo) {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,6 @@ import {
   getAllPayments,
   getAllIncomes,
   getAllExpenses,
-  getLedgerAccountsRealtime,
-  getLedgerCashAccountsRealtime,
-  getLedgerEntriesRealtime,
 } from "@/lib/firestore";
 import { Switch } from "@/components/ui/switch";
 import { toTitleCase } from "@/lib/utils";
@@ -182,20 +179,11 @@ const LedgerPage: React.FC = () => {
   }, [activeEntries, dateFrom, dateTo]);
 
   const displayEntries = useMemo(() => {
-    // Table shows newest first (reversed), but balance should calculate from bottom to top
-    // So we need to reverse entries, calculate balance from oldest to newest, then reverse back
-    const reversedForCalculation = [...filteredEntries].reverse(); // Oldest first for calculation
-    
-    // Calculate balance from oldest (bottom) to newest (top)
-    let runningBalance = 0;
-    const entriesWithBalance = reversedForCalculation.map((entry) => {
-      // Add this entry's effect to get cumulative balance
-      runningBalance = Math.round((runningBalance + entry.debit - entry.credit) * 100) / 100;
-      return { ...entry, runningBalance: runningBalance };
+    let running = 0;
+    return filteredEntries.map((entry) => {
+      running = Math.round((running + entry.debit - entry.credit) * 100) / 100;
+      return { ...entry, runningBalance: running };
     });
-    
-    // Reverse back to show newest first (as table displays)
-    return entriesWithBalance.reverse();
   }, [filteredEntries]);
 
   const groupedEntries = useMemo(() => {
@@ -278,17 +266,58 @@ const LedgerPage: React.FC = () => {
     }
   }, [linkAccountId, activeAccountId]);
 
-  // Real-time listener for cash accounts
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setLoadingCashAccounts(false);
-      return;
-    }
+    let cancelled = false;
 
-    setLoadingCashAccounts(true);
-    const unsubscribe = getLedgerCashAccountsRealtime(
-      (data) => {
-        const normalized = data
+    const loadCashAccounts = async () => {
+      setLoadingCashAccounts(true);
+      try {
+        // Γ£à Load from cache first for immediate display
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("ledgerCashAccountsCache");
+          if (cached) {
+            try {
+              const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
+              const normalized = cachedAccounts
+                .map((account) => ({
+                  ...account,
+                  noteGroups: normalizeNoteGroups(account.noteGroups),
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+              
+              if (!cancelled) {
+                setCashAccounts(normalized);
+                if (!activeCashAccountId && normalized.length > 0) {
+                  setActiveCashAccountId(normalized[0].id);
+                }
+              }
+            } catch (e) {
+              console.warn("Failed to parse cached cash accounts", e);
+            }
+          }
+        }
+
+        // Check if we should sync from Firestore
+        if (typeof window === "undefined") {
+          setLoadingCashAccounts(false);
+          return;
+        }
+
+        // Γ£à Always sync if cache is empty, otherwise respect TTL
+        const cached = window.localStorage.getItem("ledgerCashAccountsCache");
+        const lastSynced = window.localStorage.getItem("ledgerCashAccountsLastSynced");
+        const shouldSync = !cached || !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
+
+        if (!shouldSync) {
+          setLoadingCashAccounts(false);
+          return;
+        }
+
+        // Γ£à Sync from Firestore
+        const remoteAccounts = await fetchLedgerCashAccounts();
+        if (cancelled) return;
+
+        const normalized = remoteAccounts
           .map((account) => ({
             ...account,
             noteGroups: normalizeNoteGroups(account.noteGroups),
@@ -302,79 +331,158 @@ const LedgerPage: React.FC = () => {
           }
           return normalized[0]?.id ?? null;
         });
-        setLoadingCashAccounts(false);
-      },
-      (error) => {
+
+        window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
+      } catch (error) {
         console.error("Failed to load cash accounts", error);
         toast({
           title: "Unable to load cash accounts",
           description: "We could not fetch cash accounts. Please try again.",
           variant: "destructive",
         });
-        setLoadingCashAccounts(false);
+      } finally {
+        if (!cancelled) {
+          setLoadingCashAccounts(false);
+        }
       }
-    );
+    };
 
-    return () => unsubscribe();
+    loadCashAccounts();
+    return () => {
+      cancelled = true;
+    };
   }, [toast, activeCashAccountId]);
 
-  // Real-time listener for ledger accounts
+  // Load accounts from IndexedDB first, then sync from Firestore (with caching)
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setLoadingAccounts(false);
-      return;
-    }
+    let cancelled = false;
 
-    setLoadingAccounts(true);
-    const unsubscribe = getLedgerAccountsRealtime(
-      (data) => {
-        setAccounts(data);
-        if (!activeAccountId && data.length) {
-          setActiveAccountId(data[0].id);
+    const loadAccounts = async () => {
+      try {
+        if (typeof window !== "undefined" && db) {
+          const cachedAccounts = await db.ledgerAccounts.toArray();
+          if (!cancelled && cachedAccounts.length) {
+            setAccounts(cachedAccounts);
+            if (!activeAccountId) {
+              setActiveAccountId(cachedAccounts[0].id);
+            }
+          }
         }
-        setLoadingAccounts(false);
-      },
-      (error) => {
+
+        if (typeof window === "undefined") {
+          setLoadingAccounts(false);
+          return;
+        }
+
+        const lastSynced = window.localStorage.getItem("ledgerAccountsLastSynced");
+        const shouldSync = !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
+
+        if (!shouldSync) {
+          setLoadingAccounts(false);
+          return;
+        }
+
+        const remoteAccounts = await fetchLedgerAccounts();
+        if (!cancelled) {
+          setAccounts(remoteAccounts);
+          if (!activeAccountId && remoteAccounts.length) {
+            setActiveAccountId(remoteAccounts[0].id);
+          }
+        }
+
+        if (db) {
+          await db.transaction("rw", db.ledgerAccounts, async () => {
+            await db.ledgerAccounts.clear();
+            if (remoteAccounts.length) {
+              await db.ledgerAccounts.bulkPut(remoteAccounts);
+            }
+          });
+        }
+
+        window.localStorage.setItem("ledgerAccountsLastSynced", String(Date.now()));
+      } catch (error) {
         console.error("Failed to load ledger accounts", error);
         toast({
           title: "Unable to load accounts",
           description: "We could not fetch ledger accounts. Please try again.",
           variant: "destructive",
         });
-        setLoadingAccounts(false);
+      } finally {
+        if (!cancelled) setLoadingAccounts(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    loadAccounts();
+    return () => {
+      cancelled = true;
+    };
   }, [activeAccountId, toast]);
 
-  // Real-time listener for ledger entries
+  // Load entries whenever account changes
   useEffect(() => {
-    if (!activeAccountId || typeof window === "undefined") {
-      setLoadingEntries(false);
-      return;
-    }
+    if (!activeAccountId) return;
 
-    setLoadingEntries(true);
-    const unsubscribe = getLedgerEntriesRealtime(
-      (data) => {
-        const sortedRemote = sortEntries(recalculateBalances(data));
-        setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedRemote }));
-        setLoadingEntries(false);
-      },
-      (error) => {
+    let cancelled = false;
+
+    const loadEntries = async () => {
+      setLoadingEntries(true);
+      try {
+        if (db) {
+          const cachedEntries = await db.ledgerEntries
+            .where("accountId")
+            .equals(activeAccountId)
+            .toArray();
+          if (!cancelled) {
+            setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortEntries(cachedEntries) }));
+          }
+        }
+
+        if (typeof window === "undefined") {
+          setLoadingEntries(false);
+          return;
+        }
+
+        const lastSyncedKey = `ledgerEntriesLastSynced:${activeAccountId}`;
+        const lastSynced = window.localStorage.getItem(lastSyncedKey);
+        const shouldSync = !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
+
+        if (!shouldSync) {
+          setLoadingEntries(false);
+          return;
+        }
+
+        const remoteEntries = await fetchLedgerEntries(activeAccountId);
+        const sortedRemote = sortEntries(recalculateBalances(remoteEntries));
+        if (!cancelled) {
+          setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedRemote }));
+        }
+
+        if (db) {
+          await db.transaction("rw", db.ledgerEntries, async () => {
+            await db.ledgerEntries.where("accountId").equals(activeAccountId).delete();
+            if (sortedRemote.length) {
+              await db.ledgerEntries.bulkPut(sortedRemote);
+            }
+          });
+        }
+
+        window.localStorage.setItem(lastSyncedKey, String(Date.now()));
+      } catch (error) {
         console.error("Failed to load ledger entries", error);
         toast({
           title: "Unable to load entries",
           description: "We could not fetch ledger entries. Please try again.",
           variant: "destructive",
         });
-        setLoadingEntries(false);
-      },
-      activeAccountId // Filter by accountId
-    );
+      } finally {
+        if (!cancelled) setLoadingEntries(false);
+      }
+    };
 
-    return () => unsubscribe();
+    loadEntries();
+    return () => {
+      cancelled = true;
+    };
   }, [activeAccountId, toast]);
 
   const persistEntriesToIndexedDb = async (accountId: string, entries: LedgerEntry[]) => {
@@ -455,7 +563,7 @@ const LedgerPage: React.FC = () => {
       setNewCashAccountName("");
       setShowCashAccountForm(false);
       
-      // ✅ Update cache
+      // Γ£à Update cache
       if (typeof window !== "undefined") {
         localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(updatedAccounts));
         window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
@@ -504,7 +612,7 @@ const LedgerPage: React.FC = () => {
         return normalized;
       });
       
-      // ✅ Update cache
+      // Γ£à Update cache
       if (typeof window !== "undefined") {
         localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
         window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
@@ -592,7 +700,7 @@ const LedgerPage: React.FC = () => {
           return previousActive;
         });
         
-        // ✅ Update cache
+        // Γ£à Update cache
         if (typeof window !== "undefined") {
           localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
           window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
@@ -1113,8 +1221,7 @@ const LedgerPage: React.FC = () => {
       debit += entry.debit;
       credit += entry.credit;
     });
-    // Final balance from top entry (newest/first entry) since table is reversed
-    const balance = displayEntries[0]?.runningBalance || 0;
+    const balance = displayEntries.at(-1)?.runningBalance || 0;
     return { debit, credit, balance };
   }, [displayEntries]);
 
@@ -1620,13 +1727,13 @@ const LedgerPage: React.FC = () => {
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <SmartDatePicker
                   value={statementStart}
-                  onChange={(next) => setStatementStart(next || "")}
+                  onChange={(next) => setStatementStart(typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : "")}
                   inputClassName="h-10 text-sm min-w-[150px]"
                   buttonClassName="h-10 w-10"
                 />
                 <SmartDatePicker
                   value={statementEnd}
-                  onChange={(next) => setStatementEnd(next || "")}
+                  onChange={(next) => setStatementEnd(typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : "")}
                   inputClassName="h-10 text-sm min-w-[150px]"
                   buttonClassName="h-10 w-10"
                 />
@@ -1953,7 +2060,7 @@ const LedgerPage: React.FC = () => {
                                     <SmartDatePicker
                                       value={editForm.date}
                                       onChange={(next) =>
-                                        setEditForm((prev) => ({ ...prev, date: next }))
+                                        setEditForm((prev) => ({ ...prev, date: typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : "" }))
                                       }
                                       disabled={saving}
                                       inputClassName="h-8 text-xs"
