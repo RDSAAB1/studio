@@ -107,9 +107,9 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                         <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
                                         <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
                                         <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
-                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank</TableHead>
-                                        <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details</TableHead>
-                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate</TableHead>
+                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank / Gov. Required</TableHead>
+                                        <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details / Extra</TableHead>
+                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate / Gov. Qty & Rate</TableHead>
                                         <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
                                         <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
                                         <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
@@ -140,7 +140,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             <div className="text-foreground font-semibold break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-20">
-                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
+                                            <Badge variant={p.receiptType === 'RTGS' ? 'default' : p.receiptType === 'Gov.' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
                                         </TableCell>
                                         <TableCell 
                                             className="p-1 text-[11px] w-40 cursor-pointer" 
@@ -212,30 +212,64 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                 {getReceiptNumbers(p)}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
-                                            <div className="break-words text-foreground font-bold text-[11px]">
-                                                {p.bankName || ''}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
-                                            <div className="text-foreground text-[11px] font-bold break-words">
-                                                {p.bankAcNo || ''}
-                                            </div>
-                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
-                                                {p.bankBranch || ''}
-                                            </div>
-                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
-                                                {p.bankIfsc || ''}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
-                                            <div className="text-foreground text-[11px] font-bold break-words">
-                                                {p.quantity || 0}
-                                            </div>
-                                            <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
-                                                {p.rate || 0}
-                                            </div>
-                                        </TableCell>
+                                        {p.receiptType === 'Gov.' ? (
+                                            <>
+                                                <TableCell className="p-1 text-[11px] w-28" title="Gov. Required Amount">
+                                                    <div className="break-words text-foreground font-bold text-[11px]">
+                                                        {formatCurrency((p as any).govRequiredAmount || 0)}
+                                                    </div>
+                                                    <div className="text-muted-foreground text-[10px] mt-0.5">
+                                                        Required
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="p-1 text-[11px] w-36" title={`Extra Amount: ${formatCurrency((p as any).extraAmount || 0)}`}>
+                                                    <div className="text-foreground text-[11px] font-bold break-words">
+                                                        {formatCurrency((p as any).extraAmount || 0)}
+                                                    </div>
+                                                    <div className="text-muted-foreground text-[10px] mt-0.5">
+                                                        Extra
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="p-1 text-[11px] w-28" title={`Gov. Quantity: ${(p as any).govQuantity || 0} | Gov. Rate: ${(p as any).govRate || 0} | Gov. Amount: ${formatCurrency((p as any).govAmount || 0)}`}>
+                                                    <div className="text-foreground text-[11px] font-bold break-words">
+                                                        {(p as any).govQuantity || 0}
+                                                    </div>
+                                                    <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
+                                                        {(p as any).govRate || 0}
+                                                    </div>
+                                                    <div className="text-muted-foreground text-[10px] break-words mt-0.5 font-medium">
+                                                        {formatCurrency((p as any).govAmount || 0)}
+                                                    </div>
+                                                </TableCell>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
+                                                    <div className="break-words text-foreground font-bold text-[11px]">
+                                                        {p.bankName || ''}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
+                                                    <div className="text-foreground text-[11px] font-bold break-words">
+                                                        {p.bankAcNo || ''}
+                                                    </div>
+                                                    <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
+                                                        {p.bankBranch || ''}
+                                                    </div>
+                                                    <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
+                                                        {p.bankIfsc || ''}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
+                                                    <div className="text-foreground text-[11px] font-bold break-words">
+                                                        {p.quantity || 0}
+                                                    </div>
+                                                    <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
+                                                        {p.rate || 0}
+                                                    </div>
+                                                </TableCell>
+                                            </>
+                                        )}
                                         <TableCell className="text-right p-1 text-[11px] w-24 font-mono">
                                             <div className="break-words text-foreground font-bold">{formatCurrency(p.amount)}</div>
                                         </TableCell>

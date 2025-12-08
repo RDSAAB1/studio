@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { fetchMandiReports } from '@/lib/firestore';
+import { fetchMandiReports, getMandiReportsRealtime } from '@/lib/firestore';
 import { formatCurrency, toTitleCase } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,6 @@ export function MandiReportHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<{ from?: Date; to?: Date }>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [hasTriedFirestore, setHasTriedFirestore] = useState(false);
 
   // Get all mandi report entries from database
   // Use toArray() and sort manually if purchaseDate index doesn't exist yet
@@ -38,60 +37,25 @@ export function MandiReportHistory() {
     }
   }, []);
   
-  // Fetch from Firestore if IndexedDB is empty
+  // Real-time listener for mandi reports
   useEffect(() => {
-    const loadFromFirestore = async () => {
-      if (typeof window === 'undefined') return;
-      
-      // Wait a bit to see if IndexedDB loads
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // If IndexedDB is still empty or undefined, try Firestore
-      if ((allEntriesRaw === undefined || (allEntriesRaw.length === 0 && !hasTriedFirestore))) {
-        setIsLoading(true);
-        setHasTriedFirestore(true);
-        try {
-          console.log('[MandiReportHistory] IndexedDB empty or undefined, fetching from Firestore collection "mandiReports"...');
-          console.log('[MandiReportHistory] Calling fetchMandiReports()...');
-          const firestoreReports = await fetchMandiReports();
-          console.log(`[MandiReportHistory] ✅ fetchMandiReports() returned ${firestoreReports.length} reports`);
-          
-          if (firestoreReports.length === 0) {
-            console.warn('[MandiReportHistory] ⚠️ No reports found in Firestore collection "mandiReports".');
-            console.warn('[MandiReportHistory] Please check:');
-            console.warn('[MandiReportHistory] 1. Firestore Console → "mandiReports" collection exists?');
-            console.warn('[MandiReportHistory] 2. Voucher Import page → Save a test entry and check console logs');
-            console.warn('[MandiReportHistory] 3. Check if data is saved in nested path: /mandiReports/{parentId}/mandiReports/{docId}');
-          } else {
-            console.log('[MandiReportHistory] ✅ Successfully fetched reports from Firestore');
-          }
-          
-          // fetchMandiReports already syncs to IndexedDB, but let's ensure it's done
-          if (db && firestoreReports.length > 0) {
-            try {
-              await db.mandiReports.bulkPut(firestoreReports);
-              console.log('[MandiReportHistory] ✅ Synced Firestore data to IndexedDB');
-            } catch (error) {
-              console.error('[MandiReportHistory] ❌ Error syncing to IndexedDB:', error);
-            }
-          }
-        } catch (error: any) {
-          console.error('[MandiReportHistory] ❌ Error fetching from Firestore:', error);
-          console.error('[MandiReportHistory] Error details:', {
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (allEntriesRaw !== undefined) {
+    if (typeof window === 'undefined') return;
+    
+    setIsLoading(true);
+    const unsubscribe = getMandiReportsRealtime(
+      (data) => {
+        console.log(`[MandiReportHistory] ✅ Real-time update: ${data.length} reports`);
+        setIsLoading(false);
+        // Data is automatically synced to IndexedDB by the real-time function
+      },
+      (error) => {
+        console.error('[MandiReportHistory] ❌ Error in real-time listener:', error);
         setIsLoading(false);
       }
-    };
+    );
     
-    loadFromFirestore();
-  }, [allEntriesRaw, hasTriedFirestore]);
+    return () => unsubscribe();
+  }, []);
   
   // Debug: Log when data changes
   useEffect(() => {
@@ -207,7 +171,6 @@ export function MandiReportHistory() {
             <Button 
               onClick={async () => {
                 setIsLoading(true);
-                setHasTriedFirestore(false);
                 // Clear lastSync to force fresh fetch
                 if (typeof window !== 'undefined') {
                   localStorage.removeItem('lastSync:mandiReports');

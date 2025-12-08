@@ -19,7 +19,6 @@ import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/fires
 import { useToast } from "@/hooks/use-toast";
 import { syncAllData, hardSyncAllData, syncAllDataWithDetails } from "@/lib/database";
 import { SyncDialog } from "@/components/sync-dialog";
-import { useSupplierHubContext } from "@/app/sales/supplier-hub/context/supplier-hub-context";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -226,8 +225,6 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const isSupplierHub = pathname?.includes('supplier-hub');
-  const supplierHubContext = useSupplierHubContext();
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -249,37 +246,6 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
             <NetworkStatusIndicator />
-            {isSupplierHub && supplierHubContext && (
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant={supplierHubContext.activeSection === "overview" ? "default" : "outline"}
-                  size="sm"
-                  className="h-6 rounded-full px-2.5 text-[10px]"
-                  onClick={() => supplierHubContext.setActiveSection("overview")}
-                >
-                  <UserCircle className="mr-1 h-3 w-3" />
-                  Supplier Profile
-                </Button>
-                <Button
-                  variant={supplierHubContext.activeSection === "entry" ? "default" : "outline"}
-                  size="sm"
-                  className="h-6 rounded-full px-2.5 text-[10px]"
-                  onClick={() => supplierHubContext.setActiveSection("entry")}
-                >
-                  <ClipboardList className="mr-1 h-3 w-3" />
-                  Supplier Entry
-                </Button>
-                <Button
-                  variant={supplierHubContext.activeSection === "payments" ? "default" : "outline"}
-                  size="sm"
-                  className="h-6 rounded-full px-2.5 text-[10px]"
-                  onClick={() => supplierHubContext.setActiveSection("payments")}
-                >
-                  <CreditCard className="mr-1 h-3 w-3" />
-                  Supplier Payment
-                </Button>
-              </div>
-            )}
         </div>
         
         {/* Center: Dynamic Island Toaster */}

@@ -164,7 +164,13 @@ const TransactionTable = ({ transactions, onShowDetails }: { transactions: Suppl
                         {visibleTransactions.map(entry => (
                             <TableRow key={entry.id}>
                                 <TableCell className="font-mono text-xs w-[60px]">{entry.srNo}</TableCell>
-                                <TableCell className="text-xs w-[100px]">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                                <TableCell className="text-xs w-[100px]">
+                                    {formatCurrency(
+                                        (entry as any).adjustedOriginal !== undefined 
+                                            ? (entry as any).adjustedOriginal 
+                                            : parseFloat(String(entry.originalNetAmount))
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-xs text-green-600 w-[80px]">{formatCurrency(entry.totalPaid || 0)}</TableCell>
                                 <TableCell className="text-xs text-blue-600 w-[60px]">{formatCurrency(entry.totalCd || 0)}</TableCell>
                                 <TableCell className="text-xs font-semibold text-red-500 dark:text-red-400 w-[100px]">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>

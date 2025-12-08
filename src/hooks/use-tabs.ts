@@ -173,7 +173,6 @@ export const allMenuItems: MenuItem[] = [
     icon: Wrench,
     subMenus: [
         { id: "admin/migrations", name: "Database Migrations", icon: Database },
-        { id: "sales/supplier-hub", name: "Supplier Hub", icon: Sparkles },
         { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search },
     ]
   },

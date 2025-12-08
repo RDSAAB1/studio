@@ -1016,6 +1016,119 @@ export async function setAttendance(entry: AttendanceEntry): Promise<void> {
     await setDoc(docRef, entry, { merge: true });
 }
 
+export function getAttendanceRealtime(
+    callback: (data: AttendanceEntry[]) => void,
+    onError: (error: Error) => void,
+    dateFilter?: string // Optional: filter by specific date
+): () => void {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.attendance.toArray() : [];
+        }, callback);
+    }
+
+    // ✅ Use incremental sync for realtime listener
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:attendance');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    let firestoreAttendance: AttendanceEntry[] = [];
+    
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.attendance.toArray().then((localAttendance) => {
+            if (dateFilter) {
+                const filtered = localAttendance.filter(a => a.date === dateFilter);
+                callback(filtered as AttendanceEntry[]);
+            } else {
+                callback(localAttendance as AttendanceEntry[]);
+            }
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
+    }
+
+    // Build query
+    let q;
+    if (dateFilter) {
+        // Filter by specific date
+        q = query(
+            attendanceCollection,
+            where('date', '==', dateFilter),
+            orderBy('date', 'desc')
+        );
+    } else {
+        // Get all attendance
+        const lastSyncTime = getLastSyncTime();
+        if (lastSyncTime) {
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            q = query(
+                attendanceCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } else {
+            q = query(attendanceCollection, orderBy('date', 'desc'));
+        }
+    }
+
+    // ✅ Always fetch all attendance from Firestore (source of truth)
+    getDocs(q).then((fullSnapshot) => {
+        const allAttendance = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
+        firestoreAttendance = allAttendance;
+        callback(allAttendance);
+        
+        // Save to IndexedDB
+        if (db && allAttendance.length > 0) {
+            db.attendance.bulkPut(allAttendance).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:attendance', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching attendance:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    return onSnapshot(q, (snapshot) => {
+        const attendance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
+        
+        // Merge with existing data if not filtering by date
+        if (!dateFilter) {
+            // Merge new/changed entries with existing
+            attendance.forEach(entry => {
+                const index = firestoreAttendance.findIndex(a => a.id === entry.id);
+                if (index >= 0) {
+                    firestoreAttendance[index] = entry;
+                } else {
+                    firestoreAttendance.push(entry);
+                }
+            });
+            callback([...firestoreAttendance]);
+        } else {
+            callback(attendance);
+        }
+        
+        // Save to IndexedDB
+        if (db && attendance.length > 0) {
+            db.attendance.bulkPut(attendance).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:attendance', String(Date.now()));
+        }
+    }, (err: any) => {
+        console.error('Error in attendance realtime listener:', err);
+        onError(err);
+    });
+}
+
 // --- Project Functions ---
 export async function addProject(projectData: Omit<Project, 'id'>): Promise<Project> {
     const docRef = await addDoc(projectsCollection, projectData);
@@ -3688,6 +3801,118 @@ export async function updateLedgerAccount(id: string, updates: Partial<LedgerAcc
     });
 }
 
+export function getLedgerAccountsRealtime(
+    callback: (data: LedgerAccount[]) => void,
+    onError: (error: Error) => void
+): () => void {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.ledgerAccounts.toArray() : [];
+        }, callback);
+    }
+
+    // ✅ Use incremental sync for realtime listener
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:ledgerAccounts');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    let firestoreAccounts: LedgerAccount[] = [];
+    
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.ledgerAccounts.toArray().then((localAccounts) => {
+            callback(localAccounts as LedgerAccount[]);
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
+    }
+
+    // ✅ Always fetch all accounts from Firestore (source of truth)
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime) {
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            ledgerAccountsCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        q = query(ledgerAccountsCollection, orderBy('name'));
+    }
+
+    getDocs(q).then((fullSnapshot) => {
+        const allAccounts = fullSnapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                address: data.address || '',
+                contact: data.contact || '',
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerAccount;
+        });
+        firestoreAccounts = allAccounts;
+        callback(allAccounts);
+        
+        // Save to IndexedDB
+        if (db && allAccounts.length > 0) {
+            db.ledgerAccounts.bulkPut(allAccounts).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:ledgerAccounts', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching ledger accounts:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    return onSnapshot(q, (snapshot) => {
+        const accounts = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                address: data.address || '',
+                contact: data.contact || '',
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerAccount;
+        });
+        
+        // Merge with existing data
+        accounts.forEach(account => {
+            const index = firestoreAccounts.findIndex(a => a.id === account.id);
+            if (index >= 0) {
+                firestoreAccounts[index] = account;
+            } else {
+                firestoreAccounts.push(account);
+            }
+        });
+        callback([...firestoreAccounts]);
+        
+        // Save to IndexedDB
+        if (db && accounts.length > 0) {
+            db.ledgerAccounts.bulkPut(accounts).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:ledgerAccounts', String(Date.now()));
+        }
+    }, (err: any) => {
+        console.error('Error in ledger accounts realtime listener:', err);
+        onError(err);
+    });
+}
+
 export async function deleteLedgerAccount(id: string): Promise<void> {
     const batch = writeBatch(firestoreDB);
     batch.delete(doc(ledgerAccountsCollection, id));
@@ -3833,6 +4058,153 @@ export async function deleteLedgerCashAccount(id: string): Promise<void> {
     await deleteDoc(doc(ledgerCashAccountsCollection, id));
 }
 
+export function getLedgerCashAccountsRealtime(
+    callback: (data: LedgerCashAccount[]) => void,
+    onError: (error: Error) => void
+): () => void {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            // Try to get from cache first
+            if (typeof window !== 'undefined') {
+                const cached = localStorage.getItem('ledgerCashAccountsCache');
+                if (cached) {
+                    try {
+                        return JSON.parse(cached) as LedgerCashAccount[];
+                    } catch (e) {
+                        console.warn('Failed to parse cached cash accounts', e);
+                    }
+                }
+            }
+            return [];
+        }, callback);
+    }
+
+    // ✅ Use incremental sync for realtime listener
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:ledgerCashAccounts');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    let firestoreCashAccounts: LedgerCashAccount[] = [];
+    
+    // ✅ Read from cache first (immediate response)
+    if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('ledgerCashAccountsCache');
+        if (cached) {
+            try {
+                const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
+                callback(cachedAccounts);
+                firestoreCashAccounts = cachedAccounts;
+            } catch (e) {
+                console.warn('Failed to parse cached cash accounts', e);
+            }
+        }
+    }
+
+    // Build query
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (lastSyncTime && firestoreCashAccounts.length > 0) {
+        // Use incremental sync - only get changed accounts
+        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+        q = query(
+            ledgerCashAccountsCollection,
+            where('updatedAt', '>', lastSyncTimestamp),
+            orderBy('updatedAt')
+        );
+    } else {
+        // First sync - get all accounts
+        q = query(ledgerCashAccountsCollection, orderBy('name'));
+    }
+
+    // ✅ Always fetch from Firestore (source of truth)
+    getDocs(q).then((fullSnapshot) => {
+        const allAccounts = fullSnapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
+            const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
+                acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
+                return acc;
+            }, {});
+
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                noteGroups: normalizedNoteGroups,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerCashAccount;
+        });
+        
+        // Merge with existing if incremental
+        if (lastSyncTime && firestoreCashAccounts.length > 0) {
+            allAccounts.forEach(account => {
+                const index = firestoreCashAccounts.findIndex(a => a.id === account.id);
+                if (index >= 0) {
+                    firestoreCashAccounts[index] = account;
+                } else {
+                    firestoreCashAccounts.push(account);
+                }
+            });
+        } else {
+            firestoreCashAccounts = allAccounts;
+        }
+        
+        callback([...firestoreCashAccounts]);
+        
+        // ✅ Update cache
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(firestoreCashAccounts));
+            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching ledger cash accounts:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    return onSnapshot(q, (snapshot) => {
+        const accounts = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
+            const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
+                acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
+                return acc;
+            }, {});
+
+            return {
+                id: docSnap.id,
+                name: data.name || '',
+                noteGroups: normalizedNoteGroups,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+            } as LedgerCashAccount;
+        });
+        
+        // Merge with existing data
+        accounts.forEach(account => {
+            const index = firestoreCashAccounts.findIndex(a => a.id === account.id);
+            if (index >= 0) {
+                firestoreCashAccounts[index] = account;
+            } else {
+                firestoreCashAccounts.push(account);
+            }
+        });
+        callback([...firestoreCashAccounts]);
+        
+        // ✅ Update cache
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(firestoreCashAccounts));
+            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
+        }
+    }, (err: any) => {
+        console.error('Error in ledger cash accounts realtime listener:', err);
+        onError(err);
+    });
+}
+
 export async function fetchLedgerEntries(accountId: string): Promise<LedgerEntry[]> {
     try {
         if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
@@ -3937,6 +4309,168 @@ export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
         }
         throw e;
     }
+}
+
+export function getLedgerEntriesRealtime(
+    callback: (data: LedgerEntry[]) => void,
+    onError: (error: Error) => void,
+    accountId?: string // Optional: filter by specific account
+): () => void {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            if (!db) return [];
+            if (accountId) {
+                return await db.ledgerEntries.where('accountId').equals(accountId).toArray();
+            }
+            return await db.ledgerEntries.toArray();
+        }, callback);
+    }
+
+    // ✅ Use incremental sync for realtime listener
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
+        const stored = localStorage.getItem(key);
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    let firestoreEntries: LedgerEntry[] = [];
+    
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        const loadFromDB = async () => {
+            try {
+                let localEntries: LedgerEntry[];
+                if (accountId) {
+                    localEntries = await db.ledgerEntries.where('accountId').equals(accountId).toArray();
+                } else {
+                    localEntries = await db.ledgerEntries.toArray();
+                }
+                callback(localEntries as LedgerEntry[]);
+            } catch (e) {
+                // If IndexedDB read fails, Firestore will call callback
+            }
+        };
+        loadFromDB();
+    }
+
+    // Build query
+    const lastSyncTime = getLastSyncTime();
+    let q;
+    
+    if (accountId) {
+        // Filter by accountId
+        if (lastSyncTime) {
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            q = query(
+                ledgerEntriesCollection,
+                where('accountId', '==', accountId),
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } else {
+            q = query(
+                ledgerEntriesCollection,
+                where('accountId', '==', accountId),
+                orderBy('createdAt')
+            );
+        }
+    } else {
+        // Get all entries
+        if (lastSyncTime) {
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            q = query(
+                ledgerEntriesCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } else {
+            q = query(ledgerEntriesCollection, orderBy('createdAt'));
+        }
+    }
+
+    // ✅ Always fetch from Firestore (source of truth)
+    getDocs(q).then((fullSnapshot) => {
+        const allEntries = fullSnapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                accountId: data.accountId,
+                date: data.date,
+                particulars: data.particulars,
+                debit: Number(data.debit) || 0,
+                credit: Number(data.credit) || 0,
+                balance: Number(data.balance) || 0,
+                remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+                linkGroupId: data.linkGroupId || undefined,
+                linkStrategy: data.linkStrategy || undefined,
+            } as LedgerEntry;
+        });
+        firestoreEntries = allEntries;
+        callback(allEntries);
+        
+        // Save to IndexedDB
+        if (db && allEntries.length > 0) {
+            db.ledgerEntries.bulkPut(allEntries).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
+            localStorage.setItem(key, String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching ledger entries:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    return onSnapshot(q, (snapshot) => {
+        const entries = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data() as Record<string, any>;
+            return {
+                id: docSnap.id,
+                accountId: data.accountId,
+                date: data.date,
+                particulars: data.particulars,
+                debit: Number(data.debit) || 0,
+                credit: Number(data.credit) || 0,
+                balance: Number(data.balance) || 0,
+                remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || data.createdAt || '',
+                linkGroupId: data.linkGroupId || undefined,
+                linkStrategy: data.linkStrategy || undefined,
+            } as LedgerEntry;
+        });
+        
+        // Merge with existing data
+        entries.forEach(entry => {
+            const index = firestoreEntries.findIndex(e => e.id === entry.id);
+            if (index >= 0) {
+                firestoreEntries[index] = entry;
+            } else {
+                firestoreEntries.push(entry);
+            }
+        });
+        callback([...firestoreEntries]);
+        
+        // Save to IndexedDB
+        if (db && entries.length > 0) {
+            db.ledgerEntries.bulkPut(entries).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
+            localStorage.setItem(key, String(Date.now()));
+        }
+    }, (err: any) => {
+        console.error('Error in ledger entries realtime listener:', err);
+        onError(err);
+    });
 }
 
 export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {
@@ -4440,6 +4974,117 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
             return [];
         }
     }
+}
+
+export function getMandiReportsRealtime(
+    callback: (data: MandiReport[]) => void,
+    onError: (error: Error) => void
+): () => void {
+    if (isFirestoreTemporarilyDisabled()) {
+        return createPollingFallback(async () => {
+            return db ? await db.mandiReports.toArray() : [];
+        }, callback);
+    }
+
+    let firestoreReports: MandiReport[] = [];
+    const reportMap = new Map<string, MandiReport>();
+    
+    // ✅ Read from local IndexedDB first (immediate response)
+    if (db) {
+        db.mandiReports.toArray().then((localReports) => {
+            callback(localReports as MandiReport[]);
+            // Populate map for merging
+            localReports.forEach(report => {
+                reportMap.set(report.id || '', report);
+            });
+        }).catch(() => {
+            // If IndexedDB read fails, Firestore will call callback
+        });
+    }
+
+    // Use collectionGroup to listen to all '6P' subcollections
+    const collectionGroup6P = collectionGroup(firestoreDB, '6P');
+    
+    // ✅ First fetch all reports
+    getDocs(collectionGroup6P).then((fullSnapshot) => {
+        const allReports: MandiReport[] = [];
+        fullSnapshot.docs.forEach((docSnap) => {
+            const data = docSnap.data() as MandiReport;
+            const fullPath = docSnap.ref.path;
+            const pathParts = fullPath.split('/');
+            let docId = pathParts[pathParts.length - 1];
+            const finalId = data.id || docId;
+            
+            if (!reportMap.has(finalId)) {
+                reportMap.set(finalId, { ...data, id: finalId });
+            }
+        });
+        
+        firestoreReports = Array.from(reportMap.values());
+        
+        // Sort by purchaseDate (newest first)
+        firestoreReports.sort((a, b) => {
+            const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+            const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+            return dateB - dateA;
+        });
+        
+        callback(firestoreReports);
+        
+        // Save to IndexedDB
+        if (db && firestoreReports.length > 0) {
+            db.mandiReports.bulkPut(firestoreReports).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:mandiReports', String(Date.now()));
+        }
+    }).catch((error) => {
+        console.error('Error fetching mandi reports:', error);
+        onError(error);
+    });
+
+    // ✅ Set up realtime listener for future changes
+    return onSnapshot(collectionGroup6P, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data() as MandiReport;
+            const fullPath = change.doc.ref.path;
+            const pathParts = fullPath.split('/');
+            let docId = pathParts[pathParts.length - 1];
+            const finalId = data.id || docId;
+            
+            if (change.type === 'removed') {
+                reportMap.delete(finalId);
+            } else {
+                reportMap.set(finalId, { ...data, id: finalId });
+            }
+        });
+        
+        firestoreReports = Array.from(reportMap.values());
+        
+        // Sort by purchaseDate (newest first)
+        firestoreReports.sort((a, b) => {
+            const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+            const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+            return dateB - dateA;
+        });
+        
+        callback(firestoreReports);
+        
+        // Save to IndexedDB
+        if (db && firestoreReports.length > 0) {
+            db.mandiReports.bulkPut(firestoreReports).catch(() => {});
+        }
+        
+        // ✅ Save last sync time
+        if (snapshot.size > 0 && typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:mandiReports', String(Date.now()));
+        }
+    }, (err: any) => {
+        console.error('Error in mandi reports realtime listener:', err);
+        onError(err);
+    });
 }
 
 // --- Manufacturing Costing Functions ---

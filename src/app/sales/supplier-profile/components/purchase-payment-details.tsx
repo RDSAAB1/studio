@@ -40,7 +40,10 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
     // Process each transaction/purchase
     supplierData.allTransactions?.forEach(transaction => {
       const srNo = transaction.srNo || '';
-      const originalAmount = transaction.originalNetAmount || 0;
+      // Use adjustedOriginal if available (includes Gov. Required amount), otherwise use originalNetAmount
+      const originalAmount = (transaction as any).adjustedOriginal !== undefined 
+        ? (transaction as any).adjustedOriginal 
+        : (transaction.originalNetAmount || 0);
       
       // Find all payments for this specific purchase
       const paymentsForThisPurchase = supplierData.allPayments?.filter(payment =>
@@ -48,23 +51,26 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
       ) || [];
 
       let totalPaid = 0;
+      let totalCd = 0;
       let cashPaid = 0;
       let rtgsPaid = 0;
 
       paymentsForThisPurchase.forEach(payment => {
         const paidForThisPurchase = payment.paidFor?.find(pf => pf.srNo === srNo);
         if (paidForThisPurchase) {
-          totalPaid += paidForThisPurchase.amount;
+          totalPaid += paidForThisPurchase.amount || 0;
+          totalCd += paidForThisPurchase.cdAmount || 0;
           
           if (payment.type === 'cash') {
-            cashPaid += paidForThisPurchase.amount;
+            cashPaid += paidForThisPurchase.amount || 0;
           } else if (payment.type === 'rtgs') {
-            rtgsPaid += paidForThisPurchase.amount;
+            rtgsPaid += paidForThisPurchase.amount || 0;
           }
         }
       });
 
-      const outstanding = originalAmount - totalPaid;
+      // Outstanding = Adjusted Original - Total Paid - Total CD
+      const outstanding = originalAmount - totalPaid - totalCd;
 
       breakdown.push({
         srNo,

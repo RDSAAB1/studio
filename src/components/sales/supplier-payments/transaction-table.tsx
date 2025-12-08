@@ -186,7 +186,11 @@ export const TransactionTable = React.memo(
                                                 {entry.date && isValid(new Date(entry.date)) ? format(new Date(entry.date), "dd-MMM-yy") : 'N/A'}
                                             </TableCell>
                                             <TableCell className="text-right py-0 px-1 text-[11px] h-6 align-middle">
-                                                {formatCurrency(entry.originalNetAmount)}
+                                                {formatCurrency(
+                                                    (entry as any).adjustedOriginal !== undefined 
+                                                        ? (entry as any).adjustedOriginal 
+                                                        : entry.originalNetAmount
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right py-0 px-1 text-[11px] text-green-600 h-6 align-middle">
                                                 {formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}
@@ -218,7 +222,13 @@ export const TransactionTable = React.memo(
                                                             <Pencil className="h-3 w-3" />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onShowDetails(entry)} title="View Details">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-5 w-5" 
+                                                        onClick={() => onShowDetails && typeof onShowDetails === 'function' ? onShowDetails(entry) : null} 
+                                                        title="View Details"
+                                                    >
                                                         <Info className="h-3 w-3" />
                                                     </Button>
                                                 </div>

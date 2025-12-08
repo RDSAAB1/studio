@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { Employee, AttendanceEntry } from "@/lib/definitions";
-import { setAttendance, getEmployeesRealtime } from "@/lib/firestore";
+import { setAttendance, getEmployeesRealtime, getAttendanceRealtime } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,10 +37,27 @@ export default function AttendanceTrackingPage() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribe = getEmployeesRealtime(setEmployees, console.error);
-        // TODO: Add a realtime listener for attendance records for the selectedDate
-        return () => unsubscribe();
+        const unsubscribeEmployees = getEmployeesRealtime(setEmployees, console.error);
+        return () => unsubscribeEmployees();
     }, []);
+
+    // Real-time listener for attendance records
+    useEffect(() => {
+        if (!isClient) return;
+        
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const unsubscribeAttendance = getAttendanceRealtime(
+            (data) => {
+                // Filter by selected date
+                const filtered = data.filter(entry => entry.date === dateStr);
+                setAttendanceRecordsToday(filtered);
+            },
+            console.error,
+            dateStr // Filter by specific date
+        );
+        
+        return () => unsubscribeAttendance();
+    }, [selectedDate, isClient]);
     
     const attendanceMap = useMemo(() => {
         return new Map(attendanceRecordsToday.map(r => [r.employeeId, r]));

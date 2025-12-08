@@ -248,6 +248,12 @@ export type PaidFor = {
     srNo: string;
     amount: number;
     cdAmount?: number; // CD amount allocated to this specific entry
+    // Gov. payment extra amount tracking fields
+    receiptOutstanding?: number; // Current receipt outstanding before payment
+    extraAmount?: number; // Extra amount for this receipt (Gov. Required - Receipt Outstanding)
+    adjustedOriginal?: number; // Original Amount + Extra Amount
+    adjustedOutstanding?: number; // Outstanding + Extra Amount
+    govRequired?: number; // Gov. Required amount for this receipt (if per-receipt)
 }
 
 export type SupplierPayment = {
@@ -278,6 +284,12 @@ export type SupplierPayment = {
     bankAcNo?: string;
     bankIfsc?: string;
     rtgsSrNo?: string; 
+    // Gov. payment specific fields
+    govQuantity?: number;
+    govRate?: number;
+    govAmount?: number;
+    govRequiredAmount?: number; // Total Gov. Required amount (all receipts combined)
+    extraAmount?: number; // Total Extra Amount (Gov. Required - Receipt Outstanding)
     expenseTransactionId?: string;
     bankAccountId?: string; 
     isDeleted?: boolean;

@@ -222,10 +222,15 @@ export const SupplierProfileView = ({
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                      {(selectedSupplierData.allTransactions || []).map(entry => (
+                                      {(selectedSupplierData.allTransactions || []).map(entry => {
+                                          // Use adjustedOriginal if available (includes Gov. Required amount), otherwise use originalNetAmount
+                                          const displayOriginalAmount = (entry as any).adjustedOriginal !== undefined 
+                                              ? (entry as any).adjustedOriginal 
+                                              : parseFloat(String(entry.originalNetAmount));
+                                          return (
                                           <TableRow key={entry.id}>
                                               <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
+                                              <TableCell className="font-semibold">{formatCurrency(displayOriginalAmount)}</TableCell>
                                               <TableCell>
                                                   <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
                                                   {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}

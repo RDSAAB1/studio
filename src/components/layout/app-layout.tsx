@@ -10,7 +10,6 @@ import CustomSidebar from '@/components/layout/custom-sidebar';
 import TabBar from '@/components/layout/tab-bar';
 import { Header } from "@/components/layout/header";
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { SupplierHubProvider } from '@/app/sales/supplier-hub/context/supplier-hub-context';
 import { Truck, Users, Wallet, FilePlus, Banknote } from 'lucide-react';
 
 // Helper function to create sub-tabs for Entry and Payments
@@ -384,7 +383,6 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const pageId = pathname.substring(1);
 
   return (
-    <SupplierHubProvider>
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
@@ -403,6 +401,5 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           </div>
         </CustomSidebar>
     </div>
-    </SupplierHubProvider>
   );
 }

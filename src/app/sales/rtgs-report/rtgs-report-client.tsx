@@ -174,20 +174,20 @@ export default function RtgsReportClient() {
         }
 
         const printTableHTML = `
-            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px; background-color: #ffffff;">
                 <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">6R No. / 6R Date</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Transaction</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Chk-No / UTR-No</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Payee</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">A/C No. / Mobile</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Bank / IFSC / Branch</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Amount / Rate / Quantity</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Mandi Charge</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Cess Charge</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: right;">Total Charges</th>
-                        <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">Parchi No.</th>
+                    <tr style="background-color: #f2f2f2 !important;">
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">6R No. / 6R Date</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Transaction</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Chk-No / UTR-No</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Payee</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">A/C No. / Mobile</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Bank / IFSC / Branch</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Amount / Rate / Quantity</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Mandi Charge</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Cess Charge</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Total Charges</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Parchi No.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -215,18 +215,18 @@ export default function RtgsReportClient() {
                             return lines.join('<br/>' );
                         })();
                         return `
-                            <tr>
-                                <td style="border: 1px solid #ccc; padding: 4px; white-space: nowrap;">${sixRDetails}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px; white-space: nowrap;">${format(new Date(row.date), 'dd-MMM-yy')}<br/>${row.srNo}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${checkUtrDetails}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${payeeDetails}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${accountMobileDetails}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${bankDetails}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${formatNumber(row.amount)}<br/>${row.rate ? formatNumber(row.rate) : 'N/A'}<br/>${row.weight || 'N/A'}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(mandiCharge)}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(cessCharge)}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${formatNumber(totalCharges)}</td>
-                                <td style="border: 1px solid #ccc; padding: 4px;">${parchiLines}</td>
+                            <tr style="background-color: #ffffff !important;">
+                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${sixRDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${format(new Date(row.date), 'dd-MMM-yy')}<br/>${row.srNo}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${checkUtrDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${payeeDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${accountMobileDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${bankDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(row.amount)}<br/>${row.rate ? formatNumber(row.rate) : 'N/A'}<br/>${row.weight || 'N/A'}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(mandiCharge)}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(cessCharge)}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(totalCharges)}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${parchiLines}</td>
                             </tr>
                         `;
                     }).join('')}
@@ -239,13 +239,70 @@ export default function RtgsReportClient() {
             <html><head><title>RTGS Payment Report</title>
                 <style>
                     @page { size: portrait; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; font-family: sans-serif; }
-                    .print-header { text-align: center; margin-bottom: 1rem; }
-                    table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                    th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
-                    thead { background-color: #f2f2f2 !important; }
-                    th { background-color: #f2f2f2 !important; }
-                    td { vertical-align: top; }
+                    * { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        color-adjust: exact !important;
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        font-family: sans-serif; 
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                    }
+                    .print-header { 
+                        text-align: center; 
+                        margin-bottom: 1rem; 
+                        color: #000000 !important;
+                    }
+                    h2, p { 
+                        color: #000000 !important; 
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        font-size: 10px; 
+                        background-color: #ffffff !important;
+                    }
+                    th, td { 
+                        border: 1px solid #000000 !important; 
+                        padding: 6px !important; 
+                        text-align: left; 
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    thead { 
+                        background-color: #f2f2f2 !important; 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    thead tr {
+                        background-color: #f2f2f2 !important;
+                    }
+                    th { 
+                        background-color: #f2f2f2 !important; 
+                        color: #000000 !important;
+                        font-weight: bold !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    td { 
+                        vertical-align: top; 
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    tbody tr { 
+                        background-color: #ffffff !important;
+                    }
+                    tbody td {
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                    }
                 </style>
             </head><body>
                 <div class="print-header">

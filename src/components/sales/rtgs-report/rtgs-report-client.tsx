@@ -181,9 +181,60 @@ export default function RtgsReportClient() {
                 style.appendChild(iframeDoc.createTextNode(cssText));
                 style.appendChild(iframeDoc.createTextNode(`
                     @page { size: landscape; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .print-header { margin-bottom: 1rem; text-align: center; }
-                    thead { background-color: #f2f2f2 !important; }
+                    * { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        color-adjust: exact !important;
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                    }
+                    .print-header { 
+                        margin-bottom: 1rem; 
+                        text-align: center; 
+                        color: #000000 !important;
+                    }
+                    h2, p { 
+                        color: #000000 !important; 
+                    }
+                    table { 
+                        background-color: #ffffff !important;
+                        border-collapse: collapse !important;
+                        width: 100% !important;
+                    }
+                    th, td { 
+                        border: 1px solid #000000 !important; 
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                        padding: 6px !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    thead { 
+                        background-color: #f2f2f2 !important; 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    thead tr {
+                        background-color: #f2f2f2 !important;
+                    }
+                    th { 
+                        background-color: #f2f2f2 !important; 
+                        color: #000000 !important;
+                        font-weight: bold !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    tbody tr { 
+                        background-color: #ffffff !important;
+                    }
+                    tbody td {
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                    }
                 `));
                 iframeDoc.head.appendChild(style);
             } catch (e) {

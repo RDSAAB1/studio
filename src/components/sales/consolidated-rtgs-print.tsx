@@ -71,6 +71,13 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
             return;
         }
+        
+        // Show instruction toast
+        toast({ 
+            title: 'Print Instructions', 
+            description: 'In the print dialog, please uncheck "Headers and footers" to remove date/time and website link.',
+            duration: 5000
+        });
 
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
@@ -87,7 +94,12 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         }
 
         iframeDoc.open();
-        iframeDoc.write('<html><head><title>RTGS Advice</title>');
+        iframeDoc.write(`
+            <html>
+            <head>
+                <title>RTGS Advice</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        `);
         
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
@@ -102,17 +114,44 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         
         const printStyles = iframeDoc.createElement('style');
         printStyles.textContent = `
+            @page {
+                size: A4 landscape;
+                margin: 0 !important;
+                margin-top: 0 !important;
+                margin-bottom: 0 !important;
+                margin-left: 10mm !important;
+                margin-right: 10mm !important;
+            }
             @media print {
                 @page {
                     size: A4 landscape;
-                    margin: 10mm;
+                    margin: 0 !important;
+                    margin-top: 0 !important;
+                    margin-bottom: 0 !important;
+                    margin-left: 10mm !important;
+                    margin-right: 10mm !important;
+                }
+                * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 100% !important;
+                    height: 100% !important;
                 }
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                    margin: 0 !important;
+                    padding: 10mm 0 10mm 0 !important;
                 }
                 .printable-area {
                     background-color: #fff !important;
+                    color: #000 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
                 .printable-area * {
                     border-color: #000 !important;
@@ -124,6 +163,89 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 .page-break {
                     page-break-after: always;
                 }
+                header, footer {
+                    display: none !important;
+                    visibility: hidden !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+            }
+            .information-table {
+                border: 1px solid #666 !important;
+                border-collapse: separate !important;
+                border-spacing: 0 !important;
+                border-radius: 4px !important;
+                overflow: hidden !important;
+            }
+            .information-table th:first-child {
+                border-top-left-radius: 4px !important;
+            }
+            .information-table th:last-child {
+                border-top-right-radius: 4px !important;
+            }
+            .information-table tr:last-child td:first-child {
+                border-bottom-left-radius: 4px !important;
+            }
+            .information-table tr:last-child td:last-child {
+                border-bottom-right-radius: 4px !important;
+            }
+            .information-table th,
+            .information-table td {
+                border-right: 1px solid #666 !important;
+                border-bottom: 1px solid #666 !important;
+            }
+            .information-table th:last-child,
+            .information-table td:last-child {
+                border-right: none !important;
+            }
+            .information-table tr:last-child td {
+                border-bottom: none !important;
+            }
+            .information-table thead tr th {
+                border-top: 1px solid #666 !important;
+            }
+            .information-table tbody tr:first-child td {
+                border-top: none !important;
+            }
+            @media print {
+                .information-table {
+                    border: 1px solid #000 !important;
+                    border-collapse: separate !important;
+                    border-spacing: 0 !important;
+                    border-radius: 4px !important;
+                    overflow: hidden !important;
+                }
+                .information-table th:first-child {
+                    border-top-left-radius: 4px !important;
+                }
+                .information-table th:last-child {
+                    border-top-right-radius: 4px !important;
+                }
+                .information-table tr:last-child td:first-child {
+                    border-bottom-left-radius: 4px !important;
+                }
+                .information-table tr:last-child td:last-child {
+                    border-bottom-right-radius: 4px !important;
+                }
+                .information-table th,
+                .information-table td {
+                    border-right: 1px solid #000 !important;
+                    border-bottom: 1px solid #000 !important;
+                }
+                .information-table th:last-child,
+                .information-table td:last-child {
+                    border-right: none !important;
+                }
+                .information-table tr:last-child td {
+                    border-bottom: none !important;
+                }
+                .information-table thead tr th {
+                    border-top: 1px solid #000 !important;
+                }
+                .information-table tbody tr:first-child td {
+                    border-top: none !important;
+                }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -133,14 +255,78 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.close();
         
         setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
+            const printWindow = iframe.contentWindow;
+            if (printWindow) {
+                printWindow.focus();
+                // Try to suppress headers/footers via print command
+                try {
+                    printWindow.print();
+                } catch (e) {
+                    console.warn('Print error:', e);
+                    printWindow.print();
+                }
+            }
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
         }, 500);
     };
 
     return (
         <>
+            <style>{`
+                 .information-table {
+                     border: 1px solid #666 !important;
+                     border-collapse: separate !important;
+                     border-spacing: 0 !important;
+                     border-radius: 4px !important;
+                     overflow: hidden !important;
+                 }
+                 .information-table th:first-child {
+                     border-top-left-radius: 4px !important;
+                 }
+                 .information-table th:last-child {
+                     border-top-right-radius: 4px !important;
+                 }
+                 .information-table tr:last-child td:first-child {
+                     border-bottom-left-radius: 4px !important;
+                 }
+                 .information-table tr:last-child td:last-child {
+                     border-bottom-right-radius: 4px !important;
+                 }
+                 .information-table th,
+                 .information-table td {
+                     border-right: 1px solid #666 !important;
+                     border-bottom: 1px solid #666 !important;
+                 }
+                 .information-table th:last-child,
+                 .information-table td:last-child {
+                     border-right: none !important;
+                 }
+                 .information-table tr:last-child td {
+                     border-bottom: none !important;
+                 }
+                 .information-table thead tr th {
+                     border-top: 1px solid #666 !important;
+                 }
+                 .information-table tbody tr:first-child td {
+                     border-top: none !important;
+                 }
+                .printable-area {
+                    color: #000 !important;
+                }
+                .printable-area * {
+                    color: #000 !important;
+                }
+                .printable-area p,
+                .printable-area h2,
+                .printable-area h3,
+                .printable-area span,
+                .printable-area td,
+                .printable-area th {
+                    color: #000 !important;
+                }
+            `}</style>
             <DialogHeader className="p-4 pb-0 print:hidden">
                 <DialogTitle>RTGS Print Preview</DialogTitle>
                 <DialogDescription>
@@ -193,39 +379,39 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 </div>
                                 
                                 <p className="text-center font-bold mb-1 text-black">INFORMATION</p>
-                                <table className="w-full text-xs border-collapse border border-black">
+                                <table className="information-table w-full text-xs" style={{ borderCollapse: 'separate', borderSpacing: 0, borderRadius: '4px', overflow: 'hidden' }}>
                                     <thead className="text-black font-bold">
                                         <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
-                                            <th className="border border-black p-1 text-black">SR.NO.</th>
-                                            <th className="border border-black p-1 text-black">NAME</th>
-                                            <th className="border border-black p-1 text-black">A/C NO.</th>
-                                            <th className="border border-black p-1 text-black">IFSC CODE</th>
-                                            <th className="border border-black p-1 text-black">AMMOUNT</th>
-                                            <th className="border border-black p-1 text-black">BRANCH</th>
-                                            <th className="border border-black p-1 text-black">BANK</th>
+                                            <th className="p-1 text-black">SR.NO.</th>
+                                            <th className="p-1 text-black">NAME</th>
+                                            <th className="p-1 text-black">A/C NO.</th>
+                                            <th className="p-1 text-black">IFSC CODE</th>
+                                            <th className="p-1 text-black">AMMOUNT</th>
+                                            <th className="p-1 text-black">BRANCH</th>
+                                            <th className="p-1 text-black">BANK</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {chunk.map((p, index) => (
                                             <tr key={`${p.paymentId}-${index}`}>
-                                                <td className="border border-black p-1 text-center h-6 text-black">{index + 1}</td>
-                                                <td className="border border-black p-1 text-black">{toTitleCase(p.supplierName)}</td>
-                                                <td className="border border-black p-1 text-black">'{p.acNo}</td>
-                                                <td className="border border-black p-1 text-black">{p.ifscCode}</td>
-                                                <td className="border border-black p-1 text-right text-black">{formatCurrency(p.amount)}</td>
-                                                <td className="border border-black p-1 text-black">{toTitleCase(p.branch)}</td>
-                                                <td className="border border-black p-1 text-black">{p.bank}</td>
+                                                <td className="p-1 text-center h-6 text-black">{index + 1}</td>
+                                                <td className="p-1 text-black">{toTitleCase(p.supplierName)}</td>
+                                                <td className="p-1 text-black">'{p.acNo}</td>
+                                                <td className="p-1 text-black">{p.ifscCode}</td>
+                                                <td className="p-1 text-right text-black">{formatCurrency(p.amount)}</td>
+                                                <td className="p-1 text-black">{toTitleCase(p.branch)}</td>
+                                                <td className="p-1 text-black">{p.bank}</td>
                                             </tr>
                                         ))}
                                          {Array.from({ length: Math.max(0, 10 - chunk.length) }).map((_, i) => (
                                             <tr key={`empty-${i}`}>
-                                                <td className="border border-black p-1 h-6 text-center text-black">{chunk.length + i + 1}</td>
-                                                <td className="border border-black p-1 h-6"></td>
-                                                <td className="border border-black p-1 h-6"></td>
-                                                <td className="border border-black p-1 h-6"></td>
-                                                <td className="border border-black p-1 h-6"></td>
-                                                <td className="border border-black p-1 h-6"></td>
-                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="p-1 h-6 text-center text-black">{chunk.length + i + 1}</td>
+                                                <td className="p-1 h-6"></td>
+                                                <td className="p-1 h-6"></td>
+                                                <td className="p-1 h-6"></td>
+                                                <td className="p-1 h-6"></td>
+                                                <td className="p-1 h-6"></td>
+                                                <td className="p-1 h-6"></td>
                                             </tr>
                                         ))}
                                     </tbody>

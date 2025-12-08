@@ -302,8 +302,39 @@ export const useSupplierData = () => {
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                // Outstanding: Original - (Payment + CD)
-                const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+                // Check for Gov. payment extra amount
+                let adjustedOriginal = transaction.originalNetAmount || 0;
+                let totalExtraAmount = 0;
+                
+                // Find Gov. payment for this entry
+                const govPayment = paymentsForThisEntry.find(p => 
+                    (p as any).receiptType === 'Gov.' && 
+                    p.paidFor?.some(pf => pf.srNo === transaction.srNo)
+                );
+                
+                if (govPayment) {
+                    const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === transaction.srNo);
+                    // IMPORTANT: Check for adjustedOriginal first (most reliable)
+                    // If adjustedOriginal is available, use it directly
+                    if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
+                        adjustedOriginal = paidForThisEntry.adjustedOriginal;
+                        totalExtraAmount = adjustedOriginal - (transaction.originalNetAmount || 0);
+                    } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
+                        // Fallback: Use extraAmount to calculate adjustedOriginal
+                        // IMPORTANT: Check for extraAmount even if it's 0 (use !== undefined, not truthy check)
+                        // extraAmount can be 0 if Gov. Required = Receipt Outstanding
+                        totalExtraAmount = paidForThisEntry.extraAmount || 0;
+                        adjustedOriginal = (transaction.originalNetAmount || 0) + totalExtraAmount;
+                    } else if (paidForThisEntry && (govPayment as any).extraAmount !== undefined) {
+                        // Fallback: Check payment-level extraAmount if paidFor doesn't have it
+                        totalExtraAmount = (govPayment as any).extraAmount || 0;
+                        adjustedOriginal = (transaction.originalNetAmount || 0) + totalExtraAmount;
+                    }
+                }
+                
+                // Outstanding: Adjusted Original - (Payment + CD)
+                // Adjusted Original = Original + Extra Amount (from Gov. payment)
+                const calculatedNetAmount = adjustedOriginal - totalPaidForEntry - totalCdForEntry;
                 
                 // Handle very small negative amounts due to rounding - treat as zero
                 if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
@@ -311,6 +342,10 @@ export const useSupplierData = () => {
                 } else {
                     transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
+                
+                // Store extra amount and adjusted original for reference
+                (transaction as any).extraAmount = totalExtraAmount;
+                (transaction as any).adjustedOriginal = adjustedOriginal;
         });
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);

@@ -27,6 +27,7 @@ export const useOutsiderPayments = (data: any) => {
     );
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
     const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any | null>(null);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
@@ -194,6 +195,8 @@ export const useOutsiderPayments = (data: any) => {
         selectedEntries: [],
         setParchiNo: form.setParchiNo,
         isProcessing,
+        detailsSupplierEntry,
+        setDetailsSupplierEntry,
         selectedPaymentForDetails,
         setSelectedPaymentForDetails,
         isBankSettingsOpen,

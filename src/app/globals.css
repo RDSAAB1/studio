@@ -4,34 +4,26 @@
 @tailwind utilities;
 
 :root {
-  /* Professional Teal/Green Theme - Natural & Calming */
-  /* Color Palette from Image */
-  /* #051F20 = 180 60% 8% - Very dark teal (background) */
-  /* #0B2B26 = 170 50% 11% - Dark teal-green */
-  /* #163832 = 160 40% 18% - Dark muted green (cards) */
-  /* #235347 = 160 35% 25% - Medium-dark teal-green */
-  /* #8EB69B = 140 25% 65% - Light sage green (accents) */
-  /* #DAF1DE = 130 50% 92% - Very light mint (text) */
-  
-  --background: 180 60% 6%; /* #051F20 - Very dark teal - Main background */
-  --foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Main text */
-  --card: 160 40% 18% / 0.7; /* Transparent dark muted green - Card background (glass effect) */
-  --card-foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Card text */
-  --popover: 160 35% 25% / 0.85; /* Transparent medium-dark teal-green - Popover background */
-  --popover-foreground: 130 50% 95%; /* #DAF1DE - Very light mint - Popover text */
-  --primary: 160 40% 30% / 0.8; /* Transparent teal-green - Primary buttons (glass effect) */
-  --primary-foreground: 130 50% 98%; /* Brighter mint - Text on primary (better contrast) */
-  --secondary: 140 30% 70% / 0.6; /* Transparent sage green - Secondary backgrounds (glass effect) */
-  --secondary-foreground: 180 60% 10%; /* Darker teal - Text on secondary (better contrast) */
-  --muted: 170 50% 13% / 0.5; /* Transparent teal-green - Muted backgrounds (glass effect) */
-  --muted-foreground: 140 25% 75%; /* Brighter sage green - Muted text (more readable) */
-  --accent: 140 30% 70% / 0.7; /* Transparent sage green - Accent elements (glass effect) */
-  --accent-foreground: 180 60% 10%; /* Darker teal - Text on accent (better contrast) */
-  --destructive: 0 84% 60% / 0.8; /* Transparent Red - Error states */
+  /* Light Theme - White Background with Dark Text */
+  --background: 0 0% 100%; /* Pure White - Main background */
+  --foreground: 180 60% 8%; /* Dark teal - Main text */
+  --card: 0 0% 98%; /* Very light gray - Card background */
+  --card-foreground: 180 60% 8%; /* Dark teal - Card text */
+  --popover: 0 0% 100%; /* Pure White - Popover background */
+  --popover-foreground: 180 60% 8%; /* Dark teal - Popover text */
+  --primary: 160 40% 30%; /* Teal-green - Primary buttons */
+  --primary-foreground: 0 0% 100%; /* White - Text on primary */
+  --secondary: 0 0% 96%; /* Light gray - Secondary backgrounds */
+  --secondary-foreground: 180 60% 10%; /* Dark teal - Text on secondary */
+  --muted: 0 0% 94%; /* Light gray - Muted backgrounds */
+  --muted-foreground: 180 60% 20%; /* Medium dark teal - Muted text */
+  --accent: 140 30% 70%; /* Sage green - Accent elements */
+  --accent-foreground: 180 60% 10%; /* Dark teal - Text on accent */
+  --destructive: 0 84% 60%; /* Red - Error states */
   --destructive-foreground: 0 0% 100%; /* Pure White - Text on destructive */
-  --border: 170 50% 18% / 0.4; /* Transparent teal-green - Borders (glass effect) */
-  --input: 160 40% 20% / 0.6; /* Transparent green - Input backgrounds (glass effect) */
-  --ring: 140 30% 70% / 0.6; /* Transparent sage green - Focus rings (glass effect) */
+  --border: 0 0% 90%; /* Light gray - Borders */
+  --input: 0 0% 98%; /* Very light gray - Input backgrounds */
+  --ring: 160 40% 30%; /* Teal-green - Focus rings */
   --radius: 0.75rem;
   --chart-1: 140 25% 65%; /* #8EB69B - Light sage green */
   --chart-2: 160 35% 25%; /* #235347 - Medium-dark teal-green */
@@ -41,7 +33,7 @@
 }
 
 .dark {
-  /* Professional Teal/Green Theme - Enhanced Dark Mode */
+  /* Professional Teal/Green Theme - Enhanced Dark Mode with 3D Look */
   /* Color Palette from Image - Deeper Variants */
   /* #051F20 = 180 60% 8% - Very dark teal */
   /* #0B2B26 = 170 50% 11% - Dark teal-green */
@@ -50,9 +42,9 @@
   /* #8EB69B = 140 25% 65% - Light sage green */
   /* #DAF1DE = 130 50% 92% - Very light mint */
   
-  --background: 180 60% 4%; /* Ultra dark teal - Main background (deepest) */
+  --background: 160 30% 20%; /* Slightly darker than cards - Main background */
   --foreground: 130 50% 96%; /* Very light mint - Main text (maximum contrast) */
-  --card: 160 40% 18% / 0.7; /* Transparent dark muted green - Card background (glass effect) */
+  --card: 160 30% 26%; /* Dark muted green - Card background (lighter than background for 3D effect) */
   --card-foreground: 130 50% 96%; /* Very light mint - Card text */
   --popover: 160 35% 25% / 0.85; /* Transparent medium-dark teal-green - Popover */
   --popover-foreground: 130 50% 96%; /* Very light mint - Popover text */
@@ -109,13 +101,13 @@ body {
     backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
     color: hsl(var(--foreground));
-    border: none;
+    border: 1px solid hsl(var(--border));
     border-radius: calc(var(--radius) - 2px);
-    box-shadow: inset 0 1px 2px hsl(var(--background) / 0.3);
+    box-shadow: inset 0 1px 2px hsl(var(--foreground) / 0.05);
     will-change: backdrop-filter;
   }
   
-  /* Cards with optimized blurry glass effect - no outer borders */
+  /* Cards with 3D look - raised appearance with shadows */
   .card, [class*="card"] {
     background-color: hsl(var(--card));
     backdrop-filter: blur(16px) saturate(180%);
@@ -123,17 +115,28 @@ body {
     color: hsl(var(--card-foreground));
     border-radius: var(--radius);
     border: none;
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.7),
-                0 4px 16px hsl(var(--background) / 0.5),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.15);
+    box-shadow: 
+      0 10px 30px hsl(var(--background) / 0.8),
+      0 5px 15px hsl(var(--background) / 0.6),
+      0 2px 8px hsl(var(--background) / 0.4),
+      0 1px 3px hsl(var(--background) / 0.3),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.05);
     will-change: transform, backdrop-filter;
     transform: translateZ(0);
   }
   
   /* Dark theme specific styles */
   .dark body {
-    background-color: hsl(var(--background));
+    background-color: hsl(var(--background)) !important;
     color: hsl(var(--foreground));
+  }
+  
+  /* Ensure main content area uses dark green background */
+  .dark .main_container,
+  .dark body > div,
+  .dark #__next,
+  .dark [data-theme="dark"] {
+    background-color: hsl(var(--background)) !important;
   }
   
   .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
@@ -163,9 +166,11 @@ body {
     color: hsl(var(--card-foreground));
     border-radius: var(--radius);
     border: none;
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.7),
-                0 4px 16px hsl(var(--background) / 0.5),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.15);
+    box-shadow: 
+      0 15px 45px hsl(var(--background) / 0.8),
+      0 8px 25px hsl(var(--background) / 0.6),
+      0 4px 12px hsl(var(--background) / 0.4),
+      inset 0 1px 2px hsl(var(--foreground) / 0.1);
     will-change: transform, backdrop-filter;
     transform: translateZ(0);
   }
@@ -213,37 +218,121 @@ body {
     box-shadow: 0 2px 8px hsl(var(--primary) / 0.3);
   }
   
-  /* Enhanced table styling with teal theme */
+  /* Enhanced table styling with teal theme - no borders for 3D look */
   table {
     border-collapse: separate;
     border-spacing: 0;
+    border: none !important;
+    outline: none !important;
   }
   
   th {
-    background: linear-gradient(to bottom, hsl(var(--muted)), hsl(var(--muted) / 0.8));
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    border: none;
+    background-color: transparent !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none !important;
+    outline: none !important;
     font-weight: 600;
     color: hsl(var(--foreground));
   }
   
   td {
-    border: none;
+    border: none !important;
+    outline: none !important;
     transition: none;
-    background-color: hsl(var(--card) / 0.3);
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    background-color: transparent !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
   
-  /* Enhanced table row hover - more visible */
-  tr:hover td {
+  /* Remove all table borders and outlines - comprehensive */
+  table, thead, tbody, tr, th, td,
+  table *, thead *, tbody *, tr *, th *, td * {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    outline: none !important;
+    outline-width: 0 !important;
+    box-shadow: none !important;
+    border-collapse: collapse;
+  }
+  
+  /* Remove borders from all table cells specifically */
+  td, th {
+    border: 0 !important;
+    border-top: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Override Tailwind border classes on table components */
+  [class*="border-b"],
+  [class*="border-t"],
+  [class*="border-l"],
+  [class*="border-r"],
+  thead [class*="border"],
+  tbody [class*="border"],
+  tr[class*="border"],
+  th[class*="border"],
+  td[class*="border"] {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-width: 0 !important;
+  }
+  
+  /* Remove borders from TableRow, TableHeader, TableBody components */
+  [class*="TableRow"],
+  [class*="TableHeader"],
+  [class*="TableBody"],
+  [class*="TableHead"],
+  [class*="TableCell"] {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-width: 0 !important;
+  }
+  
+  /* Remove white/light colored borders specifically */
+  table,
+  table *,
+  thead,
+  thead *,
+  tbody,
+  tbody *,
+  tr,
+  tr *,
+  th,
+  th *,
+  td,
+  td * {
+    border-color: transparent !important;
+    border-style: none !important;
+    border-width: 0 !important;
+  }
+  
+  /* Enhanced table row hover - more visible, no borders */
+  tr:hover td,
+  tr:hover th {
     background-color: hsl(var(--accent) / 0.4) !important;
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
-    border-color: hsl(var(--primary) / 0.3) !important;
-    box-shadow: inset 0 1px 0 0 hsl(var(--primary) / 0.2),
-                0 2px 4px hsl(var(--accent) / 0.2) !important;
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
   
   /* Table row hover with better contrast */
@@ -254,18 +343,28 @@ body {
   /* Specific hover for table rows */
   [role="row"]:hover,
   [role="row"]:hover td,
-  tbody tr:hover td {
+  [role="row"]:hover th,
+  tbody tr:hover td,
+  tbody tr:hover th {
     background-color: hsl(var(--accent) / 0.4) !important;
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
   
-  /* Optimized blurry glass card shadows - no outer borders */
+  /* 3D card shadows - soft rounded appearance */
   .card, [class*="Card"] {
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.7),
-                0 4px 16px hsl(var(--background) / 0.5),
-                0 2px 8px hsl(var(--background) / 0.3),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.15);
+    box-shadow: 
+      0 15px 45px hsl(var(--background) / 0.8),
+      0 8px 25px hsl(var(--background) / 0.6),
+      0 4px 12px hsl(var(--background) / 0.4),
+      inset 0 1px 2px hsl(var(--foreground) / 0.1);
     transition: none;
     border: none;
     background-color: hsl(var(--card));
@@ -276,10 +375,11 @@ body {
   }
   
   .card:hover, [class*="Card"]:hover {
-    box-shadow: 0 8px 30px hsl(var(--background) / 0.9),
-                0 4px 15px hsl(var(--primary) / 0.2),
-                0 2px 5px hsl(var(--primary) / 0.15),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+    box-shadow: 
+      0 18px 50px hsl(var(--background) / 0.85),
+      0 10px 28px hsl(var(--background) / 0.65),
+      0 5px 14px hsl(var(--background) / 0.45),
+      inset 0 1px 3px hsl(var(--foreground) / 0.12);
     transform: translateY(-2px) translateZ(0);
     border-color: hsl(var(--primary) / 0.5);
   }
@@ -287,14 +387,13 @@ body {
   /* Optimized input focus states */
   input:focus, textarea:focus, select:focus {
     outline: none;
-    ring: 2px;
+    ring: 1px;
     ring-color: hsl(var(--ring));
-    ring-offset: 2px;
+    ring-offset: 1px;
     ring-offset-color: hsl(var(--background));
     border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.25),
-                0 0 0 1px hsl(var(--ring)),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    box-shadow: 0 0 0 1.5px hsl(var(--ring) / 0.2),
+                0 0 0 0.5px hsl(var(--ring));
     background-color: hsl(var(--input));
     backdrop-filter: blur(12px) saturate(150%);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
@@ -383,8 +482,22 @@ body {
     text-decoration: underline;
   }
   
-  /* Optimized blurry glass effect for all dropdowns, popovers and dialogs */
-  [role="dialog"], 
+  /* Dialogs - simple styling without 3D effect */
+  [role="dialog"] {
+    backdrop-filter: blur(12px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+    background-color: hsl(var(--popover)) !important;
+    border: none !important;
+    box-shadow: 
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    will-change: backdrop-filter;
+    transform: translateZ(0);
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+  }
+
+  /* 3D effect for popovers, dropdowns, menus, lists, tables */
   [data-radix-popper-content-wrapper], 
   [data-radix-popover-content], 
   [data-radix-dropdown-content],
@@ -395,25 +508,107 @@ body {
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
     background-color: hsl(var(--popover)) !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.6),
-                0 4px 16px hsl(var(--background) / 0.4),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.1) !important;
+    border: none !important;
+    box-shadow: 
+      0 12px 30px rgba(0, 0, 0, 0.4),
+      0 6px 15px rgba(0, 0, 0, 0.3),
+      0 3px 8px rgba(0, 0, 0, 0.25),
+      inset 0 2px 3px rgba(255, 255, 255, 0.2),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
     will-change: backdrop-filter;
     transform: translateZ(0);
     border-radius: 0 !important;
     -webkit-border-radius: 0 !important;
   }
+
+  /* Text color adjustments for popovers to ensure visibility */
+  [data-radix-popover-content],
+  [data-radix-dropdown-content],
+  [data-radix-select-content],
+  [data-radix-select-viewport],
+  [role="menu"],
+  [role="listbox"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Table and list text visibility in popovers */
+  [data-radix-popover-content] table,
+  [data-radix-popover-content] .table,
+  [data-radix-dropdown-content] table,
+  [data-radix-dropdown-content] .table,
+  [role="menu"] table,
+  [role="listbox"] table {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  [data-radix-popover-content] th,
+  [data-radix-popover-content] td,
+  [data-radix-dropdown-content] th,
+  [data-radix-dropdown-content] td,
+  [role="menu"] th,
+  [role="menu"] td,
+  [role="listbox"] th,
+  [role="listbox"] td {
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Stripe/alternate row colors for better visibility */
+  [data-radix-popover-content] tr:nth-child(even),
+  [data-radix-dropdown-content] tr:nth-child(even),
+  [role="menu"] tr:nth-child(even),
+  [role="listbox"] tr:nth-child(even) {
+    background-color: hsl(var(--muted) / 0.3) !important;
+  }
+
+  [data-radix-popover-content] tr:nth-child(odd),
+  [data-radix-dropdown-content] tr:nth-child(odd),
+  [role="menu"] tr:nth-child(odd),
+  [role="listbox"] tr:nth-child(odd) {
+    background-color: transparent !important;
+  }
   
-  /* Custom dropdown menu styling */
+  /* Custom dropdown menu styling with 3D look (no border, no movement) */
   .fixed.bg-popover {
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
     background-color: hsl(var(--popover)) !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.6),
-                0 4px 16px hsl(var(--background) / 0.4),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.1) !important;
+    border: none !important;
+    box-shadow: 
+      0 12px 30px rgba(0, 0, 0, 0.4),
+      0 6px 15px rgba(0, 0, 0, 0.3),
+      0 3px 8px rgba(0, 0, 0, 0.25),
+      inset 0 2px 3px rgba(255, 255, 255, 0.2),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+    will-change: backdrop-filter;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Text visibility in custom popover */
+  .fixed.bg-popover * {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .fixed.bg-popover table,
+  .fixed.bg-popover .table {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .fixed.bg-popover th,
+  .fixed.bg-popover td {
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Stripe colors for tables in custom popover */
+  .fixed.bg-popover tr:nth-child(even) {
+    background-color: hsl(var(--muted) / 0.3) !important;
+  }
+
+  .fixed.bg-popover tr:nth-child(odd) {
+    background-color: transparent !important;
   }
   
   /* Dropdown menu items */
@@ -534,7 +729,7 @@ body {
 }
 
 .side_bar_bottom button:hover {
-    background: hsl(var(--accent) / 0.4) !important;
+    background: transparent !important;
     box-shadow: none !important;
 }
 
@@ -603,19 +798,26 @@ body {
     margin-left: 8px;
     margin-right: 8px;
     transition: none;
-    backdrop-filter: blur(8px) saturate(140%);
-    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .side_bar_bottom .item .link:hover,
 .side_bar_bottom .item.active > .link,
 .side_bar_bottom .item .link.active{
-    background: hsl(var(--accent) / 0.6);
-    backdrop-filter: blur(10px) saturate(150%);
-    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    background: hsl(var(--accent) / 0.6) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     color: hsl(var(--accent-foreground));
-    box-shadow: 0 2px 8px hsl(var(--accent) / 0.3),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+    box-shadow: none;
+}
+
+/* Prevent button inside link from having separate hover effect */
+.side_bar_bottom .item .link:hover button,
+.side_bar_bottom .item.active > .link button,
+.side_bar_bottom .item .link.active button {
+    background: transparent !important;
 }
 
 .side_bar_bottom .item .link .icon{
@@ -672,6 +874,7 @@ body {
     transition: none;
     position: relative;
     z-index: 40;
+    background-color: hsl(var(--background)); /* Dark green background for 3D look */
 }
 
 
@@ -781,10 +984,18 @@ body {
   border-bottom-right-radius: 0 !important;
 }
 
-/* Tab styling with glass effect - rectangular for end-to-end tabs */
+/* Remove middle layer background and effects - keep only outer layer */
+.tab-bar-container .relative.flex-1 {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* Tab styling - clean single layer */
 .tab-bar-container .relative.flex-1 > div {
-    backdrop-filter: blur(8px) saturate(140%);
-    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     transition: none;
     border-radius: 0 !important;
     -webkit-border-radius: 0 !important;
@@ -792,34 +1003,80 @@ body {
     border-top-right-radius: 0 !important;
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
 }
 
-/* Hover effect for inactive tabs */
+/* Remove any nested div backgrounds - keep transparent */
+.tab-bar-container .relative.flex-1 > div > div {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove background from text elements and spans inside tabs */
+.tab-bar-container .relative.flex-1 > div > div > span,
+.tab-bar-container .relative.flex-1 > div > div span,
+.tab-bar-container .relative.flex-1 span {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* Hover effect for inactive tabs - single layer highlight on area only */
 .tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) {
-    background-color: hsl(var(--accent) / 0.3) !important;
-    backdrop-filter: blur(10px) saturate(150%);
-    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    background-color: hsl(var(--accent) / 0.6) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     color: hsl(var(--foreground)) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px hsl(var(--accent) / 0.2),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    box-shadow: none !important;
+    transform: none;
 }
 
-/* Active tab styling */
+/* Ensure text elements don't get background on hover */
+.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) > div,
+.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) > div > div,
+.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) span {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Active/Selected tab styling - single layer highlight (same as hover) */
 .tab-bar-container .relative.flex-1 > div.bg-primary {
-    backdrop-filter: blur(10px) saturate(150%);
-    -webkit-backdrop-filter: blur(10px) saturate(150%);
-    box-shadow: 0 2px 8px hsl(var(--primary) / 0.3),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
+    background-color: hsl(var(--accent) / 0.6) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
 }
 
-/* Active tab hover effect */
+/* Ensure active tab inner elements don't have background */
+.tab-bar-container .relative.flex-1 > div.bg-primary > div,
+.tab-bar-container .relative.flex-1 > div.bg-primary > div > div,
+.tab-bar-container .relative.flex-1 > div.bg-primary span {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Active tab hover effect - single layer highlight (same color) */
 .tab-bar-container .relative.flex-1 > div.bg-primary:hover {
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    box-shadow: 0 4px 12px hsl(var(--primary) / 0.4),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.3);
-    transform: translateY(-1px) scale(1.05);
+    background-color: hsl(var(--accent) / 0.6) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    transform: none;
+}
+
+/* Ensure active tab hover inner elements don't have background */
+.tab-bar-container .relative.flex-1 > div.bg-primary:hover > div,
+.tab-bar-container .relative.flex-1 > div.bg-primary:hover > div > div,
+.tab-bar-container .relative.flex-1 > div.bg-primary:hover span {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 /* Header bar glass effect - rectangular corners */
@@ -840,4 +1097,81 @@ header.bg-card,
     border-top-right-radius: 0 !important;
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
+}
+
+/* TabsList - remove border and background, rectangular corners */
+[role="tablist"],
+[class*="TabsList"] {
+    background-color: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+}
+
+/* TabsTrigger - input field background, no outer border, rectangular corners */
+[role="tab"],
+[class*="TabsTrigger"] {
+    background-color: hsl(var(--input)) !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* TabsTrigger hover - light color, no movement */
+[role="tab"]:hover,
+[class*="TabsTrigger"]:hover {
+    background-color: hsl(var(--input)) !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* TabsTrigger active - same input background, rectangular corners */
+[role="tab"][data-state="active"],
+[class*="TabsTrigger"][data-state="active"] {
+    background-color: hsl(var(--input)) !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* TabsTrigger active hover - light color, no movement */
+[role="tab"][data-state="active"]:hover,
+[class*="TabsTrigger"][data-state="active"]:hover {
+    background-color: hsl(var(--input)) !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* Clear and Filter buttons (outline variant) - primary color like Finalize */
+button[class*="outline"],
+button[class*="variant-outline"] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border-color: hsl(var(--primary)) !important;
+}
+
+button[class*="outline"]:hover,
+button[class*="variant-outline"]:hover {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border-color: hsl(var(--primary)) !important;
 }

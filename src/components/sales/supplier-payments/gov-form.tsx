@@ -35,7 +35,7 @@ export const GovForm = (props: any) => {
     const calculations = useMemo(() => {
         const baseQty = minRate > 0 ? calcTargetAmount / minRate : 0;
         const govQty = govQuantity || (selectedPaymentOption?.quantity || 0);
-        const qtyDifference = baseQty - govQty;
+        const qtyDifference = govQty - baseQty; // Final (selected) - Base
         const baseAmt = calcTargetAmount;
         const govAmt = govAmount || (selectedPaymentOption?.calculatedAmount || 0);
         const pendingAmt = selectedPaymentOption?.amountRemaining || 0;

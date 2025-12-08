@@ -112,6 +112,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     setActiveTab: () => {},
     selectedEntries: [],
     setParchiNo: () => {},
+    setDetailsSupplierEntry: () => {},
+    detailsSupplierEntry: null,
   };
   
   // Get data based on type
@@ -540,6 +542,21 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     return (payment?.id || payment?.paymentId || '').toString();
   };
 
+  const govHistoryRows = useMemo(() => {
+    const filtered = hook.paymentHistory
+      .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "gov.")
+      .filter(paymentMatchesSelection);
+    // Sort by ID (descending - high to low)
+    return [...filtered].sort((a, b) => {
+      const idA = getPaymentIdForSort(a);
+      const idB = getPaymentIdForSort(b);
+      if (!idA && !idB) return 0;
+      if (!idA) return 1;
+      if (!idB) return -1;
+      return idB.localeCompare(idA, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [hook.paymentHistory, paymentMatchesSelection]);
+
   const cashHistoryRows = useMemo(() => {
     const filtered = hook.paymentHistory
       .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash")
@@ -653,6 +670,9 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                 <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="process">Payment</TabsTrigger>
                                 <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="cash">Cash History</TabsTrigger>
                                 <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="rtgs">RTGS History</TabsTrigger>
+                                {type === 'supplier' && (
+                                <TabsTrigger className="px-3 py-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="gov">Gov. History</TabsTrigger>
+                                )}
                 </TabsList>
                         <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                             {type !== 'outsider' && (
@@ -1227,6 +1247,26 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                             } : undefined}
                         />
                     </TabsContent>
+                    {type === 'supplier' && (
+                    <TabsContent value="gov" className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-muted-foreground">Gov. Payments</h2>
+                            <Badge variant="outline" className="text-xs font-medium">
+                                {govHistoryRows.length} {govHistoryRows.length === 1 ? "entry" : "entries"}
+                            </Badge>
+                        </div>
+                        <PaymentHistory
+                            key={`gov-${refreshKey}`}
+                            payments={govHistoryRows}
+                            onShowDetails={hook.setSelectedPaymentForDetails}
+                            onPrintRtgs={hook.setRtgsReceiptData}
+                            onEdit={hook.handleEditPayment}
+                            onDelete={(payment: Payment) => hook.handleDeletePayment(payment)}
+                            title="Gov. Payment History"
+                            suppliers={hook.suppliers}
+                        />
+                    </TabsContent>
+                    )}
             </Tabs>
              )}
 
