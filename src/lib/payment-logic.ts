@@ -12,6 +12,7 @@ const expensesCollection = collection(firestoreDB, "expenses");
 const incomesCollection = collection(firestoreDB, "incomes");
 const paymentsCollection = collection(firestoreDB, "payments");
 const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
+const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
 const settingsCollection = collection(firestoreDB, "settings");
 const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
 
@@ -33,6 +34,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         supplierDetails, bankDetails,
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
         isCustomer = false, // Flag to determine if this is a customer payment
+        extraAmount: userExtraAmount, // Extra amount from form (Gov. payment only)
     } = context;
 
 
@@ -703,6 +705,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // Variables already declared outside block for offline fallback access
             
             if (paymentMethod === 'Gov.' && govAmount > 0) {
+                // First, initialize adjustedOriginal for ALL entries (will be updated if extra amount exists)
+                // This ensures the original amount is correctly displayed in the outstanding table
+                entryOutstandings.forEach(eo => {
+                    adjustedOriginalPerEntry[eo.entry.srNo] = eo.originalAmount || 0;
+                    const originalOutstanding = eo.originalOutstanding || (Math.max(0, eo.outstanding || 0) + (cdAllocations[eo.entry.srNo] || 0));
+                    adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding;
+                });
+
                 // Calculate total receipt outstanding (after CD)
                 const totalReceiptOutstanding = entryOutstandings.reduce((sum, eo) => {
                     const outstanding = eo.outstanding || 0; // Already updated after CD
@@ -712,14 +722,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 // Gov. Required Amount = Gov. Amount (user entered)
                 govRequiredAmount = govAmount;
                 
-                // Extra Amount = Gov. Required - Total Receipt Outstanding
-                totalExtraAmount = Math.max(0, govRequiredAmount - totalReceiptOutstanding);
+                // IMPORTANT: Use extra amount from form directly (not calculated)
+                // Extra Amount = Gov. Amount + Pending Amount - Target Amount (from form)
+                totalExtraAmount = userExtraAmount !== undefined ? Math.max(0, userExtraAmount) : 0;
                 
                 // Distribute extra amount based on outstanding (not original amount)
                 // This ensures fair distribution - receipts with more outstanding get more extra amount
                 if (totalExtraAmount > 0 && totalReceiptOutstanding > 0) {
                     entryOutstandings.forEach(eo => {
                         const outstanding = Math.max(0, eo.outstanding || 0); // Already updated after CD
+                        const originalOutstanding = eo.originalOutstanding || (outstanding + (cdAllocations[eo.entry.srNo] || 0));
+                        
                         if (outstanding > 0) {
                             const proportion = outstanding / totalReceiptOutstanding;
                             extraAmountPerEntry[eo.entry.srNo] = Math.round(totalExtraAmount * proportion * 100) / 100;
@@ -727,13 +740,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             // Calculate adjusted original and outstanding
                             // IMPORTANT: Use originalOutstanding (before CD) for adjusted outstanding
                             // This ensures verification doesn't double-subtract CD
-                            const originalOutstanding = eo.originalOutstanding || (outstanding + (cdAllocations[eo.entry.srNo] || 0));
                             adjustedOriginalPerEntry[eo.entry.srNo] = (eo.originalAmount || 0) + extraAmountPerEntry[eo.entry.srNo];
                             adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding + extraAmountPerEntry[eo.entry.srNo];
                         } else {
+                            // Even if outstanding is 0, keep the initialized adjustedOriginal
+                            // This ensures the original amount is correctly displayed in the outstanding table
                             extraAmountPerEntry[eo.entry.srNo] = 0;
-                            adjustedOriginalPerEntry[eo.entry.srNo] = eo.originalAmount || 0;
-                            adjustedOutstandingPerEntry[eo.entry.srNo] = 0;
+                            // adjustedOriginalPerEntry already initialized above
+                            adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding;
                         }
                     });
                 }
@@ -1850,7 +1864,16 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
 
         const paymentIdToUse = editingPayment ? editingPayment.id : ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId);
-        const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        
+        // For Gov. payments, use the separate governmentFinalizedPayments collection
+        // For other payments, use the regular payments collection
+        let paymentCollection;
+        if (paymentMethod === 'Gov.') {
+            paymentCollection = governmentFinalizedPaymentsCollection;
+        } else {
+            paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        }
+        
         const newPaymentRef = doc(paymentCollection, paymentIdToUse);
         const now = Timestamp.now();
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id, updatedAt: now });
@@ -1934,13 +1957,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             try {
                 if (db && finalPaymentData) {
                     if (editingPayment?.id) {
-                        if (isCustomer) {
+                        if (paymentMethod === 'Gov.') {
+                            await db.governmentFinalizedPayments.delete(editingPayment.id);
+                        } else if (isCustomer) {
                             await db.customerPayments.delete(editingPayment.id);
                         } else {
                             await db.payments.delete(editingPayment.id);
                         }
                     }
-                    if (isCustomer) {
+                    if (paymentMethod === 'Gov.') {
+                        await db.governmentFinalizedPayments.put(finalPaymentData);
+                    } else if (isCustomer) {
                         await db.customerPayments.put(finalPaymentData as any);
                     } else {
                         await db.payments.put(finalPaymentData);
@@ -1954,7 +1981,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     const deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
                     await enqueueSyncTask(deleteTaskType, { id: editingPayment.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${editingPayment.id}` });
                 }
-                const upsertTaskType = isCustomer ? 'upsert:customerPayment' : 'upsert:payment';
+                // For Gov. payments, use a different sync task type
+                let upsertTaskType;
+                if (paymentMethod === 'Gov.') {
+                    upsertTaskType = 'upsert:governmentFinalizedPayment';
+                } else {
+                    upsertTaskType = isCustomer ? 'upsert:customerPayment' : 'upsert:payment';
+                }
                 await enqueueSyncTask(upsertTaskType, finalPaymentData, { attemptImmediate: true, dedupeKey: `${upsertTaskType}:${finalPaymentData.id}` });
             } catch {}
         } else {
@@ -1964,7 +1997,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     // Ensure local IndexedDB reflects the latest payment so UI updates instantly
     try {
         if (db && finalPaymentData) {
-            if (isCustomer) {
+            if (paymentMethod === 'Gov.') {
+                await db.governmentFinalizedPayments.put(finalPaymentData);
+            } else if (isCustomer) {
                 await db.customerPayments.put(finalPaymentData as any);
             } else {
                 await db.payments.put(finalPaymentData);
@@ -1995,8 +2030,19 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
         throw new Error("Payment not found.");
     }
 
+    // Check if this is a Gov. payment
+    const isGovPayment = paymentToDelete.receiptType === 'Gov.';
+    
     const performDelete = async (transOrBatch: any) => {
-        const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        // For Gov. payments, use the governmentFinalizedPayments collection
+        // For other payments, use the regular payments collection
+        let paymentCollection;
+        if (isGovPayment) {
+            paymentCollection = governmentFinalizedPaymentsCollection;
+        } else {
+            paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+        }
+        
         const paymentDocRef = doc(paymentCollection, paymentToDelete.id);
         const paymentDoc = await transOrBatch.get(paymentDocRef);
         
@@ -2013,7 +2059,9 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
     });
 
     if (db) {
-        if (isCustomer) {
+        if (isGovPayment) {
+            await db.governmentFinalizedPayments.delete(paymentToDelete.id);
+        } else if (isCustomer) {
             await db.customerPayments.delete(paymentToDelete.id);
         } else {
             await db.payments.delete(paymentToDelete.id);

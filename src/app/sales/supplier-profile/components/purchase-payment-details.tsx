@@ -101,7 +101,9 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Purchase #</TableHead>
-                <TableHead>Original Amount</TableHead>
+                <TableHead>Base Original</TableHead>
+                <TableHead>Extra Amount</TableHead>
+                <TableHead>Adjusted Original</TableHead>
                 <TableHead>Total Paid</TableHead>
                 <TableHead>Cash Paid</TableHead>
                 <TableHead>RTGS Paid</TableHead>
@@ -110,58 +112,108 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {purchasePaymentBreakdown.map((purchase, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">
-                    {formatSerialNumber(purchase.srNo)}
-                  </TableCell>
-                  <TableCell>{formatCurrency(purchase.originalAmount)}</TableCell>
-                  <TableCell>{formatCurrency(purchase.totalPaid)}</TableCell>
-                  <TableCell className="text-green-600">
-                    {formatCurrency(purchase.cashPaid)}
-                  </TableCell>
-                  <TableCell className="text-blue-600">
-                    {formatCurrency(purchase.rtgsPaid)}
-                  </TableCell>
-                  <TableCell className={purchase.outstanding > 0 ? "text-red-600" : "text-green-600"}>
-                    {formatCurrency(purchase.outstanding)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={purchase.outstanding > 0 ? "destructive" : "default"}>
-                      {purchase.outstanding > 0 ? "Outstanding" : "Paid"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {purchasePaymentBreakdown.map((purchase, index) => {
+                // Get base original amount (without extra amount)
+                const baseOriginal = supplierData.allTransactions?.find(t => t.srNo === purchase.srNo)?.originalNetAmount || 0;
+                const extraAmount = purchase.originalAmount - baseOriginal;
+                
+                return (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">
+                      {formatSerialNumber(purchase.srNo)}
+                    </TableCell>
+                    <TableCell>{formatCurrency(baseOriginal)}</TableCell>
+                    <TableCell className={extraAmount > 0 ? "text-green-600 font-semibold" : ""}>
+                      {extraAmount > 0 ? `+ ${formatCurrency(extraAmount)}` : '-'}
+                    </TableCell>
+                    <TableCell className="font-semibold">{formatCurrency(purchase.originalAmount)}</TableCell>
+                    <TableCell>{formatCurrency(purchase.totalPaid)}</TableCell>
+                    <TableCell className="text-green-600">
+                      {formatCurrency(purchase.cashPaid)}
+                    </TableCell>
+                    <TableCell className="text-blue-600">
+                      {formatCurrency(purchase.rtgsPaid)}
+                    </TableCell>
+                    <TableCell className={purchase.outstanding > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                      {formatCurrency(purchase.outstanding)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={purchase.outstanding > 0 ? "destructive" : "default"}>
+                        {purchase.outstanding > 0 ? "Outstanding" : "Paid"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
 
         {/* Summary */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.totalPaid, 0))}
+        <div className="mt-6 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-primary/5 rounded border border-primary/20">
+              <div className="text-2xl font-bold text-primary">
+                {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.originalAmount, 0))}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Total Original Amount</div>
             </div>
-            <div className="text-sm text-gray-600">Total Paid</div>
+            <div className="text-center p-4 bg-green-50 rounded border border-green-200">
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.totalPaid, 0))}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Total Paid</div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded border border-blue-200">
+              <div className="text-2xl font-bold text-blue-600">
+                {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.cashPaid, 0))}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Cash Paid</div>
+            </div>
+            <div className="text-center p-4 bg-indigo-50 rounded border border-indigo-200">
+              <div className="text-2xl font-bold text-indigo-600">
+                {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.rtgsPaid, 0))}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">RTGS Paid</div>
+            </div>
           </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.cashPaid, 0))}
-            </div>
-            <div className="text-sm text-gray-600">Cash Paid</div>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.rtgsPaid, 0))}
-            </div>
-            <div className="text-sm text-gray-600">RTGS Paid</div>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.outstanding, 0))}
-            </div>
-            <div className="text-sm text-gray-600">Outstanding</div>
+          
+          {/* Extra Amount and Outstanding Summary */}
+          <div className="grid grid-cols-2 gap-4">
+            {(() => {
+              // Calculate total extra amount from Gov. payments
+              const totalExtraAmount = purchasePaymentBreakdown.reduce((sum, p) => {
+                // Find Gov. payment for this purchase
+                const govPayment = p.paymentDetails.find(payment => (payment as any).receiptType === 'Gov.');
+                if (govPayment) {
+                  const paidForThis = govPayment.paidFor?.find((pf: any) => pf.srNo === p.srNo);
+                  if (paidForThis) {
+                    const extraAmount = (paidForThis as any).extraAmount || 0;
+                    return sum + extraAmount;
+                  }
+                }
+                return sum;
+              }, 0);
+              
+              return (
+                <>
+                  {totalExtraAmount > 0 && (
+                    <div className="text-center p-4 bg-green-50 rounded border border-green-200">
+                      <div className="text-xl font-bold text-green-600">
+                        + {formatCurrency(totalExtraAmount)}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">Extra Amount (Gov. Payment)</div>
+                    </div>
+                  )}
+                  <div className="text-center p-4 bg-red-50 rounded border border-red-200">
+                    <div className="text-2xl font-bold text-red-600">
+                      {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.outstanding, 0))}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">Total Outstanding</div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </CardContent>

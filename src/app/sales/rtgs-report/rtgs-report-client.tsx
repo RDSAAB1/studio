@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
-import { doc, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, Timestamp, FieldValue } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -107,7 +107,7 @@ export default function RtgsReportClient() {
                 const amount = p.rtgsAmount || p.amount || 0;
                 return {
                     paymentId: p.paymentId,
-                    date: p.date,
+                    date: p.date || '',
                     checkNo: p.checkNo || '',
                     type: p.type || (settings?.type || 'SB'),
                     srNo: srNo,
@@ -129,7 +129,12 @@ export default function RtgsReportClient() {
                 };
             })
             .filter(row => row.amount > 0); // Filter out negative amounts
-        return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return newReportRows.sort((a, b) => {
+            // Handle null/empty dates in sorting
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [payments, settings]);
 
 
@@ -170,17 +175,22 @@ export default function RtgsReportClient() {
     const completedRows = useMemo(() => {
         return filteredReportRows.filter(row => {
             // Check if date exists and is valid (try to parse it)
+            // Handle null, empty string, and undefined properly
             let hasDate = false;
             try {
-                if (row.date) {
-                    const dateObj = new Date(row.date);
-                    hasDate = !isNaN(dateObj.getTime()) && row.date.trim() !== '';
+                if (row.date && row.date !== null && row.date !== '') {
+                    const dateStr = String(row.date).trim();
+                    if (dateStr) {
+                        const dateObj = new Date(dateStr);
+                        hasDate = !isNaN(dateObj.getTime());
+                    }
                 }
             } catch (e) {
                 hasDate = false;
             }
-            // Check if checkNo exists and is not empty
-            const hasCheckNo = row.checkNo && row.checkNo.trim() !== '';
+            // Check if checkNo exists and is not empty or null
+            const checkNoStr = row.checkNo ? String(row.checkNo).trim() : '';
+            const hasCheckNo = checkNoStr !== '' && row.checkNo !== null;
             return hasDate && hasCheckNo;
         });
     }, [filteredReportRows]);
@@ -188,17 +198,22 @@ export default function RtgsReportClient() {
     const pendingRows = useMemo(() => {
         return filteredReportRows.filter(row => {
             // Check if date exists and is valid (try to parse it)
+            // Handle null, empty string, and undefined properly
             let hasDate = false;
             try {
-                if (row.date) {
-                    const dateObj = new Date(row.date);
-                    hasDate = !isNaN(dateObj.getTime()) && row.date.trim() !== '';
+                if (row.date && row.date !== null && row.date !== '') {
+                    const dateStr = String(row.date).trim();
+                    if (dateStr) {
+                        const dateObj = new Date(dateStr);
+                        hasDate = !isNaN(dateObj.getTime());
+                    }
                 }
             } catch (e) {
                 hasDate = false;
             }
-            // Check if checkNo exists and is not empty
-            const hasCheckNo = row.checkNo && row.checkNo.trim() !== '';
+            // Check if checkNo exists and is not empty or null
+            const checkNoStr = row.checkNo ? String(row.checkNo).trim() : '';
+            const hasCheckNo = checkNoStr !== '' && row.checkNo !== null;
             // Pending if either date or checkNo is missing
             return !hasDate || !hasCheckNo;
         });
@@ -450,15 +465,6 @@ export default function RtgsReportClient() {
             return;
         }
 
-        if (!updateDate && !updateCheckNo.trim()) {
-            toast({ 
-                title: "Invalid input", 
-                description: "Please provide at least a date or check number.", 
-                variant: "destructive" 
-            });
-            return;
-        }
-
         setIsUpdating(true);
         try {
             const batch = writeBatch(firestoreDB);
@@ -466,12 +472,29 @@ export default function RtgsReportClient() {
                 updatedAt: Timestamp.now()
             };
 
-            if (updateDate) {
+            // Only update fields that user explicitly wants to change
+            // We need to track which fields the user actually wants to update
+            // If user doesn't provide a value, we don't update that field
+            
+            // Track if user wants to update date
+            // If updateDate is a Date object, update it
+            // If updateDate is explicitly set to null (cleared), we'll handle it differently
+            // For now, we only update if updateDate is a valid Date
+            if (updateDate !== undefined && updateDate !== null) {
                 updateData.date = updateDate.toISOString();
+            } else if (updateDate === null) {
+                // User explicitly cleared date - set to null
+                updateData.date = null;
             }
+            // If updateDate is undefined, don't update the date field
 
-            if (updateCheckNo.trim()) {
-                updateData.checkNo = updateCheckNo.trim();
+            // For checkNo, only update if user provided a value (even if empty)
+            // If updateCheckNo is an empty string, it means user wants to clear it
+            // If updateCheckNo is undefined, don't update
+            if (updateCheckNo !== undefined) {
+                // If empty string, set to null to clear it
+                // Otherwise, set to the trimmed value
+                updateData.checkNo = updateCheckNo.trim() === '' ? null : updateCheckNo.trim();
             }
 
             let updateCount = 0;
@@ -492,12 +515,16 @@ export default function RtgsReportClient() {
                             try {
                                 const existing = await db.payments.get(paymentId);
                                 if (existing) {
-                                    await db.payments.put({ 
-                                        ...existing, 
-                                        ...updateData,
-                                        date: updateDate ? updateDate.toISOString() : existing.date,
-                                        checkNo: updateCheckNo.trim() || existing.checkNo
-                                    });
+                                    const localUpdateData: any = { ...existing, ...updateData };
+                                    // Handle date update - if updateDate is undefined, don't change; if it's null/empty, clear it
+                                    if (updateDate !== undefined) {
+                                        localUpdateData.date = updateDate ? updateDate.toISOString() : '';
+                                    }
+                                    // Handle checkNo update - if updateCheckNo is provided (even if empty), update it
+                                    if (updateCheckNo !== undefined) {
+                                        localUpdateData.checkNo = updateCheckNo.trim();
+                                    }
+                                    await db.payments.put(localUpdateData);
                                 }
                             } catch (localError) {
                                 console.warn(`Failed to update local IndexedDB for ${paymentId}:`, localError);
@@ -963,7 +990,7 @@ export default function RtgsReportClient() {
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="updateDate">Date</Label>
+                            <Label htmlFor="updateDate">Date (Leave empty to clear)</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -974,29 +1001,47 @@ export default function RtgsReportClient() {
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {updateDate ? format(updateDate, "PPP") : <span>Select date</span>}
+                                        {updateDate ? format(updateDate, "PPP") : <span>Select date or leave empty</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
                                     <Calendar mode="single" selected={updateDate} onSelect={setUpdateDate} initialFocus />
+                                    {updateDate && (
+                                        <div className="p-2 border-t">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full"
+                                                onClick={() => setUpdateDate(undefined)}
+                                            >
+                                                Clear Date
+                                            </Button>
+                                        </div>
+                                    )}
                                 </PopoverContent>
                             </Popover>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="updateCheckNo">Check No.</Label>
+                            <Label htmlFor="updateCheckNo">Check No. (Leave empty to clear)</Label>
                             <Input
                                 id="updateCheckNo"
                                 value={updateCheckNo}
                                 onChange={(e) => setUpdateCheckNo(e.target.value)}
-                                placeholder="Enter check number"
+                                placeholder="Enter check number or leave empty"
                             />
+                        </div>
+                        <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                            <p className="font-semibold mb-1">Note:</p>
+                            <p>• If both date and check number are filled, entry will be in "Completed" table</p>
+                            <p>• If either date or check number is missing, entry will move to "Pending" table</p>
+                            <p>• You can clear fields by leaving them empty or using "Clear Date" button</p>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)} disabled={isUpdating}>
                             Cancel
                         </Button>
-                        <Button onClick={handleBulkUpdate} disabled={isUpdating || (!updateDate && !updateCheckNo.trim())}>
+                        <Button onClick={handleBulkUpdate} disabled={isUpdating}>
                             {isUpdating ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

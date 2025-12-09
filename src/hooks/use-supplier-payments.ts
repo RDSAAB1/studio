@@ -570,7 +570,16 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected });
+            // Calculate extra amount for Gov. payment (if applicable)
+            let extraAmount = 0;
+            if (form.paymentMethod === 'Gov.' && form.govAmount > 0 && form.calcTargetAmount > 0) {
+                // Extra Amount = Gov. Amount + Pending Amount - Target Amount
+                // Pending Amount = amount remaining from selected payment option
+                const pendingAmt = selectedPaymentOption?.amountRemaining || 0;
+                extraAmount = form.govAmount + pendingAmt - form.calcTargetAmount;
+            }
+            
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected, extraAmount });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });

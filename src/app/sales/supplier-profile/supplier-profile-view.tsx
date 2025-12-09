@@ -388,9 +388,35 @@ export const SupplierProfileView = ({
                         </div>
                             </div>
                                 <Separator className="my-2"/>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Total Original Amount:</span>
-                                    <span className="font-bold text-primary">{formatCurrency(Math.abs(selectedSupplierData.totalOriginalAmount || 0))}</span>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Base Original Amount:</span>
+                                        <span className="font-semibold text-primary">{formatCurrency(Math.abs(selectedSupplierData.totalOriginalAmount || 0))}</span>
+                                    </div>
+                                    {(() => {
+                                        // Calculate total extra amount from Gov. payments
+                                        const totalExtraAmount = (selectedSupplierData.allTransactions || []).reduce((sum, t) => {
+                                            const extra = (t as any).extraAmount || 0;
+                                            return sum + extra;
+                                        }, 0);
+                                        
+                                        if (totalExtraAmount > 0) {
+                                            const adjustedOriginal = (selectedSupplierData.totalOriginalAmount || 0) + totalExtraAmount;
+                                            return (
+                                                <>
+                                                    <div className="flex justify-between pl-2">
+                                                        <span className="text-muted-foreground text-[10px]">+ Extra Amount (Gov.):</span>
+                                                        <span className="font-semibold text-green-600 text-[10px]">{formatCurrency(totalExtraAmount)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between pt-1 border-t border-primary/20">
+                                                        <span className="text-muted-foreground font-medium">Adjusted Original:</span>
+                                                        <span className="font-bold text-primary">{formatCurrency(adjustedOriginal)}</span>
+                                                    </div>
+                                                </>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                             </div>
                 </CardContent>
             </Card>
@@ -403,40 +429,101 @@ export const SupplierProfileView = ({
                                     Financial Summary
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                            <CardContent className="space-y-3 px-3 pb-3 text-xs">
+                                {/* Original Amount Section */}
+                                <div className="space-y-1.5 bg-primary/5 p-2 rounded-md border border-primary/20">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground font-medium">Base Original Amount:</span>
+                                        <span className="font-semibold text-primary">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span>
+                                    </div>
+                                    {(() => {
+                                        // Calculate total extra amount from Gov. payments
+                                        const totalExtraAmount = (selectedSupplierData.allTransactions || []).reduce((sum, t) => {
+                                            const extra = (t as any).extraAmount || 0;
+                                            return sum + extra;
+                                        }, 0);
+                                        
+                                        if (totalExtraAmount > 0) {
+                                            const adjustedOriginal = (selectedSupplierData.totalOriginalAmount || 0) + totalExtraAmount;
+                                            return (
+                                                <>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-muted-foreground text-[10px]">Extra Amount (Gov. Payment):</span>
+                                                        <span className="font-semibold text-green-600">+ {formatCurrency(totalExtraAmount)}</span>
+                                                    </div>
+                                                    <Separator className="my-1"/>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-muted-foreground font-medium">Adjusted Original Amount:</span>
+                                                        <span className="font-bold text-primary text-sm">{formatCurrency(adjustedOriginal)}</span>
+                                                    </div>
+                                                </>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+
+                                {/* Payment Breakdown */}
                                 <div className="space-y-1">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Net Payable:</span>
-                                        <span className="font-medium">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span>
+                                        <span className="text-muted-foreground">Total Paid:</span>
+                                        <span className="font-medium text-green-600">{formatCurrency(selectedSupplierData.totalPaid || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Cash Paid:</span>
-                                        <span className="font-medium text-green-500">{formatCurrency(selectedSupplierData.totalCashPaid || 0)}</span>
+                                    <div className="flex justify-between pl-4">
+                                        <span className="text-muted-foreground text-[10px]">• Cash Paid:</span>
+                                        <span className="font-medium text-green-500 text-[10px]">{formatCurrency(selectedSupplierData.totalCashPaid || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total RTGS Paid:</span>
-                                        <span className="font-medium text-green-500">{formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}</span>
+                                    <div className="flex justify-between pl-4">
+                                        <span className="text-muted-foreground text-[10px]">• RTGS Paid:</span>
+                                        <span className="font-medium text-green-500 text-[10px]">{formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}</span>
                                     </div>
+                                    {(() => {
+                                        const govPaid = (selectedSupplierData.allPayments || [])
+                                            .filter(p => (p as any).receiptType === 'Gov.')
+                                            .reduce((sum, p) => {
+                                                const paidForThis = p.paidFor?.find(pf => 
+                                                    (selectedSupplierData.allTransactions || []).some(t => t.srNo === pf.srNo)
+                                                );
+                                                return sum + (paidForThis?.amount || 0);
+                                            }, 0);
+                                        if (govPaid > 0) {
+                                            return (
+                                                <div className="flex justify-between pl-4">
+                                                    <span className="text-muted-foreground text-[10px]">• Gov. Paid:</span>
+                                                    <span className="font-medium text-green-500 text-[10px]">{formatCurrency(govPaid)}</span>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Total CD Granted:</span>
-                                        <span className="font-medium">{formatCurrency(selectedSupplierData.totalCdAmount || 0)}</span>
+                                        <span className="font-medium text-blue-600">{formatCurrency(selectedSupplierData.totalCdAmount || 0)}</span>
                                     </div>
                                 </div>
+                                
                                 <Separator className="my-2"/>
+                                
+                                {/* Transaction Stats */}
                                 <div className="space-y-1">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Total Transactions:</span>
-                                        <span className="font-medium">{selectedSupplierData.totalTransactions} Entries</span>
+                                        <span className="font-medium">{selectedSupplierData.totalTransactions || 0} Entries</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Outstanding Entries:</span>
-                                        <span className="font-medium text-red-500 dark:text-red-400">{selectedSupplierData.totalOutstandingTransactions} Entries</span>
+                                        <span className="font-medium text-red-500 dark:text-red-400">{selectedSupplierData.totalOutstandingTransactions || 0} Entries</span>
                                     </div>
                                 </div>
+                                
                                 <Separator className="my-2"/>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Outstanding:</span>
-                                    <span className="font-bold text-red-500 dark:text-red-400">{formatCurrency(selectedSupplierData.totalOutstanding)}</span>
+                                
+                                {/* Final Outstanding */}
+                                <div className="bg-red-50 dark:bg-red-950/20 p-2 rounded-md border border-red-200 dark:border-red-800">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground font-semibold">Final Outstanding:</span>
+                                        <span className="font-bold text-red-600 dark:text-red-400 text-base">{formatCurrency(selectedSupplierData.totalOutstanding || 0)}</span>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

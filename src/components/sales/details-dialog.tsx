@@ -86,9 +86,46 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
             return sum;
         }, 0);
     }, [paymentsForDetailsEntry, customer?.srNo]);
+
+    // Calculate adjusted original and extra amount from Gov. payments
+    const { adjustedOriginal, totalExtraAmount, govPaymentDetails } = useMemo(() => {
+        if (!customer) return { adjustedOriginal: 0, totalExtraAmount: 0, govPaymentDetails: null };
+        
+        let adjustedOriginal = customer.originalNetAmount || 0;
+        let totalExtraAmount = 0;
+        let govPaymentDetails: Payment | null = null;
+
+        // Find Gov. payment for this entry
+        const govPayment = paymentsForDetailsEntry.find(p => 
+            (p as any).receiptType === 'Gov.' && 
+            p.paidFor?.some(pf => pf.srNo === customer.srNo)
+        );
+
+        if (govPayment) {
+            govPaymentDetails = govPayment as Payment;
+            const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === customer.srNo);
+            
+            // Check for adjustedOriginal first (most reliable)
+            if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
+                adjustedOriginal = paidForThisEntry.adjustedOriginal;
+                totalExtraAmount = adjustedOriginal - (customer.originalNetAmount || 0);
+            } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
+                // Fallback: Use extraAmount to calculate adjustedOriginal
+                totalExtraAmount = paidForThisEntry.extraAmount || 0;
+                adjustedOriginal = (customer.originalNetAmount || 0) + totalExtraAmount;
+            } else if ((govPayment as any).extraAmount !== undefined) {
+                // Fallback: Check payment-level extraAmount
+                totalExtraAmount = (govPayment as any).extraAmount || 0;
+                adjustedOriginal = (customer.originalNetAmount || 0) + totalExtraAmount;
+            }
+        }
+
+        return { adjustedOriginal, totalExtraAmount, govPaymentDetails };
+    }, [paymentsForDetailsEntry, customer]);
     
     // Calculate derived values (not hooks, so safe to be after early return check)
-    const finalOutstanding = customer ? (customer.originalNetAmount || 0) - totalPaidForThisEntry - totalCdForThisEntry : 0;
+    // Outstanding = Adjusted Original - Total Paid - Total CD
+    const finalOutstanding = customer ? adjustedOriginal - totalPaidForThisEntry - totalCdForThisEntry : 0;
     const isCustomer = entryType === 'Customer';
     const totalBagWeightKg = customer ? (customer.bags || 0) * (customer.bagWeightKg || 0) : 0;
     const displayBrokerageAmount = customer ? (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0) : 0;
@@ -202,12 +239,27 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                         </div>
                         
                         <Card className="border-primary/50 bg-primary/5 text-center">
-                            <CardContent className="p-3">
-                                <p className="text-sm text-primary/80 font-medium">{isCustomer ? 'Original Receivable' : 'Original Payable'} Amount</p>
-                                <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
+                            <CardContent className="p-3 space-y-2">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">Base Original Amount</p>
+                                    <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
+                                </div>
+                                {totalExtraAmount > 0 && (
+                                    <div className="pt-1">
+                                        <p className="text-xs text-muted-foreground">Extra Amount (Gov. Payment)</p>
+                                        <p className="text-lg font-semibold text-green-600 font-mono">+ {formatCurrency(totalExtraAmount)}</p>
+                                    </div>
+                                )}
                                 <Separator className="my-2"/>
-                                <p className="text-sm text-destructive font-medium">{isCustomer ? 'Final Receivable' : 'Final Outstanding'} Amount</p>
-                                <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstanding)}</p>
+                                <div>
+                                    <p className="text-sm text-primary/80 font-medium">{isCustomer ? 'Adjusted Original Receivable' : 'Adjusted Original Payable'} Amount</p>
+                                    <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(adjustedOriginal)}</p>
+                                </div>
+                                <Separator className="my-2"/>
+                                <div>
+                                    <p className="text-sm text-destructive font-medium">{isCustomer ? 'Final Receivable' : 'Final Outstanding'} Amount</p>
+                                    <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstanding)}</p>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -251,12 +303,23 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     // It's NOT (To Be Paid - CD), it's the actual payment amount
                                                     const actualPaidForEntry = paidForThis.amount; // This is the To Be Paid / Actual Paid amount
                                                     const settledAmountForEntry = actualPaidForEntry + cdForThisEntry; // Total settled = Paid + CD
+                                                    
+                                                    // Get extra amount for this payment (if Gov. payment)
+                                                    const extraAmountForThisPayment = (paidForThis as any).extraAmount || 0;
+                                                    const isGovPayment = (payment as any).receiptType === 'Gov.';
 
                                                     return (
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                            <TableCell className="p-2">{payment.type}</TableCell>
+                                                            <TableCell className="p-2">
+                                                                {payment.type}
+                                                                {isGovPayment && extraAmountForThisPayment > 0 && (
+                                                                    <span className="ml-1 text-xs text-green-600" title={`Extra Amount: ${formatCurrency(extraAmountForThisPayment)}`}>
+                                                                        (Gov.)
+                                                                    </span>
+                                                                )}
+                                                            </TableCell>
                                                             <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right text-blue-600">{formatCurrency(cdForThisEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(settledAmountForEntry)}</TableCell>

@@ -8,6 +8,7 @@ export class AppDatabase extends Dexie {
     customers!: Table<Customer>;
     payments!: Table<Payment>;
     customerPayments!: Table<CustomerPayment>;
+    governmentFinalizedPayments!: Table<Payment>;
     transactions!: Table<Transaction>;
     options!: Table<OptionItem>;
     banks!: Table<Bank>;
@@ -77,6 +78,31 @@ export class AppDatabase extends Dexie {
             customers: '++id, &srNo, name, contact, date, customerId',
             payments: '++id, paymentId, customerId, date',
             customerPayments: '++id, paymentId, customerId, date',
+            transactions: '++id, transactionId, date, category, subCategory, type',
+            options: '++id, type, name',
+            banks: '&id, name',
+            bankBranches: '++id, &ifscCode, bankName, branchName',
+            bankAccounts: '++id, &accountNumber',
+            settings: '&id',
+            projects: '++id, name, startDate',
+            loans: '++id, loanId, startDate',
+            fundTransactions: '++id, date, type',
+            employees: '++id, employeeId, name',
+            payroll: '++id, employeeId, payPeriod',
+            attendance: '&id, employeeId, date', 
+            inventoryItems: '++id, sku, name',
+            ledgerAccounts: '&id, name',
+            ledgerEntries: '&id, accountId, date',
+            mandiReports: '&id, voucherNo, sellerName, purchaseDate',
+            syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
+        });
+
+        this.version(4).stores({
+            suppliers: '&id, &srNo, name, contact, date, customerId',
+            customers: '++id, &srNo, name, contact, date, customerId',
+            payments: '++id, paymentId, customerId, date',
+            customerPayments: '++id, paymentId, customerId, date',
+            governmentFinalizedPayments: '++id, paymentId, customerId, date',
             transactions: '++id, transactionId, date, category, subCategory, type',
             options: '++id, type, name',
             banks: '&id, name',

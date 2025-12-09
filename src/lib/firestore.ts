@@ -36,6 +36,7 @@ const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
 const supplierPaymentsCollection = collection(firestoreDB, "payments");
 const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
+const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
 const incomesCollection = collection(firestoreDB, "incomes");
 const expensesCollection = collection(firestoreDB, "expenses");
 const payeeProfilesCollection = collection(firestoreDB, "payeeProfiles");
@@ -1696,8 +1697,10 @@ export async function getAllPayments(): Promise<Payment[]> {
   if (db) {
     try {
       const localPayments = await db.payments.toArray();
-      if (localPayments.length > 0) {
-        return localPayments;
+      const localGovPayments = await db.governmentFinalizedPayments.toArray();
+      const allLocalPayments = [...localPayments, ...localGovPayments];
+      if (allLocalPayments.length > 0) {
+        return allLocalPayments;
       }
     } catch (error) {
       // If local read fails, continue with Firestore
@@ -1713,6 +1716,7 @@ export async function getAllPayments(): Promise<Payment[]> {
 
   const lastSyncTime = getLastSyncTime();
   let q;
+  let govQ;
   
   if (lastSyncTime) {
     const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
@@ -1721,25 +1725,38 @@ export async function getAllPayments(): Promise<Payment[]> {
       where('updatedAt', '>', lastSyncTimestamp),
       orderBy('updatedAt')
     );
+    govQ = query(
+      governmentFinalizedPaymentsCollection,
+      where('updatedAt', '>', lastSyncTimestamp),
+      orderBy('updatedAt')
+    );
   } else {
     q = query(supplierPaymentsCollection);
+    govQ = query(governmentFinalizedPaymentsCollection);
   }
 
-  const snapshot = await getDocs(q);
+  const [snapshot, govSnapshot] = await Promise.all([
+    getDocs(q),
+    getDocs(govQ)
+  ]);
+  
   const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  const govPayments = govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  const allPayments = [...payments, ...govPayments];
   
   // Track Firestore read
-  firestoreMonitor.logRead('payments', 'getAllPayments', payments.length);
+  firestoreMonitor.logRead('payments', 'getAllPayments', allPayments.length);
   
   // Save to local IndexedDB and update last sync time
-  if (db && payments.length > 0) {
+  if (db && allPayments.length > 0) {
     await db.payments.bulkPut(payments);
+    await db.governmentFinalizedPayments.bulkPut(govPayments);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:payments', String(Date.now()));
     }
   }
   
-  return payments;
+  return allPayments;
 }
 
 export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
@@ -2197,7 +2214,9 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
 export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            return db ? await db.payments.orderBy('date').reverse().toArray() : [];
+            const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
+            const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
+            return [...regularPayments, ...govPayments] as Payment[];
         }, callback);
     }
 
@@ -2206,10 +2225,13 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     
     // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
     if (db) {
-        db.payments.orderBy('date').reverse().toArray().then((localData) => {
-            localPayments = localData as Payment[];
+        Promise.all([
+            db.payments.orderBy('date').reverse().toArray(),
+            db.governmentFinalizedPayments.orderBy('date').reverse().toArray()
+        ]).then(([regularData, govData]) => {
+            localPayments = [...regularData, ...govData] as Payment[];
             callbackCalledFromIndexedDB = true;
-            callback(localData as Payment[]);
+            callback(localPayments);
         }).catch(() => {
             callbackCalledFromIndexedDB = false;
         });
@@ -2224,6 +2246,7 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
 
     const lastSyncTime = getLastSyncTime();
     let q;
+    let govQ;
     
     if (lastSyncTime) {
         // Only listen to NEW changes after last sync
@@ -2234,17 +2257,88 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                 where('updatedAt', '>', lastSyncTimestamp),
                 orderBy('updatedAt')
             );
+            govQ = query(
+                governmentFinalizedPaymentsCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
         } catch (error) {
             // If updatedAt query fails (no index or missing fields), fallback to full sync
             console.warn('Incremental sync failed for payments, using full sync:', error);
             q = query(supplierPaymentsCollection, orderBy("date", "desc"));
+            govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
         }
     } else {
         // First sync - get all (only once)
         q = query(supplierPaymentsCollection, orderBy("date", "desc"));
+        govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
     }
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    let allPayments: Payment[] = [];
+    let allDeletedIds: string[] = [];
+    let snapshotCount = 0;
+    const totalSnapshots = 2; // Regular payments + Gov. payments
+
+    const mergeAndCallback = async () => {
+        if (snapshotCount < totalSnapshots) return; // Wait for both snapshots
+        
+        // Track Firestore read
+        firestoreMonitor.logRead('payments', 'getPaymentsRealtime', allPayments.length);
+        
+        // Merge new changes with local data
+        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
+            const mergedMap = new Map<string, Payment>();
+            // Add all local payments first
+            localPayments.forEach(p => mergedMap.set(p.id, p));
+            // Remove deleted payments
+            allDeletedIds.forEach(id => mergedMap.delete(id));
+            // Update/add new payments from Firestore
+            allPayments.forEach(p => mergedMap.set(p.id, p));
+            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            });
+            callback(merged);
+            // Update localPayments for next merge
+            localPayments = merged;
+            
+            if (db && allPayments.length > 0) {
+                const regularPayments = allPayments.filter(p => p.receiptType !== 'Gov.');
+                const govPayments = allPayments.filter(p => p.receiptType === 'Gov.');
+                if (regularPayments.length > 0) {
+                    await db.payments.bulkPut(regularPayments);
+                }
+                if (govPayments.length > 0) {
+                    await db.governmentFinalizedPayments.bulkPut(govPayments);
+                }
+            }
+        } else {
+            // No local data or first sync - use Firestore data directly
+            callback(allPayments);
+            localPayments = allPayments;
+            if (db && allPayments.length > 0) {
+                const regularPayments = allPayments.filter(p => p.receiptType !== 'Gov.');
+                const govPayments = allPayments.filter(p => p.receiptType === 'Gov.');
+                if (regularPayments.length > 0) {
+                    await db.payments.bulkPut(regularPayments);
+                }
+                if (govPayments.length > 0) {
+                    await db.governmentFinalizedPayments.bulkPut(govPayments);
+                }
+            }
+        }
+        
+        // ✅ Save last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:payments', String(Date.now()));
+        }
+        
+        // Reset for next update
+        allPayments = [];
+        allDeletedIds = [];
+        snapshotCount = 0;
+    };
+
+    const unsubscribe1 = onSnapshot(q, async (snapshot) => {
         const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         
         // ✅ Handle deletions - remove deleted documents from IndexedDB
@@ -2260,54 +2354,65 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             await Promise.all(deletedIds.map(id => db.payments.delete(id)));
         }
         
-        // Track Firestore read
-        firestoreMonitor.logRead('payments', 'getPaymentsRealtime', newPayments.length);
-        
-        // Merge new changes with local data
-        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
-            const mergedMap = new Map<string, Payment>();
-            // Add all local payments first
-            localPayments.forEach(p => mergedMap.set(p.id, p));
-            // Remove deleted payments
-            deletedIds.forEach(id => mergedMap.delete(id));
-            // Update/add new payments from Firestore
-            newPayments.forEach(p => mergedMap.set(p.id, p));
-            const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                return new Date(b.date).getTime() - new Date(a.date).getTime();
-            });
-            callback(merged);
-            // Update localPayments for next merge
-            localPayments = merged;
-            
-            if (db && newPayments.length > 0) {
-                await db.payments.bulkPut(newPayments);
-            }
-        } else {
-            // No local data or first sync - use Firestore data directly
-            callback(newPayments);
-            localPayments = newPayments;
-            if (db && newPayments.length > 0) {
-                await db.payments.bulkPut(newPayments);
-            }
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:payments', String(Date.now()));
-        }
+        allPayments.push(...newPayments);
+        allDeletedIds.push(...deletedIds);
+        snapshotCount++;
+        await mergeAndCallback();
     }, (err: any) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
             const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.payments.orderBy('date').reverse().toArray() : [];
+                const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
+                const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
+                return [...regularPayments, ...govPayments] as Payment[];
             }, callback);
-            try { unsubscribe(); } catch {}
+            try { unsubscribe1(); unsubscribe2(); } catch {}
             (pollUnsub as any).__fromQuota__ = true;
             return;
         }
         onError(err);
     });
-    return unsubscribe;
+
+    const unsubscribe2 = onSnapshot(govQ, async (snapshot) => {
+        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        
+        // ✅ Handle deletions - remove deleted documents from IndexedDB
+        const deletedIds: string[] = [];
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'removed') {
+                deletedIds.push(change.doc.id);
+            }
+        });
+        
+        // Remove deleted documents from IndexedDB
+        if (db && deletedIds.length > 0) {
+            await Promise.all(deletedIds.map(id => db.governmentFinalizedPayments.delete(id)));
+        }
+        
+        allPayments.push(...newPayments);
+        allDeletedIds.push(...deletedIds);
+        snapshotCount++;
+        await mergeAndCallback();
+    }, (err: any) => {
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+            const pollUnsub = createPollingFallback(async () => {
+                const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
+                const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
+                return [...regularPayments, ...govPayments] as Payment[];
+            }, callback);
+            try { unsubscribe1(); unsubscribe2(); } catch {}
+            (pollUnsub as any).__fromQuota__ = true;
+            return;
+        }
+        onError(err);
+    });
+
+    // Return a function that unsubscribes from both listeners
+    return () => {
+        unsubscribe1();
+        unsubscribe2();
+    };
 }
 
 export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) => void, onError: (error: Error) => void) {
