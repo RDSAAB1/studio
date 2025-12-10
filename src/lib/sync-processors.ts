@@ -74,4 +74,41 @@ registerSyncProcessor<{ id: string }>("delete:payment", async (task) => {
 	}
 });
 
+// Government Finalized Payment upsert
+registerSyncProcessor<Payment>("upsert:governmentFinalizedPayment", async (task) => {
+	const payload = task.payload as Payment;
+	if (!payload?.id) throw new Error("Missing government payment id");
+	try {
+		const { collection } = await import("firebase/firestore");
+		const { firestoreDB } = await import("./firebase");
+		const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
+		const ref = doc(governmentFinalizedPaymentsCollection, payload.id);
+		// Ensure updatedAt is set for incremental sync
+		const paymentWithTimestamp = {
+			...payload,
+			updatedAt: payload.updatedAt || Timestamp.now()
+		};
+		await setDoc(ref, paymentWithTimestamp, { merge: true });
+	} catch (e) {
+		if (isQuotaError(e)) markFirestoreDisabled();
+		throw e;
+	}
+});
+
+// Government Finalized Payment delete
+registerSyncProcessor<{ id: string }>("delete:governmentFinalizedPayment", async (task) => {
+	const { id } = task.payload as { id: string };
+	if (!id) throw new Error("Missing government payment id");
+	try {
+		const { collection } = await import("firebase/firestore");
+		const { firestoreDB } = await import("./firebase");
+		const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
+		const ref = doc(governmentFinalizedPaymentsCollection, id);
+		await deleteDoc(ref);
+	} catch (e) {
+		if (isQuotaError(e)) markFirestoreDisabled();
+		throw e;
+	}
+});
+
 

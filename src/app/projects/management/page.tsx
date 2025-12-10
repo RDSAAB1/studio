@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { format } from "date-fns";
-import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
+import { addProject, updateProject, deleteProject } from '@/lib/firestore';
+import { getProjectsRealtime } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
@@ -24,14 +25,22 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 export default function ProjectManagementPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isClient, setIsClient] = useState(false);
+    
+    // Fetch projects data directly
+    useEffect(() => {
+        const unsubscribe = getProjectsRealtime(
+            (data) => setProjects(data),
+            (error) => console.error('Error fetching projects:', error)
+        );
+        return () => unsubscribe();
+    }, []);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
     const { toast } = useToast();
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribe = getProjectsRealtime(setProjects, console.error);
-        return () => unsubscribe();
+        // Use global data store - NO duplicate listeners
     }, []);
 
     const handleNewProject = () => {

@@ -256,14 +256,21 @@ export const useSupplierPayments = () => {
 
     const [settleAmountManual, setSettleAmountManual] = useState(0);
     const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
+    const [toBePaidAmountDebounced, setToBePaidAmountDebounced] = useState(0);
+    const toBePaidDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    
+    // Initialize debounced value with manual value on mount
+    useEffect(() => {
+        setToBePaidAmountDebounced(toBePaidAmountManual);
+    }, []); // Only on mount
 
     const settleAmount = (form.paymentType === 'Full') ? settleAmountDerived : settleAmountManual;
 
     // Removed heavy console logs to improve typing performance
 
-    // For Partial payments, use toBePaidAmountManual as base for CD calculation
+    // For Partial payments, use debounced toBePaidAmount for CD calculation to prevent lag
     // For Full payments, use settleAmount
-    const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountManual : settleAmount;
+    const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountDebounced : settleAmount;
 
     const { calculatedCdAmount, setCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
@@ -284,6 +291,7 @@ export const useSupplierPayments = () => {
     // For Full payment: To Be Paid = settleAmount - CD (cash matches settlement minus discount)
     // For Partial payment: To Be Paid = toBePaidAmountManual (user entered amount)
     // Total settlement = To Be Paid + CD
+    // Use immediate value for UI display (no lag), debounced value only for calculations
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
             // For Full payment: actual cash paid = settle amount - CD (only if CD is enabled)
@@ -291,7 +299,7 @@ export const useSupplierPayments = () => {
             return Math.max(0, Math.round(adjustedToBePaid * 100) / 100);
         }
         // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)
-        // Settle Amount = toBePaidAmount + CD (handled separately in useEffect)
+        // Use immediate value for responsive UI - calculations use debounced value
         return Math.max(0, Math.round(toBePaidAmountManual * 100) / 100);
     }, [form.paymentType, settleAmount, effectiveCdAmount, toBePaidAmountManual]);
     
@@ -305,15 +313,38 @@ export const useSupplierPayments = () => {
     };
 
     const handleToBePaidChange = (value: number) => {
+        // Update immediately for UI responsiveness
         setToBePaidAmountManual(value);
-        form.setCalcTargetAmount(Math.round(value));
+        
+        // Debounce heavy calculations to prevent lag
+        if (toBePaidDebounceRef.current) {
+            clearTimeout(toBePaidDebounceRef.current);
+        }
+        
+        toBePaidDebounceRef.current = setTimeout(() => {
+            // Update debounced value for CD calculations and settle amount
+            setToBePaidAmountDebounced(value);
+            
+            // Update calcTargetAmount (debounced for all payment methods to prevent lag)
+            form.setCalcTargetAmount(Math.round(value));
+        }, 800); // 800ms delay - increased to significantly reduce lag
     };
+    
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (toBePaidDebounceRef.current) {
+                clearTimeout(toBePaidDebounceRef.current);
+            }
+        };
+    }, []);
 
     // Auto-calculate settle amount for Partial payment type
     // IMPORTANT: Only add CD to settlement if CD is enabled
+    // Use debounced value to prevent lag
     useEffect(() => {
         if (form.paymentType === 'Partial') {
-            const newSettleAmount = toBePaidAmountManual + effectiveCdAmount;
+            const newSettleAmount = toBePaidAmountDebounced + effectiveCdAmount;
             const roundedSettle = Math.round(newSettleAmount * 100) / 100;
             const currentSettle = Math.round(settleAmountManual * 100) / 100;
             
@@ -322,7 +353,7 @@ export const useSupplierPayments = () => {
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [toBePaidAmountManual, effectiveCdAmount, form.paymentType]);
+    }, [toBePaidAmountDebounced, effectiveCdAmount, form.paymentType]);
 
     // Auto-update Target Amount when To Be Paid changes in Full mode
     useEffect(() => {
@@ -442,6 +473,8 @@ export const useSupplierPayments = () => {
                 form.setGovQuantity((paymentData as any).govQuantity || 0);
                 form.setGovRate((paymentData as any).govRate || 0);
                 form.setGovAmount((paymentData as any).govAmount || 0);
+                form.setGovRequiredAmount((paymentData as any).govRequiredAmount || (paymentData as any).govAmount || 0);
+                form.setExtraAmount((paymentData as any).extraAmount || 0);
             }
             
             // Preserve contact number from payment data or find from supplier entry
@@ -555,6 +588,13 @@ export const useSupplierPayments = () => {
             form.setGovQuantity(option.quantity);
             form.setGovRate(option.rate);
             form.setGovAmount(roundedAmount);
+            // Set Gov Required Amount = Selected Amount + Pending Amount
+            const roundedAmountRemaining = Math.round(option.amountRemaining);
+            const govRequiredAmt = roundedAmount + roundedAmountRemaining;
+            form.setGovRequiredAmount(govRequiredAmt);
+            // Set Extra Amount = Gov Amount + Pending Amount - Target Amount (only when entry selected)
+            const extraAmt = roundedAmount + roundedAmountRemaining - form.calcTargetAmount;
+            form.setExtraAmount(Math.max(0, extraAmt));
         }
         form.setPaymentType('Partial'); // Set to Partial first
         
@@ -570,16 +610,10 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            // Calculate extra amount for Gov. payment (if applicable)
-            let extraAmount = 0;
-            if (form.paymentMethod === 'Gov.' && form.govAmount > 0 && form.calcTargetAmount > 0) {
-                // Extra Amount = Gov. Amount + Pending Amount - Target Amount
-                // Pending Amount = amount remaining from selected payment option
-                const pendingAmt = selectedPaymentOption?.amountRemaining || 0;
-                extraAmount = form.govAmount + pendingAmt - form.calcTargetAmount;
-            }
+            // Use extra amount from form (manual or from entry selection)
+            const extraAmount = form.extraAmount || 0;
             
-            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected, extraAmount });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected, extraAmount, govRequiredAmount: form.govRequiredAmount });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });

@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { doc, updateDoc, writeBatch, Timestamp, FieldValue } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
@@ -53,7 +54,9 @@ interface RtgsReportRow {
 }
 
 export default function RtgsReportClient() {
-    const [payments, setPayments] = useState<Payment[]>([]);
+    // Use global data store - NO duplicate listeners
+    const globalData = useGlobalData();
+    const payments = globalData.paymentHistory;
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
@@ -87,9 +90,7 @@ export default function RtgsReportClient() {
             }
         };
         fetchSettings();
-        
-        const unsubscribe = getPaymentsRealtime(setPayments, console.error);
-        return () => unsubscribe();
+        // Use global data store - NO duplicate listeners
     }, []);
 
     useEffect(() => {

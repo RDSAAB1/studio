@@ -150,9 +150,154 @@ export const useSupplierData = () => {
             checkAllLoaded();
         });
 
+        // ✅ Listen for IndexedDB updates to trigger immediate refresh
+        const handlePaymentUpdate = async (event: CustomEvent) => {
+            if (!isSubscribed) return;
+            try {
+                if (!event || !event.detail) {
+                    console.warn('Invalid event data for payment update');
+                    return;
+                }
+                
+                const { payment, paymentMethod, isCustomer: isCustomerPayment } = event.detail;
+                
+                // Immediately refresh payments from IndexedDB
+                const databaseModule = await import('@/lib/database');
+                const dbInstance = databaseModule?.db;
+                if (!dbInstance) {
+                    console.warn('Database instance not available for payment update refresh');
+                    return;
+                }
+                
+                if (paymentMethod === 'Gov.') {
+                    const allPayments = await Promise.all([
+                        dbInstance.payments.orderBy('date').reverse().toArray(),
+                        dbInstance.governmentFinalizedPayments.orderBy('date').reverse().toArray()
+                    ]);
+                    startTransition(() => setPaymentHistory([...allPayments[0], ...allPayments[1]] as Payment[]));
+                } else if (isCustomerPayment) {
+                    const customerPayments = await dbInstance.customerPayments.orderBy('date').reverse().toArray();
+                    startTransition(() => setCustomerPayments(customerPayments as CustomerPayment[]));
+                } else {
+                    const payments = await dbInstance.payments.orderBy('date').reverse().toArray();
+                    startTransition(() => setPaymentHistory(payments as Payment[]));
+                }
+            } catch (error) {
+                console.error('Error refreshing payments from IndexedDB after update:', error);
+                // Don't throw - this is a background update
+            }
+        };
+
+        const handlePaymentDelete = async (event: CustomEvent) => {
+            if (!isSubscribed) return;
+            try {
+                if (!event || !event.detail) {
+                    console.warn('Invalid event data for payment delete');
+                    return;
+                }
+                
+                const { paymentId, isGovPayment, isCustomer: isCustomerPayment } = event.detail;
+                
+                // Immediately refresh payments from IndexedDB
+                const databaseModule = await import('@/lib/database');
+                const dbInstance = databaseModule?.db;
+                if (!dbInstance) {
+                    console.warn('Database instance not available for payment delete refresh');
+                    return;
+                }
+                
+                if (isGovPayment) {
+                    const allPayments = await Promise.all([
+                        dbInstance.payments.orderBy('date').reverse().toArray(),
+                        dbInstance.governmentFinalizedPayments.orderBy('date').reverse().toArray()
+                    ]);
+                    startTransition(() => setPaymentHistory([...allPayments[0], ...allPayments[1]] as Payment[]));
+                } else if (isCustomerPayment) {
+                    const customerPayments = await dbInstance.customerPayments.orderBy('date').reverse().toArray();
+                    startTransition(() => setCustomerPayments(customerPayments as CustomerPayment[]));
+                } else {
+                    const payments = await dbInstance.payments.orderBy('date').reverse().toArray();
+                    startTransition(() => setPaymentHistory(payments as Payment[]));
+                }
+            } catch (error) {
+                console.error('Error refreshing payments from IndexedDB after delete:', error);
+                // Don't throw - this is a background update
+            }
+        };
+
+        const handleSuppliersUpdate = async (event: CustomEvent) => {
+            if (!isSubscribed) return;
+            try {
+                if (!event || !event.detail) {
+                    console.warn('Invalid event data for suppliers update');
+                    return;
+                }
+                
+                const { affectedSrNos, isCustomer: isCustomerUpdate } = event.detail;
+                if (!affectedSrNos || !Array.isArray(affectedSrNos)) {
+                    console.warn('Invalid affectedSrNos in suppliers update event');
+                    return;
+                }
+                
+                // Immediately refresh suppliers/customers from IndexedDB
+                const databaseModule = await import('@/lib/database');
+                const dbInstance = databaseModule?.db;
+                if (!dbInstance) {
+                    console.warn('Database instance not available for suppliers update refresh');
+                    return;
+                }
+                
+                if (isCustomerUpdate) {
+                    const customers = await dbInstance.customers.orderBy('srNo').reverse().toArray();
+                    startTransition(() => {
+                        // Update only affected customers in state
+                        setSuppliers(prev => {
+                            const updated = [...prev];
+                            customers.forEach(customer => {
+                                const index = updated.findIndex(s => s.id === customer.id);
+                                if (index >= 0) {
+                                    updated[index] = customer as Customer;
+                                } else if (affectedSrNos.includes(customer.srNo)) {
+                                    updated.push(customer as Customer);
+                                }
+                            });
+                            return updated;
+                        });
+                    });
+                } else {
+                    const suppliers = await dbInstance.suppliers.orderBy('srNo').reverse().toArray();
+                    startTransition(() => {
+                        // Update only affected suppliers in state
+                        setSuppliers(prev => {
+                            const updated = [...prev];
+                            suppliers.forEach(supplier => {
+                                const index = updated.findIndex(s => s.id === supplier.id);
+                                if (index >= 0) {
+                                    updated[index] = supplier as Customer;
+                                } else if (affectedSrNos.includes(supplier.srNo)) {
+                                    updated.push(supplier as Customer);
+                                }
+                            });
+                            return updated;
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Error refreshing suppliers from IndexedDB after update:', error);
+                // Don't throw - this is a background update
+            }
+        };
+
+        window.addEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
+        window.addEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+        window.addEventListener('indexeddb:suppliers:updated', handleSuppliersUpdate as EventListener);
+
         return () => {
             isSubscribed = false;
             unsubFunctions.forEach(unsub => unsub());
+            window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
+            window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+            window.removeEventListener('indexeddb:suppliers:updated', handleSuppliersUpdate as EventListener);
         };
     }, [isClient]);
     

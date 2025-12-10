@@ -5,7 +5,7 @@ import type { Customer, CustomerSummary, Payment, CustomerPayment } from "@/lib/
 import { toTitleCase, cn, formatCurrency, levenshteinDistance } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfYear, endOfYear, subDays } from 'date-fns';
-import { getCustomersRealtime, getCustomerPaymentsRealtime } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
 
 // UI Components
@@ -29,8 +29,10 @@ import { Users, Download, Printer, Loader2 } from "lucide-react";
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
 export default function CustomerProfileClient() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
+  // Use global data store - NO duplicate listeners
+  const globalData = useGlobalData();
+  const customers = globalData.customers;
+  const customerPayments = globalData.customerPayments;
   const [selectedCustomerKey, setSelectedCustomerKey] = usePersistedSelection('customer-profile-selected', MILL_OVERVIEW_KEY);
   const [selectedVariety, setSelectedVariety] = usePersistedState<string>('customer-profile-variety-filter', 'All');
   
@@ -58,12 +60,7 @@ export default function CustomerProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-    const unsubPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
-    return () => {
-        unsubCustomers();
-        unsubPayments();
-    };
+    // Use global data store - NO duplicate listeners
   }, []);
 
   const filteredData = useMemo(() => {

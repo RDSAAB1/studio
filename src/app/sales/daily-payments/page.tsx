@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { Customer, Payment } from '@/lib/definitions';
 import { format, isSameDay } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
@@ -31,20 +31,17 @@ const StatCard = ({ title, value, icon, colorClass }: { title: string, value: st
 
 export default function DailyPaymentsPage() {
     const router = useRouter();
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
+    // Use global data store - NO duplicate listeners
+    const globalData = useGlobalData();
+    const suppliers = globalData.suppliers;
+    const payments = globalData.paymentHistory;
     const [isClient, setIsClient] = useState(false);
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribeSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-        const unsubscribePayments = getPaymentsRealtime(setPayments, console.error);
-        return () => {
-            unsubscribeSuppliers();
-            unsubscribePayments();
-        };
+        // Use global data store - NO duplicate listeners
     }, []);
 
     const filteredData = useMemo(() => {

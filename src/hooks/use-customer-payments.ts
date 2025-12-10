@@ -321,14 +321,8 @@ export const useCustomerPayments = () => {
 
         setIsProcessing(true);
         try {
-            // Calculate extra amount for Gov. payment (if applicable)
-            let extraAmount = 0;
-            if (form.paymentMethod === 'Gov.' && form.govAmount > 0 && form.calcTargetAmount > 0) {
-                // Extra Amount = Gov. Amount + Pending Amount - Target Amount
-                // Pending Amount = amount remaining from selected payment option (if available)
-                const pendingAmt = 0; // Customer payments may not have selectedPaymentOption
-                extraAmount = form.govAmount + pendingAmt - form.calcTargetAmount;
-            }
+            // Use extra amount from form (manual or from entry selection)
+            const extraAmount = form.extraAmount || 0;
             
             const result = await processPaymentLogic({ 
                 ...data, 
@@ -340,7 +334,8 @@ export const useCustomerPayments = () => {
                 settleAmount, 
                 totalOutstandingForSelected,
                 isCustomer: true, // Mark as customer payment
-                extraAmount
+                extraAmount,
+                govRequiredAmount: form.govRequiredAmount
             });
 
             if (!result.success) {

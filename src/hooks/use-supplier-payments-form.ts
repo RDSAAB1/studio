@@ -35,6 +35,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [govQuantity, setGovQuantity] = useState(0);
     const [govRate, setGovRate] = useState(0);
     const [govAmount, setGovAmount] = useState(0);
+    const [govRequiredAmount, setGovRequiredAmount] = useState(0);
+    const [extraAmount, setExtraAmount] = useState(0);
 
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
@@ -243,6 +245,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setGovQuantity(0); setGovRate(0); setGovAmount(0);
+        setGovRequiredAmount(0);
+        setExtraAmount(0);
         setRtgsSrNo(getNextPaymentId('RTGS'));
         setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : paymentMethod === 'Gov.' ? getNextPaymentId('Gov.') : getNextPaymentId('Cash'));
     }, [getNextPaymentId, paymentMethod]);
@@ -277,6 +281,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         govQuantity, setGovQuantity,
         govRate, setGovRate,
         govAmount, setGovAmount,
+        govRequiredAmount, setGovRequiredAmount,
+        extraAmount, setExtraAmount,
         editingPayment, setEditingPayment,
         isBeingEdited, setIsBeingEdited,
         calcTargetAmount, setCalcTargetAmount,

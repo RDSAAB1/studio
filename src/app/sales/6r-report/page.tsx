@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
+import { getRtgsSettings } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import { db } from '@/lib/database';
@@ -47,7 +48,9 @@ interface SixRReportRow {
 }
 
 export default function SixRReportPage() {
-    const [payments, setPayments] = useState<Payment[]>([]);
+    // Use global data store - NO duplicate listeners
+    const globalData = useGlobalData();
+    const payments = globalData.paymentHistory;
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
@@ -66,11 +69,8 @@ export default function SixRReportPage() {
 
     useEffect(() => {
         getRtgsSettings().then(setSettings);
-        const unsubscribe = getPaymentsRealtime(data => {
-            setPayments(data);
-            setLoading(false);
-        }, console.error);
-        return () => unsubscribe();
+        // Use global data store - NO duplicate listeners
+        setLoading(false);
     }, []);
 
     const reportRows = useMemo((): SixRReportRow[] => {

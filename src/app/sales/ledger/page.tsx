@@ -817,9 +817,42 @@ const LedgerPage: React.FC = () => {
         await persistEntriesToIndexedDb(linkTargetId, counterUpdatedEntries);
       }
 
-      await queueLedgerEntryUpsert(savedEntry);
-      if (savedCounterEntry) {
-        await queueLedgerEntryUpsert(savedCounterEntry);
+      // Sync all entries that had balance recalculated, not just the new entry
+      const timestamp = new Date().toISOString();
+      const entriesToSync: LedgerEntry[] = [];
+      
+      // Find all entries whose balance changed due to the new entry
+      updatedEntries.forEach((entry, idx) => {
+        const previousEntry = currentEntries[idx];
+        if (!previousEntry || entry.balance !== previousEntry.balance || entry.id === savedEntry.id) {
+          entriesToSync.push({ ...entry, updatedAt: timestamp });
+        }
+      });
+
+      if (entriesToSync.length) {
+        await queueLedgerEntriesUpsert(entriesToSync);
+      } else {
+        // Fallback: at least sync the new entry
+        await queueLedgerEntryUpsert(savedEntry);
+      }
+
+      // Sync counterpart entries if linked
+      if (linkTargetId && counterUpdatedEntries) {
+        const counterpartCurrentEntries = entriesMap[linkTargetId] || [];
+        const counterpartEntriesToSync: LedgerEntry[] = [];
+        
+        counterUpdatedEntries.forEach((entry, idx) => {
+          const previousEntry = counterpartCurrentEntries[idx];
+          if (!previousEntry || entry.balance !== previousEntry.balance || entry.id === savedCounterEntry?.id) {
+            counterpartEntriesToSync.push({ ...entry, updatedAt: timestamp });
+          }
+        });
+
+        if (counterpartEntriesToSync.length) {
+          await queueLedgerEntriesUpsert(counterpartEntriesToSync);
+        } else if (savedCounterEntry) {
+          await queueLedgerEntryUpsert(savedCounterEntry);
+        }
       }
 
       toast({ title: "Entry added" });
@@ -888,8 +921,11 @@ const LedgerPage: React.FC = () => {
       const timestamp = new Date().toISOString();
       const changedEntries: LedgerEntry[] = [];
 
-      const finalActiveEntries = recalculatedActive.map((entry, idx) => {
-        const previous = currentEntries[idx];
+      // Create a map of previous entries by ID for accurate comparison
+      const previousEntriesMap = new Map(currentEntries.map(e => [e.id, e]));
+
+      const finalActiveEntries = recalculatedActive.map((entry) => {
+        const previous = previousEntriesMap.get(entry.id);
         const hasChanged =
           !previous ||
           entry.date !== previous.date ||
@@ -947,8 +983,11 @@ const LedgerPage: React.FC = () => {
           );
 
           const recalculatedCounter = recalculateBalances(counterpartUpdatedRaw);
-          counterpartUpdated = recalculatedCounter.map((entry, idx) => {
-            const previous = counterpartEntries![idx];
+          // Create a map of previous counterpart entries by ID for accurate comparison
+          const previousCounterpartMap = new Map(counterpartEntries!.map(e => [e.id, e]));
+          
+          counterpartUpdated = recalculatedCounter.map((entry) => {
+            const previous = previousCounterpartMap.get(entry.id);
             const hasChanged =
               !previous ||
               entry.date !== previous.date ||
@@ -1014,6 +1053,7 @@ const LedgerPage: React.FC = () => {
     let counterpartAccountId: string | null = null;
     let counterpartEntryId: string | null = null;
     let counterpartUpdated: LedgerEntry[] | null = null;
+    let counterpartEntries: LedgerEntry[] | null = null;
     let strategy: "mirror" | "same" | undefined = entryToDelete.linkStrategy;
 
     if (entryToDelete.linkGroupId) {
@@ -1023,6 +1063,7 @@ const LedgerPage: React.FC = () => {
         if (match) {
           counterpartAccountId = accId;
           counterpartEntryId = match.id;
+          counterpartEntries = entries; // Store original entries for comparison
           const filtered = entries.filter((entry) => entry.id !== match.id);
           counterpartUpdated = recalculateBalances(filtered.map((entry) => ({ ...entry })));
           if (!strategy && match.linkStrategy) {
@@ -1043,8 +1084,11 @@ const LedgerPage: React.FC = () => {
       const timestamp = new Date().toISOString();
       const changedEntries: LedgerEntry[] = [];
 
-      const finalEntries = recalculated.map((entry, idx) => {
-        const previous = remaining[idx];
+      // Create a map of previous entries by ID for accurate comparison
+      const previousEntriesMap = new Map(remaining.map(e => [e.id, e]));
+
+      const finalEntries = recalculated.map((entry) => {
+        const previous = previousEntriesMap.get(entry.id);
         const hasChanged =
           !previous ||
           entry.balance !== previous.balance ||
@@ -1071,11 +1115,26 @@ const LedgerPage: React.FC = () => {
       }));
 
       await persistEntriesToIndexedDb(activeAccountId, finalEntries);
-      if (counterpartAccountId && counterpartUpdated) {
+      if (counterpartAccountId && counterpartUpdated && counterpartEntries) {
         await persistEntriesToIndexedDb(counterpartAccountId, counterpartUpdated);
-        counterpartUpdated.forEach((entry) =>
-          changedEntries.push({ ...entry, updatedAt: timestamp })
-        );
+        
+        // Only sync counterpart entries that actually changed
+        const previousCounterpartMap = new Map(counterpartEntries.map((e: LedgerEntry) => [e.id, e]));
+        counterpartUpdated.forEach((entry) => {
+          const previous = previousCounterpartMap.get(entry.id);
+          const hasChanged =
+            !previous ||
+            entry.balance !== previous.balance ||
+            entry.debit !== previous.debit ||
+            entry.credit !== previous.credit ||
+            entry.particulars !== previous.particulars ||
+            entry.date !== previous.date ||
+            entry.remarks !== previous.remarks;
+          
+          if (hasChanged) {
+            changedEntries.push({ ...entry, updatedAt: timestamp });
+          }
+        });
       }
 
       if (changedEntries.length) {

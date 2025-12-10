@@ -24,7 +24,9 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
+import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
+import { getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getLoansRealtime, getSuppliersRealtime, getBankAccountsRealtime } from "@/lib/firestore";
+import type { FundTransaction, Income, Expense, Payment, CustomerPayment, Loan, Customer, BankAccount } from "@/lib/definitions";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -58,15 +60,61 @@ const initialLoanFormState: Partial<Loan> = {
 };
 
 export default function CashBankClient() {
-    
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
     const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    
+    // Fetch data directly
+    useEffect(() => {
+        const unsubFunds = getFundTransactionsRealtime(
+            (data) => setFundTransactions(data),
+            (error) => console.error('Error fetching fund transactions:', error)
+        );
+        const unsubIncomes = getIncomeRealtime(
+            (data) => setIncomes(data),
+            (error) => console.error('Error fetching incomes:', error)
+        );
+        const unsubExpenses = getExpensesRealtime(
+            (data) => setExpenses(data),
+            (error) => console.error('Error fetching expenses:', error)
+        );
+        const unsubPayments = getPaymentsRealtime(
+            (data) => setSupplierPayments(data),
+            (error) => console.error('Error fetching payments:', error)
+        );
+        const unsubCustomerPayments = getCustomerPaymentsRealtime(
+            (data) => setCustomerPayments(data),
+            (error) => console.error('Error fetching customer payments:', error)
+        );
+        const unsubLoans = getLoansRealtime(
+            (data) => setLoans(data),
+            (error) => console.error('Error fetching loans:', error)
+        );
+        const unsubSuppliers = getSuppliersRealtime(
+            (data) => setSuppliers(data),
+            (error) => console.error('Error fetching suppliers:', error)
+        );
+        const unsubBankAccounts = getBankAccountsRealtime(
+            (data) => setBankAccounts(data),
+            (error) => console.error('Error fetching bank accounts:', error)
+        );
+        return () => {
+            unsubFunds();
+            unsubIncomes();
+            unsubExpenses();
+            unsubPayments();
+            unsubCustomerPayments();
+            unsubLoans();
+            unsubSuppliers();
+            unsubBankAccounts();
+        };
+    }, []);
+    // All data is now fetched directly via useState hooks above
     
     const [isClient, setIsClient] = useState(false);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
@@ -76,25 +124,7 @@ export default function CashBankClient() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
-        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-        const unsubSupplierPayments = getPaymentsRealtime(setSupplierPayments, console.error);
-        const unsubCustomerPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
-        const unsubLoans = getLoansRealtime(setLoans, console.error);
-        const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-
-        return () => {
-            unsubFundTransactions();
-            unsubIncomes();
-            unsubExpenses();
-            unsubSupplierPayments();
-            unsubCustomerPayments();
-            unsubLoans();
-            unsubBankAccounts();
-            unsubSuppliers();
-        };
+        // Use global data store - NO duplicate listeners
     }, []);
 
     const allExpenses = useMemo(() => [...expenses, ...supplierPayments], [expenses, supplierPayments]);

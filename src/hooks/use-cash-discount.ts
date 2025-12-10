@@ -122,9 +122,21 @@ export const useCashDiscount = ({
         }
     }, [cdEnabled]);
 
+    // Only calculate totalCdOnSelectedEntries if CD is enabled or editing payment
+    // Skip heavy paymentHistory processing when CD is disabled
     const totalCdOnSelectedEntries = useMemo(() => {
+        // Skip calculation if CD is disabled and not editing
+        if (!cdEnabled && !editingPayment) {
+            return 0;
+        }
+
         if (editingPayment) {
             const selectedSrNos = selectedEntries.map(e => e.srNo);
+            // Early return if no selected entries
+            if (selectedSrNos.length === 0) {
+                return 0;
+            }
+            
             const otherPaymentsForEntries = paymentHistory.filter(
                 payment =>
                     payment.id !== editingPayment.id &&
@@ -152,9 +164,20 @@ export const useCashDiscount = ({
         }
 
         return selectedEntries.reduce((sum, entry) => sum + (Number(entry.totalCd) || 0), 0);
-    }, [selectedEntries, editingPayment, paymentHistory]);
+    }, [selectedEntries, editingPayment, paymentHistory, cdEnabled]);
 
+    // Only calculate CD context if CD is enabled - skip heavy calculations when disabled
     const cdContext: CdComputationContext = useMemo(() => {
+        // If CD is not enabled, return zero values immediately (no heavy calculations)
+        if (!cdEnabled) {
+            return {
+                amount: 0,
+                baseAmount: 0,
+                offset: 0,
+                maxAvailable: 0,
+            };
+        }
+
         const percent = Number.isFinite(cdPercentState) ? Math.max(cdPercentState, 0) : 0;
         const outstanding = Math.max(totalOutstanding, 0);
 
@@ -195,21 +218,25 @@ export const useCashDiscount = ({
                 break;
             }
             case 'on_previously_paid_no_cd': {
+                // Only process paymentHistory if CD is enabled and this mode is selected
                 const selectedSrNos = selectedEntries.map(e => e.srNo);
                 let totalPaidWithoutCD = 0;
-                paymentHistory.forEach(payment => {
-                    if (
-                        payment.paidFor &&
-                        payment.paidFor.some(pf => selectedSrNos.includes(pf.srNo)) &&
-                        (!payment.cdApplied || !payment.cdAmount)
-                    ) {
-                        payment.paidFor.forEach(pf => {
-                            if (selectedSrNos.includes(pf.srNo)) {
-                                totalPaidWithoutCD += Number(pf.amount) || 0;
-                            }
-                        });
-                    }
-                });
+                // Only loop through paymentHistory if we have selected entries
+                if (selectedSrNos.length > 0) {
+                    paymentHistory.forEach(payment => {
+                        if (
+                            payment.paidFor &&
+                            payment.paidFor.some(pf => selectedSrNos.includes(pf.srNo)) &&
+                            (!payment.cdApplied || !payment.cdAmount)
+                        ) {
+                            payment.paidFor.forEach(pf => {
+                                if (selectedSrNos.includes(pf.srNo)) {
+                                    totalPaidWithoutCD += Number(pf.amount) || 0;
+                                }
+                            });
+                        }
+                    });
+                }
                 baseAmount = totalPaidWithoutCD;
                 maxAvailable = Math.min(maxAvailable, totalPaidWithoutCD);
                 computedAmount = (baseAmount * percent) / 100;
@@ -242,6 +269,7 @@ export const useCashDiscount = ({
             maxAvailable: rupeeMaxAvailable,
         };
     }, [
+        cdEnabled, // Add cdEnabled to dependencies - skip calculations when disabled
         cdAt,
         cdPercentState,
         paymentType,

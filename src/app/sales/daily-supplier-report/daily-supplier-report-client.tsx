@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Customer, RtgsSettings } from '@/lib/definitions';
-import { getRtgsSettings, getSuppliersRealtime } from '@/lib/firestore';
+import { getRtgsSettings } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
@@ -40,7 +41,9 @@ const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { lab
 
 
 export default function DailySupplierReportClient() {
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    // Use global data store - NO duplicate listeners
+    const globalData = useGlobalData();
+    const suppliers = globalData.suppliers;
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -55,13 +58,8 @@ export default function DailySupplierReportClient() {
             setSettings(fetchedSettings);
         }
         fetchSettings();
-        
-        const unsubscribe = getSuppliersRealtime(setSuppliers, (error) => {
-            console.error(error);
-            setLoading(false);
-        });
-        
-        return () => unsubscribe();
+        // Use global data store - NO duplicate listeners
+        setLoading(false);
     }, []);
 
     useEffect(() => {

@@ -46,6 +46,24 @@ export const PaymentForm = (props: any) => {
         hideRtgsToggle = false // New prop to hide RTGS toggle
     } = props;
 
+    // Local state for To Be Paid to prevent lag - updates immediately, syncs to parent after debounce
+    const [localToBePaid, setLocalToBePaid] = useState(finalAmountToBePaid);
+    const toBePaidDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Sync local state when prop changes (e.g., from external updates)
+    useEffect(() => {
+        setLocalToBePaid(finalAmountToBePaid);
+    }, [finalAmountToBePaid]);
+
+    // Cleanup debounce timer
+    useEffect(() => {
+        return () => {
+            if (toBePaidDebounceRef.current) {
+                clearTimeout(toBePaidDebounceRef.current);
+            }
+        };
+    }, []);
+
     // Debug: Log when parchiNo changes
     useEffect(() => {
         console.log('[PaymentForm] parchiNo value changed:', parchiNo);
@@ -92,8 +110,10 @@ export const PaymentForm = (props: any) => {
                                             type="button"
                                             size="sm"
                                             className={cn(
-                                                "h-6 px-2 text-[10px]",
-                                                paymentMethod === method ? "bg-primary text-primary-foreground" : "border border-input bg-muted/60 text-muted-foreground hover:text-foreground"
+                                                "h-6 px-2 text-[10px] font-semibold transition-all",
+                                                paymentMethod === method 
+                                                    ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1" 
+                                                    : "border border-input bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                             )}
                                             variant={paymentMethod === method ? "default" : "ghost"}
                                             onClick={(e) => {
@@ -203,7 +223,26 @@ export const PaymentForm = (props: any) => {
 
                              <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
                                 <Label className="text-[10px] font-bold text-green-600">To Be Paid</Label>
-                                <Input type="number" value={isNaN(finalAmountToBePaid) ? 0 : Math.round(finalAmountToBePaid)} onChange={(e) => handleToBePaidChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className={cn("h-7 text-[10px] font-bold text-green-600 border-green-500 bg-green-500/10", paymentType === 'Full' && 'bg-muted/50 border-input')} />
+                                <Input 
+                                    type="number" 
+                                    value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)} 
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value) || 0;
+                                        // Update local state immediately for responsive UI
+                                        setLocalToBePaid(value);
+                                        
+                                        // Debounce parent update to prevent lag
+                                        if (toBePaidDebounceRef.current) {
+                                            clearTimeout(toBePaidDebounceRef.current);
+                                        }
+                                        
+                                        toBePaidDebounceRef.current = setTimeout(() => {
+                                            handleToBePaidChange(value);
+                                        }, 500); // 500ms debounce for parent updates
+                                    }} 
+                                    readOnly={paymentType === 'Full'} 
+                                    className={cn("h-7 text-[10px] font-bold text-green-600 border-green-500 bg-green-500/10", paymentType === 'Full' && 'bg-muted/50 border-input')} 
+                                />
                             </div>
                             
                             <div className="space-y-0.5 flex-1 min-w-[120px] max-w-full">

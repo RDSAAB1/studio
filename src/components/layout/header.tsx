@@ -15,7 +15,9 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter, usePathname } from "next/navigation";
-import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
+import { getDailyPaymentLimit, getHolidays } from '@/lib/firestore';
+import { getLoansRealtime } from '@/lib/firestore';
+import type { Loan } from '@/lib/definitions';
 import { useToast } from "@/hooks/use-toast";
 import { syncAllData, hardSyncAllData, syncAllDataWithDetails } from "@/lib/database";
 import { SyncDialog } from "@/components/sync-dialog";
@@ -72,9 +74,13 @@ const NotificationBell = () => {
     const [open, setOpen] = useState(false);
     const router = useRouter();
 
+    // Fetch loans data directly
     useEffect(() => {
-        const unsub = getLoansRealtime(setLoans, console.error);
-        return () => unsub();
+        const unsubscribe = getLoansRealtime(
+            (data) => setLoans(data),
+            (error) => console.error('Error fetching loans:', error)
+        );
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {

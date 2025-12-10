@@ -31,6 +31,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
         rtgsQuantity, rtgsRate, rtgsAmount, govQuantity, govRate, govAmount,
+        govRequiredAmount: userGovRequiredAmount, // Gov Required Amount from form
         supplierDetails, bankDetails,
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
         isCustomer = false, // Flag to determine if this is a customer payment
@@ -719,8 +720,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     return sum + Math.max(0, outstanding);
                 }, 0);
                 
-                // Gov. Required Amount = Gov. Amount (user entered)
-                govRequiredAmount = govAmount;
+                // Gov. Required Amount = from form (or fallback to govAmount if not provided)
+                govRequiredAmount = userGovRequiredAmount !== undefined && userGovRequiredAmount > 0 
+                    ? userGovRequiredAmount 
+                    : govAmount;
                 
                 // IMPORTANT: Use extra amount from form directly (not calculated)
                 // Extra Amount = Gov. Amount + Pending Amount - Target Amount (from form)
@@ -728,14 +731,44 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 
                 // Distribute extra amount based on outstanding (not original amount)
                 // This ensures fair distribution - receipts with more outstanding get more extra amount
+                // IMPORTANT: Extra amount increases the capacity for payment, so it should be distributed
+                // proportionally based on outstanding to ensure fair distribution
                 if (totalExtraAmount > 0 && totalReceiptOutstanding > 0) {
+                    // Calculate proportions based on outstanding
+                    const proportions: { [srNo: string]: number } = {};
                     entryOutstandings.forEach(eo => {
                         const outstanding = Math.max(0, eo.outstanding || 0); // Already updated after CD
+                        if (outstanding > 0) {
+                            proportions[eo.entry.srNo] = outstanding / totalReceiptOutstanding;
+                        }
+                    });
+                    
+                    // Distribute extra amount proportionally
+                    let totalDistributed = 0;
+                    const sortedByOutstanding = [...entryOutstandings].sort((a, b) => {
+                        const outstandingA = Math.max(0, a.outstanding || 0);
+                        const outstandingB = Math.max(0, b.outstanding || 0);
+                        return outstandingB - outstandingA; // Highest outstanding first for rounding
+                    });
+                    
+                    // Distribute to all entries with outstanding > 0
+                    sortedByOutstanding.forEach((eo, index) => {
+                        const outstanding = Math.max(0, eo.outstanding || 0);
                         const originalOutstanding = eo.originalOutstanding || (outstanding + (cdAllocations[eo.entry.srNo] || 0));
                         
                         if (outstanding > 0) {
-                            const proportion = outstanding / totalReceiptOutstanding;
-                            extraAmountPerEntry[eo.entry.srNo] = Math.round(totalExtraAmount * proportion * 100) / 100;
+                            const proportion = proportions[eo.entry.srNo] || 0;
+                            let extraAmount = totalExtraAmount * proportion;
+                            
+                            // For last entry, use remaining amount to avoid rounding errors
+                            if (index === sortedByOutstanding.length - 1) {
+                                extraAmount = totalExtraAmount - totalDistributed;
+                            } else {
+                                extraAmount = Math.round(extraAmount * 100) / 100;
+                            }
+                            
+                            extraAmountPerEntry[eo.entry.srNo] = Math.max(0, extraAmount);
+                            totalDistributed += extraAmountPerEntry[eo.entry.srNo];
                             
                             // Calculate adjusted original and outstanding
                             // IMPORTANT: Use originalOutstanding (before CD) for adjusted outstanding
@@ -750,6 +783,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding;
                         }
                     });
+                    
+                    // Verify total distributed matches total extra amount (with small tolerance for rounding)
+                    const roundingDifference = Math.abs(totalDistributed - totalExtraAmount);
+                    if (roundingDifference > 0.01) {
+                        console.warn('Extra amount distribution rounding difference:', roundingDifference);
+                    }
                 }
                 
                 console.log('Gov. Payment Extra Amount Calculation:', {
@@ -784,7 +823,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     originalPaymentAmount: finalAmountToPay,
                     govRequiredAmount,
                     totalAdjustedOutstanding,
-                    limitedPaymentAmount: amountToDistribute
+                    limitedPaymentAmount: amountToDistribute,
+                    extraAmountDistribution: extraAmountPerEntry,
+                    allReceipts: entryOutstandings.map(eo => ({
+                        srNo: eo.entry.srNo,
+                        outstanding: eo.outstanding,
+                        originalOutstanding: eo.originalOutstanding,
+                        extraAmount: extraAmountPerEntry[eo.entry.srNo] || 0,
+                        adjustedOutstanding: adjustedOutstandingPerEntry[eo.entry.srNo] || 0
+                    }))
                 });
             }
             
@@ -986,15 +1033,21 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // STEP 4: Create paidForDetails with payment amounts
             // ============================================================
             // IMPORTANT: Include entries even if only CD is present (no payment)
+            // For Gov. payments, also include entries that have extra amount (even if no payment)
             // Settlement Amount = Paid Amount + CD Amount
             for (const { entry } of entryOutstandings) {
                 const paymentForThisEntry = roundedPayments[entry.srNo] || 0;
                 const cdForThisEntry = Math.round((cdAllocations[entry.srNo] || 0) * 100) / 100;
+                const extraAmount = extraAmountPerEntry[entry.srNo] || 0;
                 
-                // Include entry if it has payment OR CD (CD-only payments are valid)
-                if (paymentForThisEntry > 0 || cdForThisEntry > 0) {
+                // Include entry if it has:
+                // 1. Payment amount > 0, OR
+                // 2. CD amount > 0, OR
+                // 3. Extra amount > 0 (for Gov. payments - even if no payment, extra amount should be tracked)
+                const shouldInclude = paymentForThisEntry > 0 || cdForThisEntry > 0 || (paymentMethod === 'Gov.' && extraAmount > 0);
+                
+                if (shouldInclude) {
                     const receiptOutstanding = Math.max(0, (entryOutstandings.find(eo => eo.entry.srNo === entry.srNo)?.originalOutstanding || 0));
-                    const extraAmount = extraAmountPerEntry[entry.srNo] || 0;
                     const adjustedOriginal = adjustedOriginalPerEntry[entry.srNo] || (entry.originalNetAmount || 0);
                     const adjustedOutstanding = adjustedOutstandingPerEntry[entry.srNo] || receiptOutstanding;
                     
@@ -1073,10 +1126,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         const recalculatedCd: { [srNo: string]: number } = {};
                         
                         // Get original outstanding before CD was applied (add back CD that was already allocated)
+                        // For Gov. payment, use adjusted outstanding (original outstanding + extra amount)
                         const getOriginalOutstanding = (srNo: string) => {
                             const eo = entryOutstandings.find(e => e.entry.srNo === srNo);
                             if (eo) {
-                                // Current outstanding + CD already allocated = original outstanding before CD
+                                // For Gov. payment, use adjusted outstanding (original outstanding + extra amount)
+                                if (paymentMethod === 'Gov.' && adjustedOutstandingPerEntry[srNo] !== undefined) {
+                                    // Adjusted Outstanding = Original Outstanding (before CD) + Extra Amount
+                                    // This is the capacity for Gov. payment
+                                    return adjustedOutstandingPerEntry[srNo];
+                                }
+                                // For other payment methods, current outstanding + CD already allocated = original outstanding before CD
                                 const currentCd = cdAllocations[srNo] || 0;
                                 return eo.outstanding + currentCd;
                             }
@@ -1978,7 +2038,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             try {
                 const { enqueueSyncTask } = await import('./sync-queue');
                 if (editingPayment?.id) {
-                    const deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
+                    // For Gov. payments, use delete:governmentFinalizedPayment
+                    let deleteTaskType;
+                    if (paymentMethod === 'Gov.') {
+                        deleteTaskType = 'delete:governmentFinalizedPayment';
+                    } else {
+                        deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
+                    }
                     await enqueueSyncTask(deleteTaskType, { id: editingPayment.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${editingPayment.id}` });
                 }
                 // For Gov. payments, use a different sync task type
@@ -2004,14 +2070,150 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             } else {
                 await db.payments.put(finalPaymentData);
             }
+            
+            // ✅ Trigger custom event to notify listeners of IndexedDB update
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('indexeddb:payment:updated', { 
+                    detail: { payment: finalPaymentData, paymentMethod, isCustomer } 
+                }));
+            }
         }
     } catch {}
     if (!finalPaymentData) {
         return { success: false, message: "Failed to create payment" };
     }
+    
+    // ✅ Recalculate outstanding for affected suppliers/customers after payment save/edit
+    try {
+        const affectedSrNos = finalPaymentData.paidFor?.map(pf => pf.srNo) || [];
+        if (affectedSrNos.length > 0) {
+            // Get old payment's affected SR Nos if editing
+            const oldAffectedSrNos = editingPayment?.paidFor?.map(pf => pf.srNo) || [];
+            // Combine both old and new to ensure all affected entries are updated
+            const allAffectedSrNos = [...new Set([...affectedSrNos, ...oldAffectedSrNos])];
+            await recalculateOutstandingForAffectedEntries(allAffectedSrNos, isCustomer);
+            
+            // ✅ Trigger custom event to notify listeners of supplier/customer updates
+            if (typeof window !== 'undefined') {
+                try {
+                    window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
+                        detail: { affectedSrNos: allAffectedSrNos, isCustomer } 
+                    }));
+                } catch (error) {
+                    console.error('Error dispatching suppliers update event:', error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error recalculating outstanding after payment save:', error);
+        // Don't fail the payment save if recalculation fails
+    }
+    
     return { success: true, payment: finalPaymentData };
 };
 
+
+/**
+ * Recalculate and update outstanding/netAmount for suppliers/customers affected by payment changes
+ */
+async function recalculateOutstandingForAffectedEntries(
+    affectedSrNos: string[],
+    isCustomer: boolean = false
+): Promise<void> {
+    if (!affectedSrNos || affectedSrNos.length === 0) return;
+
+    try {
+        const { getAllSuppliers, getAllCustomers, getHolidays, getDailyPaymentLimit } = await import('./firestore');
+        const { calculateSupplierEntry } = await import('./utils');
+        const { writeBatch } = await import('firebase/firestore');
+        const { collection, doc, getDoc, query, where, getDocs } = await import('firebase/firestore');
+
+        const holidays = await getHolidays();
+        const dailyPaymentLimit = await getDailyPaymentLimit();
+        
+        // Get all payments to recalculate outstanding (including Gov. payments)
+        const regularPayments = isCustomer 
+            ? await db.customerPayments.toArray() 
+            : await db.payments.toArray();
+        const govPayments = await db.governmentFinalizedPayments.toArray();
+        const allPayments = [...regularPayments, ...govPayments];
+        
+        const batch = writeBatch(firestoreDB);
+        let updatedCount = 0;
+
+        for (const srNo of affectedSrNos) {
+            // Find supplier/customer by srNo using query
+            const collectionRef = isCustomer ? customersCollection : suppliersCollection;
+            const q = query(collectionRef, where('srNo', '==', srNo));
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) continue;
+            
+            const entryDoc = querySnapshot.docs[0];
+            const entryData = entryDoc.data() as Customer;
+            const entryRef = doc(collectionRef, entryDoc.id);
+            
+            // Recalculate outstanding based on all payments
+            const recalculatedData = calculateSupplierEntry(entryData, allPayments, holidays, dailyPaymentLimit, []);
+            
+            // Calculate total paid and CD for this entry
+            const paymentsForEntry = allPayments.filter(p => 
+                p.paidFor?.some(pf => pf.srNo === srNo)
+            );
+            
+            let totalPaid = 0;
+            let totalCd = 0;
+            
+            paymentsForEntry.forEach(p => {
+                const paidForEntry = p.paidFor?.find(pf => pf.srNo === srNo);
+                if (paidForEntry) {
+                    totalPaid += Number(paidForEntry.amount || 0);
+                    totalCd += Number(paidForEntry.cdAmount || 0);
+                }
+            });
+            
+            // Outstanding = Original - Total Paid - Total CD
+            const outstanding = Math.round((recalculatedData.originalNetAmount - totalPaid - totalCd) * 100) / 100;
+            const netAmount = outstanding;
+            
+            // Update only outstanding and netAmount
+            batch.update(entryRef, {
+                netAmount: netAmount,
+                updatedAt: new Date().toISOString()
+            });
+            
+            // Also update IndexedDB
+            if (db) {
+                if (isCustomer) {
+                    await db.customers.update(entryDoc.id, { netAmount, updatedAt: new Date().toISOString() });
+                } else {
+                    await db.suppliers.update(entryDoc.id, { netAmount, updatedAt: new Date().toISOString() });
+                }
+            }
+            
+            updatedCount++;
+        }
+        
+        if (updatedCount > 0) {
+            await batch.commit();
+            console.log(`Updated outstanding for ${updatedCount} ${isCustomer ? 'customers' : 'suppliers'}`);
+            
+            // ✅ Trigger custom event to notify listeners of IndexedDB update
+            if (typeof window !== 'undefined') {
+                try {
+                    window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
+                        detail: { affectedSrNos, isCustomer } 
+                    }));
+                } catch (error) {
+                    console.error('Error dispatching suppliers update event:', error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error recalculating outstanding:', error);
+        // Don't throw - this is a background update
+    }
+}
 
 export const handleDeletePaymentLogic = async (context: { paymentId: string; paymentHistory?: Payment[]; suppliers?: Customer[]; expenses?: Expense[]; incomes?: Income[]; isCustomer?: boolean }) => {
     const { paymentId, paymentHistory, suppliers, expenses, incomes, isCustomer = false } = context;
@@ -2029,6 +2231,9 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
     if (!paymentToDelete) {
         throw new Error("Payment not found.");
     }
+
+    // Get affected SR Nos before deleting
+    const affectedSrNos = paymentToDelete.paidFor?.map(pf => pf.srNo) || [];
 
     // Check if this is a Gov. payment
     const isGovPayment = paymentToDelete.receiptType === 'Gov.';
@@ -2065,6 +2270,33 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
             await db.customerPayments.delete(paymentToDelete.id);
         } else {
             await db.payments.delete(paymentToDelete.id);
+        }
+        
+        // ✅ Trigger custom event to notify listeners of IndexedDB delete
+        if (typeof window !== 'undefined') {
+            try {
+                window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', { 
+                    detail: { paymentId: paymentToDelete.id, isGovPayment, isCustomer } 
+                }));
+            } catch (error) {
+                console.error('Error dispatching payment delete event:', error);
+            }
+        }
+    }
+
+    // ✅ Recalculate outstanding for affected suppliers/customers
+    if (affectedSrNos.length > 0) {
+        await recalculateOutstandingForAffectedEntries(affectedSrNos, isCustomer);
+        
+        // ✅ Trigger custom event to notify listeners of supplier/customer updates
+        if (typeof window !== 'undefined') {
+            try {
+                window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
+                    detail: { affectedSrNos, isCustomer } 
+                }));
+            } catch (error) {
+                console.error('Error dispatching suppliers update event:', error);
+            }
         }
     }
 };

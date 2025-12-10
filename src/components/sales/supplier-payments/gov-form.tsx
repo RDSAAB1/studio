@@ -14,6 +14,10 @@ export const GovForm = (props: any) => {
         setGovRate,
         govAmount = 0,
         setGovAmount,
+        govRequiredAmount = 0,
+        setGovRequiredAmount,
+        extraAmount = 0,
+        setExtraAmount,
         calcTargetAmount = 0,
         minRate = 0,
         selectedPaymentOption = null,
@@ -31,7 +35,7 @@ export const GovForm = (props: any) => {
         }
     }, [govQuantity, govRate, setGovAmount]);
 
-    // Calculate all derived fields
+    // Calculate all derived fields (Extra Amount is NOT auto-calculated, use manual value)
     const calculations = useMemo(() => {
         const baseQty = minRate > 0 ? calcTargetAmount / minRate : 0;
         const govQty = govQuantity || (selectedPaymentOption?.quantity || 0);
@@ -40,7 +44,8 @@ export const GovForm = (props: any) => {
         const govAmt = govAmount || (selectedPaymentOption?.calculatedAmount || 0);
         const pendingAmt = selectedPaymentOption?.amountRemaining || 0;
         const bags = selectedPaymentOption?.bags || null;
-        const extraAmt = govAmt + pendingAmt - calcTargetAmount;
+        // Use manual extraAmount from form (NOT auto-calculated)
+        const extraAmt = extraAmount || 0;
         const selectedReceiptFinalWt = govQty; // Assuming this is the selected quantity
         const incrementalRate = selectedReceiptFinalWt > 0 ? extraAmt / selectedReceiptFinalWt : 0;
 
@@ -55,7 +60,7 @@ export const GovForm = (props: any) => {
             extraAmt,
             incrementalRate: incrementalRate.toFixed(2),
         };
-    }, [calcTargetAmount, minRate, govQuantity, govAmount, selectedPaymentOption]);
+    }, [calcTargetAmount, minRate, govQuantity, govAmount, selectedPaymentOption, extraAmount]);
 
     return (
         <div className="space-y-3">
@@ -106,6 +111,20 @@ export const GovForm = (props: any) => {
                 </div>
             </div>
 
+            {/* Row 2: Gov Required Amount */}
+            <div className="grid grid-cols-1 gap-2">
+                <div className="space-y-1">
+                    <Label className="text-[10px] font-medium">Gov Required Amount</Label>
+                    <Input
+                        type="number"
+                        value={govRequiredAmount || ''}
+                        onChange={(e) => setGovRequiredAmount?.(Number(e.target.value) || 0)}
+                        className="h-8 text-[11px] font-medium"
+                        placeholder="Enter Gov Required Amount"
+                    />
+                </div>
+            </div>
+
             {/* Calculation Fields - 3 columns per row */}
             <div className="border-t border-border/50 pt-3 mt-3">
                 <Label className="text-xs font-bold text-foreground mb-3 block">Calculations</Label>
@@ -148,9 +167,13 @@ export const GovForm = (props: any) => {
                         </div>
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-foreground block">EXTRA AMT</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-primary/30 backdrop-blur-sm rounded-md border border-primary/40 text-primary shadow-sm">
-                                {formatCurrency(calculations.extraAmt)}
-                            </div>
+                            <Input
+                                type="number"
+                                value={extraAmount || ''}
+                                onChange={(e) => setExtraAmount?.(Number(e.target.value) || 0)}
+                                className="h-9 text-sm font-bold px-3 bg-primary/30 backdrop-blur-sm rounded-md border border-primary/40 text-primary shadow-sm"
+                                placeholder="Enter Extra Amount"
+                            />
                         </div>
                     </div>
 

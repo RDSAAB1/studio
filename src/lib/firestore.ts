@@ -475,6 +475,62 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
     return false;
   }
   
+  // ✅ Check if SR No is being changed - need to update related payments
+  let oldSrNo: string | undefined;
+  let newSrNo: string | undefined;
+  
+  if (supplierData.srNo) {
+    // Get current supplier to check old SR No
+    const supplierDoc = await getDoc(doc(suppliersCollection, id));
+    if (supplierDoc.exists()) {
+      const currentData = supplierDoc.data() as Customer;
+      oldSrNo = currentData.srNo;
+      newSrNo = supplierData.srNo;
+      
+      // If SR No is changing, update all related payments
+      if (oldSrNo && newSrNo && oldSrNo !== newSrNo) {
+        try {
+          // Find all payments with old SR No in paidFor
+          const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: oldSrNo }));
+          const paymentsSnapshot = await getDocs(paymentsQuery);
+          
+          if (!paymentsSnapshot.empty) {
+            const batch = writeBatch(firestoreDB);
+            
+            paymentsSnapshot.forEach(paymentDoc => {
+              const payment = paymentDoc.data() as Payment;
+              if (payment.paidFor) {
+                // Update paidFor array: replace old SR No with new SR No
+                const updatedPaidFor = payment.paidFor.map(pf => 
+                  pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
+                );
+                
+                batch.update(paymentDoc.ref, {
+                  paidFor: updatedPaidFor,
+                  updatedAt: new Date().toISOString()
+                });
+                
+                // Also update IndexedDB
+                if (db) {
+                  db.payments.update(paymentDoc.id, {
+                    paidFor: updatedPaidFor,
+                    updatedAt: new Date().toISOString()
+                  }).catch(err => console.error('Error updating payment in IndexedDB:', err));
+                }
+              }
+            });
+            
+            await batch.commit();
+            console.log(`Updated ${paymentsSnapshot.size} payments with new SR No: ${oldSrNo} -> ${newSrNo}`);
+          }
+        } catch (error) {
+          console.error('Error updating payments for SR No change:', error);
+          // Continue with supplier update even if payment update fails
+        }
+      }
+    }
+  }
+  
   // Use local-first sync manager
   try {
     const { writeLocalFirst } = await import('./local-first-sync');
@@ -662,6 +718,63 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         console.error("updateCustomer requires a valid ID.");
         return false;
     }
+    
+    // ✅ Check if SR No is being changed - need to update related customerPayments
+    let oldSrNo: string | undefined;
+    let newSrNo: string | undefined;
+    
+    if (customerData.srNo) {
+        // Get current customer to check old SR No
+        const customerDoc = await getDoc(doc(customersCollection, id));
+        if (customerDoc.exists()) {
+            const currentData = customerDoc.data() as Customer;
+            oldSrNo = currentData.srNo;
+            newSrNo = customerData.srNo;
+            
+            // If SR No is changing, update all related customerPayments
+            if (oldSrNo && newSrNo && oldSrNo !== newSrNo) {
+                try {
+                    // Find all customerPayments with old SR No in paidFor
+                    const paymentsQuery = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo: oldSrNo }));
+                    const paymentsSnapshot = await getDocs(paymentsQuery);
+                    
+                    if (!paymentsSnapshot.empty) {
+                        const batch = writeBatch(firestoreDB);
+                        
+                        paymentsSnapshot.forEach(paymentDoc => {
+                            const payment = paymentDoc.data() as Payment;
+                            if (payment.paidFor) {
+                                // Update paidFor array: replace old SR No with new SR No
+                                const updatedPaidFor = payment.paidFor.map(pf => 
+                                    pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
+                                );
+                                
+                                batch.update(paymentDoc.ref, {
+                                    paidFor: updatedPaidFor,
+                                    updatedAt: new Date().toISOString()
+                                });
+                                
+                                // Also update IndexedDB
+                                if (db) {
+                                    db.customerPayments.update(paymentDoc.id, {
+                                        paidFor: updatedPaidFor,
+                                        updatedAt: new Date().toISOString()
+                                    }).catch(err => console.error('Error updating customerPayment in IndexedDB:', err));
+                                }
+                            }
+                        });
+                        
+                        await batch.commit();
+                        console.log(`Updated ${paymentsSnapshot.size} customerPayments with new SR No: ${oldSrNo} -> ${newSrNo}`);
+                    }
+                } catch (error) {
+                    console.error('Error updating customerPayments for SR No change:', error);
+                    // Continue with customer update even if payment update fails
+                }
+            }
+        }
+    }
+    
     // Use local-first sync manager
     try {
         const { writeLocalFirst } = await import('./local-first-sync');

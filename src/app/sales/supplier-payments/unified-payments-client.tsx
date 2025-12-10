@@ -329,12 +329,34 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     let totalCd = 0;
     let totalCashPaid = 0;
     let totalRtgsPaid = 0;
+    let totalExtraAmount = 0; // Total extra amount from Gov. payments
     
     filteredTransactions.forEach((entry: Customer) => {
       const entrySrNo = (entry.srNo || "").toLowerCase();
       const paymentsForEntry = filteredPayments.filter((p: Payment) => 
         p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
       );
+      
+      // Check for Gov. payment extra amount for this entry
+      const govPayment = paymentsForEntry.find(p => 
+        (p as any).receiptType === 'Gov.' && 
+        p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
+      );
+      
+      if (govPayment) {
+        const paidForThisEntry = govPayment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
+        if (paidForThisEntry) {
+          // Get extra amount from paidFor entry
+          if (paidForThisEntry.adjustedOriginal !== undefined) {
+            const extra = paidForThisEntry.adjustedOriginal - (Number(entry.originalNetAmount) || 0);
+            totalExtraAmount += extra;
+          } else if (paidForThisEntry.extraAmount !== undefined) {
+            totalExtraAmount += (paidForThisEntry.extraAmount || 0);
+          } else if ((govPayment as any).extraAmount !== undefined) {
+            totalExtraAmount += ((govPayment as any).extraAmount || 0);
+          }
+        }
+      }
       
       paymentsForEntry.forEach((payment: Payment) => {
         const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
@@ -363,9 +385,13 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       });
     });
     
-    const totalOutstanding = totalOriginalAmount - totalPaid - totalCd;
+    // Calculate adjusted original (base original + extra amount from Gov. payments)
+    const totalAdjustedOriginal = totalOriginalAmount + totalExtraAmount;
     
-    // Calculate outstanding entry IDs
+    // Outstanding = Adjusted Original - Paid - CD
+    const totalOutstanding = totalAdjustedOriginal - totalPaid - totalCd;
+    
+    // Calculate outstanding entry IDs (using adjusted original for Gov. payments)
     const outstandingEntryIds = filteredTransactions
       .filter((t: Customer) => {
         const entrySrNo = (t.srNo || "").toLowerCase();
@@ -374,6 +400,27 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
         );
         let entryPaid = 0;
         let entryCd = 0;
+        
+        // Check for Gov. payment extra amount
+        let adjustedOriginal = Number(t.originalNetAmount) || 0;
+        const govPayment = paymentsForEntry.find(p => 
+          (p as any).receiptType === 'Gov.' && 
+          p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
+        );
+        
+        if (govPayment) {
+          const paidForThisEntry = govPayment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
+          if (paidForThisEntry) {
+            if (paidForThisEntry.adjustedOriginal !== undefined) {
+              adjustedOriginal = paidForThisEntry.adjustedOriginal;
+            } else if (paidForThisEntry.extraAmount !== undefined) {
+              adjustedOriginal = (Number(t.originalNetAmount) || 0) + (paidForThisEntry.extraAmount || 0);
+            } else if ((govPayment as any).extraAmount !== undefined) {
+              adjustedOriginal = (Number(t.originalNetAmount) || 0) + ((govPayment as any).extraAmount || 0);
+            }
+          }
+        }
+        
         paymentsForEntry.forEach((payment: Payment) => {
           const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
           if (paidForEntry) {
@@ -389,16 +436,28 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
             }
           }
         });
-        const originalAmount = Number(t.originalNetAmount) || 0;
-        const entryOutstanding = originalAmount - entryPaid - entryCd;
+        
+        // Outstanding = Adjusted Original - Paid - CD
+        const entryOutstanding = adjustedOriginal - entryPaid - entryCd;
         return entryOutstanding > 0.01;
       })
       .map((t: Customer) => t.id)
       .filter(Boolean);
     
-    // Calculate averages
-    const totalRate = filteredTransactions.reduce((sum, t) => sum + (Number(t.rate) || 0), 0);
-    const averageRate = filteredTransactions.length > 0 ? totalRate / filteredTransactions.length : 0;
+    // Calculate averages - use weighted average for rate (rate * weight / total weight)
+    const totalWeightedRate = filteredTransactions.reduce((sum, t) => {
+      const rate = Number(t.rate) || 0;
+      const netWeight = Number(t.netWeight) || 0;
+      return sum + rate * netWeight;
+    }, 0);
+    
+    const safeNetWeight = totalNetWeight || 0;
+    const averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
+    
+    // Calculate average original price (adjusted original / net weight)
+    const totalAdjustedOriginalForAvg = totalAdjustedOriginal || totalOriginalAmount || 0;
+    const averageOriginalPrice = safeNetWeight > 0 ? totalAdjustedOriginalForAvg / safeNetWeight : 0;
+    
     const minRate = filteredTransactions.length > 0 
       ? Math.min(...filteredTransactions.map(t => Number(t.rate) || 0).filter(r => r > 0))
       : 0;
@@ -427,6 +486,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       totalKanta,
       totalOther,
       totalOriginalAmount,
+      totalExtraAmount, // Add extra amount for display
+      totalAdjustedOriginal, // Add adjusted original for display
       totalPaid,
       totalCdAmount: totalCd,
       totalCashPaid,
@@ -434,6 +495,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       totalOutstanding,
       outstandingEntryIds,
       averageRate,
+      averageOriginalPrice, // Add average original price
       minRate,
       maxRate,
       averageKartaPercentage,
@@ -1111,6 +1173,10 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                       setGovRate={hook.setGovRate}
                                       govAmount={hook.govAmount}
                                       setGovAmount={hook.setGovAmount}
+                                      govRequiredAmount={hook.govRequiredAmount}
+                                      setGovRequiredAmount={hook.setGovRequiredAmount}
+                                      extraAmount={hook.extraAmount}
+                                      setExtraAmount={hook.setExtraAmount}
                                       calcTargetAmount={hook.calcTargetAmount}
                                       minRate={hook.minRate}
                                       selectedPaymentOption={hook.selectedPaymentOption}
@@ -1362,6 +1428,12 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                       <span className="text-muted-foreground">Max Rate:</span>
                       <span className="font-medium">{formatRate(filteredSupplierSummary.maxRate || 0)}</span>
                     </div>
+                    {((filteredSupplierSummary as any).averageOriginalPrice || 0) > 0 && (
+                      <div className="flex justify-between pt-0.5 border-t border-muted">
+                        <span className="text-muted-foreground text-[10px]">Avg. Original Price:</span>
+                        <span className="font-medium text-[10px]">{formatRate((filteredSupplierSummary as any).averageOriginalPrice || 0)}</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1396,11 +1468,36 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                       <span className="text-muted-foreground">Total Other:</span>
                       <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(filteredSupplierSummary.totalBrokerage || 0)}</span>
                     </div>
+                    <div className="flex justify-between pt-0.5 border-t border-muted">
+                      <span className="text-muted-foreground text-[10px]">Total Deductions:</span>
+                      <span className="font-semibold text-red-500 dark:text-red-400 text-[10px]">
+                        - {formatCurrency(
+                          (filteredSupplierSummary.totalKartaAmount || 0) +
+                          (filteredSupplierSummary.totalLabouryAmount || 0) +
+                          (filteredSupplierSummary.totalKanta || 0) +
+                          (filteredSupplierSummary.totalBrokerage || 0)
+                        )}
+                      </span>
+                    </div>
                   </div>
                   <Separator className="my-1"/>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Original Amount:</span>
-                    <span className="font-bold text-primary">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Base Original Amount:</span>
+                      <span className="font-semibold text-primary">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                    </div>
+                    {((filteredSupplierSummary as any).totalExtraAmount || 0) > 0 && (
+                      <>
+                        <div className="flex justify-between pl-2">
+                          <span className="text-muted-foreground text-[10px]">+ Extra Amount (Gov.):</span>
+                          <span className="font-semibold text-green-600 text-[10px]">{formatCurrency((filteredSupplierSummary as any).totalExtraAmount || 0)}</span>
+                        </div>
+                        <div className="flex justify-between pt-0.5 border-t border-primary/20">
+                          <span className="text-muted-foreground font-medium">Adjusted Original:</span>
+                          <span className="font-bold text-primary">{formatCurrency((filteredSupplierSummary as any).totalAdjustedOriginal || filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1413,26 +1510,70 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                     Financial Summary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0.5 px-2 pb-2 text-[11px]">
+                <CardContent className="space-y-1 px-2 pb-2 text-[11px]">
+                  {/* Original Amount Section */}
+                  <div className="space-y-0.5 bg-primary/5 p-1.5 rounded border border-primary/20">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Base Original Amount:</span>
+                      <span className="font-semibold text-primary">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                    </div>
+                    {((filteredSupplierSummary as any).totalExtraAmount || 0) > 0 && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground text-[10px]">Extra Amount (Gov.):</span>
+                          <span className="font-semibold text-green-600 text-[10px]">+ {formatCurrency((filteredSupplierSummary as any).totalExtraAmount || 0)}</span>
+                        </div>
+                        <Separator className="my-0.5"/>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground font-medium">Adjusted Original:</span>
+                          <span className="font-bold text-primary text-xs">{formatCurrency((filteredSupplierSummary as any).totalAdjustedOriginal || filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Payment Breakdown */}
                   <div className="space-y-0.5">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Net Payable:</span>
-                      <span className="font-medium">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
+                      <span className="text-muted-foreground">Total Paid:</span>
+                      <span className="font-medium text-green-600">{formatCurrency(filteredSupplierSummary.totalPaid || 0)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Cash Paid:</span>
-                      <span className="font-medium text-green-500">{formatCurrency(filteredSupplierSummary.totalCashPaid || 0)}</span>
+                    <div className="flex justify-between pl-2">
+                      <span className="text-muted-foreground text-[10px]">• Cash Paid:</span>
+                      <span className="font-medium text-green-500 text-[10px]">{formatCurrency(filteredSupplierSummary.totalCashPaid || 0)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total RTGS Paid:</span>
-                      <span className="font-medium text-green-500">{formatCurrency(filteredSupplierSummary.totalRtgsPaid || 0)}</span>
+                    <div className="flex justify-between pl-2">
+                      <span className="text-muted-foreground text-[10px]">• RTGS Paid:</span>
+                      <span className="font-medium text-green-500 text-[10px]">{formatCurrency(filteredSupplierSummary.totalRtgsPaid || 0)}</span>
                     </div>
+                    {(() => {
+                      const govPaid = (filteredSupplierSummary.allPayments || [])
+                        .filter((p: Payment) => (p as any).receiptType === 'Gov.')
+                        .reduce((sum: number, p: Payment) => {
+                          const paidForThis = p.paidFor?.find(pf => 
+                            (filteredSupplierSummary.allTransactions || []).some((t: Customer) => t.srNo === pf.srNo)
+                          );
+                          return sum + (paidForThis?.amount || 0);
+                        }, 0);
+                      if (govPaid > 0) {
+                        return (
+                          <div className="flex justify-between pl-2">
+                            <span className="text-muted-foreground text-[10px]">• Gov. Paid:</span>
+                            <span className="font-medium text-green-500 text-[10px]">{formatCurrency(govPaid)}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total CD Granted:</span>
-                      <span className="font-medium">{formatCurrency(filteredSupplierSummary.totalCdAmount || 0)}</span>
+                      <span className="font-medium text-blue-600">{formatCurrency(filteredSupplierSummary.totalCdAmount || 0)}</span>
                     </div>
                   </div>
+                  
                   <Separator className="my-1"/>
+                  
+                  {/* Transaction Stats */}
                   <div className="space-y-0.5">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total Transactions:</span>
@@ -1443,10 +1584,15 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                       <span className="font-medium text-red-500 dark:text-red-400">{filteredSupplierSummary.outstandingEntryIds?.length || 0} Entries</span>
                     </div>
                   </div>
+                  
                   <Separator className="my-1"/>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Outstanding:</span>
-                    <span className="font-bold text-red-500 dark:text-red-400">{formatCurrency(filteredSupplierSummary.totalOutstanding || 0)}</span>
+                  
+                  {/* Final Outstanding */}
+                  <div className="bg-red-50 dark:bg-red-950/20 p-1.5 rounded border border-red-200 dark:border-red-800">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-semibold">Final Outstanding:</span>
+                      <span className="font-bold text-red-600 dark:text-red-400 text-sm">{formatCurrency(filteredSupplierSummary.totalOutstanding || 0)}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
