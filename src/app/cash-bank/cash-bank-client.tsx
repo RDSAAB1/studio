@@ -25,7 +25,7 @@ import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Sc
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
 import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
-import { getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getLoansRealtime, getSuppliersRealtime, getBankAccountsRealtime } from "@/lib/firestore";
+import { getLoansRealtime } from "@/lib/firestore";
 import { db } from "@/lib/database";
 import type { FundTransaction, Income, Expense, Payment, CustomerPayment, Loan, Customer, BankAccount } from "@/lib/definitions";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
@@ -61,75 +61,42 @@ const initialLoanFormState: Partial<Loan> = {
 };
 
 export default function CashBankClient() {
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
+    // Map global data to local state
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
+    const [incomes, setIncomes] = useState<Income[]>(globalData.incomes);
+    const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
+    const [supplierPayments, setSupplierPayments] = useState<Payment[]>(globalData.paymentHistory);
+    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>(globalData.customerPayments);
     const [loans, setLoans] = useState<Loan[]>([]);
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
     
     // Force re-render key to trigger useMemo recalculation
     const [refreshKey, setRefreshKey] = useState(0);
     
-    // Fetch data directly
+    // Sync global data to local state when it changes
     useEffect(() => {
-        const unsubFunds = getFundTransactionsRealtime(
-            (data) => {
-                setFundTransactions(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
-            },
-            (error) => console.error('Error fetching fund transactions:', error)
-        );
-        const unsubIncomes = getIncomeRealtime(
-            (data) => {
-                setIncomes(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
-            },
-            (error) => console.error('Error fetching incomes:', error)
-        );
-        const unsubExpenses = getExpensesRealtime(
-            (data) => {
-                setExpenses(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
-            },
-            (error) => console.error('Error fetching expenses:', error)
-        );
-        const unsubPayments = getPaymentsRealtime(
-            (data) => {
-                setSupplierPayments(data);
-                setRefreshKey(prev => prev + 1); // Force re-render when payments change
-            },
-            (error) => console.error('Error fetching payments:', error)
-        );
-        const unsubCustomerPayments = getCustomerPaymentsRealtime(
-            (data) => {
-                setCustomerPayments(data);
-                setRefreshKey(prev => prev + 1); // Force re-render when customer payments change
-            },
-            (error) => console.error('Error fetching customer payments:', error)
-        );
+        setFundTransactions(globalData.fundTransactions);
+        setIncomes(globalData.incomes);
+        setExpenses(globalData.expenses);
+        setSupplierPayments(globalData.paymentHistory);
+        setCustomerPayments(globalData.customerPayments);
+        setSuppliers(globalData.suppliers);
+        setBankAccounts(globalData.bankAccounts);
+        setRefreshKey(prev => prev + 1); // Force re-render
+    }, [globalData]);
+    
+    // Fetch data directly (only data not in global context)
+    useEffect(() => {
         const unsubLoans = getLoansRealtime(
             (data) => {
                 setLoans(data);
                 setRefreshKey(prev => prev + 1); // Force re-render
             },
             (error) => console.error('Error fetching loans:', error)
-        );
-        const unsubSuppliers = getSuppliersRealtime(
-            (data) => {
-                setSuppliers(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
-            },
-            (error) => console.error('Error fetching suppliers:', error)
-        );
-        const unsubBankAccounts = getBankAccountsRealtime(
-            (data) => {
-                setBankAccounts(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
-            },
-            (error) => console.error('Error fetching bank accounts:', error)
         );
         
         // ✅ Listen for payment updates to refresh immediately when payment is finalized

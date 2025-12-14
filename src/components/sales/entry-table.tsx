@@ -1,7 +1,7 @@
 
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import type { Customer } from "@/lib/definitions";
 import { format, isValid } from "date-fns";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
@@ -28,6 +28,60 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
     });
 
     const visibleEntries = entries.slice(0, visibleItems);
+    
+    // Restore scroll position from localStorage
+    useEffect(() => {
+        if (!scrollRef.current || typeof window === 'undefined') return;
+        
+        const restoreScroll = () => {
+            try {
+                const savedScroll = localStorage.getItem(`entry-table-scroll-position-${entryType}`);
+                if (savedScroll) {
+                    const scrollPosition = parseInt(savedScroll, 10);
+                    if (!isNaN(scrollPosition) && scrollPosition > 0) {
+                        const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+                        if (viewport) {
+                            viewport.scrollTop = scrollPosition;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error restoring scroll position:', error);
+            }
+        };
+        
+        // Try immediately
+        restoreScroll();
+        // Also try after a delay to ensure DOM is ready
+        const timer = setTimeout(restoreScroll, 300);
+        return () => clearTimeout(timer);
+    }, [scrollRef, entryType, visibleEntries.length]);
+    
+    // Save scroll position to localStorage
+    useEffect(() => {
+        if (!scrollRef.current || typeof window === 'undefined') return;
+        
+        const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+        if (!viewport) return;
+        
+        let saveTimer: NodeJS.Timeout;
+        const handleScroll = () => {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                try {
+                    localStorage.setItem(`entry-table-scroll-position-${entryType}`, String(viewport.scrollTop));
+                } catch (error) {
+                    console.warn('Error saving scroll position:', error);
+                }
+            }, 200);
+        };
+        
+        viewport.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            viewport.removeEventListener('scroll', handleScroll);
+            clearTimeout(saveTimer);
+        };
+    }, [scrollRef, entryType]);
 
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = entries.map((c: Customer) => c.id);
@@ -136,14 +190,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {isLoading && (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="text-center py-4">
-                                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                                        <span className="ml-2 text-sm text-muted-foreground">Loading more entries...</span>
-                                    </TableCell>
-                                </TableRow>
-                            )}
+                            {/* NO LOADING STATES - Data loads instantly */}
                             {!hasMore && entries.length > 30 && (
                                 <TableRow>
                                     <TableCell colSpan={9} className="text-center py-2 text-xs text-muted-foreground">

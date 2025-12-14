@@ -6,7 +6,6 @@ import type { Customer, Payment, ReceiptSettings } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
-import { useCustomerData } from '@/hooks/use-customer-data';
 import { useCustomerPayments } from '@/hooks/use-customer-payments';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,7 +40,7 @@ import { PaymentCombinationGenerator, PaymentCombinationResults } from '@/compon
 import { RtgsForm } from '@/components/sales/supplier-payments/rtgs-form';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
-import { useSupplierData } from "@/hooks/use-supplier-data";
+import { useGlobalData } from '@/contexts/global-data-context';
 import { StatementPreview } from "../supplier-profile/components/statement-preview";
 import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
 
@@ -82,8 +81,25 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   // Use supplier hooks for supplier, customer hooks for customer
   const supplierHook = type === 'supplier' ? useSupplierPayments() : null;
   const customerHook = type === 'customer' ? useCustomerPayments() : null;
-  const supplierData = type === 'supplier' ? useSupplierData() : null;
-  const customerData = type === 'customer' ? useCustomerData() : null;
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  const supplierData = type === 'supplier' ? {
+    suppliers: globalData.suppliers,
+    paymentHistory: globalData.paymentHistory,
+    banks: globalData.banks,
+    bankBranches: globalData.bankBranches,
+    bankAccounts: globalData.bankAccounts,
+    supplierBankAccounts: globalData.supplierBankAccounts,
+    receiptSettings: globalData.receiptSettings,
+  } : null;
+  const customerData = type === 'customer' ? {
+    customers: globalData.customers,
+    paymentHistory: globalData.customerPayments as any,
+    banks: globalData.banks,
+    bankBranches: globalData.bankBranches,
+    bankAccounts: globalData.bankAccounts,
+    receiptSettings: globalData.receiptSettings,
+  } : null;
   
   // Use appropriate hook based on type
   const hook = supplierHook || customerHook || {

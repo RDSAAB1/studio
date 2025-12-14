@@ -3,9 +3,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { useToast } from '@/hooks/use-toast';
-import { useSupplierData } from '@/hooks/use-supplier-data';
 import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
-import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
+import { useGlobalData } from '@/contexts/global-data-context';
 
 // UI Components
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -251,53 +250,15 @@ export default function SupplierProfileClient() {
     }
   };
 
-  // Load data on component mount
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  
   useEffect(() => {
     setIsClient(true);
-    
-    let isSubscribed = true;
-    
-    // Use realtime listeners (they return unsubscribe functions, not promises)
-    const unsubSuppliers = getSuppliersRealtime((suppliersData) => {
-      if (isSubscribed) {
-        setSuppliers(suppliersData);
-        setLoading(false);
-      }
-    }, (error) => {
-      console.error('Error loading suppliers:', error);
-      if (isSubscribed) {
-        toast({
-          title: "Error",
-          description: "Failed to load supplier data",
-          variant: "destructive",
-        });
-        setLoading(false);
-      }
-    });
-
-    const unsubPayments = getPaymentsRealtime((paymentsData) => {
-      if (isSubscribed) {
-        setPaymentHistory(paymentsData);
-      }
-    }, (error) => {
-      console.error('Error loading payments:', error);
-      if (isSubscribed) {
-        toast({
-          title: "Error",
-          description: "Failed to load payment data",
-          variant: "destructive",
-        });
-      }
-    });
-
-    return () => {
-      isSubscribed = false;
-      unsubSuppliers();
-      unsubPayments();
-    };
-    // Removed toast from dependencies - it's stable from useToast hook
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setSuppliers(globalData.suppliers);
+    setPaymentHistory(globalData.paymentHistory);
+    setLoading(false);
+  }, [globalData.suppliers, globalData.paymentHistory]);
 
   if (!isClient || loading) {
     return (

@@ -51,7 +51,6 @@ export default function SixRReportPage() {
     // Use global data store - NO duplicate listeners
     const globalData = useGlobalData();
     const payments = globalData.paymentHistory;
-    const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
@@ -70,7 +69,6 @@ export default function SixRReportPage() {
     useEffect(() => {
         getRtgsSettings().then(setSettings);
         // Use global data store - NO duplicate listeners
-        setLoading(false);
     }, []);
 
     const reportRows = useMemo((): SixRReportRow[] => {
@@ -370,10 +368,6 @@ export default function SixRReportPage() {
             setIsUpdating(false);
         }
     };
-
-    if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading 6R Reports...</div>;
-    }
 
     return (
         <div className="space-y-6">

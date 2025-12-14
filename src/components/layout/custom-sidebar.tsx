@@ -128,7 +128,8 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
     }
 
     // Desktop rendering
-    if (!item.subMenus) {
+    // For sales-entry and sales-payments, don't show dropdown - direct click navigation
+    if (!item.subMenus || item.id === 'sales-entry' || item.id === 'sales-payments') {
         return (
             <Tooltip>
                 <TooltipTrigger asChild>
@@ -138,6 +139,28 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
                         "w-full h-12 flex items-center justify-center cursor-pointer border-none bg-transparent p-0",
                         isActive && "bg-accent/60"
                     )}
+                    >
+                        <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                    <p>{item.name}</p>
+                </TooltipContent>
+            </Tooltip>
+        )
+    }
+    
+    // For sales-entry, sales-payments, and sales-reports, don't show dropdown - direct click navigation
+    if (item.id === 'sales-entry' || item.id === 'sales-payments' || item.id === 'sales-reports') {
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button 
+                        onClick={() => handleLinkClick(item)} 
+                        className={cn(
+                            "w-full h-12 flex items-center justify-center cursor-pointer border-none bg-transparent p-0",
+                            isActive && "bg-accent/60"
+                        )}
                     >
                         <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
                     </button>

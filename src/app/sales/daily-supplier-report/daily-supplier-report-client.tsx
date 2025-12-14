@@ -44,7 +44,6 @@ export default function DailySupplierReportClient() {
     // Use global data store - NO duplicate listeners
     const globalData = useGlobalData();
     const suppliers = globalData.suppliers;
-    const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [searchTerm, setSearchTerm] = useState('');
@@ -59,14 +58,7 @@ export default function DailySupplierReportClient() {
         }
         fetchSettings();
         // Use global data store - NO duplicate listeners
-        setLoading(false);
     }, []);
-
-    useEffect(() => {
-        if(suppliers.length > 0 || !loading) {
-            setLoading(false);
-        }
-    }, [suppliers, loading]);
     
     const varietyOptions = useMemo(() => {
         if (!suppliers) return [{ value: 'all', label: 'All Varieties' }];
@@ -230,10 +222,6 @@ export default function DailySupplierReportClient() {
         }, 500);
     };
 
-
-    if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
 
     return (
         <div className="space-y-4">

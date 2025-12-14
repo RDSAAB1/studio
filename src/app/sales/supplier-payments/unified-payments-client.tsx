@@ -6,8 +6,8 @@ import type { Customer, Payment, ReceiptSettings } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
-import { useCustomerData } from '@/hooks/use-customer-data';
 import { useCustomerPayments } from '@/hooks/use-customer-payments';
+import { useGlobalData } from '@/contexts/global-data-context';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,6 @@ import { RtgsFormOutsider } from '@/components/sales/supplier-payments/rtgs-form
 import { GovForm } from '@/components/sales/supplier-payments/gov-form';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
-import { useSupplierData } from "@/hooks/use-supplier-data";
 import { useOutsiderData } from "@/hooks/use-outsider-data";
 import { useOutsiderPayments } from "@/hooks/use-outsider-payments";
 import { StatementPreview } from "../supplier-profile/components/statement-preview";
@@ -87,8 +86,25 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   // But only use the results based on type
   const supplierHook = useSupplierPayments();
   const customerHook = useCustomerPayments();
-  const supplierData = useSupplierData();
-  const customerData = useCustomerData();
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  const supplierData = {
+    suppliers: globalData.suppliers,
+    paymentHistory: globalData.paymentHistory,
+    banks: globalData.banks,
+    bankBranches: globalData.bankBranches,
+    bankAccounts: globalData.bankAccounts,
+    supplierBankAccounts: globalData.supplierBankAccounts,
+    receiptSettings: globalData.receiptSettings,
+  };
+  const customerData = {
+    customers: globalData.customers,
+    paymentHistory: globalData.customerPayments as any,
+    banks: globalData.banks,
+    bankBranches: globalData.bankBranches,
+    bankAccounts: globalData.bankAccounts,
+    receiptSettings: globalData.receiptSettings,
+  };
   const outsiderData = useOutsiderData();
   const outsiderHook = useOutsiderPayments(outsiderData);
   

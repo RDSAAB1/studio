@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
+import { getLoansRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
+import { useGlobalData } from "@/contexts/global-data-context";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,33 +66,38 @@ export default function DashboardClient() {
     const [level2, setLevel2] = useState<string | null>(null);
     const [level3, setLevel3] = useState<string | null>(null);
     
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
     useEffect(() => {
         setIsClient(true);
-        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+        // Use global data instead of creating duplicate listeners
+        setSuppliers(globalData.suppliers);
+        setCustomers(globalData.customers);
+        setSupplierPayments(globalData.paymentHistory);
+        setCustomerPayments(globalData.customerPayments);
+        setIncomes(globalData.incomes);
+        setExpenses(globalData.expenses);
+        setFundTransactions(globalData.fundTransactions);
+        setBankAccounts(globalData.bankAccounts);
+        
+        // Only fetch data that's not in global context
         const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, console.error);
-        const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-        const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
         const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, console.error);
         const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, console.error);
-        const unsubSupplierPayments = getPaymentsRealtime(setSupplierPayments, console.error);
-        const unsubCustomerPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
         
-        const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
-        const unsubExpenses = getExpensesRealtime((data) => { 
-            setExpenses(data);
-            setIsLoading(false);
-        }, console.error);
+        setIsLoading(false);
 
         return () => {
-            unsubSuppliers(); unsubCustomers(); unsubKantaParchi(); unsubFunds();
-            unsubAccounts(); unsubIncomes(); unsubExpenses();
-            unsubLoans(); unsubProjects(); unsubExpCats(); unsubIncCats();
-            unsubSupplierPayments(); unsubCustomerPayments();
+            unsubKantaParchi();
+            unsubLoans();
+            unsubProjects();
+            unsubExpCats();
+            unsubIncCats();
         };
-    }, []);
+    }, [globalData]);
     
     const filteredData = useMemo(() => {
         if (!date || !date.from) {

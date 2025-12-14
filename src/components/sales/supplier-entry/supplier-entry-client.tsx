@@ -11,7 +11,8 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { useGlobalData } from '@/contexts/global-data-context';
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 
@@ -264,39 +265,17 @@ export default function SupplierEntryClient() {
     }
   }, []);
 
-  // Load all suppliers and payments using realtime listeners
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  
   useEffect(() => {
     if (!isClient) return;
-    
-    setIsLoading(true);
-    
-    // Setup realtime listeners for all data
-    const unsubSuppliers = getSuppliersRealtime((data) => {
-      setSuppliers(data);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error loading suppliers:", error);
-      toast({ title: 'Error loading suppliers', variant: 'destructive' });
-      setIsLoading(false);
-    });
-
-    const unsubPayments = getPaymentsRealtime((data) => {
-      setPaymentHistory(data);
-    }, (error) => {
-      console.error("Error loading payments:", error);
-      toast({ title: 'Error loading payments', variant: 'destructive' });
-    });
-
+    setSuppliers(globalData.suppliers);
+    setPaymentHistory(globalData.paymentHistory);
+    setIsLoading(false);
     handleNew();
-
-    return () => {
-      unsubSuppliers();
-      unsubPayments();
-    };
-    // Removed handleNew and toast from dependencies
-    // handleNew is only called once on mount, toast is stable from useToast
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient]);
+  }, [isClient, globalData.suppliers, globalData.paymentHistory]);
 
 
   useEffect(() => {

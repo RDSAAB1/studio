@@ -40,7 +40,7 @@ interface SimpleSupplierTableProps {
     paymentTypeOptions: OptionItem[];
 }
 
-export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, isLoading = false, varietyOptions, paymentTypeOptions }: SimpleSupplierTableProps) => {
+export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions }: SimpleSupplierTableProps) => {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
@@ -48,7 +48,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     const lastClickTimeRef = React.useRef<number>(0);
     
     // Infinite scroll pagination - moved to top to be available for drag handlers
-    const { visibleItems, hasMore, isLoading: isLoadingMore, scrollRef } = useInfiniteScroll(suppliers, {
+    const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(suppliers, {
         totalItems: suppliers.length,
         initialLoad: 30,
         loadMore: 30,
@@ -57,6 +57,60 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
     });
 
     const displaySuppliers = suppliers.slice(0, visibleItems);
+    
+    // Restore scroll position from localStorage
+    useEffect(() => {
+        if (!scrollRef.current || typeof window === 'undefined') return;
+        
+        const restoreScroll = () => {
+            try {
+                const savedScroll = localStorage.getItem('supplier-table-scroll-position');
+                if (savedScroll) {
+                    const scrollPosition = parseInt(savedScroll, 10);
+                    if (!isNaN(scrollPosition) && scrollPosition > 0) {
+                        const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+                        if (viewport) {
+                            viewport.scrollTop = scrollPosition;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error restoring scroll position:', error);
+            }
+        };
+        
+        // Try immediately
+        restoreScroll();
+        // Also try after a delay to ensure DOM is ready
+        const timer = setTimeout(restoreScroll, 300);
+        return () => clearTimeout(timer);
+    }, [scrollRef, displaySuppliers.length]);
+    
+    // Save scroll position to localStorage
+    useEffect(() => {
+        if (!scrollRef.current || typeof window === 'undefined') return;
+        
+        const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+        if (!viewport) return;
+        
+        let saveTimer: NodeJS.Timeout;
+        const handleScroll = () => {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                try {
+                    localStorage.setItem('supplier-table-scroll-position', String(viewport.scrollTop));
+                } catch (error) {
+                    console.warn('Error saving scroll position:', error);
+                }
+            }, 200);
+        };
+        
+        viewport.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            viewport.removeEventListener('scroll', handleScroll);
+            clearTimeout(saveTimer);
+        };
+    }, [scrollRef]);
     
     // Keep refs in sync
     React.useEffect(() => {
@@ -1189,14 +1243,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         </td>
                                     </tr>
                                 )}
-                                {hasData && isLoadingMore && (
-                                    <tr>
-                                        <td colSpan={17} className="text-center py-4">
-                                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                                            <span className="ml-2 text-sm text-muted-foreground">Loading more entries...</span>
-                                        </td>
-                                    </tr>
-                                )}
+                                {/* NO LOADING - Data loads instantly, infinite scroll works in background */}
                                 {hasData && !hasMore && suppliers.length > 30 && (
                                     <tr>
                                         <td colSpan={17} className="text-center py-2 text-xs text-muted-foreground">

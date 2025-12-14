@@ -12,7 +12,8 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument, getCustomersRealtime } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument } from "@/lib/firestore";
+import { useGlobalData } from '@/contexts/global-data-context';
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -89,6 +90,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
+  // Use global context for receipt settings (customers and payment history are managed via pagination for now)
+  const globalData = useGlobalData();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [lastVisibleCustomer, setLastVisibleCustomer] = useState<any>(null);
   const [hasMoreCustomers, setHasMoreCustomers] = useState(true);
@@ -100,8 +103,7 @@ export default function CustomerEntryClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Start with false - don't block UI
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // NO LOADING STATES - Data loads initially, then only CRUD updates
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
@@ -117,7 +119,8 @@ export default function CustomerEntryClient() {
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
 
-  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
+  // Use receipt settings from global context
+  const receiptSettings = globalData.receiptSettings;
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
@@ -149,11 +152,34 @@ export default function CustomerEntryClient() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      ...getInitialFormState(lastVariety, lastPaymentType),
-    },
+    defaultValues: getInitialFormState(lastVariety, lastPaymentType),
     shouldFocusError: false,
   });
+  
+  // Restore form state from localStorage after form is initialized
+  useEffect(() => {
+    if (!isClient) return;
+    
+    try {
+      const saved = localStorage.getItem('customer-entry-form-state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Only restore if form has meaningful data
+        if (parsed.name || parsed.srNo || parsed.variety || (parsed.grossWeight && parsed.grossWeight > 0)) {
+          // Convert date string back to Date object
+          if (parsed.date) {
+            parsed.date = new Date(parsed.date);
+          }
+          // Restore form values
+          Object.keys(parsed).forEach(key => {
+            form.setValue(key as any, parsed[key], { shouldValidate: false });
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Error restoring form state:', error);
+    }
+  }, [isClient, form]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -162,8 +188,7 @@ export default function CustomerEntryClient() {
   }, []);
 
   const loadInitialData = useCallback(async () => {
-    // Don't block UI - load data in background, only show loading in table area
-    setIsLoading(true);
+    // NO LOADING - Data loads initially via global context, this is just for pagination
     try {
         const [custResult, paymentResult] = await Promise.all([
             getInitialCustomers(),
@@ -185,8 +210,6 @@ export default function CustomerEntryClient() {
     } catch (error) {
         console.error("Error loading initial data:", error);
         toast({ title: 'Error', description: 'Could not load initial data.', variant: 'destructive' });
-    } finally {
-        setIsLoading(false);
     }
     // Removed toast from dependencies - it's stable from useToast hook
     // form reference is stable, only need to include if form instance changes
@@ -195,15 +218,15 @@ export default function CustomerEntryClient() {
 
   useEffect(() => {
     if (isClient) {
-      // Load data in background - UI shows immediately, only table shows loading
+      // Load data - NO loading states, instant UI
       loadInitialData();
     }
   }, [isClient, loadInitialData]);
 
 
   const loadMoreData = useCallback(async () => {
-      if (!hasMoreCustomers || isLoadingMore) return;
-      setIsLoadingMore(true);
+      if (!hasMoreCustomers) return;
+      // NO LOADING STATE - Instant update
       try {
           const result = await getMoreCustomers(lastVisibleCustomer);
           setCustomers(prev => [...prev, ...result.data]);
@@ -213,37 +236,16 @@ export default function CustomerEntryClient() {
           console.error("Error loading more customers:", error);
           toast({ title: 'Error', description: 'Could not load more entries.', variant: 'destructive' });
       }
-      setIsLoadingMore(false);
       // Removed toast from dependencies - it's stable from useToast hook
       // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastVisibleCustomer, hasMoreCustomers, isLoadingMore]);
+  }, [lastVisibleCustomer, hasMoreCustomers]);
 
 
   useEffect(() => {
     if (!isClient) return;
 
-    const fetchSettings = async () => {
-        const settings = await getReceiptSettings();
-        if (settings) {
-            setReceiptSettings(settings);
-        }
-    };
-    fetchSettings();
-
-
-    // ✅ Setup realtime listener to sync customers from Firestore to IndexedDB
-    // This ensures that customers saved on other devices appear on this device
-    const unsubCustomers = getCustomersRealtime(
-      (customers) => {
-        // The realtime listener automatically updates IndexedDB via bulkPut
-        // This will keep the local data in sync with Firestore
-        console.log('Realtime customers updated:', customers.length);
-        // Update local state if needed (but getInitialCustomers should handle this)
-      },
-      (error) => {
-        console.error('Error in customers realtime listener:', error);
-      }
-    );
+    // ✅ Global context handles customers and customerPayments realtime listeners - no duplicate listeners needed
+    // Receipt settings are also provided by global context
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
@@ -263,7 +265,6 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubCustomers();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -292,10 +293,31 @@ export default function CustomerEntryClient() {
   }, [paymentHistory]);
   
   useEffect(() => {
+    let saveTimer: NodeJS.Timeout;
+    
     const subscription = form.watch((value) => {
+        // Debounced save to localStorage (save after 500ms of no changes)
+        if (typeof window !== 'undefined') {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                try {
+                    // Only save if form has meaningful data (not empty)
+                    if (value.name || value.srNo || value.variety || (value.grossWeight && value.grossWeight > 0)) {
+                        localStorage.setItem('customer-entry-form-state', JSON.stringify(value));
+                    }
+                } catch (error) {
+                    console.warn('Error saving form state:', error);
+                }
+            }, 500);
+        }
+        
         performCalculations(value as Partial<FormValues>);
     });
-    return () => subscription.unsubscribe();
+    
+    return () => {
+        subscription.unsubscribe();
+        clearTimeout(saveTimer);
+    };
     // Only re-subscribe if form instance changes (rare)
     // performCalculations callback already handles paymentHistory updates internally
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -372,6 +394,10 @@ export default function CustomerEntryClient() {
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
+    // Clear saved form state when creating new entry
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('customer-entry-form-state');
+    }
     setTimeout(() => form.setFocus('srNo'), 50);
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
@@ -536,6 +562,10 @@ export default function CustomerEntryClient() {
                 return [savedEntry, ...prev].sort((a,b) => b.srNo.localeCompare(a.srNo));
             });
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
+            // Clear saved form state after successful save
+            if (typeof window !== 'undefined' && !callback) {
+                localStorage.removeItem('customer-entry-form-state');
+            }
             if (callback) callback(savedEntry as Customer); else handleNew();
         }
     } catch (error) {
@@ -713,13 +743,6 @@ export default function CustomerEntryClient() {
         </form>
       </FormProvider>      
       
-      {isLoading ? (
-        <div className="flex justify-center items-center py-8">
-          <p className="text-muted-foreground flex items-center">
-            <Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...
-          </p>
-        </div>
-      ) : (
       <EntryTable
         entries={filteredCustomers} 
         onEdit={handleEdit} 
@@ -731,11 +754,10 @@ export default function CustomerEntryClient() {
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
-      )}
       {hasMoreCustomers && (
         <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
+                <Button onClick={loadMoreData}>
+                Load More
             </Button>
         </div>
        )}

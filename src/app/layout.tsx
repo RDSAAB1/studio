@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store.tsx';
+import { GlobalDataProvider } from '@/contexts/global-data-context';
 import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import { getFirebaseAuth, onAuthStateChanged, type User } from '@/lib/firebase';
@@ -180,9 +181,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
                 <StateProvider>
-                   <AuthWrapper>
-                        {children}
-                   </AuthWrapper>
+                    <GlobalDataProvider>
+                        <AuthWrapper>
+                            {children}
+                        </AuthWrapper>
+                    </GlobalDataProvider>
                 </StateProvider>
                 <Toaster />
             </body>

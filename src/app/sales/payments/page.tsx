@@ -1,22 +1,20 @@
 "use client";
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { Suspense } from "react";
+import { useSearchParams } from 'next/navigation';
+import UnifiedPaymentsPage from "./unified-payments-page";
 
-export default function PaymentsPage() {
-  const router = useRouter();
+function PaymentsPageContent() {
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab') || 'supplier';
+  const tab = searchParams.get('tab') || 'supplier';
   
-  // Redirect to new direct paths
-  useEffect(() => {
-    const validTab = (tabParam === 'supplier' || tabParam === 'customer' || tabParam === 'outsider') 
-      ? tabParam 
-      : 'supplier';
-    
-    router.replace(`/sales/payments-${validTab}`);
-  }, [tabParam, router]);
-  
-  return null;
+  return <UnifiedPaymentsPage defaultTab={tab as 'supplier' | 'customer' | 'outsider'} />;
 }
 
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <PaymentsPageContent />
+    </Suspense>
+  );
+}

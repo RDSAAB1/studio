@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { useToast } from '@/hooks/use-toast';
-import { useSupplierData } from '@/hooks/use-supplier-data';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { usePersistedSelection, usePersistedState } from '@/hooks/use-persisted-state';
 
 // UI Components
@@ -32,8 +32,11 @@ export default function SupplierProfileClient() {
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [selectedVariety, setSelectedVariety] = usePersistedSelection('selectedVariety', null as string | null);
 
-  // Use the existing hook for data loading
-  const { suppliers, paymentHistory, loading } = useSupplierData();
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  const suppliers = globalData.suppliers;
+  const paymentHistory = globalData.paymentHistory;
+  const loading = false; // No loading state needed - data loads instantly
 
   // Use custom hooks for data processing
   const { supplierSummaryMap, MILL_OVERVIEW_KEY } = useSupplierSummary(

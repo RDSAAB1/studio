@@ -7,7 +7,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo, getSuppliersRealtime } from "@/lib/firestore";
+import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo } from "@/lib/firestore";
+import { useGlobalData } from '@/contexts/global-data-context';
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import SimpleSupplierFormAllFields from "@/components/sales/simple-supplier-form-all-fields";
@@ -65,7 +66,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, lat
 
 export default function SimpleSupplierEntryAllFields() {
     const { toast } = useToast();
-    // Get suppliers data once and reuse - non-blocking
+    // Use global context for suppliers data (updated by global context, read from IndexedDB for reactivity)
+    const globalData = useGlobalData();
     const suppliersForSerial = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().limit(1).toArray());
     const allSuppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray());
     const totalSuppliersCount = useLiveQuery(() => db.suppliers.count());
@@ -75,11 +77,12 @@ export default function SimpleSupplierEntryAllFields() {
     const [isEditing, setIsEditing] = useState(false);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [isPending, startTransition] = useTransition();
-    const [isDataLoading, setIsDataLoading] = useState(false);
+    // NO LOADING STATES - Data loads initially, then only CRUD updates
     const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
     const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
     const [allConsolidatedGroups, setAllConsolidatedGroups] = useState<ConsolidatedReceiptData[]>([]);
-    const [receiptSettings, setReceiptSettings] = useState<any>(null);
+    // Use receipt settings from global context
+    const receiptSettings = globalData.receiptSettings;
     
     const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
     const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
@@ -226,6 +229,31 @@ export default function SimpleSupplierEntryAllFields() {
         resolver: zodResolver(completeSupplierFormSchema),
         defaultValues: getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]),
     });
+    
+    // Restore form state from localStorage after form is initialized
+    useEffect(() => {
+        if (!isClient) return;
+        
+        try {
+            const saved = localStorage.getItem('supplier-entry-form-state');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Only restore if form has meaningful data
+                if (parsed.name || parsed.srNo || parsed.variety || (parsed.grossWeight && parsed.grossWeight > 0)) {
+                    // Convert date string back to Date object
+                    if (parsed.date) {
+                        parsed.date = new Date(parsed.date);
+                    }
+                    // Restore form values
+                    Object.keys(parsed).forEach(key => {
+                        form.setValue(key as any, parsed[key], { shouldValidate: false });
+                    });
+                }
+            }
+        } catch (error) {
+            console.warn('Error restoring form state:', error);
+        }
+    }, [isClient, form]);
 
     // Delete current form entry
     const handleDeleteCurrent = useCallback(async () => {
@@ -375,24 +403,7 @@ export default function SimpleSupplierEntryAllFields() {
         }
     }, [suppliersForSerial, lastPaymentType, form]);
 
-    // Hide loading when data is available or after timeout
-    useEffect(() => {
-        if (currentView === 'data' && isDataLoading) {
-            if (allSuppliers && allSuppliers.length > 0) {
-                // Data is available, hide loading immediately
-                setIsDataLoading(false);
-            } else {
-                // No data yet, hide loading after a short delay
-                const timeout = setTimeout(() => {
-                    setIsDataLoading(false);
-                }, 500); // 500ms delay
-                
-                return () => clearTimeout(timeout);
-            }
-        } else if (currentView === 'entry') {
-            setIsDataLoading(false);
-        }
-    }, [currentView, allSuppliers, isDataLoading]);
+    // NO LOADING STATES - Data loads initially, instant UI
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -410,18 +421,8 @@ export default function SimpleSupplierEntryAllFields() {
     useEffect(() => {
         if (!isClient) return;
         
-        // ✅ Setup realtime listener to sync suppliers from Firestore to IndexedDB
-        // This ensures that suppliers saved on other devices appear on this device
-        const unsubSuppliers = getSuppliersRealtime(
-            (suppliers) => {
-                // The realtime listener automatically updates IndexedDB via bulkPut
-                // useLiveQuery will automatically react to IndexedDB changes
-                console.log('Realtime suppliers updated:', suppliers.length);
-            },
-            (error) => {
-                console.error('Error in suppliers realtime listener:', error);
-            }
-        );
+        // ✅ Global context handles suppliers realtime listener - no duplicate listener needed
+        // useLiveQuery will automatically react to IndexedDB changes updated by global context
         
         const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
         const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
@@ -439,40 +440,10 @@ export default function SimpleSupplierEntryAllFields() {
         }
 
         form.setValue('date', new Date());
-
-        // Load receipt settings
-        const defaultSettings = {
-            companyName: "Jagdambe Rice Mill",
-            contactNo: "9794092767",
-            email: "",
-            address: "",
-            fields: {
-                srNo: true,
-                date: true,
-                name: true,
-                contact: true,
-                address: true,
-                vehicleNo: true,
-                variety: true,
-                grossWeight: true,
-                teirWeight: true,
-                weight: true,
-                kartaWeight: true,
-                netWeight: true,
-                rate: true,
-                amount: true,
-                kartaAmount: true,
-                labouryAmount: true,
-                kanta: true,
-                netAmount: true,
-                dueDate: true,
-                term: true
-            }
-        };
-        setReceiptSettings(defaultSettings);
+        
+        // Receipt settings are now provided by global context
 
         return () => {
-            unsubSuppliers();
             unsubVarieties();
             unsubPaymentTypes();
         };
@@ -556,17 +527,41 @@ export default function SimpleSupplierEntryAllFields() {
     }, [form]);
 
     // Real-time calculations with debouncing (updates summary as you type)
+    // Also save form state to localStorage (debounced)
     useEffect(() => {
+        let saveTimer: NodeJS.Timeout;
+        
         const subscription = form.watch((values) => {
+            // Debounced save to localStorage (save after 500ms of no changes)
+            if (typeof window !== 'undefined') {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(() => {
+                    try {
+                        // Only save if form has meaningful data (not empty)
+                        if (values.name || values.srNo || values.variety || values.grossWeight > 0) {
+                            localStorage.setItem('supplier-entry-form-state', JSON.stringify(values));
+                        }
+                    } catch (error) {
+                        console.warn('Error saving form state:', error);
+                    }
+                }, 500);
+            }
+            
             const timer = setTimeout(() => {
                 calculateSummary();
             }, 300); // Wait 300ms after user stops typing
             
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(timer);
+                clearTimeout(saveTimer);
+            };
         });
         
-        return () => subscription.unsubscribe();
-    }, [calculateSummary]);
+        return () => {
+            subscription.unsubscribe();
+            clearTimeout(saveTimer);
+        };
+    }, [calculateSummary, form]);
 
     const handleSrNoBlur = async (srNoValue: string) => {
         let formattedSrNo = srNoValue.trim().toUpperCase();
@@ -920,7 +915,12 @@ export default function SimpleSupplierEntryAllFields() {
 
             // Reset form for new entry with next serial number (only if not editing)
             if (!isEditing) {
-                form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+                const newState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]);
+                form.reset(newState);
+                // Clear saved form state after successful save
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('supplier-entry-form-state');
+                }
             }
             
         } catch (error: any) {
@@ -1199,15 +1199,8 @@ export default function SimpleSupplierEntryAllFields() {
     }, []);
 
     const handleViewChange = useCallback((view: 'entry' | 'data') => {
-        // Show loading for data view click
-        if (view === 'data') {
-            setIsDataLoading(true);
-        }
-        
-        // Ultra fast switching - non-blocking transition
-        startTransition(() => {
-            setCurrentView(view);
-        });
+        // NO LOADING - Instant switch
+        setCurrentView(view);
     }, []);
 
     const handleEditSupplier = useCallback((supplier: Customer) => {
@@ -1572,12 +1565,11 @@ export default function SimpleSupplierEntryAllFields() {
                 onMultiDelete={handleMultiDelete}
                 suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers : []}
                 totalCount={filteredSuppliers.length}
-                isLoading={isDataLoading}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
             />
         </div>
-    ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, isDataLoading]);
+    ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);
 
     // Remove loading state completely - always show content
     // if (!isClient || isLoading) {

@@ -23,7 +23,6 @@ interface EntryFormProps {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   activeAccount: LedgerAccount | null;
   saving: boolean;
-  loadingEntries: boolean;
   accounts: LedgerAccount[];
   activeAccountId: string | null;
   linkAccountId: string;
@@ -38,7 +37,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onSubmit,
   activeAccount,
   saving,
-  loadingEntries,
   accounts,
   activeAccountId,
   linkAccountId,
@@ -145,7 +143,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         </div>
       </div>
       <div className="md:col-span-2 flex justify-end">
-        <Button type="submit" disabled={!activeAccount || saving || loadingEntries} className="h-8 px-4 text-sm disabled:opacity-60">
+        <Button type="submit" disabled={!activeAccount || saving} className="h-8 px-4 text-sm disabled:opacity-60">
           Add Entry
         </Button>
       </div>

@@ -48,15 +48,14 @@ const LedgerPage: React.FC = () => {
   const [entriesMap, setEntriesMap] = useState<Record<string, LedgerEntry[]>>({});
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [showAccountForm, setShowAccountForm] = useState(false);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [loadingEntries, setLoadingEntries] = useState(false);
+  // NO LOADING STATES - Data loads initially, then only CRUD updates
   const [saving, setSaving] = useState(false);
 
   const [cashAccounts, setCashAccounts] = useState<LedgerCashAccount[]>([]);
   const [activeCashAccountId, setActiveCashAccountId] = useState<string | null>(null);
   const [showCashAccountForm, setShowCashAccountForm] = useState(false);
   const [newCashAccountName, setNewCashAccountName] = useState("");
-  const [loadingCashAccounts, setLoadingCashAccounts] = useState(true);
+  // NO LOADING STATES - Data loads initially, then only CRUD updates
   const [cashSaving, setCashSaving] = useState(false);
 
   const createEmptyNoteGroups = (): Record<string, number[]> =>
@@ -287,7 +286,6 @@ const LedgerPage: React.FC = () => {
   }, [linkAccountId, activeAccountId]);
 
   useEffect(() => {
-    setLoadingCashAccounts(true);
     const unsubscribe = getLedgerCashAccountsRealtime(
       (data) => {
         const normalized = data
@@ -304,7 +302,6 @@ const LedgerPage: React.FC = () => {
           }
           return normalized[0]?.id ?? null;
         });
-        setLoadingCashAccounts(false);
       },
       (error) => {
         console.error("Failed to load cash accounts", error);
@@ -313,7 +310,6 @@ const LedgerPage: React.FC = () => {
           description: "We could not fetch cash accounts. Please try again.",
           variant: "destructive",
         });
-        setLoadingCashAccounts(false);
       }
     );
 
@@ -324,14 +320,12 @@ const LedgerPage: React.FC = () => {
 
   // Load accounts using realtime listener
   useEffect(() => {
-    setLoadingAccounts(true);
     const unsubscribe = getLedgerAccountsRealtime(
       (data) => {
         setAccounts(data);
         if (!activeAccountId && data.length > 0) {
           setActiveAccountId(data[0].id);
         }
-        setLoadingAccounts(false);
       },
       (error) => {
         console.error("Failed to load ledger accounts", error);
@@ -340,7 +334,6 @@ const LedgerPage: React.FC = () => {
           description: "We could not fetch ledger accounts. Please try again.",
           variant: "destructive",
         });
-        setLoadingAccounts(false);
       }
     );
 
@@ -353,12 +346,10 @@ const LedgerPage: React.FC = () => {
   useEffect(() => {
     if (!activeAccountId) return;
 
-    setLoadingEntries(true);
     const unsubscribe = getLedgerEntriesRealtime(
       (data) => {
         const sortedEntries = sortEntries(recalculateBalances(data));
         setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedEntries }));
-        setLoadingEntries(false);
       },
       (error) => {
         console.error("Failed to load ledger entries", error);
@@ -367,7 +358,6 @@ const LedgerPage: React.FC = () => {
           description: "We could not fetch ledger entries. Please try again.",
           variant: "destructive",
         });
-        setLoadingEntries(false);
       },
       activeAccountId
     );
@@ -1689,14 +1679,12 @@ const LedgerPage: React.FC = () => {
             accountDropdownOptions={accountDropdownOptions}
             activeAccountId={activeAccountId}
             onAccountChange={(value) => setActiveAccountId(value)}
-            loadingAccounts={loadingAccounts}
             accountsLength={accounts.length}
             showAccountForm={showAccountForm}
             onToggleAccountForm={() => setShowAccountForm((prev) => !prev)}
             saving={saving}
             onPrintLedger={handlePrint}
             activeAccount={activeAccount}
-            loadingEntries={loadingEntries}
           />
             ) : (
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1739,7 +1727,7 @@ const LedgerPage: React.FC = () => {
         <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border py-3">
           <div>
             <CardTitle className="text-lg">
-              {activeAccount ? activeAccount.name : loadingAccounts ? "Loading…" : "Select an account"}
+              {activeAccount ? activeAccount.name : "Select an account"}
             </CardTitle>
             {activeAccount && (
               <p className="text-xs text-muted-foreground">
@@ -1764,7 +1752,6 @@ const LedgerPage: React.FC = () => {
             onSubmit={handleAddEntry}
             activeAccount={activeAccount}
             saving={saving}
-            loadingEntries={loadingEntries}
             accounts={accounts}
             activeAccountId={activeAccountId}
             linkAccountId={linkAccountId}
@@ -1797,16 +1784,12 @@ const LedgerPage: React.FC = () => {
                 value={activeCashAccountId}
                 onChange={(value) => setActiveCashAccountId(value)}
                 placeholder={
-                  loadingCashAccounts
-                    ? "Loading cash accounts..."
-                    : cashAccounts.length
+                  cashAccounts.length
                     ? "Search cash account..."
                     : "No cash accounts yet"
                 }
                 noItemsPlaceholder={
-                  loadingCashAccounts
-                    ? "Loading cash accounts..."
-                    : cashAccounts.length === 0
+                  cashAccounts.length === 0
                     ? "No cash accounts yet. Create one below."
                     : "No matching cash account."
                 }
@@ -1817,7 +1800,6 @@ const LedgerPage: React.FC = () => {
                 type="button"
                 size="sm"
                 className="h-8"
-                disabled={loadingCashAccounts}
                 onClick={() => {
                   setShowCashAccountForm((prev) => !prev);
                   if (showCashAccountForm) {
@@ -2016,13 +1998,7 @@ const LedgerPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {loadingEntries ? (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            Loading entries…
-                          </td>
-                        </tr>
-                      ) : groupedEntries.length > 0 ? (
+                      {groupedEntries.length > 0 ? (
                         groupedEntries.flatMap((group) => {
                           // Removed date header row - entries will be displayed without date grouping headers
 
@@ -2181,8 +2157,6 @@ const LedgerPage: React.FC = () => {
                               ? dateFrom || dateTo
                                 ? "No entries in this date range."
                                 : "No entries yet. Add your first transaction."
-                              : loadingAccounts
-                              ? "Loading accounts…"
                               : "Select an account to view entries."}
                           </td>
                         </tr>

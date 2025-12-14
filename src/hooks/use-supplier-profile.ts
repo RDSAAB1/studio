@@ -2,24 +2,29 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
+import { useGlobalData } from "@/contexts/global-data-context";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, levenshteinDistance } from '@/lib/utils';
 
 
 export const useSupplierData = () => {
     const { toast } = useToast();
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
+    // Map global data to local variables for backward compatibility
+    const suppliers = globalData.suppliers;
+    const paymentHistory = globalData.paymentHistory;
+    const customerPayments = globalData.customerPayments;
+    const incomes = globalData.incomes;
+    const expenses = globalData.expenses;
+    const fundTransactions = globalData.fundTransactions;
+    const banks = globalData.banks;
+    const bankBranches = globalData.bankBranches;
+    const bankAccounts = globalData.bankAccounts;
+    const receiptSettings = globalData.receiptSettings;
+    
+    const [loading, setLoading] = useState(false); // No loading needed - data is already available
     const [isClient, setIsClient] = useState(false);
     
     const allExpenses = useMemo(() => [...(expenses || []), ...(paymentHistory || [])], [expenses, paymentHistory]);
@@ -28,38 +33,9 @@ export const useSupplierData = () => {
 
     useEffect(() => {
         setIsClient(true);
-    }, []);
-
-    useEffect(() => {
-        if (!isClient) return;
-
-        let isSubscribed = true;
-        
-        const unsubFunctions = [
-            getSuppliersRealtime(data => { if (isSubscribed) setSuppliers(data); }, error => console.error("Suppliers fetch error:", error)),
-            getPaymentsRealtime(data => { if (isSubscribed) setPaymentHistory(data); }, error => console.error("Payments fetch error:", error)),
-            getCustomerPaymentsRealtime(data => { if (isSubscribed) setCustomerPayments(data); }, error => console.error("Customer Payments fetch error:", error)),
-            getIncomeRealtime(data => { if (isSubscribed) setIncomes(data); }, error => console.error("Incomes fetch error:", error)),
-            getExpensesRealtime(data => { if (isSubscribed) setExpenses(data); }, error => console.error("Expenses fetch error:", error)),
-            getFundTransactionsRealtime(data => { if (isSubscribed) setFundTransactions(data); }, error => console.error("Fund Transactions fetch error:", error)),
-            getBanksRealtime(data => { if (isSubscribed) setBanks(data); }, error => console.error("Banks fetch error:", error)),
-            getBankBranchesRealtime(data => { if (isSubscribed) setBankBranches(data); }, error => console.error("Bank Branches fetch error:", error)),
-            getBankAccountsRealtime(data => { if (isSubscribed) setBankAccounts(data); }, error => console.error("Bank Accounts fetch error:", error)),
-        ];
-
-        getReceiptSettings().then(settings => {
-            if (isSubscribed) setReceiptSettings(settings);
-        }).catch(error => {
-            console.error("Receipt settings fetch error:", error);
-        });
-
+        // Data is already loaded from global context, no need to wait
         setLoading(false);
-
-        return () => {
-            isSubscribed = false;
-            unsubFunctions.forEach(unsub => unsub());
-        };
-    }, [isClient]);
+    }, []);
     
     const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];

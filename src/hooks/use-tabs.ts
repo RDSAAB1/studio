@@ -66,25 +66,16 @@ export const allMenuItems: MenuItem[] = [
     icon: LayoutDashboard,
   },
   {
-    id: "entry",
+    id: "sales-entry",
     name: "Entry",
     icon: FilePlus,
-    subMenus: [
-      { id: "entry-supplier", name: "Supplier Entry", icon: Truck, href: "/sales/entry?tab=supplier" },
-      { id: "entry-customer", name: "Customer Entry", icon: Users, href: "/sales/entry?tab=customer" },
-    ],
+    href: "/sales?menu=entry&tab=supplier-entry",
   },
   {
-    id: "payments",
+    id: "sales-payments",
     name: "Payments",
     icon: Wallet,
-    subMenus: [
-      { id: "payments-supplier", name: "Supplier Payments", icon: Truck, href: "/sales/payments-supplier" },
-      { id: "payments-customer", name: "Customer Payments", icon: Users, href: "/sales/payments-customer" },
-      { id: "payments-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales/payments-outsider" },
-      { id: "expense-tracker", name: "Income & Expense", icon: Calculator, href: "/expense-tracker" },
-      { id: "sales/ledger", name: "Ledger Accounting", icon: BookOpen, href: "/sales/ledger" },
-    ],
+    href: "/sales?menu=payments&tab=supplier-payments",
   },
   {
     id: "cash-bank",
@@ -100,18 +91,10 @@ export const allMenuItems: MenuItem[] = [
     ],
   },
   {
-    id: "reports",
+    id: "sales-reports",
     name: "Reports",
     icon: PieChart,
-    subMenus: [
-        { id: "sales/daily-payments", name: "Daily Payments", icon: CalendarClock },
-        { id: "sales/rtgs-report", name: "RTGS Report", icon: Banknote },
-        { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
-        { id: "sales/6r-report", name: "6R Report", icon: FileText },
-        { id: "tools/voucher-import", name: "Mandi Report Import", icon: FileSpreadsheet },
-        { id: "tools/mandi-report-history", name: "Mandi Report History", icon: FileText, href: "/tools/mandi-report-history" },
-        { id: "admin/firestore-monitor", name: "Firestore Monitor", icon: Activity },
-    ]
+    href: "/sales?menu=reports&tab=daily-payments",
   },
   {
     id: "hr",

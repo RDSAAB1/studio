@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useState, useRef, useTransition, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, useRef, useTransition, useMemo, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import { Loader2 } from 'lucide-react';
@@ -11,6 +11,9 @@ import TabBar from '@/components/layout/tab-bar';
 import { Header } from "@/components/layout/header";
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { Truck, Users, Wallet, FilePlus, Banknote } from 'lucide-react';
+
+// Pre-compute flattened menu items once (outside component to avoid recalculation)
+const flattenedMenuItems = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i);
 
 // Helper function to create sub-tabs for Entry and Payments
 const createSubTabs = (parentId: string): MenuItem[] => {
@@ -36,11 +39,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     'app-open-tabs',
     [],
     {
-      serialize: (tabs) => JSON.stringify(tabs.map(t => ({ id: t.id, name: t.name, icon: t.icon }))),
+      serialize: (tabs) => JSON.stringify(tabs.map((t: MenuItem) => ({ id: t.id, name: t.name, icon: t.icon }))),
       deserialize: (str) => {
         const parsed = JSON.parse(str);
-        return parsed.map((t: any) => {
-          const fullMenuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === t.id);
+        return parsed.map((t: { id: string; name: string; icon?: any }) => {
+          const fullMenuItem = flattenedMenuItems.find(item => item.id === t.id);
           return fullMenuItem || t;
         });
       }
@@ -52,6 +55,22 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const router = useRouter();
   const pathname = usePathname();
   const lastPathnameRef = useRef<string | null>(null);
+  const initializedRef = useRef(false);
+
+  // Initialize tabs on mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
+    // If no tabs exist, initialize with dashboard
+    if (openTabs.length === 0) {
+      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
+      if (dashboardTab) {
+        setOpenTabs([dashboardTab]);
+        setActiveTabId('dashboard-overview');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     // Skip if pathname hasn't changed
@@ -69,14 +88,17 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       currentPathId = 'payments-outsider';
     }
     
-    const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
+    const menuItem = flattenedMenuItems.find(item => item.id === currentPathId);
     
-    // Check if this is Entry page - if so, create sub-tabs
+    // Check if this is unified Sales page - if so, create sub-tabs
+    const isSalesPage = pathname === '/sales' || pathname.startsWith('/sales?');
     const isEntryPage = pathname === '/sales/entry' || pathname.startsWith('/sales/entry');
+    const isUnifiedPaymentsPage = pathname === '/sales/payments' || pathname.startsWith('/sales/payments');
     
-    // Get tab from URL query for entry pages
+    // Get tab and menu from URL query for sales, entry and payments pages
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const tabParam = urlParams?.get('tab') || 'supplier';
+    const menuParam = urlParams?.get('menu') || (isSalesPage ? 'entry' : null);
+    const tabParam = urlParams?.get('tab') || (isEntryPage ? 'supplier' : isUnifiedPaymentsPage ? 'supplier' : isSalesPage ? 'supplier-entry' : null);
     
     if (isEntryPage) {
       const subTabs = createSubTabs('entry');
@@ -94,6 +116,73 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         const newTabs = [...filtered];
         subTabs.forEach(subTab => {
           if (!newTabs.some(t => t.id === subTab.id)) {
+            newTabs.push(subTab);
+          }
+        });
+        
+        return newTabs;
+      });
+      
+      setActiveTabId(activeSubTabId);
+      return;
+    }
+    
+    if (isSalesPage && menuParam && tabParam) {
+      // Get menu type from URL
+      let menuItemId: string;
+      if (menuParam === 'entry') {
+        menuItemId = 'sales-entry';
+      } else if (menuParam === 'payments') {
+        menuItemId = 'sales-payments';
+      } else if (menuParam === 'reports') {
+        menuItemId = 'sales-reports';
+      } else {
+        menuItemId = 'sales-entry';
+      }
+      
+      const menuItem = allMenuItems.find(item => item.id === menuItemId);
+      
+      if (menuItem) {
+        setOpenTabs(prev => {
+          // Remove old entry/payment/reports tabs
+          const filtered = prev.filter(tab => 
+            tab.id !== 'sales-entry' &&
+            tab.id !== 'sales-payments' &&
+            tab.id !== 'sales-reports' &&
+            !tab.id.startsWith('entry-') &&
+            !tab.id.startsWith('payments-')
+          );
+          
+          // Add current menu item
+          const newTabs = [...filtered];
+          if (!newTabs.some((t: MenuItem) => t.id === menuItemId)) {
+            newTabs.push(menuItem);
+          }
+          
+          return newTabs;
+        });
+        
+        setActiveTabId(menuItemId);
+      }
+      return;
+    }
+    
+    if (isUnifiedPaymentsPage && tabParam) {
+      const subTabs = createSubTabs('sales/payments');
+      const activeSubTabId = `payments-${tabParam}`;
+      
+      setOpenTabs(prev => {
+        // Remove old parent tab and other payment tabs if exist
+        const filtered = prev.filter(tab => 
+          tab.id !== 'sales/payments' && 
+          tab.id !== 'payments' &&
+          !tab.id.startsWith('payments-')
+        );
+        
+        // Add sub-tabs if they don't exist
+        const newTabs = [...filtered];
+        subTabs.forEach(subTab => {
+          if (!newTabs.some((t: MenuItem) => t.id === subTab.id)) {
             newTabs.push(subTab);
           }
         });
@@ -167,12 +256,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         setActiveTabId('dashboard-overview');
       }
     }
-  }, [pathname, activeTabId]);
+  }, [pathname]);
 
   const handleTabSelect = (tabIdOrMenuItem: string | MenuItem) => {
     // Handle both string (tabId from TabBar) and MenuItem (from CustomSidebar)
     const menuItem = typeof tabIdOrMenuItem === 'string' 
-      ? openTabs.find(tab => tab.id === tabIdOrMenuItem) || allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === tabIdOrMenuItem)
+      ? openTabs.find(tab => tab.id === tabIdOrMenuItem) || flattenedMenuItems.find(item => item.id === tabIdOrMenuItem)
       : tabIdOrMenuItem;
     
     if (!menuItem) return;
@@ -182,8 +271,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       ? menuItem.href 
       : (menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`);
     
-    // Handle sub-tabs for Entry and Payments
-    if (menuItem.id.startsWith('entry-')) {
+    // Handle sales-entry and sales-payments menu items
+    if (menuItem.id === 'sales-entry') {
+      targetPath = '/sales?menu=entry&tab=supplier-entry';
+    } else if (menuItem.id === 'sales-payments') {
+      targetPath = '/sales?menu=payments&tab=supplier-payments';
+    } else if (menuItem.id.startsWith('entry-')) {
       let tabType = 'supplier';
       if (menuItem.id.includes('supplier')) {
         tabType = 'supplier';
@@ -242,20 +335,8 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           return;
         }
         
-        // Use router.push with error handling
-        const pushPromise = router.push(targetPath);
-        
-        // Handle promise rejection (prefetch failures)
-        if (pushPromise && typeof pushPromise.catch === 'function') {
-          pushPromise.catch((err: any) => {
-            // Prefetch failures are often non-critical - try direct navigation
-            console.warn('Router push failed, using fallback:', err);
-            if (typeof window !== 'undefined') {
-              // Use replace to avoid adding to history
-              window.location.href = targetPath;
-            }
-          });
-        }
+        // Use router.push - Next.js 15 returns void
+        router.push(targetPath);
       } catch (err) {
         console.warn('Navigation error:', err);
         // As a resilience fallback (e.g., dev server hiccup), force a hard navigation
@@ -388,10 +469,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
               <div className="sticky top-0 z-30 flex-shrink-0 bg-card" style={{ borderRadius: 0 }}>
               <Header toggleSidebar={toggleSidebar} />
-              <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={(tabId: string) => {
-                const menuItem = openTabs.find(tab => tab.id === tabId) || allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === tabId);
-                if (menuItem) handleTabSelect(menuItem);
-              }} closeTab={handleTabClose} />
+              {/* Hide TabBar for unified sales page - it has its own tab system */}
+              {!pathname.startsWith('/sales') && (
+                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={(tabId: string) => {
+                   const menuItem = openTabs.find(tab => tab.id === tabId) || flattenedMenuItems.find(item => item.id === tabId);
+                   if (menuItem) handleTabSelect(menuItem);
+                 }} closeTab={handleTabClose} />
+              )}
             </div>
               <div className="flex-grow relative overflow-y-auto overflow-x-hidden">
                 <main className="p-4 sm:p-6" style={{ margin: '-16px' }}>

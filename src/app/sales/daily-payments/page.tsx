@@ -9,7 +9,7 @@ import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { CalendarClock, CircleDollarSign, Users, Loader2, Calendar as CalendarIcon, CheckCircle } from 'lucide-react';
+import { CalendarClock, CircleDollarSign, Users, Calendar as CalendarIcon, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -35,14 +35,8 @@ export default function DailyPaymentsPage() {
     const globalData = useGlobalData();
     const suppliers = globalData.suppliers;
     const payments = globalData.paymentHistory;
-    const [isClient, setIsClient] = useState(false);
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
-
-    useEffect(() => {
-        setIsClient(true);
-        // Use global data store - NO duplicate listeners
-    }, []);
 
     const filteredData = useMemo(() => {
         const today = new Date();
@@ -91,10 +85,6 @@ export default function DailyPaymentsPage() {
     const handleGoToPayments = (supplier: Customer) => {
         const customerId = supplier.customerId;
         router.push(`/sales/supplier-payments?customerId=${encodeURIComponent(customerId)}`);
-    }
-
-    if (!isClient) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
     
     return (

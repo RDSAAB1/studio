@@ -15,7 +15,7 @@ import {
 } from '@/lib/firestore';
 import type { BankAccount, Payment } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
-import { useSupplierData } from '@/hooks/use-supplier-data';
+import { useGlobalData } from '@/contexts/global-data-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,7 +45,10 @@ type SupplierBankAccountFormData = z.infer<typeof supplierBankAccountSchema>;
 
 export default function SupplierBankAccountsPage({ embedded = false }: SupplierBankAccountsPageProps = {}) {
   const { toast } = useToast();
-  const { banks, bankBranches } = useSupplierData();
+  // Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+  const banks = globalData.banks;
+  const bankBranches = globalData.bankBranches;
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);

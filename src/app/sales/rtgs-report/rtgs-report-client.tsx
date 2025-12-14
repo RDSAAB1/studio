@@ -57,7 +57,6 @@ export default function RtgsReportClient() {
     // Use global data store - NO duplicate listeners
     const globalData = useGlobalData();
     const payments = globalData.paymentHistory;
-    const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
@@ -92,12 +91,6 @@ export default function RtgsReportClient() {
         fetchSettings();
         // Use global data store - NO duplicate listeners
     }, []);
-
-    useEffect(() => {
-        if (settings !== null && payments !== undefined) {
-            setLoading(false);
-        }
-    }, [settings, payments]);
 
     const reportRows = useMemo(() => {
         if (!settings || !payments) return [];
@@ -558,10 +551,6 @@ export default function RtgsReportClient() {
             setIsUpdating(false);
         }
     };
-
-    if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
-    }
     
     return (
         <div className="space-y-6">

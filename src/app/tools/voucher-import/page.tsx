@@ -722,7 +722,6 @@ export default function VoucherImportTool() {
   const [formState, setFormState] = useState<CombinedEntry>(emptyEntry);
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [headerSettings, setHeaderSettings] = useState<MandiHeaderSettings>(defaultHeaderSettings);
   const [isHeaderSaving, setIsHeaderSaving] = useState(false);
 
@@ -900,10 +899,6 @@ export default function VoucherImportTool() {
             description: "Unable to load mandi report data.",
             variant: "destructive",
           });
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
         }
       }
     };
@@ -2061,9 +2056,7 @@ export default function VoucherImportTool() {
                   {entries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={17} className="text-center py-10">
-                        {isLoading
-                          ? "Loading data..."
-                          : 'No entries yet. Paste inputs above and click "Parse & Merge".'}
+                        {'No entries yet. Paste inputs above and click "Parse & Merge".'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -2315,7 +2308,7 @@ export default function VoucherImportTool() {
               disabled={isSaving}
             >
               {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span>Saving...</span>
               ) : (
                 <SaveIcon className="mr-2 h-4 w-4" />
               )}

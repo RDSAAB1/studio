@@ -1,26 +1,31 @@
 "use client";
 
-import { useState, useEffect, useMemo, startTransition } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getSupplierBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
+import { useGlobalData } from "@/contexts/global-data-context";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, levenshteinDistance } from '@/lib/utils';
 
 
 export const useSupplierData = () => {
     const { toast } = useToast();
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [supplierBankAccounts, setSupplierBankAccounts] = useState<BankAccount[]>([]);
-    const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
+    // Map global data to local variables for backward compatibility
+    const suppliers = globalData.suppliers;
+    const paymentHistory = globalData.paymentHistory;
+    const customerPayments = globalData.customerPayments;
+    const incomes = globalData.incomes;
+    const expenses = globalData.expenses;
+    const fundTransactions = globalData.fundTransactions;
+    const banks = globalData.banks;
+    const bankBranches = globalData.bankBranches;
+    const bankAccounts = globalData.bankAccounts;
+    const supplierBankAccounts = globalData.supplierBankAccounts;
+    const receiptSettings = globalData.receiptSettings;
+    
+    const [loading, setLoading] = useState(false); // No loading needed - data is already available
     const [isClient, setIsClient] = useState(false);
     
     const allExpenses = useMemo(() => [...(expenses || []), ...(paymentHistory || [])], [expenses, paymentHistory]);
@@ -29,326 +34,9 @@ export const useSupplierData = () => {
 
     useEffect(() => {
         setIsClient(true);
+        // Data is already loaded from global context, no need to wait
+        setLoading(false);
     }, []);
-
-    useEffect(() => {
-        if (!isClient) return;
-
-        let isSubscribed = true;
-        let dataLoadCount = 0;
-        const totalListeners = 10; // 9 realtime + 1 receipt settings
-        let initialLoadComplete = false; // Track when initial load is done
-        
-        const checkAllLoaded = () => {
-            dataLoadCount++;
-            if (dataLoadCount >= totalListeners && isSubscribed) {
-                startTransition(() => {
-                    setLoading(false);
-                });
-                // Mark initial load complete after all data is loaded
-                initialLoadComplete = true;
-            }
-        };
-        
-        const unsubFunctions = [
-            getSuppliersRealtime(data => { 
-                if (isSubscribed) {
-                    // ✅ Use startTransition only during initial load
-                    // Real-time updates should be immediate for live chat experience
-                    if (!initialLoadComplete) {
-                        startTransition(() => setSuppliers(data));
-                    } else {
-                        // Real-time update - immediate state update (no transition)
-                        setSuppliers(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Suppliers fetch error:", error);
-                checkAllLoaded();
-            }),
-            getPaymentsRealtime(data => { 
-                if (isSubscribed) {
-                    // ✅ Real-time updates should be immediate on device Y
-                    if (!initialLoadComplete) {
-                        startTransition(() => setPaymentHistory(data));
-                    } else {
-                        // Immediate update for real-time changes from other devices
-                        setPaymentHistory(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Payments fetch error:", error);
-                checkAllLoaded();
-            }),
-            getCustomerPaymentsRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setCustomerPayments(data));
-                    } else {
-                        // Immediate update for real-time changes
-                        setCustomerPayments(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Customer Payments fetch error:", error);
-                checkAllLoaded();
-            }),
-            getIncomeRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setIncomes(data));
-                    } else {
-                        setIncomes(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Incomes fetch error:", error);
-                checkAllLoaded();
-            }),
-            getExpensesRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setExpenses(data));
-                    } else {
-                        setExpenses(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Expenses fetch error:", error);
-                checkAllLoaded();
-            }),
-            getFundTransactionsRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setFundTransactions(data));
-                    } else {
-                        setFundTransactions(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Fund Transactions fetch error:", error);
-                checkAllLoaded();
-            }),
-            getBanksRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setBanks(data));
-                    } else {
-                        setBanks(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Banks fetch error:", error);
-                checkAllLoaded();
-            }),
-            getBankBranchesRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setBankBranches(data));
-                    } else {
-                        setBankBranches(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Bank Branches fetch error:", error);
-                checkAllLoaded();
-            }),
-            getBankAccountsRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setBankAccounts(data));
-                    } else {
-                        setBankAccounts(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Bank Accounts fetch error:", error);
-                checkAllLoaded();
-            }),
-            getSupplierBankAccountsRealtime(data => { 
-                if (isSubscribed) {
-                    if (!initialLoadComplete) {
-                        startTransition(() => setSupplierBankAccounts(data));
-                    } else {
-                        setSupplierBankAccounts(data);
-                    }
-                    checkAllLoaded();
-                }
-            }, error => {
-                console.error("Supplier Bank Accounts fetch error:", error);
-                checkAllLoaded();
-            }),
-        ];
-
-        getReceiptSettings().then(settings => {
-            if (isSubscribed) {
-                startTransition(() => setReceiptSettings(settings));
-                checkAllLoaded();
-            }
-        }).catch(error => {
-            console.error("Receipt settings fetch error:", error);
-            checkAllLoaded();
-        });
-
-        // ✅ Listen for IndexedDB updates to trigger immediate refresh
-        const handlePaymentUpdate = async (event: CustomEvent) => {
-            if (!isSubscribed) return;
-            try {
-                if (!event || !event.detail) {
-                    console.warn('Invalid event data for payment update');
-                    return;
-                }
-                
-                const { payment, paymentMethod, isCustomer: isCustomerPayment } = event.detail;
-                
-                // Immediately refresh payments from IndexedDB
-                const databaseModule = await import('@/lib/database');
-                const dbInstance = databaseModule?.db;
-                if (!dbInstance) {
-                    console.warn('Database instance not available for payment update refresh');
-                    return;
-                }
-                
-                if (paymentMethod === 'Gov.') {
-                    const allPayments = await Promise.all([
-                        dbInstance.payments.orderBy('date').reverse().toArray(),
-                        dbInstance.governmentFinalizedPayments.orderBy('date').reverse().toArray()
-                    ]);
-                    startTransition(() => setPaymentHistory([...allPayments[0], ...allPayments[1]] as Payment[]));
-                } else if (isCustomerPayment) {
-                    const customerPayments = await dbInstance.customerPayments.orderBy('date').reverse().toArray();
-                    startTransition(() => setCustomerPayments(customerPayments as CustomerPayment[]));
-                } else {
-                    const payments = await dbInstance.payments.orderBy('date').reverse().toArray();
-                    startTransition(() => setPaymentHistory(payments as Payment[]));
-                }
-            } catch (error) {
-                console.error('Error refreshing payments from IndexedDB after update:', error);
-                // Don't throw - this is a background update
-            }
-        };
-
-        const handlePaymentDelete = async (event: CustomEvent) => {
-            if (!isSubscribed) return;
-            try {
-                if (!event || !event.detail) {
-                    console.warn('Invalid event data for payment delete');
-                    return;
-                }
-                
-                const { paymentId, isGovPayment, isCustomer: isCustomerPayment } = event.detail;
-                
-                // Immediately refresh payments from IndexedDB
-                const databaseModule = await import('@/lib/database');
-                const dbInstance = databaseModule?.db;
-                if (!dbInstance) {
-                    console.warn('Database instance not available for payment delete refresh');
-                    return;
-                }
-                
-                if (isGovPayment) {
-                    const allPayments = await Promise.all([
-                        dbInstance.payments.orderBy('date').reverse().toArray(),
-                        dbInstance.governmentFinalizedPayments.orderBy('date').reverse().toArray()
-                    ]);
-                    startTransition(() => setPaymentHistory([...allPayments[0], ...allPayments[1]] as Payment[]));
-                } else if (isCustomerPayment) {
-                    const customerPayments = await dbInstance.customerPayments.orderBy('date').reverse().toArray();
-                    startTransition(() => setCustomerPayments(customerPayments as CustomerPayment[]));
-                } else {
-                    const payments = await dbInstance.payments.orderBy('date').reverse().toArray();
-                    startTransition(() => setPaymentHistory(payments as Payment[]));
-                }
-            } catch (error) {
-                console.error('Error refreshing payments from IndexedDB after delete:', error);
-                // Don't throw - this is a background update
-            }
-        };
-
-        const handleSuppliersUpdate = async (event: CustomEvent) => {
-            if (!isSubscribed) return;
-            try {
-                if (!event || !event.detail) {
-                    console.warn('Invalid event data for suppliers update');
-                    return;
-                }
-                
-                const { affectedSrNos, isCustomer: isCustomerUpdate } = event.detail;
-                if (!affectedSrNos || !Array.isArray(affectedSrNos)) {
-                    console.warn('Invalid affectedSrNos in suppliers update event');
-                    return;
-                }
-                
-                // Immediately refresh suppliers/customers from IndexedDB
-                const databaseModule = await import('@/lib/database');
-                const dbInstance = databaseModule?.db;
-                if (!dbInstance) {
-                    console.warn('Database instance not available for suppliers update refresh');
-                    return;
-                }
-                
-                if (isCustomerUpdate) {
-                    const customers = await dbInstance.customers.orderBy('srNo').reverse().toArray();
-                    startTransition(() => {
-                        // Update only affected customers in state
-                        setSuppliers(prev => {
-                            const updated = [...prev];
-                            customers.forEach(customer => {
-                                const index = updated.findIndex(s => s.id === customer.id);
-                                if (index >= 0) {
-                                    updated[index] = customer as Customer;
-                                } else if (affectedSrNos.includes(customer.srNo)) {
-                                    updated.push(customer as Customer);
-                                }
-                            });
-                            return updated;
-                        });
-                    });
-                } else {
-                    const suppliers = await dbInstance.suppliers.orderBy('srNo').reverse().toArray();
-                    startTransition(() => {
-                        // Update only affected suppliers in state
-                        setSuppliers(prev => {
-                            const updated = [...prev];
-                            suppliers.forEach(supplier => {
-                                const index = updated.findIndex(s => s.id === supplier.id);
-                                if (index >= 0) {
-                                    updated[index] = supplier as Customer;
-                                } else if (affectedSrNos.includes(supplier.srNo)) {
-                                    updated.push(supplier as Customer);
-                                }
-                            });
-                            return updated;
-                        });
-                    });
-                }
-            } catch (error) {
-                console.error('Error refreshing suppliers from IndexedDB after update:', error);
-                // Don't throw - this is a background update
-            }
-        };
-
-        window.addEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
-        window.addEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
-        window.addEventListener('indexeddb:suppliers:updated', handleSuppliersUpdate as EventListener);
-
-        return () => {
-            isSubscribed = false;
-            unsubFunctions.forEach(unsub => unsub());
-            window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
-            window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
-            window.removeEventListener('indexeddb:suppliers:updated', handleSuppliersUpdate as EventListener);
-        };
-    }, [isClient]);
     
     const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];

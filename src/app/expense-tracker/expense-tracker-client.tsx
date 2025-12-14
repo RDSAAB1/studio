@@ -23,7 +23,8 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes, getAllExpenses } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes } from "@/lib/firestore";
+import { useGlobalData } from "@/contexts/global-data-context";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
@@ -140,7 +141,7 @@ const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
   handleEdit: (tx: any) => void;
   handleDelete: (tx: any) => void;
 }) {
-  const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(runningLedger, {
+  const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(runningLedger, {
     totalItems: runningLedger.length,
     initialLoad: 30,
     loadMore: 30,
@@ -217,14 +218,7 @@ const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
               </TableCell>
             </TableRow>
           ))}
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading more transactions...</span>
-              </TableCell>
-            </TableRow>
-          )}
+          {/* NO LOADING - Data loads instantly, infinite scroll works in background */}
           {!hasMore && runningLedger.length > 30 && (
             <TableRow>
               <TableCell colSpan={8} className="text-center py-2 text-xs text-muted-foreground">
@@ -277,15 +271,18 @@ export default function IncomeExpenseClient() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // ✅ Use global data context - NO duplicate listeners
+  const globalData = useGlobalData();
+
   const [income, setIncome] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses); // Use global data
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions); // Use global data
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts); // Use global data
   const [projects, setProjects] = useState<Project[]>([]);
 
-  const [isPageLoading, setIsPageLoading] = useState(true);
+  // NO PAGE LOADING - Data loads initially, then only CRUD updates
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' }>({
@@ -308,55 +305,46 @@ export default function IncomeExpenseClient() {
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
 
     useEffect(() => {
-        // First, fetch ALL income and expense transactions for payee extraction
-        // Then set up realtime listeners for updates
+        // ✅ Use global data instead of creating duplicate listeners
+        // Sync global data to local state
+        setExpenses(globalData.expenses);
+        setFundTransactions(globalData.fundTransactions);
+        setBankAccounts(globalData.bankAccounts);
+        
+        // First, fetch ALL income transactions for payee extraction (expenses already from global)
         const fetchAllTransactions = async () => {
             try {
-                console.log('[Income/Expense] Fetching all transactions for payee extraction...');
-                const [allIncomes, allExpenses] = await Promise.all([
-                    getAllIncomes(),
-                    getAllExpenses()
-                ]);
-                console.log('[Income/Expense] Fetched all:', {
+                console.log('[Income/Expense] Fetching income transactions for payee extraction...');
+                const allIncomes = await getAllIncomes();
+                console.log('[Income/Expense] Fetched:', {
                     incomes: allIncomes.length,
-                    expenses: allExpenses.length,
+                    expenses: globalData.expenses.length,
                     incomePayees: [...new Set(allIncomes.map(i => i.payee).filter(Boolean))].slice(0, 10),
-                    expensePayees: [...new Set(allExpenses.map(e => e.payee).filter(Boolean))].slice(0, 10)
+                    expensePayees: [...new Set(globalData.expenses.map(e => e.payee).filter(Boolean))].slice(0, 10)
                 });
                 setIncome(allIncomes);
-                setExpenses(allExpenses);
             } catch (error) {
-                console.error('[Income/Expense] Error fetching all transactions:', error);
+                console.error('[Income/Expense] Error fetching income transactions:', error);
             }
         };
 
         fetchAllTransactions();
 
-        // Then set up realtime listeners for updates
+        // Then set up realtime listeners for updates (only for data not in global context)
         const unsubIncome = getIncomeRealtime((data) => {
             console.log('[Income] Realtime update:', data.length, 'income transactions');
             setIncome(data);
         }, console.error);
-        const unsubExpenses = getExpensesRealtime((data) => {
-            console.log('[Expenses] Realtime update:', data.length, 'expense transactions');
-            setExpenses(data);
-        }, console.error);
         const unsubPayments = getPaymentsRealtime(setPayments, console.error);
-        const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
-        const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
 
         return () => {
-            unsubIncome(); unsubExpenses(); unsubFunds(); unsubLoans(); unsubAccounts(); unsubProjects(); unsubPayments();
+            unsubIncome(); unsubLoans(); unsubProjects(); unsubPayments();
         }
-    }, []);
+    }, [globalData]);
 
-  useEffect(() => {
-    if(income !== undefined && expenses !== undefined) {
-      setIsPageLoading(false);
-    }
-  }, [income, expenses])
+  // NO PAGE LOADING - Components render immediately
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
       console.log('[AllTransactions] Checking data:', {
@@ -1531,9 +1519,7 @@ export default function IncomeExpenseClient() {
     };
   }, [filteredTransactions, runningLedger]);
     
-  if(isPageLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin" /></div>
-  }
+  // NO PAGE LOADING - Always render immediately
 
   return (
     <div className="space-y-6">

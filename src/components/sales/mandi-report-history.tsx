@@ -41,34 +41,18 @@ export function MandiReportHistory() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    setIsLoading(true);
     const unsubscribe = getMandiReportsRealtime(
       (data) => {
         console.log(`[MandiReportHistory] ✅ Real-time update: ${data.length} reports`);
-        setIsLoading(false);
         // Data is automatically synced to IndexedDB by the real-time function
       },
       (error) => {
         console.error('[MandiReportHistory] ❌ Error in real-time listener:', error);
-        setIsLoading(false);
       }
     );
     
     return () => unsubscribe();
   }, []);
-  
-  // Debug: Log when data changes
-  useEffect(() => {
-    if (allEntriesRaw !== undefined) {
-      console.log('Mandi reports data updated:', {
-        count: allEntriesRaw?.length || 0,
-        sample: allEntriesRaw?.[0] || null
-      });
-      if (allEntriesRaw.length > 0) {
-        setIsLoading(false);
-      }
-    }
-  }, [allEntriesRaw]);
   
   // Sort by purchaseDate manually
   const allEntries = useMemo(() => {
@@ -170,7 +154,6 @@ export function MandiReportHistory() {
           <div className="flex items-center gap-2">
             <Button 
               onClick={async () => {
-                setIsLoading(true);
                 // Clear lastSync to force fresh fetch
                 if (typeof window !== 'undefined') {
                   localStorage.removeItem('lastSync:mandiReports');
@@ -196,15 +179,12 @@ export function MandiReportHistory() {
                   }
                 } catch (error) {
                   console.error('[MandiReportHistory] Error refreshing data:', error);
-                } finally {
-                  setIsLoading(false);
                 }
               }} 
               variant="outline" 
               size="sm"
-              disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className="h-4 w-4 mr-2" />
               Force Refresh
             </Button>
             <Button onClick={handleExport} variant="outline" size="sm" disabled={filteredEntries.length === 0}>
@@ -265,16 +245,7 @@ export function MandiReportHistory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(allEntriesRaw === undefined || isLoading) ? (
-                <TableRow>
-                  <TableCell colSpan={13} className="text-center py-8">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-muted-foreground">Loading data...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredEntries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                     {allEntries.length === 0 ? (

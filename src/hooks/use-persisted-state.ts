@@ -34,11 +34,16 @@ export function usePersistedState<T>(
       return;
     }
 
-    try {
-      window.localStorage.setItem(key, serialize(state));
-    } catch (error) {
-      console.warn(`Error saving persisted state for key "${key}":`, error);
-    }
+    // Debounce localStorage writes to avoid blocking UI
+    const timeoutId = setTimeout(() => {
+      try {
+        window.localStorage.setItem(key, serialize(state));
+      } catch (error) {
+        console.warn(`Error saving persisted state for key "${key}":`, error);
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [key, state, serialize]);
 
   return [state, setState];

@@ -2190,17 +2190,89 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
 
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:suppliers');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+    
     const fetchSuppliers = async (): Promise<Customer[]> => {
-        const snapshot = await getDocs(query(suppliersCollection, orderBy("srNo", "desc")));
+        const lastSyncTime = getLastSyncTime();
+        
+        // ✅ Check if local data exists (synchronously check count)
+        let hasLocalSupplierData = false;
+        if (db && db.suppliers) {
+            try {
+                const count = await db.suppliers.count();
+                hasLocalSupplierData = count > 0;
+            } catch {
+                hasLocalSupplierData = false;
+            }
+        }
+        
+        let suppliersQuery;
+        let snapshot;
+        
+        // ✅ Only use incremental sync if we have BOTH lastSyncTime AND local data exists
+        // If IndexedDB is empty, do full sync even if lastSyncTime exists (data might have been cleared)
+        if (lastSyncTime && hasLocalSupplierData) {
+            // Use incremental sync - only get changes after last sync (when we have local data)
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            
+            try {
+                suppliersQuery = query(
+                    suppliersCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+                snapshot = await getDocs(suppliersQuery);
+            } catch (error) {
+                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
+                console.warn('Incremental sync failed for suppliers, falling back to full sync:', error);
+                suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
+                snapshot = await getDocs(suppliersQuery);
+            }
+        } else {
+            // Full sync - get all (when no local data OR no lastSyncTime)
+            suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
+            snapshot = await getDocs(suppliersQuery);
+        }
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', snapshot.size);
+        
+        // Update last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:suppliers', Date.now().toString());
+        }
+        
         return suppliers;
     };
     
     return createMetadataBasedListener<Customer>(
         {
             collectionName: 'suppliers',
-            fetchFunction: fetchSuppliers,
+            fetchFunction: async () => {
+                const newSuppliers = await fetchSuppliers();
+                const lastSyncTime = getLastSyncTime();
+                
+                // Always merge with existing local data if doing incremental sync
+                if (db && db.suppliers && lastSyncTime) {
+                    const existingSuppliers = await db.suppliers.toArray();
+                    const mergedMap = new Map<string, Customer>();
+                    // Start with existing data
+                    existingSuppliers.forEach(s => mergedMap.set(s.id, s));
+                    // Update/add with new data
+                    newSuppliers.forEach(s => mergedMap.set(s.id, s));
+                    const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                        const aSrNo = parseInt(a.srNo || '0') || 0;
+                        const bSrNo = parseInt(b.srNo || '0') || 0;
+                        return bSrNo - aSrNo;
+                    });
+                    return merged;
+                }
+                // Full sync - return all new suppliers
+                return newSuppliers;
+            },
             localTableName: 'suppliers'
         },
         callback,
@@ -2326,6 +2398,13 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     // ✅ Use metadata-based listener - listen to sync_registry instead of actual collections
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
+    // ✅ Use incremental sync - only fetch NEW/CHANGED payments after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:payments');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
     // ✅ Load from IndexedDB first (immediate response, no Firestore read)
     if (db) {
         Promise.all([
@@ -2333,28 +2412,92 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             db.governmentFinalizedPayments.orderBy('date').reverse().toArray()
         ]).then(([regularData, govData]) => {
             const allPayments = [...regularData, ...govData] as Payment[];
-            const sorted = allPayments.sort((a, b) => {
-                return new Date(b.date).getTime() - new Date(a.date).getTime();
-            });
-            callback(sorted);
+            if (allPayments.length > 0) {
+                const sorted = allPayments.sort((a, b) => {
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                });
+                callback(sorted);
+            }
         }).catch(() => {
             // If local read fails, continue with Firestore
         });
     }
-    
-    // Fetch function that gets both regular and gov payments (one-time fetch when sync registry changes)
+
+    // Fetch function that gets both regular and gov payments (incremental sync)
     const fetchPayments = async (): Promise<Payment[]> => {
-        const [regularSnapshot, govSnapshot] = await Promise.all([
-            getDocs(query(supplierPaymentsCollection, orderBy("date", "desc"))),
-            getDocs(query(governmentFinalizedPaymentsCollection, orderBy("date", "desc")))
-        ]);
+        const lastSyncTime = getLastSyncTime();
+        
+        // ✅ Check if local data exists (synchronously check count)
+        let hasLocalData = false;
+        if (db) {
+            try {
+                const [regularCount, govCount] = await Promise.all([
+                    db.payments.count(),
+                    db.governmentFinalizedPayments.count()
+                ]);
+                hasLocalData = (regularCount + govCount) > 0;
+            } catch {
+                hasLocalData = false;
+            }
+        }
+        
+        let regularQuery, govQuery;
+        
+        // ✅ Only use incremental sync if we have BOTH lastSyncTime AND local data exists
+        // If IndexedDB is empty, do full sync even if lastSyncTime exists (data might have been cleared)
+        let regularSnapshot, govSnapshot;
+        
+        if (lastSyncTime && hasLocalData) {
+            // Use incremental sync - only get changes after last sync (when we have local data)
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            
+            try {
+                regularQuery = query(
+                    supplierPaymentsCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+                govQuery = query(
+                    governmentFinalizedPaymentsCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+                
+                [regularSnapshot, govSnapshot] = await Promise.all([
+                    getDocs(regularQuery),
+                    getDocs(govQuery)
+                ]);
+            } catch (error) {
+                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
+                console.warn('Incremental sync failed, falling back to full sync:', error);
+                regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
+                govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
+                [regularSnapshot, govSnapshot] = await Promise.all([
+                    getDocs(regularQuery),
+                    getDocs(govQuery)
+                ]);
+            }
+        } else {
+            // Full sync - get all (when no local data OR no lastSyncTime)
+            regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
+            govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
+            [regularSnapshot, govSnapshot] = await Promise.all([
+                getDocs(regularQuery),
+                getDocs(govQuery)
+            ]);
+        }
         
         const regularPayments = regularSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         const govPayments = govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         
-        // Track reads (one-time fetch per sync signal, not streaming)
+        // Track reads (incremental sync - only reads changed documents)
         firestoreMonitor.logRead('payments', 'getPaymentsRealtime', regularSnapshot.size);
         firestoreMonitor.logRead('governmentFinalizedPayments', 'getPaymentsRealtime', govSnapshot.size);
+        
+        // Update last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:payments', Date.now().toString());
+        }
         
         // Merge and sort by date (newest first)
         const allPayments = [...regularPayments, ...govPayments].sort((a, b) => {
@@ -2398,11 +2541,78 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         }
     };
     
+    // Shared fetch function with merge logic and debouncing
+    let lastFetchTime = 0;
+    let lastFetchPromise: Promise<Payment[]> | null = null;
+    const sharedFetchFunction = async (): Promise<Payment[]> => {
+        // Debounce: Don't fetch if we just fetched within last 30 seconds (prevents duplicate reads)
+        const now = Date.now();
+        if (now - lastFetchTime < 30000 && lastFetchPromise) {
+            // Return existing data from IndexedDB if available, or wait for ongoing fetch
+            if (db && db.payments && db.governmentFinalizedPayments) {
+                try {
+                    // Wait for ongoing fetch if it exists
+                    if (lastFetchPromise) {
+                        return await lastFetchPromise;
+                    }
+                    // Otherwise return cached data
+                    const [existingRegular, existingGov] = await Promise.all([
+                        db.payments.toArray(),
+                        db.governmentFinalizedPayments.toArray()
+                    ]);
+                    const existingPayments = [...existingRegular, ...existingGov] as Payment[];
+                    return existingPayments.sort((a, b) => {
+                        return new Date(b.date).getTime() - new Date(a.date).getTime();
+                    });
+                } catch {
+                    // If IndexedDB read fails, continue with fetch
+                }
+            }
+        }
+        lastFetchTime = now;
+        
+        // Create fetch promise and cache it
+        lastFetchPromise = (async () => {
+            const newPayments = await fetchPayments();
+            const lastSyncTime = getLastSyncTime();
+            
+            // Always merge with existing local data if doing incremental sync
+            if (db && db.payments && db.governmentFinalizedPayments && lastSyncTime) {
+                const [existingRegular, existingGov] = await Promise.all([
+                    db.payments.toArray(),
+                    db.governmentFinalizedPayments.toArray()
+                ]);
+                const existingPayments = [...existingRegular, ...existingGov] as Payment[];
+                const mergedMap = new Map<string, Payment>();
+                // Start with existing data
+                existingPayments.forEach(p => mergedMap.set(p.id, p));
+                // Update/add with new data
+                newPayments.forEach(p => mergedMap.set(p.id, p));
+                const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                });
+                return merged;
+            }
+            // Full sync - return all new payments
+            return newPayments;
+        })();
+        
+        const result = await lastFetchPromise;
+        // Clear promise after 30 seconds
+        setTimeout(() => {
+            if (Date.now() - lastFetchTime >= 30000) {
+                lastFetchPromise = null;
+            }
+        }, 30000);
+        
+        return result;
+    };
+    
     // Listen to payments collection metadata (triggers fetch when payments change)
     const unsubscribe1 = createMetadataBasedListener<Payment>(
         {
             collectionName: 'payments',
-            fetchFunction: fetchPayments,
+            fetchFunction: sharedFetchFunction,
             localTableName: 'payments' // Not used for dual-collection, but required
         },
         async (data) => {
@@ -2416,7 +2626,7 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     const unsubscribe2 = createMetadataBasedListener<Payment>(
         {
             collectionName: 'governmentFinalizedPayments',
-            fetchFunction: fetchPayments,
+            fetchFunction: sharedFetchFunction,
             localTableName: 'governmentFinalizedPayments' // Not used for dual-collection, but required
         },
         async (data) => {
@@ -2549,17 +2759,138 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
 
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
+    // ✅ Use incremental sync - only fetch NEW/CHANGED expenses after last sync
+    const getLastSyncTime = (): number | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem('lastSync:expenses');
+        return stored ? parseInt(stored, 10) : undefined;
+    };
+
+    // ✅ Load from IndexedDB first (immediate response, no Firestore read)
+    if (db && db.expenses) {
+        db.expenses.orderBy('date').reverse().toArray().then((localData) => {
+            if (localData && localData.length > 0) { // Only call callback if local data exists
+                callback(localData as Expense[]);
+            }
+        }).catch(() => {
+            // If local read fails, continue with Firestore
+        });
+    }
+
     const fetchExpenses = async (): Promise<Expense[]> => {
-        const snapshot = await getDocs(query(expensesCollection, orderBy("date", "desc")));
+        const lastSyncTime = getLastSyncTime();
+        
+        // ✅ Check if local data exists (synchronously check count)
+        let hasLocalExpenseData = false;
+        if (db && db.expenses) {
+            try {
+                const count = await db.expenses.count();
+                hasLocalExpenseData = count > 0;
+            } catch {
+                hasLocalExpenseData = false;
+            }
+        }
+        
+        let expensesQuery;
+        let snapshot;
+        
+        // ✅ Only use incremental sync if we have BOTH lastSyncTime AND local data exists
+        // If IndexedDB is empty, do full sync even if lastSyncTime exists (data might have been cleared)
+        if (lastSyncTime && hasLocalExpenseData) {
+            // Use incremental sync - only get changes after last sync (when we have local data)
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            
+            try {
+                expensesQuery = query(
+                    expensesCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+                snapshot = await getDocs(expensesQuery);
+            } catch (error) {
+                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
+                console.warn('Incremental sync failed for expenses, falling back to full sync:', error);
+                expensesQuery = query(expensesCollection, orderBy("date", "desc"));
+                snapshot = await getDocs(expensesQuery);
+            }
+        } else {
+            // Full sync - get all (when no local data OR no lastSyncTime)
+            expensesQuery = query(expensesCollection, orderBy("date", "desc"));
+            snapshot = await getDocs(expensesQuery);
+        }
+        
         const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
         firestoreMonitor.logRead('expenses', 'getExpensesRealtime', snapshot.size);
+        
+        // Update last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:expenses', Date.now().toString());
+        }
+        
         return expenses;
+    };
+    
+    // Shared fetch function with merge logic and debouncing (similar to payments)
+    let lastFetchTime = 0;
+    let lastFetchPromise: Promise<Expense[]> | null = null;
+    const sharedFetchFunction = async (): Promise<Expense[]> => {
+        // Debounce: Don't fetch if we just fetched within last 30 seconds (prevents duplicate reads)
+        const now = Date.now();
+        if (now - lastFetchTime < 30000 && lastFetchPromise) {
+            // Return existing data from IndexedDB if available, or wait for ongoing fetch
+            if (db && db.expenses) {
+                try {
+                    // Wait for ongoing fetch if it exists
+                    if (lastFetchPromise) {
+                        return await lastFetchPromise;
+                    }
+                    // Otherwise return cached data
+                    const existingExpenses = await db.expenses.orderBy('date').reverse().toArray();
+                    return existingExpenses as Expense[];
+                } catch {
+                    // If IndexedDB read fails, continue with fetch
+                }
+            }
+        }
+        lastFetchTime = now;
+        
+        // Create fetch promise and cache it
+        lastFetchPromise = (async () => {
+            const newExpenses = await fetchExpenses();
+            const lastSyncTime = getLastSyncTime();
+            
+            // Always merge with existing local data if doing incremental sync
+            if (db && db.expenses && lastSyncTime) {
+                const existingExpenses = await db.expenses.toArray();
+                const mergedMap = new Map<string, Expense>();
+                // Start with existing data
+                existingExpenses.forEach(e => mergedMap.set(e.id, e));
+                // Update/add with new data
+                newExpenses.forEach(e => mergedMap.set(e.id, e));
+                const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                });
+                return merged;
+            }
+            // Full sync - return all new expenses
+            return newExpenses;
+        })();
+        
+        const result = await lastFetchPromise;
+        // Clear promise after 30 seconds
+        setTimeout(() => {
+            if (Date.now() - lastFetchTime >= 30000) {
+                lastFetchPromise = null;
+            }
+        }, 30000);
+        
+        return result;
     };
     
     return createMetadataBasedListener<Expense>(
         {
             collectionName: 'expenses',
-            fetchFunction: fetchExpenses,
+            fetchFunction: sharedFetchFunction,
             localTableName: 'expenses'
         },
         callback,
