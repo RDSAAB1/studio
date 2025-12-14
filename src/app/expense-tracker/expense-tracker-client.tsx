@@ -31,7 +31,7 @@ import { firestoreDB } from "@/lib/firebase";
 
 
 import { Loader2, Pen, PlusCircle, Save, Trash, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer } from "lucide-react";
-import { format, addMonths } from "date-fns"
+import { format, addMonths, parse, isValid } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
@@ -289,8 +289,8 @@ export default function IncomeExpenseClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' }>({
-    key: 'transactionId',
-    direction: 'descending',
+    key: 'date',
+    direction: 'descending', // Newest first by default
   });
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
@@ -1127,6 +1127,40 @@ export default function IncomeExpenseClient() {
     setSortConfig({ key, direction });
   };
 
+  // Helper function to parse dates consistently (same as in runningLedger)
+  const parseDateForSort = (dateStr: string): number => {
+    if (!dateStr || typeof dateStr !== 'string') return 0;
+    
+    // First try ISO format (yyyy-MM-dd) - this is how dates are stored in database
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+      const isoDate = new Date(dateStr + 'T00:00:00');
+      if (!isNaN(isoDate.getTime())) {
+        return isoDate.getTime();
+      }
+    }
+    
+    // Try date-fns parse for other formats
+    const formats = ['dd-MMM-yy', 'dd-MMM-yyyy', 'dd/MM/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
+    for (const fmt of formats) {
+      try {
+        const parsed = parse(dateStr, fmt, new Date());
+        if (isValid(parsed)) {
+          return parsed.getTime();
+        }
+      } catch {
+        continue;
+      }
+    }
+    
+    // Fallback to native Date parsing
+    const fallbackDate = new Date(dateStr);
+    if (!isNaN(fallbackDate.getTime())) {
+      return fallbackDate.getTime();
+    }
+    
+    return 0;
+  };
+
   const sortedTransactions = useMemo(() => {
     const sortableItems = [...filteredTransactions];
         sortableItems.sort((a, b) => {
@@ -1140,9 +1174,27 @@ export default function IncomeExpenseClient() {
       }
 
       if (sortConfig.key === 'date') {
-        const timeA = new Date(String(valA)).getTime();
-        const timeB = new Date(String(valB)).getTime();
-        return sortConfig.direction === 'ascending' ? timeA - timeB : timeB - timeA;
+        // Use consistent date parsing for accurate date-wise sorting
+        const timeA = parseDateForSort(String(valA));
+        const timeB = parseDateForSort(String(valB));
+        
+        if (timeA !== timeB) {
+          return sortConfig.direction === 'ascending' ? timeA - timeB : timeB - timeA;
+        }
+        
+        // If dates are same, sort by createdAt (oldest first if ascending, newest first if descending)
+        if (a.createdAt && b.createdAt) {
+          const createdAtCompare = a.createdAt.localeCompare(b.createdAt);
+          if (createdAtCompare !== 0) {
+            return sortConfig.direction === 'ascending' ? createdAtCompare : -createdAtCompare;
+          }
+        }
+        
+        // Final fallback: sort by transactionId
+        const idA = (a.transactionId || '').toUpperCase();
+        const idB = (b.transactionId || '').toUpperCase();
+        const idCompare = idA.localeCompare(idB);
+        return sortConfig.direction === 'ascending' ? idCompare : -idCompare;
       }
 
             if (valA < valB) {
@@ -1157,16 +1209,128 @@ export default function IncomeExpenseClient() {
   }, [filteredTransactions, sortConfig]);
 
   const runningLedger = useMemo(() => {
+    // Since transactions are displayed newest first, we need to calculate balance from oldest to newest
+    // Use filteredTransactions (all transactions for selected account) for calculation, not sortedTransactions
+    // This ensures we calculate balance for ALL transactions, not just the sorted/displayed ones
+    
+    // Create a copy and sort by date (oldest first) for balance calculation
+    // Dates are stored in ISO format (yyyy-MM-dd) in the database
+    const parseDate = (dateStr: string): number => {
+      if (!dateStr || typeof dateStr !== 'string') return 0;
+      
+      // First try ISO format (yyyy-MM-dd) - this is how dates are stored in database
+      // Example: "2025-08-14" or "2025-12-10"
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+        const isoDate = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+        if (!isNaN(isoDate.getTime())) {
+          return isoDate.getTime();
+        }
+      }
+      
+      // Try date-fns parse for other possible formats
+      const formats = ['dd-MMM-yy', 'dd-MMM-yyyy', 'dd/MM/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
+      for (const fmt of formats) {
+        try {
+          const parsed = parse(dateStr, fmt, new Date());
+          if (isValid(parsed)) {
+            return parsed.getTime();
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      // Fallback to native Date parsing
+      const fallbackDate = new Date(dateStr);
+      if (!isNaN(fallbackDate.getTime())) {
+        return fallbackDate.getTime();
+      }
+      
+      // If all parsing fails, return 0 (will be sorted last)
+      console.warn(`[Balance Calc] Failed to parse date: ${dateStr}`);
+      return 0;
+    };
+    
+    // Use filteredTransactions for calculation to ensure we have ALL transactions
+    // Important: We must use ALL transactions for the selected account, sorted chronologically by DATE
+    // Date-wise sorting: Sort by date first (oldest to newest), then by createdAt, then by transactionId
+    const sortedForCalculation = [...filteredTransactions].sort((a, b) => {
+      // PRIMARY SORT: By date field (date-wise sorting - oldest first)
+      const timeA = parseDate(a.date);
+      const timeB = parseDate(b.date);
+      
+      // If both dates parsed successfully, sort by date
+      if (timeA > 0 && timeB > 0) {
+        if (timeA !== timeB) {
+          return timeA - timeB; // Oldest date first
+        }
+        // Dates are equal, continue to secondary sort
+      } else if (timeA > 0) {
+        // Only A has valid date, A comes first
+        return -1;
+      } else if (timeB > 0) {
+        // Only B has valid date, B comes first
+        return 1;
+      }
+      // Both dates failed to parse, continue to secondary sort
+      
+      // SECONDARY SORT: By createdAt (oldest first) for transactions on same date
+      // This ensures correct chronological order when dates are the same
+      if (a.createdAt && b.createdAt) {
+        const createdAtCompare = a.createdAt.localeCompare(b.createdAt);
+        if (createdAtCompare !== 0) {
+          return createdAtCompare; // Oldest createdAt first
+        }
+      } else if (a.createdAt) {
+        return -1; // A has createdAt, A comes first
+      } else if (b.createdAt) {
+        return 1; // B has createdAt, B comes first
+      }
+      
+      // TERTIARY SORT: By transactionId (ascending) for consistent order
+      // This ensures same date, same createdAt transactions are in consistent order
+      const idA = (a.transactionId || '').toUpperCase();
+      const idB = (b.transactionId || '').toUpperCase();
+      return idA.localeCompare(idB);
+    });
+    
+    // Calculate running balance from oldest to newest (chronological order)
+    // Starting balance is 0, then accumulate: Income adds, Expense subtracts
     let balance = 0;
-    return sortedTransactions.map(transaction => {
-      const delta = transaction.transactionType === 'Income' ? transaction.amount : -transaction.amount;
+    const withBalances = sortedForCalculation.map((transaction) => {
+      // Ensure we correctly identify Income vs Expense (case-insensitive check)
+      const txType = String(transaction.transactionType || '').trim();
+      const isIncome = txType.toLowerCase() === 'income';
+      const amount = Number(transaction.amount) || 0;
+      const delta = isIncome ? amount : -amount;
       balance += delta;
+      
       return {
         ...transaction,
-        runningBalance: balance,
+        runningBalance: Math.round(balance * 100) / 100,
       };
     });
-  }, [sortedTransactions]);
+    
+    // Create a map of balances by transaction ID for quick lookup
+    const balanceMap = new Map(withBalances.map(tx => [tx.id, tx.runningBalance]));
+    
+    // Return transactions in the display order (sortedTransactions order) with correct balances
+    // This ensures balance is calculated in real-time whenever transactions or sorting changes
+    return sortedTransactions.map(transaction => {
+      const calculatedBalance = balanceMap.get(transaction.id);
+      if (calculatedBalance === undefined) {
+        // Fallback: if balance not found, calculate it on the fly (shouldn't happen normally)
+        return {
+          ...transaction,
+          runningBalance: 0,
+        };
+      }
+      return {
+        ...transaction,
+        runningBalance: calculatedBalance,
+      };
+    });
+  }, [sortedTransactions, filteredTransactions]);
 
   useEffect(() => {
     setSelectedTransactionIds(prev => {
@@ -1353,13 +1517,19 @@ export default function IncomeExpenseClient() {
     const expenseTotal = filteredTransactions
       .filter((t) => t.transactionType === 'Expense')
       .reduce((sum, t) => sum + t.amount, 0);
+    
+    // Calculate final running balance
+    // Mathematically, final balance = Total Income - Total Expense
+    // This should match the running balance of the newest transaction in the ledger
+    const finalRunningBalance = incomeTotal - expenseTotal;
+    
     return {
       totalIncome: incomeTotal,
       totalExpense: expenseTotal,
-      netProfitLoss: incomeTotal - expenseTotal,
+      netProfitLoss: finalRunningBalance,
       totalTransactions: filteredTransactions.length,
     };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, runningLedger]);
     
   if(isPageLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin" /></div>

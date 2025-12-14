@@ -7,7 +7,7 @@ import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,8 +128,10 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     const finalOutstanding = customer ? adjustedOriginal - totalPaidForThisEntry - totalCdForThisEntry : 0;
     const isCustomer = entryType === 'Customer';
     const totalBagWeightKg = customer ? (customer.bags || 0) * (customer.bagWeightKg || 0) : 0;
-    const displayBrokerageAmount = customer ? (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0) : 0;
-    const displayCdAmount = customer ? (Number(customer.amount) || 0) * ((Number(customer.cdRate) || 0) / 100) : 0;
+    // Calculate brokerage amount: Final Weight × Brokerage Rate (for both suppliers and customers)
+    const displayBrokerageAmount = customer ? 
+        (Number(customer.weight || 0)) * (Number(customer.brokerageRate || 0)) : 0;
+    const displayCdAmount = customer ? (Number(customer.amount || 0)) * ((Number(customer.cdRate || 0)) / 100) : 0;
 
     // Early return after all hooks
     if (!customer) return null;
@@ -166,9 +168,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                             </Button>
                         )}
                     </div>
-                    <DialogClose asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
-                    </DialogClose>
                 </DialogHeader>
                 <ScrollArea className="max-h-[85vh]">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
@@ -226,6 +225,16 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.labouryAmount) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kartaAmount) || 0)}</td></tr>}
+                                            {!isCustomer && (customer.brokerageRate || displayBrokerageAmount > 0) && (
+                                                <tr className="[&_td]:p-1">
+                                                    <td className="text-muted-foreground">
+                                                        Brokerage ({customer.brokerageAddSubtract ? 'INCLUDE' : 'EXCLUDE'}) (@{formatCurrency(Number(customer.brokerageRate) || 0)})
+                                                    </td>
+                                                    <td className={`text-right font-semibold ${customer.brokerageAddSubtract ? 'text-green-600' : 'text-destructive'}`}>
+                                                        {customer.brokerageAddSubtract ? '+ ' : '- '}{formatCurrency(displayBrokerageAmount || customer.brokerageAmount || 0)}
+                                                    </td>
+                                                </tr>
+                                            )}
                                             
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({(customer.bags || 0)} @ {formatCurrency(Number(customer.bagRate) || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.bagAmount) || 0)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}

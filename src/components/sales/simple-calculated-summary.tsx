@@ -42,12 +42,24 @@ export const SimpleCalculatedSummary = ({
     
     // Calculate values based on current form data
     const finalWt = grossWeight - teirWeight;
-    const kartaWt = Number((finalWt * (kartaPercentage / 100)).toFixed(2));
+    
+    // Calculate Karta Weight with proper rounding: round UP when Final Wt decimal part >= 0.50
+    const rawKartaWt = finalWt * (kartaPercentage / 100);
+    const decimalPart = Math.round((finalWt - Math.floor(finalWt)) * 10);
+    let kartaWt;
+    if (decimalPart >= 5) {
+        kartaWt = Math.ceil(rawKartaWt * 100) / 100;
+    } else {
+        kartaWt = Math.floor(rawKartaWt * 100) / 100;
+    }
+    
     const netWt = finalWt - kartaWt;
     const amount = finalWt * rate;
     const kartaAmt = kartaWt * rate;
-    const labAmt = netWt * labouryRate;
-    const brokerageAmt = brokerageRate * netWt;
+    // Labour Amount calculated on Final Wt, not Net Wt
+    const labAmt = finalWt * labouryRate;
+    // Brokerage calculated on Final Wt, not Net Wt
+    const brokerageAmt = brokerageRate * finalWt;
     const netPayable = amount - kartaAmt - labAmt - kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt);
     
     const formatWeight = (wt: number) => `${wt.toFixed(2)} Qtl`;
@@ -128,14 +140,16 @@ export const SimpleCalculatedSummary = ({
                             <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kanta)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Brokerage Amt:</span>
-                            <span className="font-medium text-red-500 dark:text-red-400">{brokerageAddSubtract ? '- ' : '+ '}{formatCurrency(brokerageAmt)}</span>
+                            <span className="text-muted-foreground">Brokerage Amt ({brokerageAddSubtract ? 'INCLUDE' : 'EXCLUDE'}):</span>
+                            <span className={`font-medium ${brokerageAddSubtract ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                {brokerageAddSubtract ? '+ ' : '- '}{formatCurrency(brokerageAmt)}
+                            </span>
                         </div>
                     </div>
                     <Separator className="my-2"/>
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Deductions:</span>
-                        <span className="font-bold text-primary">{formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt))}</span>
+                        <span className="font-bold text-primary">{formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? 0 : brokerageAmt))}</span>
                     </div>
                 </CardContent>
             </Card>
@@ -156,7 +170,7 @@ export const SimpleCalculatedSummary = ({
                         </div>
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Total Deductions:</span>
-                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt))}</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? 0 : brokerageAmt))}</span>
                         </div>
                     </div>
                     <Separator className="my-2"/>

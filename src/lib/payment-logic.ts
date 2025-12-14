@@ -1939,6 +1939,16 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id, updatedAt: now });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase, updatedAt: now } as Payment;
         
+        // ✅ Update sync registry atomically within transaction
+        const { notifySyncRegistry } = await import('./sync-registry');
+        let collectionName: string;
+        if (paymentMethod === 'Gov.') {
+            collectionName = 'governmentFinalizedPayments';
+        } else {
+            collectionName = isCustomer ? 'customerPayments' : 'payments';
+        }
+        await notifySyncRegistry(collectionName, { transaction });
+        
     });
     } catch (err: any) {
         // Quota/offline fallback: write locally and enqueue sync
@@ -2259,9 +2269,28 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
         transOrBatch.delete(paymentDocRef);
     };
     
-    await runTransaction(firestoreDB, async (t) => {
-        await performDelete(t);
-    });
+    try {
+        await runTransaction(firestoreDB, async (t) => {
+            await performDelete(t);
+            
+            // ✅ Update sync registry atomically within transaction
+            const { notifySyncRegistry } = await import('./sync-registry');
+            let collectionName: string;
+            if (isGovPayment) {
+                collectionName = 'governmentFinalizedPayments';
+            } else {
+                collectionName = isCustomer ? 'customerPayments' : 'payments';
+            }
+            await notifySyncRegistry(collectionName, { transaction: t });
+        });
+    } catch (err: any) {
+        // Quota/offline fallback: delete locally and enqueue sync
+        const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
+        if (isQuotaError(err)) {
+            markFirestoreDisabled();
+        }
+        // Continue with local delete and sync queue
+    }
 
     if (db) {
         if (isGovPayment) {
@@ -2272,11 +2301,32 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
             await db.payments.delete(paymentToDelete.id);
         }
         
+        // ✅ Enqueue sync task for deletion
+        try {
+            const { enqueueSyncTask } = await import('./sync-queue');
+            let deleteTaskType;
+            if (isGovPayment) {
+                deleteTaskType = 'delete:governmentFinalizedPayment';
+            } else {
+                deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
+            }
+            await enqueueSyncTask(deleteTaskType, { id: paymentToDelete.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${paymentToDelete.id}` });
+        } catch (error) {
+            console.error('Error enqueueing payment delete sync task:', error);
+        }
+        
         // ✅ Trigger custom event to notify listeners of IndexedDB delete
         if (typeof window !== 'undefined') {
             try {
                 window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', { 
-                    detail: { paymentId: paymentToDelete.id, isGovPayment, isCustomer } 
+                    detail: { 
+                        paymentId: paymentToDelete.id, 
+                        payment: paymentToDelete,
+                        receiptType: paymentToDelete.receiptType,
+                        paymentMethod: (paymentToDelete as any).paymentMethod,
+                        isGovPayment, 
+                        isCustomer 
+                    } 
                 }));
             } catch (error) {
                 console.error('Error dispatching payment delete event:', error);

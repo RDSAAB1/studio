@@ -12,10 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/database";
 import type { LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerCashAccount } from "@/lib/definitions";
 import {
-  fetchLedgerAccounts,
+  getLedgerAccountsRealtime,
   createLedgerAccount,
-  fetchLedgerEntries,
-  fetchLedgerCashAccounts,
+  getLedgerEntriesRealtime,
+  getLedgerCashAccountsRealtime,
   createLedgerCashAccount,
   updateLedgerCashAccount,
   deleteLedgerCashAccount,
@@ -179,11 +179,31 @@ const LedgerPage: React.FC = () => {
   }, [activeEntries, dateFrom, dateTo]);
 
   const displayEntries = useMemo(() => {
+    // Since entries are displayed newest first, calculate balance from oldest to newest
+    // First, sort by date (oldest first) for calculation
+    const sortedForCalculation = [...filteredEntries].sort((a, b) => {
+      if (a.date && b.date) {
+        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+      }
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+    
+    // Calculate balance from oldest to newest
     let running = 0;
-    return filteredEntries.map((entry) => {
+    const withBalances = sortedForCalculation.map((entry) => {
       running = Math.round((running + entry.debit - entry.credit) * 100) / 100;
       return { ...entry, runningBalance: running };
     });
+    
+    // Create a map of balances by entry ID
+    const balanceMap = new Map(withBalances.map(e => [e.id, e.runningBalance]));
+    
+    // Return original order (newest first) with correct balances
+    return filteredEntries.map((entry) => ({
+      ...entry,
+      runningBalance: balanceMap.get(entry.id) ?? 0,
+    }));
   }, [filteredEntries]);
 
   const groupedEntries = useMemo(() => {
@@ -267,57 +287,10 @@ const LedgerPage: React.FC = () => {
   }, [linkAccountId, activeAccountId]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadCashAccounts = async () => {
-      setLoadingCashAccounts(true);
-      try {
-        // Γ£à Load from cache first for immediate display
-        if (typeof window !== "undefined") {
-          const cached = localStorage.getItem("ledgerCashAccountsCache");
-          if (cached) {
-            try {
-              const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
-              const normalized = cachedAccounts
-                .map((account) => ({
-                  ...account,
-                  noteGroups: normalizeNoteGroups(account.noteGroups),
-                }))
-                .sort((a, b) => a.name.localeCompare(b.name));
-              
-              if (!cancelled) {
-                setCashAccounts(normalized);
-                if (!activeCashAccountId && normalized.length > 0) {
-                  setActiveCashAccountId(normalized[0].id);
-                }
-              }
-            } catch (e) {
-              console.warn("Failed to parse cached cash accounts", e);
-            }
-          }
-        }
-
-        // Check if we should sync from Firestore
-        if (typeof window === "undefined") {
-          setLoadingCashAccounts(false);
-          return;
-        }
-
-        // Γ£à Always sync if cache is empty, otherwise respect TTL
-        const cached = window.localStorage.getItem("ledgerCashAccountsCache");
-        const lastSynced = window.localStorage.getItem("ledgerCashAccountsLastSynced");
-        const shouldSync = !cached || !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
-
-        if (!shouldSync) {
-          setLoadingCashAccounts(false);
-          return;
-        }
-
-        // Γ£à Sync from Firestore
-        const remoteAccounts = await fetchLedgerCashAccounts();
-        if (cancelled) return;
-
-        const normalized = remoteAccounts
+    setLoadingCashAccounts(true);
+    const unsubscribe = getLedgerCashAccountsRealtime(
+      (data) => {
+        const normalized = data
           .map((account) => ({
             ...account,
             noteGroups: normalizeNoteGroups(account.noteGroups),
@@ -331,157 +304,76 @@ const LedgerPage: React.FC = () => {
           }
           return normalized[0]?.id ?? null;
         });
-
-        window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
-      } catch (error) {
+        setLoadingCashAccounts(false);
+      },
+      (error) => {
         console.error("Failed to load cash accounts", error);
         toast({
           title: "Unable to load cash accounts",
           description: "We could not fetch cash accounts. Please try again.",
           variant: "destructive",
         });
-      } finally {
-        if (!cancelled) {
-          setLoadingCashAccounts(false);
-        }
+        setLoadingCashAccounts(false);
       }
-    };
+    );
 
-    loadCashAccounts();
     return () => {
-      cancelled = true;
+      unsubscribe();
     };
   }, [toast, activeCashAccountId]);
 
-  // Load accounts from IndexedDB first, then sync from Firestore (with caching)
+  // Load accounts using realtime listener
   useEffect(() => {
-    let cancelled = false;
-
-    const loadAccounts = async () => {
-      try {
-        if (typeof window !== "undefined" && db) {
-          const cachedAccounts = await db.ledgerAccounts.toArray();
-          if (!cancelled && cachedAccounts.length) {
-            setAccounts(cachedAccounts);
-            if (!activeAccountId) {
-              setActiveAccountId(cachedAccounts[0].id);
-            }
-          }
+    setLoadingAccounts(true);
+    const unsubscribe = getLedgerAccountsRealtime(
+      (data) => {
+        setAccounts(data);
+        if (!activeAccountId && data.length > 0) {
+          setActiveAccountId(data[0].id);
         }
-
-        if (typeof window === "undefined") {
-          setLoadingAccounts(false);
-          return;
-        }
-
-        const lastSynced = window.localStorage.getItem("ledgerAccountsLastSynced");
-        const shouldSync = !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
-
-        if (!shouldSync) {
-          setLoadingAccounts(false);
-          return;
-        }
-
-        const remoteAccounts = await fetchLedgerAccounts();
-        if (!cancelled) {
-          setAccounts(remoteAccounts);
-          if (!activeAccountId && remoteAccounts.length) {
-            setActiveAccountId(remoteAccounts[0].id);
-          }
-        }
-
-        if (db) {
-          await db.transaction("rw", db.ledgerAccounts, async () => {
-            await db.ledgerAccounts.clear();
-            if (remoteAccounts.length) {
-              await db.ledgerAccounts.bulkPut(remoteAccounts);
-            }
-          });
-        }
-
-        window.localStorage.setItem("ledgerAccountsLastSynced", String(Date.now()));
-      } catch (error) {
+        setLoadingAccounts(false);
+      },
+      (error) => {
         console.error("Failed to load ledger accounts", error);
         toast({
           title: "Unable to load accounts",
           description: "We could not fetch ledger accounts. Please try again.",
           variant: "destructive",
         });
-      } finally {
-        if (!cancelled) setLoadingAccounts(false);
+        setLoadingAccounts(false);
       }
-    };
+    );
 
-    loadAccounts();
     return () => {
-      cancelled = true;
+      unsubscribe();
     };
   }, [activeAccountId, toast]);
 
-  // Load entries whenever account changes
+  // Load entries using realtime listener whenever account changes
   useEffect(() => {
     if (!activeAccountId) return;
 
-    let cancelled = false;
-
-    const loadEntries = async () => {
-      setLoadingEntries(true);
-      try {
-        if (db) {
-          const cachedEntries = await db.ledgerEntries
-            .where("accountId")
-            .equals(activeAccountId)
-            .toArray();
-          if (!cancelled) {
-            setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortEntries(cachedEntries) }));
-          }
-        }
-
-        if (typeof window === "undefined") {
-          setLoadingEntries(false);
-          return;
-        }
-
-        const lastSyncedKey = `ledgerEntriesLastSynced:${activeAccountId}`;
-        const lastSynced = window.localStorage.getItem(lastSyncedKey);
-        const shouldSync = !lastSynced || Date.now() - Number(lastSynced) > CACHE_TTL_MS;
-
-        if (!shouldSync) {
-          setLoadingEntries(false);
-          return;
-        }
-
-        const remoteEntries = await fetchLedgerEntries(activeAccountId);
-        const sortedRemote = sortEntries(recalculateBalances(remoteEntries));
-        if (!cancelled) {
-          setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedRemote }));
-        }
-
-        if (db) {
-          await db.transaction("rw", db.ledgerEntries, async () => {
-            await db.ledgerEntries.where("accountId").equals(activeAccountId).delete();
-            if (sortedRemote.length) {
-              await db.ledgerEntries.bulkPut(sortedRemote);
-            }
-          });
-        }
-
-        window.localStorage.setItem(lastSyncedKey, String(Date.now()));
-      } catch (error) {
+    setLoadingEntries(true);
+    const unsubscribe = getLedgerEntriesRealtime(
+      (data) => {
+        const sortedEntries = sortEntries(recalculateBalances(data));
+        setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedEntries }));
+        setLoadingEntries(false);
+      },
+      (error) => {
         console.error("Failed to load ledger entries", error);
         toast({
           title: "Unable to load entries",
           description: "We could not fetch ledger entries. Please try again.",
           variant: "destructive",
         });
-      } finally {
-        if (!cancelled) setLoadingEntries(false);
-      }
-    };
+        setLoadingEntries(false);
+      },
+      activeAccountId
+    );
 
-    loadEntries();
     return () => {
-      cancelled = true;
+      unsubscribe();
     };
   }, [activeAccountId, toast]);
 
@@ -949,6 +841,7 @@ const LedgerPage: React.FC = () => {
       let strategy: "mirror" | "same" | undefined = editedEntry.linkStrategy;
 
       if (editedEntry.linkGroupId) {
+        // Find the linked account entry
         for (const [accId, entries] of Object.entries(entriesMap)) {
           if (accId === activeAccountId) continue;
           const match = entries.find((entry) => entry.linkGroupId === editedEntry.linkGroupId);
@@ -963,11 +856,14 @@ const LedgerPage: React.FC = () => {
         }
 
         if (counterpartAccountId && counterpartEntries) {
+          console.log(`[Edit] Found linked entry in account ${counterpartAccountId}, updating...`);
+          
           const counterpartUpdatedRaw = counterpartEntries.map((entry) =>
             entry.linkGroupId === editedEntry.linkGroupId
               ? {
                   ...entry,
                   date: editForm.date,
+                  particulars: editForm.particulars.trim() || "-",
                   debit:
                     strategy === "same"
                       ? Math.round((Number(editForm.debit) || 0) * 100) / 100
@@ -1000,10 +896,18 @@ const LedgerPage: React.FC = () => {
             if (hasChanged) {
               const updatedEntry = { ...entry, updatedAt: timestamp };
               changedEntries.push(updatedEntry);
+              console.log(`[Edit] Linked entry ${entry.id} updated:`, {
+                date: entry.date,
+                particulars: entry.particulars,
+                debit: entry.debit,
+                credit: entry.credit,
+              });
               return updatedEntry;
             }
             return entry;
           });
+        } else {
+          console.warn(`[Edit] Linked entry not found for linkGroupId: ${editedEntry.linkGroupId}`);
         }
       }
 
@@ -1018,13 +922,23 @@ const LedgerPage: React.FC = () => {
       await persistEntriesToIndexedDb(activeAccountId, finalActiveEntries);
       if (counterpartAccountId && counterpartUpdated) {
         await persistEntriesToIndexedDb(counterpartAccountId, counterpartUpdated);
+        // Invalidate cache for linked account so it reloads fresh data
+        if (typeof window !== "undefined") {
+          const lastSyncedKey = `ledgerEntriesLastSynced:${counterpartAccountId}`;
+          window.localStorage.removeItem(lastSyncedKey);
+        }
+        console.log(`[Edit] Persisted ${counterpartUpdated.length} entries to IndexedDB for account ${counterpartAccountId}`);
       }
 
       if (changedEntries.length) {
         await queueLedgerEntriesUpsert(changedEntries);
+        console.log(`[Edit] Queued ${changedEntries.length} entries for sync to Firestore`);
       }
 
-      toast({ title: "Entry updated" });
+      toast({ 
+        title: "Entry updated",
+        description: counterpartAccountId ? `Updated in both accounts` : undefined
+      });
       handleCancelEdit();
     } catch (error: any) {
       console.error("Failed to update ledger entry", error);
@@ -1280,7 +1194,9 @@ const LedgerPage: React.FC = () => {
       debit += entry.debit;
       credit += entry.credit;
     });
-    const balance = displayEntries.at(-1)?.runningBalance || 0;
+    // Since displayEntries is sorted newest first, the first entry (index 0) has the final balance
+    // This is the balance after all transactions (newest transaction's balance)
+    const balance = displayEntries.length > 0 ? (displayEntries[0]?.runningBalance || 0) : 0;
     return { debit, credit, balance };
   }, [displayEntries]);
 

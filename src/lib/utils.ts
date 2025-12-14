@@ -116,6 +116,8 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const rawKartaWeight = weight * kartaPercentage / 100;
 
     let kartaWeight;
+    // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
+    // Only round down if decimal part < 0.50 (e.g., 179.40 -> 1.79)
     if (decimalPart >= 5) {
         kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
     } else {
@@ -126,22 +128,25 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const netWeight = weight - kartaWeight;
     const amount = Math.round(weight * rate); 
     const labouryRate = values.labouryRate || 0;
+    // Labour Amount calculated on Final Wt (weight), not Net Wt
     const labouryAmount = Math.round(weight * labouryRate);
     const kanta = values.kanta || 0;
     
-    // Brokerage calculation (if provided)
-    const brokerageRate = Number(values.brokerage || values.brokerageRate) || 0;
-    const brokerageAmount = Math.round(netWeight * brokerageRate);
+    // Brokerage calculation (if provided) - calculated on Final Wt (weight), not Net Wt
+    // Brokerage Amount = Final Weight × Brokerage Rate
+    const brokerageRate = Number(values.brokerageRate || values.brokerage) || 0;
+    const brokerageAmount = Math.round(weight * brokerageRate);
     
     // Calculate base amount before brokerage
     let originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
     
-    // Brokerage logic: Include = Add, Exclude = Subtract
+    // Brokerage logic: INCLUDE (brokerageAddSubtract = true) = Add, EXCLUDE (brokerageAddSubtract = false) = Subtract
     if (brokerageAmount > 0) {
-        if (values.isBrokerageIncluded) {
-            originalNetAmount += brokerageAmount; // Add when included
+        const isIncluded = values.brokerageAddSubtract ?? true; // Default to INCLUDE (ADD)
+        if (isIncluded) {
+            originalNetAmount += brokerageAmount; // Add when INCLUDE
         } else {
-            originalNetAmount -= brokerageAmount; // Subtract when excluded
+            originalNetAmount -= brokerageAmount; // Subtract when EXCLUDE
         }
     }
     

@@ -37,6 +37,7 @@ export const useSupplierData = () => {
         let isSubscribed = true;
         let dataLoadCount = 0;
         const totalListeners = 10; // 9 realtime + 1 receipt settings
+        let initialLoadComplete = false; // Track when initial load is done
         
         const checkAllLoaded = () => {
             dataLoadCount++;
@@ -44,13 +45,22 @@ export const useSupplierData = () => {
                 startTransition(() => {
                     setLoading(false);
                 });
+                // Mark initial load complete after all data is loaded
+                initialLoadComplete = true;
             }
         };
         
         const unsubFunctions = [
             getSuppliersRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setSuppliers(data));
+                    // ✅ Use startTransition only during initial load
+                    // Real-time updates should be immediate for live chat experience
+                    if (!initialLoadComplete) {
+                        startTransition(() => setSuppliers(data));
+                    } else {
+                        // Real-time update - immediate state update (no transition)
+                        setSuppliers(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -59,7 +69,13 @@ export const useSupplierData = () => {
             }),
             getPaymentsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setPaymentHistory(data));
+                    // ✅ Real-time updates should be immediate on device Y
+                    if (!initialLoadComplete) {
+                        startTransition(() => setPaymentHistory(data));
+                    } else {
+                        // Immediate update for real-time changes from other devices
+                        setPaymentHistory(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -68,7 +84,12 @@ export const useSupplierData = () => {
             }),
             getCustomerPaymentsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setCustomerPayments(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setCustomerPayments(data));
+                    } else {
+                        // Immediate update for real-time changes
+                        setCustomerPayments(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -77,7 +98,11 @@ export const useSupplierData = () => {
             }),
             getIncomeRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setIncomes(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setIncomes(data));
+                    } else {
+                        setIncomes(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -86,7 +111,11 @@ export const useSupplierData = () => {
             }),
             getExpensesRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setExpenses(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setExpenses(data));
+                    } else {
+                        setExpenses(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -95,7 +124,11 @@ export const useSupplierData = () => {
             }),
             getFundTransactionsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setFundTransactions(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setFundTransactions(data));
+                    } else {
+                        setFundTransactions(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -104,7 +137,11 @@ export const useSupplierData = () => {
             }),
             getBanksRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBanks(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBanks(data));
+                    } else {
+                        setBanks(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -113,7 +150,11 @@ export const useSupplierData = () => {
             }),
             getBankBranchesRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBankBranches(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBankBranches(data));
+                    } else {
+                        setBankBranches(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -122,7 +163,11 @@ export const useSupplierData = () => {
             }),
             getBankAccountsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBankAccounts(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBankAccounts(data));
+                    } else {
+                        setBankAccounts(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -131,7 +176,11 @@ export const useSupplierData = () => {
             }),
             getSupplierBankAccountsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setSupplierBankAccounts(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setSupplierBankAccounts(data));
+                    } else {
+                        setSupplierBankAccounts(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {

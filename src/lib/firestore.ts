@@ -595,6 +595,13 @@ export async function deleteSupplier(id: string): Promise<void> {
     // Delete the supplier
     batch.delete(doc(suppliersCollection, id));
     
+    // ✅ Update sync registry atomically for suppliers and payments
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('suppliers', { batch });
+    if (paymentsSnapshot.size > 0) {
+        await notifySyncRegistry('payments', { batch });
+    }
+    
     // Commit all changes
     await batch.commit();
     
@@ -654,6 +661,13 @@ export async function deleteMultipleSuppliers(supplierIds: string[]): Promise<vo
         batch.delete(doc(suppliersCollection, supplierId));
     }
     
+    // ✅ Update sync registry atomically for suppliers and payments
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('suppliers', { batch });
+    if (paymentsToDelete.length > 0) {
+        await notifySyncRegistry('payments', { batch });
+    }
+    
     await batch.commit();
 
     // Sync Dexie
@@ -699,6 +713,10 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
             updatedCount++;
         }
     }
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('suppliers', { batch });
     
     await batch.commit();
     return updatedCount;
@@ -1318,7 +1336,16 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
     }
     
     const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
-    await setDoc(docRef, newIncome);
+    
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, newIncome);
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('incomes', { batch });
+    
+    await batch.commit();
     return newIncome;
 }
 
@@ -1350,24 +1377,65 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
     }
     
     const newExpense = { ...expenseData, transactionId: newTransactionId, id: docRef.id };
-    await setDoc(docRef, newExpense);
+    
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, newExpense);
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('expenses', { batch });
+    
+    await batch.commit();
     return newExpense;
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
-    await updateDoc(doc(incomesCollection, id), incomeData);
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.update(doc(incomesCollection, id), incomeData);
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('incomes', { batch });
+    
+    await batch.commit();
 }
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
-    await updateDoc(doc(expensesCollection, id), expenseData);
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.update(doc(expensesCollection, id), expenseData);
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('expenses', { batch });
+    
+    await batch.commit();
 }
 
 export async function deleteIncome(id: string): Promise<void> {
-    await deleteDoc(doc(incomesCollection, id));
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.delete(doc(incomesCollection, id));
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('incomes', { batch });
+    
+    await batch.commit();
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-    await deleteDoc(doc(expensesCollection, id));
+    // ✅ Use batch write to ensure atomicity with sync registry
+    const batch = writeBatch(firestoreDB);
+    batch.delete(doc(expensesCollection, id));
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('expenses', { batch });
+    
+    await batch.commit();
 }
 
 export async function updateExpensePayee(oldPayee: string, newPayee: string): Promise<void> {
@@ -1377,6 +1445,11 @@ export async function updateExpensePayee(oldPayee: string, newPayee: string): Pr
     snapshot.forEach(doc => {
         batch.update(doc.ref, { payee: toTitleCase(newPayee) });
     });
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('expenses', { batch });
+    
     await batch.commit();
 }
 
@@ -1387,6 +1460,11 @@ export async function updateIncomePayee(oldPayee: string, newPayee: string): Pro
     snapshot.forEach(doc => {
         batch.update(doc.ref, { payee: toTitleCase(newPayee) });
     });
+    
+    // ✅ Update sync registry atomically
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('incomes', { batch });
+    
     await batch.commit();
 }
 
@@ -2104,118 +2182,30 @@ export async function getMoreCustomerPayments(startAfterDoc: QueryDocumentSnapsh
 // =================================================================
 
 export function getSuppliersRealtime(callback: (data: Customer[]) => void, onError: (error: Error) => void) {
-    // Circuit breaker: if FS is temporarily disabled, fallback to local polling
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
             return db ? await db.suppliers.orderBy('srNo').reverse().toArray() : [];
         }, callback);
     }
 
-    let localSuppliers: Customer[] = [];
-    let callbackCalledFromIndexedDB = false;
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
-    if (db) {
-        db.suppliers.orderBy('srNo').reverse().toArray().then((localData) => {
-            localSuppliers = localData as Customer[];
-            callbackCalledFromIndexedDB = true;
-            // Always call callback with IndexedDB results (even if empty) to clear loading state
-            callback(localData as Customer[]);
-        }).catch(() => {
-            // If IndexedDB read fails, ensure Firestore will call callback
-            callbackCalledFromIndexedDB = false;
-        });
-    }
-
-    // ✅ Use incremental sync - only listen to NEW changes after last sync
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:suppliers');
-        return stored ? parseInt(stored, 10) : undefined;
+    const fetchSuppliers = async (): Promise<Customer[]> => {
+        const snapshot = await getDocs(query(suppliersCollection, orderBy("srNo", "desc")));
+        const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', snapshot.size);
+        return suppliers;
     };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            suppliersCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(suppliersCollection, orderBy("srNo", "desc"));
-    }
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const newSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        
-        // ✅ Handle deletions - remove deleted documents from IndexedDB
-        const deletedIds: string[] = [];
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'removed') {
-                deletedIds.push(change.doc.id);
-            }
-        });
-        
-        // Remove deleted documents from IndexedDB
-        if (db && deletedIds.length > 0) {
-            await Promise.all(deletedIds.map(id => db.suppliers.delete(id)));
-        }
-        
-        // Track Firestore read
-        firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', newSuppliers.length);
-        
-        // Merge new changes with local data
-        if (callbackCalledFromIndexedDB && localSuppliers.length > 0) {
-            const mergedMap = new Map<string, Customer>();
-            // Add all local suppliers
-            localSuppliers.forEach(s => mergedMap.set(s.id, s));
-            // Remove deleted suppliers
-            deletedIds.forEach(id => mergedMap.delete(id));
-            // Update/add new suppliers from Firestore
-            newSuppliers.forEach(s => mergedMap.set(s.id, s));
-            const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                const aSrNo = parseInt(a.srNo || '0') || 0;
-                const bSrNo = parseInt(b.srNo || '0') || 0;
-                return bSrNo - aSrNo;
-            });
-            callback(merged);
-            
-            // Update IndexedDB with new changes
-            if (db && newSuppliers.length > 0) {
-                await db.suppliers.bulkPut(newSuppliers);
-            }
-        } else {
-            // No local data or first sync - use Firestore data directly
-            callback(newSuppliers);
-            if (db && newSuppliers.length > 0) {
-                await db.suppliers.bulkPut(newSuppliers);
-            }
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:suppliers', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            // Switch to polling fallback immediately
-            const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.suppliers.orderBy('srNo').reverse().toArray() : [];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            // Return a compound unsubscribe
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    return createMetadataBasedListener<Customer>(
+        {
+            collectionName: 'suppliers',
+            fetchFunction: fetchSuppliers,
+            localTableName: 'suppliers'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getCustomersRealtime(callback: (data: Customer[]) => void, onError: (error: Error) => void) {
@@ -2333,193 +2323,108 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         }, callback);
     }
 
-    let localPayments: Payment[] = [];
-    let callbackCalledFromIndexedDB = false;
+    // ✅ Use metadata-based listener - listen to sync_registry instead of actual collections
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    // ✅ Load from IndexedDB first (immediate response, no Firestore read)
     if (db) {
         Promise.all([
             db.payments.orderBy('date').reverse().toArray(),
             db.governmentFinalizedPayments.orderBy('date').reverse().toArray()
         ]).then(([regularData, govData]) => {
-            localPayments = [...regularData, ...govData] as Payment[];
-            callbackCalledFromIndexedDB = true;
-            callback(localPayments);
-        }).catch(() => {
-            callbackCalledFromIndexedDB = false;
-        });
-    }
-
-    // ✅ Use incremental sync - only listen to NEW changes after last sync
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:payments');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    let govQ;
-    
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        try {
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            q = query(
-                supplierPaymentsCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-            govQ = query(
-                governmentFinalizedPaymentsCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-        } catch (error) {
-            // If updatedAt query fails (no index or missing fields), fallback to full sync
-            console.warn('Incremental sync failed for payments, using full sync:', error);
-            q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-            govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
-        }
-    } else {
-        // First sync - get all (only once)
-        q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-        govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
-    }
-
-    let allPayments: Payment[] = [];
-    let allDeletedIds: string[] = [];
-    let snapshotCount = 0;
-    const totalSnapshots = 2; // Regular payments + Gov. payments
-
-    const mergeAndCallback = async () => {
-        if (snapshotCount < totalSnapshots) return; // Wait for both snapshots
-        
-        // Track Firestore read
-        firestoreMonitor.logRead('payments', 'getPaymentsRealtime', allPayments.length);
-        
-        // Merge new changes with local data
-        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
-            const mergedMap = new Map<string, Payment>();
-            // Add all local payments first
-            localPayments.forEach(p => mergedMap.set(p.id, p));
-            // Remove deleted payments
-            allDeletedIds.forEach(id => mergedMap.delete(id));
-            // Update/add new payments from Firestore
-            allPayments.forEach(p => mergedMap.set(p.id, p));
-            const merged = Array.from(mergedMap.values()).sort((a, b) => {
+            const allPayments = [...regularData, ...govData] as Payment[];
+            const sorted = allPayments.sort((a, b) => {
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
             });
-            callback(merged);
-            // Update localPayments for next merge
-            localPayments = merged;
-            
-            if (db && allPayments.length > 0) {
-                const regularPayments = allPayments.filter(p => p.receiptType !== 'Gov.');
-                const govPayments = allPayments.filter(p => p.receiptType === 'Gov.');
-                if (regularPayments.length > 0) {
-                    await db.payments.bulkPut(regularPayments);
-                }
-                if (govPayments.length > 0) {
-                    await db.governmentFinalizedPayments.bulkPut(govPayments);
-                }
-            }
-        } else {
-            // No local data or first sync - use Firestore data directly
-            callback(allPayments);
-            localPayments = allPayments;
-            if (db && allPayments.length > 0) {
-                const regularPayments = allPayments.filter(p => p.receiptType !== 'Gov.');
-                const govPayments = allPayments.filter(p => p.receiptType === 'Gov.');
-                if (regularPayments.length > 0) {
-                    await db.payments.bulkPut(regularPayments);
-                }
-                if (govPayments.length > 0) {
-                    await db.governmentFinalizedPayments.bulkPut(govPayments);
-                }
-            }
-        }
+            callback(sorted);
+        }).catch(() => {
+            // If local read fails, continue with Firestore
+        });
+    }
+    
+    // Fetch function that gets both regular and gov payments (one-time fetch when sync registry changes)
+    const fetchPayments = async (): Promise<Payment[]> => {
+        const [regularSnapshot, govSnapshot] = await Promise.all([
+            getDocs(query(supplierPaymentsCollection, orderBy("date", "desc"))),
+            getDocs(query(governmentFinalizedPaymentsCollection, orderBy("date", "desc")))
+        ]);
         
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:payments', String(Date.now()));
-        }
+        const regularPayments = regularSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        const govPayments = govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         
-        // Reset for next update
-        allPayments = [];
-        allDeletedIds = [];
-        snapshotCount = 0;
+        // Track reads (one-time fetch per sync signal, not streaming)
+        firestoreMonitor.logRead('payments', 'getPaymentsRealtime', regularSnapshot.size);
+        firestoreMonitor.logRead('governmentFinalizedPayments', 'getPaymentsRealtime', govSnapshot.size);
+        
+        // Merge and sort by date (newest first)
+        const allPayments = [...regularPayments, ...govPayments].sort((a, b) => {
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        
+        return allPayments;
     };
-
-    const unsubscribe1 = onSnapshot(q, async (snapshot) => {
-        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        
-        // ✅ Handle deletions - remove deleted documents from IndexedDB
-        const deletedIds: string[] = [];
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'removed') {
-                deletedIds.push(change.doc.id);
+    
+    // Helper to save payments to IndexedDB (handles both collections)
+    const savePaymentsToIndexedDB = async (data: Payment[]) => {
+        if (db && data.length > 0) {
+            const regularPayments = data.filter(p => p.receiptType !== 'Gov.');
+            const govPayments = data.filter(p => p.receiptType === 'Gov.');
+            
+            // Get existing IDs to handle deletions
+            const existingRegularIds = new Set((await db.payments.toArray()).map(p => p.id));
+            const existingGovIds = new Set((await db.governmentFinalizedPayments.toArray()).map(p => p.id));
+            
+            const freshRegularIds = new Set(regularPayments.map(p => p.id));
+            const freshGovIds = new Set(govPayments.map(p => p.id));
+            
+            // Delete items that are no longer in Firestore
+            const regularIdsToDelete = Array.from(existingRegularIds).filter(id => !freshRegularIds.has(id));
+            const govIdsToDelete = Array.from(existingGovIds).filter(id => !freshGovIds.has(id));
+            
+            if (regularIdsToDelete.length > 0) {
+                await db.payments.bulkDelete(regularIdsToDelete);
             }
-        });
-        
-        // Remove deleted documents from IndexedDB
-        if (db && deletedIds.length > 0) {
-            await Promise.all(deletedIds.map(id => db.payments.delete(id)));
-        }
-        
-        allPayments.push(...newPayments);
-        allDeletedIds.push(...deletedIds);
-        snapshotCount++;
-        await mergeAndCallback();
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
-                const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
-                return [...regularPayments, ...govPayments] as Payment[];
-            }, callback);
-            try { unsubscribe1(); unsubscribe2(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-
-    const unsubscribe2 = onSnapshot(govQ, async (snapshot) => {
-        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        
-        // ✅ Handle deletions - remove deleted documents from IndexedDB
-        const deletedIds: string[] = [];
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'removed') {
-                deletedIds.push(change.doc.id);
+            if (govIdsToDelete.length > 0) {
+                await db.governmentFinalizedPayments.bulkDelete(govIdsToDelete);
             }
-        });
-        
-        // Remove deleted documents from IndexedDB
-        if (db && deletedIds.length > 0) {
-            await Promise.all(deletedIds.map(id => db.governmentFinalizedPayments.delete(id)));
+            
+            // Update/add fresh data
+            if (regularPayments.length > 0) {
+                await db.payments.bulkPut(regularPayments);
+            }
+            if (govPayments.length > 0) {
+                await db.governmentFinalizedPayments.bulkPut(govPayments);
+            }
         }
-        
-        allPayments.push(...newPayments);
-        allDeletedIds.push(...deletedIds);
-        snapshotCount++;
-        await mergeAndCallback();
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
-                const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
-                return [...regularPayments, ...govPayments] as Payment[];
-            }, callback);
-            try { unsubscribe1(); unsubscribe2(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
+    };
+    
+    // Listen to payments collection metadata (triggers fetch when payments change)
+    const unsubscribe1 = createMetadataBasedListener<Payment>(
+        {
+            collectionName: 'payments',
+            fetchFunction: fetchPayments,
+            localTableName: 'payments' // Not used for dual-collection, but required
+        },
+        async (data) => {
+            await savePaymentsToIndexedDB(data);
+            callback(data);
+        },
+        onError
+    );
+    
+    // Also listen to governmentFinalizedPayments collection metadata (in case only gov payments change)
+    const unsubscribe2 = createMetadataBasedListener<Payment>(
+        {
+            collectionName: 'governmentFinalizedPayments',
+            fetchFunction: fetchPayments,
+            localTableName: 'governmentFinalizedPayments' // Not used for dual-collection, but required
+        },
+        async (data) => {
+            await savePaymentsToIndexedDB(data);
+            callback(data);
+        },
+        onError
+    );
 
     // Return a function that unsubscribes from both listeners
     return () => {
@@ -2535,101 +2440,24 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
         }, callback);
     }
 
-    let localPayments: CustomerPayment[] = [];
-    let callbackCalledFromIndexedDB = false;
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
-    if (db) {
-        db.customerPayments.orderBy('date').reverse().toArray().then((localData) => {
-            localPayments = localData as CustomerPayment[];
-            callbackCalledFromIndexedDB = true;
-            callback(localData as CustomerPayment[]);
-        }).catch(() => {
-            callbackCalledFromIndexedDB = false;
-        });
-    }
-
-    // ✅ Use incremental sync - only listen to NEW changes after last sync
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:customerPayments');
-        return stored ? parseInt(stored, 10) : undefined;
+    const fetchCustomerPayments = async (): Promise<CustomerPayment[]> => {
+        const snapshot = await getDocs(query(customerPaymentsCollection, orderBy("date", "desc")));
+        const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+        firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', snapshot.size);
+        return payments;
     };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            customerPaymentsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(customerPaymentsCollection, orderBy("date", "desc"));
-    }
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const newPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
-        
-        // ✅ Handle deletions - remove deleted documents from IndexedDB
-        const deletedIds: string[] = [];
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'removed') {
-                deletedIds.push(change.doc.id);
-            }
-        });
-        
-        // Remove deleted documents from IndexedDB
-        if (db && deletedIds.length > 0) {
-            await Promise.all(deletedIds.map(id => db.customerPayments.delete(id)));
-        }
-        
-        // Track Firestore read
-        firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', newPayments.length);
-        
-        // Merge new changes with local data
-        if (callbackCalledFromIndexedDB && localPayments.length > 0) {
-            const mergedMap = new Map<string, CustomerPayment>();
-            localPayments.forEach(p => mergedMap.set(p.id, p));
-            // Remove deleted payments
-            deletedIds.forEach(id => mergedMap.delete(id));
-            newPayments.forEach(p => mergedMap.set(p.id, p));
-            const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                return new Date(b.date).getTime() - new Date(a.date).getTime();
-            });
-            callback(merged);
-            
-            if (db && newPayments.length > 0) {
-                await db.customerPayments.bulkPut(newPayments);
-            }
-        } else {
-            callback(newPayments);
-            if (db && newPayments.length > 0) {
-                await db.customerPayments.bulkPut(newPayments);
-            }
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:customerPayments', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.customerPayments.orderBy('date').reverse().toArray() : [];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    return createMetadataBasedListener<CustomerPayment>(
+        {
+            collectionName: 'customerPayments',
+            fetchFunction: fetchCustomerPayments,
+            localTableName: 'customerPayments'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (error: Error) => void) {
@@ -2639,84 +2467,24 @@ export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (err
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:loans');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    let firestoreLoans: Loan[] = []; // Store all Firestore loans
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response)
-    if (db) {
-        db.loans.orderBy('startDate').reverse().toArray().then((localLoans) => {
-            // Call callback with IndexedDB data to clear loading state quickly
-            callback(localLoans as Loan[]);
-        }).catch(() => {
-            // If IndexedDB read fails, Firestore will call callback
-        });
-    }
-
-    // ✅ Always fetch all loans from Firestore (source of truth)
-    // First do a full fetch to get all loans
-    getDocs(query(loansCollection, orderBy("startDate", "desc"))).then((fullSnapshot) => {
-        const allLoans = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
-        firestoreLoans = allLoans;
-        callback(allLoans);
-        
-        // Save to IndexedDB
-        if (db && allLoans.length > 0) {
-            db.loans.bulkPut(allLoans).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:loans', String(Date.now()));
-        }
-    }).catch((error) => {
-        console.error('Error fetching loans:', error);
-        onError(error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    let q;
-    try {
-        q = query(loansCollection, orderBy("startDate", "desc"));
-    } catch (error) {
-        // If orderBy fails, use simple query
-        q = query(loansCollection);
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const newLoans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
-        
-        // Update firestoreLoans with latest data
-        firestoreLoans = newLoans;
-        callback(newLoans);
-        
-        // Save to IndexedDB
-        if (db && newLoans.length > 0) {
-            db.loans.bulkPut(newLoans).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:loans', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.loans.orderBy('startDate').reverse().toArray() : [];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    const fetchLoans = async (): Promise<Loan[]> => {
+        const snapshot = await getDocs(query(loansCollection, orderBy("startDate", "desc")));
+        const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+        firestoreMonitor.logRead('loans', 'getLoansRealtime', snapshot.size);
+        return loans;
+    };
+    
+    return createMetadataBasedListener<Loan>(
+        {
+            collectionName: 'loans',
+            fetchFunction: fetchLoans,
+            localTableName: 'loans'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) => void, onError: (error: Error) => void) {
@@ -2726,191 +2494,77 @@ export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) 
         }, callback);
     }
 
-    let firestoreTransactions: FundTransaction[] = []; // Store all Firestore transactions
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response)
-    if (db) {
-        db.fundTransactions.orderBy('date').reverse().toArray().then((localTransactions) => {
-            // Call callback with IndexedDB data to clear loading state quickly
-            callback(localTransactions as FundTransaction[]);
-        }).catch(() => {
-            // If IndexedDB read fails, Firestore will call callback
-        });
-    }
-
-    // ✅ Always fetch all transactions from Firestore (source of truth)
-    // First do a full fetch to get all transactions
-    getDocs(query(fundTransactionsCollection, orderBy("date", "desc"))).then((fullSnapshot) => {
-        const allTransactions = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
-        firestoreTransactions = allTransactions;
-        callback(allTransactions);
-        
-        // Save to IndexedDB
-        if (db && allTransactions.length > 0) {
-            db.fundTransactions.bulkPut(allTransactions).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:fundTransactions', String(Date.now()));
-        }
-    }).catch((error) => {
-        console.error('Error fetching fund transactions:', error);
-        onError(error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    let q;
-    try {
-        q = query(fundTransactionsCollection, orderBy("date", "desc"));
-    } catch (error) {
-        // If orderBy fails, use simple query
-        q = query(fundTransactionsCollection);
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const newTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
-        
-        // Update firestoreTransactions with latest data
-        firestoreTransactions = newTransactions;
-        callback(newTransactions);
-        
-        // Save to IndexedDB
-        if (db && newTransactions.length > 0) {
-            db.fundTransactions.bulkPut(newTransactions).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:fundTransactions', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.fundTransactions.orderBy('date').reverse().toArray() : [];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    const fetchFundTransactions = async (): Promise<FundTransaction[]> => {
+        const snapshot = await getDocs(query(fundTransactionsCollection, orderBy("date", "desc")));
+        const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+        firestoreMonitor.logRead('fundTransactions', 'getFundTransactionsRealtime', snapshot.size);
+        return transactions;
+    };
+    
+    return createMetadataBasedListener<FundTransaction>(
+        {
+            collectionName: 'fundTransactions',
+            fetchFunction: fetchFundTransactions,
+            localTableName: 'fundTransactions'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
-        // Fallback to local transactions filtered as Income
         return createPollingFallback(async () => {
-            if (!db) return [];
-            const tx = await db.transactions.orderBy('date').reverse().toArray();
-            return tx.filter((t: any) => (t.transactionType || t.type) === 'Income') as unknown as Income[];
+            return db ? await db.incomes.orderBy('date').reverse().toArray() : [];
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:incomes');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            incomesCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(incomesCollection, orderBy("date", "desc"));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
-        callback(transactions);
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:incomes', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                if (!db) return [];
-                const tx = await db.transactions.orderBy('date').reverse().toArray();
-                return tx.filter((t: any) => (t.transactionType || t.type) === 'Income') as unknown as Income[];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    const fetchIncomes = async (): Promise<Income[]> => {
+        const snapshot = await getDocs(query(incomesCollection, orderBy("date", "desc")));
+        const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+        firestoreMonitor.logRead('incomes', 'getIncomeRealtime', snapshot.size);
+        return incomes;
+    };
+    
+    return createMetadataBasedListener<Income>(
+        {
+            collectionName: 'incomes',
+            fetchFunction: fetchIncomes,
+            localTableName: 'incomes'
+        },
+        callback,
+        onError
+    );
 }
 export function getExpensesRealtime(callback: (data: Expense[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            if (!db) return [];
-            const tx = await db.transactions.orderBy('date').reverse().toArray();
-            return tx.filter((t: any) => (t.transactionType || t.type) === 'Expense') as unknown as Expense[];
+            return db ? await db.expenses.orderBy('date').reverse().toArray() : [];
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:expenses');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            expensesCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(expensesCollection, orderBy("date", "desc"));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
-        callback(transactions);
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:expenses', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                if (!db) return [];
-                const tx = await db.transactions.orderBy('date').reverse().toArray();
-                return tx.filter((t: any) => (t.transactionType || t.type) === 'Expense') as unknown as Expense[];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+    const fetchExpenses = async (): Promise<Expense[]> => {
+        const snapshot = await getDocs(query(expensesCollection, orderBy("date", "desc")));
+        const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+        firestoreMonitor.logRead('expenses', 'getExpensesRealtime', snapshot.size);
+        return expenses;
+    };
+    
+    return createMetadataBasedListener<Expense>(
+        {
+            collectionName: 'expenses',
+            fetchFunction: fetchExpenses,
+            localTableName: 'expenses'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => void, onError: (error: Error) => void) {
@@ -3439,7 +3093,6 @@ export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (err
             );
         } catch (error) {
             // If updatedAt query fails (no index or missing fields), fallback to full sync
-            console.warn('Incremental sync failed for banks, using full sync:', error);
             q = query(banksCollection);
         }
     } else {
@@ -3503,7 +3156,6 @@ export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (err
             localStorage.setItem('lastSync:banks', String(Date.now()));
         }
         } catch (error) {
-            console.error('Error processing banks snapshot:', error);
             // On error, still try to use cached banks from IndexedDB
             if (cachedBanks.length > 0) {
                 callback(cachedBanks);
@@ -3512,7 +3164,6 @@ export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (err
             }
         }
     }, (error) => {
-        console.error('Banks snapshot error:', error);
         // On snapshot error, use cached banks from IndexedDB if available
         if (cachedBanks.length > 0) {
             callback(cachedBanks);
@@ -3993,30 +3644,41 @@ export async function fetchLedgerAccounts(): Promise<LedgerAccount[]> {
 
 export async function createLedgerAccount(account: LedgerAccountInput): Promise<LedgerAccount> {
     const timestamp = new Date().toISOString();
-    const docRef = await addDoc(ledgerAccountsCollection, {
-        name: account.name,
-        address: account.address || '',
-        contact: account.contact || '',
-        createdAt: timestamp,
-        updatedAt: timestamp,
-    });
-
-    return {
-        id: docRef.id,
+    const docRef = doc(ledgerAccountsCollection);
+    const newAccount = {
         name: account.name,
         address: account.address || '',
         contact: account.contact || '',
         createdAt: timestamp,
         updatedAt: timestamp,
     };
+    
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, newAccount);
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerAccounts', { batch });
+    
+    await batch.commit();
+
+    return {
+        id: docRef.id,
+        ...newAccount,
+    };
 }
 
 export async function updateLedgerAccount(id: string, updates: Partial<LedgerAccountInput>): Promise<void> {
     const docRef = doc(ledgerAccountsCollection, id);
-    await updateDoc(docRef, {
+    const batch = writeBatch(firestoreDB);
+    batch.update(docRef, {
         ...updates,
         updatedAt: new Date().toISOString(),
     });
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerAccounts', { batch });
+    
+    await batch.commit();
 }
 
 export function getLedgerAccountsRealtime(
@@ -4029,70 +3691,10 @@ export function getLedgerAccountsRealtime(
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:ledgerAccounts');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    let firestoreAccounts: LedgerAccount[] = [];
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response)
-    if (db) {
-        db.ledgerAccounts.toArray().then((localAccounts) => {
-            callback(localAccounts as LedgerAccount[]);
-        }).catch(() => {
-            // If IndexedDB read fails, Firestore will call callback
-        });
-    }
-
-    // ✅ Always fetch all accounts from Firestore (source of truth)
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (lastSyncTime) {
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            ledgerAccountsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        q = query(ledgerAccountsCollection, orderBy('name'));
-    }
-
-    getDocs(q).then((fullSnapshot) => {
-        const allAccounts = fullSnapshot.docs.map((docSnap) => {
-            const data = docSnap.data() as Record<string, any>;
-            return {
-                id: docSnap.id,
-                name: data.name || '',
-                address: data.address || '',
-                contact: data.contact || '',
-                createdAt: data.createdAt || '',
-                updatedAt: data.updatedAt || data.createdAt || '',
-            } as LedgerAccount;
-        });
-        firestoreAccounts = allAccounts;
-        callback(allAccounts);
-        
-        // Save to IndexedDB
-        if (db && allAccounts.length > 0) {
-            db.ledgerAccounts.bulkPut(allAccounts).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:ledgerAccounts', String(Date.now()));
-        }
-    }).catch((error) => {
-        console.error('Error fetching ledger accounts:', error);
-        onError(error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    return onSnapshot(q, (snapshot) => {
+    const fetchLedgerAccounts = async (): Promise<LedgerAccount[]> => {
+        const snapshot = await getDocs(query(ledgerAccountsCollection, orderBy('name')));
         const accounts = snapshot.docs.map((docSnap) => {
             const data = docSnap.data() as Record<string, any>;
             return {
@@ -4104,31 +3706,19 @@ export function getLedgerAccountsRealtime(
                 updatedAt: data.updatedAt || data.createdAt || '',
             } as LedgerAccount;
         });
-        
-        // Merge with existing data
-        accounts.forEach(account => {
-            const index = firestoreAccounts.findIndex(a => a.id === account.id);
-            if (index >= 0) {
-                firestoreAccounts[index] = account;
-            } else {
-                firestoreAccounts.push(account);
-            }
-        });
-        callback([...firestoreAccounts]);
-        
-        // Save to IndexedDB
-        if (db && accounts.length > 0) {
-            db.ledgerAccounts.bulkPut(accounts).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:ledgerAccounts', String(Date.now()));
-        }
-    }, (err: any) => {
-        console.error('Error in ledger accounts realtime listener:', err);
-        onError(err);
-    });
+        firestoreMonitor.logRead('ledgerAccounts', 'getLedgerAccountsRealtime', snapshot.size);
+        return accounts;
+    };
+    
+    return createMetadataBasedListener<LedgerAccount>(
+        {
+            collectionName: 'ledgerAccounts',
+            fetchFunction: fetchLedgerAccounts,
+            localTableName: 'ledgerAccounts'
+        },
+        callback,
+        onError
+    );
 }
 
 export async function deleteLedgerAccount(id: string): Promise<void> {
@@ -4139,6 +3729,12 @@ export async function deleteLedgerAccount(id: string): Promise<void> {
     entriesSnapshot.forEach((entryDoc) => {
         batch.delete(entryDoc.ref);
     });
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerAccounts', { batch });
+    if (entriesSnapshot.size > 0) {
+        await notifySyncRegistry('ledgerEntries', { batch });
+    }
 
     await batch.commit();
 }
@@ -4255,7 +3851,15 @@ export async function createLedgerCashAccount(account: LedgerCashAccountInput): 
         createdAt: timestamp,
         updatedAt: timestamp,
     };
-    const docRef = await addDoc(ledgerCashAccountsCollection, payload);
+    const docRef = doc(ledgerCashAccountsCollection);
+    
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, payload);
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerCashAccounts', { batch });
+    
+    await batch.commit();
 
     return {
         id: docRef.id,
@@ -4269,11 +3873,25 @@ export async function updateLedgerCashAccount(id: string, updates: Partial<Ledge
         ...updates,
         updatedAt: new Date().toISOString(),
     });
-    await updateDoc(docRef, payload);
+    
+    const batch = writeBatch(firestoreDB);
+    batch.update(docRef, payload);
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerCashAccounts', { batch });
+    
+    await batch.commit();
 }
 
 export async function deleteLedgerCashAccount(id: string): Promise<void> {
-    await deleteDoc(doc(ledgerCashAccountsCollection, id));
+    const docRef = doc(ledgerCashAccountsCollection, id);
+    const batch = writeBatch(firestoreDB);
+    batch.delete(docRef);
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerCashAccounts', { batch });
+    
+    await batch.commit();
 }
 
 export function getLedgerCashAccountsRealtime(
@@ -4282,108 +3900,22 @@ export function getLedgerCashAccountsRealtime(
 ): () => void {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            // Try to get from cache first
             if (typeof window !== 'undefined') {
                 const cached = localStorage.getItem('ledgerCashAccountsCache');
                 if (cached) {
                     try {
                         return JSON.parse(cached) as LedgerCashAccount[];
-                    } catch (e) {
-                        console.warn('Failed to parse cached cash accounts', e);
-                    }
+                    } catch {}
                 }
             }
             return [];
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const stored = localStorage.getItem('lastSync:ledgerCashAccounts');
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    let firestoreCashAccounts: LedgerCashAccount[] = [];
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from cache first (immediate response)
-    if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem('ledgerCashAccountsCache');
-        if (cached) {
-            try {
-                const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
-                callback(cachedAccounts);
-                firestoreCashAccounts = cachedAccounts;
-            } catch (e) {
-                console.warn('Failed to parse cached cash accounts', e);
-            }
-        }
-    }
-
-    // Build query
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (lastSyncTime && firestoreCashAccounts.length > 0) {
-        // Use incremental sync - only get changed accounts
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            ledgerCashAccountsCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all accounts
-        q = query(ledgerCashAccountsCollection, orderBy('name'));
-    }
-
-    // ✅ Always fetch from Firestore (source of truth)
-    getDocs(q).then((fullSnapshot) => {
-        const allAccounts = fullSnapshot.docs.map((docSnap) => {
-            const data = docSnap.data() as Record<string, any>;
-            const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
-            const normalizedNoteGroups = Object.entries(rawNoteGroups).reduce<Record<string, number[]>>((acc, [key, value]) => {
-                acc[key] = Array.isArray(value) ? value.map((entry) => Number(entry) || 0) : [];
-                return acc;
-            }, {});
-
-            return {
-                id: docSnap.id,
-                name: data.name || '',
-                noteGroups: normalizedNoteGroups,
-                createdAt: data.createdAt || '',
-                updatedAt: data.updatedAt || data.createdAt || '',
-            } as LedgerCashAccount;
-        });
-        
-        // Merge with existing if incremental
-        if (lastSyncTime && firestoreCashAccounts.length > 0) {
-            allAccounts.forEach(account => {
-                const index = firestoreCashAccounts.findIndex(a => a.id === account.id);
-                if (index >= 0) {
-                    firestoreCashAccounts[index] = account;
-                } else {
-                    firestoreCashAccounts.push(account);
-                }
-            });
-        } else {
-            firestoreCashAccounts = allAccounts;
-        }
-        
-        callback([...firestoreCashAccounts]);
-        
-        // ✅ Update cache
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(firestoreCashAccounts));
-            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
-        }
-    }).catch((error) => {
-        console.error('Error fetching ledger cash accounts:', error);
-        onError(error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    return onSnapshot(q, (snapshot) => {
+    const fetchLedgerCashAccounts = async (): Promise<LedgerCashAccount[]> => {
+        const snapshot = await getDocs(query(ledgerCashAccountsCollection, orderBy('name')));
         const accounts = snapshot.docs.map((docSnap) => {
             const data = docSnap.data() as Record<string, any>;
             const rawNoteGroups = (data.noteGroups && typeof data.noteGroups === 'object') ? data.noteGroups : {};
@@ -4400,27 +3932,24 @@ export function getLedgerCashAccountsRealtime(
                 updatedAt: data.updatedAt || data.createdAt || '',
             } as LedgerCashAccount;
         });
-        
-        // Merge with existing data
-        accounts.forEach(account => {
-            const index = firestoreCashAccounts.findIndex(a => a.id === account.id);
-            if (index >= 0) {
-                firestoreCashAccounts[index] = account;
-            } else {
-                firestoreCashAccounts.push(account);
+        firestoreMonitor.logRead('ledgerCashAccounts', 'getLedgerCashAccountsRealtime', snapshot.size);
+        return accounts;
+    };
+    
+    return createMetadataBasedListener<LedgerCashAccount>(
+        {
+            collectionName: 'ledgerCashAccounts',
+            fetchFunction: fetchLedgerCashAccounts,
+            localTableName: 'ledgerCashAccounts'
+        },
+        async (data) => {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(data));
             }
-        });
-        callback([...firestoreCashAccounts]);
-        
-        // ✅ Update cache
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(firestoreCashAccounts));
-            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
-        }
-    }, (err: any) => {
-        console.error('Error in ledger cash accounts realtime listener:', err);
-        onError(err);
-    });
+            callback(data);
+        },
+        onError
+    );
 }
 
 export async function fetchLedgerEntries(accountId: string): Promise<LedgerEntry[]> {
@@ -4544,100 +4073,21 @@ export function getLedgerEntriesRealtime(
         }, callback);
     }
 
-    // ✅ Use incremental sync for realtime listener
-    const getLastSyncTime = (): number | undefined => {
-        if (typeof window === 'undefined') return undefined;
-        const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
-        const stored = localStorage.getItem(key);
-        return stored ? parseInt(stored, 10) : undefined;
-    };
-
-    let firestoreEntries: LedgerEntry[] = [];
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
-    // ✅ Read from local IndexedDB first (immediate response)
-    if (db) {
-        const loadFromDB = async () => {
-            try {
-                let localEntries: LedgerEntry[];
-                if (accountId) {
-                    localEntries = await db.ledgerEntries.where('accountId').equals(accountId).toArray();
-                } else {
-                    localEntries = await db.ledgerEntries.toArray();
-                }
-                callback(localEntries as LedgerEntry[]);
-            } catch (e) {
-                // If IndexedDB read fails, Firestore will call callback
-            }
-        };
-        loadFromDB();
-    }
-
-    // Build query
-    const lastSyncTime = getLastSyncTime();
-    let q;
-    
-    if (accountId) {
-        // Filter by accountId
-        // Avoid composite index requirement by using simpler query
-        // Client-side filtering can filter by updatedAt if needed
-        q = query(
-            ledgerEntriesCollection,
-            where('accountId', '==', accountId),
-            orderBy('createdAt')
-        );
-    } else {
-        // Get all entries
-        if (lastSyncTime) {
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+    const fetchLedgerEntries = async (): Promise<LedgerEntry[]> => {
+        let q;
+        if (accountId) {
             q = query(
                 ledgerEntriesCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
+                where('accountId', '==', accountId),
+                orderBy('createdAt')
             );
         } else {
             q = query(ledgerEntriesCollection, orderBy('createdAt'));
         }
-    }
-
-    // ✅ Always fetch from Firestore (source of truth)
-    getDocs(q).then((fullSnapshot) => {
-        const allEntries = fullSnapshot.docs.map((docSnap) => {
-            const data = docSnap.data() as Record<string, any>;
-            return {
-                id: docSnap.id,
-                accountId: data.accountId,
-                date: data.date,
-                particulars: data.particulars,
-                debit: Number(data.debit) || 0,
-                credit: Number(data.credit) || 0,
-                balance: Number(data.balance) || 0,
-                remarks: typeof data.remarks === 'string' ? data.remarks : undefined,
-                createdAt: data.createdAt || '',
-                updatedAt: data.updatedAt || data.createdAt || '',
-                linkGroupId: data.linkGroupId || undefined,
-                linkStrategy: data.linkStrategy || undefined,
-            } as LedgerEntry;
-        });
-        firestoreEntries = allEntries;
-        callback(allEntries);
         
-        // Save to IndexedDB
-        if (db && allEntries.length > 0) {
-            db.ledgerEntries.bulkPut(allEntries).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
-            localStorage.setItem(key, String(Date.now()));
-        }
-    }).catch((error) => {
-        console.error('Error fetching ledger entries:', error);
-        onError(error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    return onSnapshot(q, (snapshot) => {
+        const snapshot = await getDocs(q);
         const entries = snapshot.docs.map((docSnap) => {
             const data = docSnap.data() as Record<string, any>;
             return {
@@ -4655,32 +4105,41 @@ export function getLedgerEntriesRealtime(
                 linkStrategy: data.linkStrategy || undefined,
             } as LedgerEntry;
         });
-        
-        // Merge with existing data
-        entries.forEach(entry => {
-            const index = firestoreEntries.findIndex(e => e.id === entry.id);
-            if (index >= 0) {
-                firestoreEntries[index] = entry;
-            } else {
-                firestoreEntries.push(entry);
+        firestoreMonitor.logRead('ledgerEntries', 'getLedgerEntriesRealtime', snapshot.size);
+        return entries;
+    };
+    
+    // For filtered queries (accountId), we need to handle IndexedDB updates carefully
+    // Only update entries for the specific account, don't delete entries from other accounts
+    const handleCallback = async (data: LedgerEntry[]) => {
+        if (db && accountId) {
+            // For filtered queries, only update entries for this account
+            const accountEntries = data.filter(e => e.accountId === accountId);
+            const existingIds = new Set(
+                (await db.ledgerEntries.where('accountId').equals(accountId).toArray()).map(e => e.id)
+            );
+            const freshIds = new Set(accountEntries.map(e => e.id));
+            const deletedIds = Array.from(existingIds).filter(id => !freshIds.has(id));
+            
+            if (deletedIds.length > 0) {
+                await db.ledgerEntries.bulkDelete(deletedIds);
             }
-        });
-        callback([...firestoreEntries]);
-        
-        // Save to IndexedDB
-        if (db && entries.length > 0) {
-            db.ledgerEntries.bulkPut(entries).catch(() => {});
+            if (accountEntries.length > 0) {
+                await db.ledgerEntries.bulkPut(accountEntries);
+            }
         }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            const key = accountId ? `lastSync:ledgerEntries:${accountId}` : 'lastSync:ledgerEntries';
-            localStorage.setItem(key, String(Date.now()));
-        }
-    }, (err: any) => {
-        console.error('Error in ledger entries realtime listener:', err);
-        onError(err);
-    });
+        callback(data);
+    };
+    
+    return createMetadataBasedListener<LedgerEntry>(
+        {
+            collectionName: 'ledgerEntries',
+            fetchFunction: fetchLedgerEntries,
+            localTableName: accountId ? undefined : 'ledgerEntries' // Don't use default IndexedDB update for filtered queries
+        },
+        accountId ? handleCallback : callback,
+        onError
+    );
 }
 
 export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {
@@ -4741,7 +4200,13 @@ export async function updateLedgerEntriesBatch(entries: LedgerEntry[]): Promise<
 
 export async function deleteLedgerEntry(id: string): Promise<void> {
     const entryRef = doc(ledgerEntriesCollection, id);
-    await deleteDoc(entryRef);
+    const batch = writeBatch(firestoreDB);
+    batch.delete(entryRef);
+    
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('ledgerEntries', { batch });
+    
+    await batch.commit();
 }
     
 function chunkArray<T>(items: T[], size: number): T[][] {
@@ -4828,6 +4293,8 @@ export async function bulkUpsertLedgerAccounts(accounts: LedgerAccount[], chunkS
             const ref = doc(ledgerAccountsCollection, account.id);
             batch.set(ref, account, { merge: true });
         });
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('ledgerAccounts', { batch });
         await batch.commit();
     }
 }
@@ -4844,6 +4311,8 @@ export async function bulkUpsertLedgerEntries(entries: LedgerEntry[], chunkSize 
             const ref = doc(ledgerEntriesCollection, entry.id);
             batch.set(ref, entry, { merge: true });
         });
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('ledgerEntries', { batch });
         await batch.commit();
     }
 }
@@ -4860,6 +4329,8 @@ export async function bulkUpsertLedgerCashAccounts(accounts: LedgerCashAccount[]
             const ref = doc(ledgerCashAccountsCollection, account.id);
             batch.set(ref, account, { merge: true });
         });
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('ledgerCashAccounts', { batch });
         await batch.commit();
     }
 }

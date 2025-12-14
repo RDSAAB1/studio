@@ -26,6 +26,7 @@ import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-f
 
 import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getLoansRealtime, getSuppliersRealtime, getBankAccountsRealtime } from "@/lib/firestore";
+import { db } from "@/lib/database";
 import type { FundTransaction, Income, Expense, Payment, CustomerPayment, Loan, Customer, BankAccount } from "@/lib/definitions";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,40 +70,153 @@ export default function CashBankClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     
+    // Force re-render key to trigger useMemo recalculation
+    const [refreshKey, setRefreshKey] = useState(0);
+    
     // Fetch data directly
     useEffect(() => {
         const unsubFunds = getFundTransactionsRealtime(
-            (data) => setFundTransactions(data),
+            (data) => {
+                setFundTransactions(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching fund transactions:', error)
         );
         const unsubIncomes = getIncomeRealtime(
-            (data) => setIncomes(data),
+            (data) => {
+                setIncomes(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching incomes:', error)
         );
         const unsubExpenses = getExpensesRealtime(
-            (data) => setExpenses(data),
+            (data) => {
+                setExpenses(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching expenses:', error)
         );
         const unsubPayments = getPaymentsRealtime(
-            (data) => setSupplierPayments(data),
+            (data) => {
+                setSupplierPayments(data);
+                setRefreshKey(prev => prev + 1); // Force re-render when payments change
+            },
             (error) => console.error('Error fetching payments:', error)
         );
         const unsubCustomerPayments = getCustomerPaymentsRealtime(
-            (data) => setCustomerPayments(data),
+            (data) => {
+                setCustomerPayments(data);
+                setRefreshKey(prev => prev + 1); // Force re-render when customer payments change
+            },
             (error) => console.error('Error fetching customer payments:', error)
         );
         const unsubLoans = getLoansRealtime(
-            (data) => setLoans(data),
+            (data) => {
+                setLoans(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching loans:', error)
         );
         const unsubSuppliers = getSuppliersRealtime(
-            (data) => setSuppliers(data),
+            (data) => {
+                setSuppliers(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching suppliers:', error)
         );
         const unsubBankAccounts = getBankAccountsRealtime(
-            (data) => setBankAccounts(data),
+            (data) => {
+                setBankAccounts(data);
+                setRefreshKey(prev => prev + 1); // Force re-render
+            },
             (error) => console.error('Error fetching bank accounts:', error)
         );
+        
+        // ✅ Listen for payment updates to refresh immediately when payment is finalized
+        const handlePaymentUpdate = async (event: CustomEvent) => {
+            const { payment, paymentMethod, isCustomer } = event.detail;
+            // Only refresh if it's a Cash payment (affects Cash in Hand balance)
+            if (paymentMethod === 'Cash' || payment?.receiptType === 'Cash' || payment?.paymentMethod === 'Cash') {
+                // Force refresh by re-reading from IndexedDB
+                if (typeof window !== 'undefined' && db) {
+                    try {
+                        if (isCustomer) {
+                            const customerPayments = await db.customerPayments.orderBy('date').reverse().toArray();
+                            setCustomerPayments(customerPayments as CustomerPayment[]);
+                        } else {
+                            const regularPayments = await db.payments.orderBy('date').reverse().toArray();
+                            const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
+                            setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
+                        }
+                        setRefreshKey(prev => prev + 1); // Force re-render
+                    } catch (error) {
+                        console.error('Error refreshing payments after update:', error);
+                    }
+                }
+            }
+        };
+        
+        // ✅ Listen for payment deletions to refresh immediately when payment is deleted
+        const handlePaymentDelete = async (event: CustomEvent) => {
+            const { payment, receiptType, paymentMethod, isCustomer } = event.detail;
+            // Only refresh if it's a Cash payment (affects Cash in Hand balance)
+            if (receiptType === 'Cash' || paymentMethod === 'Cash' || payment?.receiptType === 'Cash' || payment?.paymentMethod === 'Cash') {
+                // Force refresh by re-reading from IndexedDB
+                if (typeof window !== 'undefined' && db) {
+                    try {
+                        if (isCustomer) {
+                            const customerPayments = await db.customerPayments.orderBy('date').reverse().toArray();
+                            setCustomerPayments(customerPayments as CustomerPayment[]);
+                        } else {
+                            const regularPayments = await db.payments.orderBy('date').reverse().toArray();
+                            const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
+                            setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
+                        }
+                        setRefreshKey(prev => prev + 1); // Force re-render
+                    } catch (error) {
+                        console.error('Error refreshing payments after delete:', error);
+                    }
+                }
+            }
+        };
+        
+        window.addEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
+        window.addEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+        
+        // ✅ Refresh data when window gains focus (user switches back to tab)
+        const handleVisibilityChange = async () => {
+            if (!document.hidden && db) {
+                // User switched back to tab - refresh data to get latest from IndexedDB
+                try {
+                    const [funds, incomes, expenses, regularPayments, govPayments, customerPayments, loans, suppliers, bankAccounts] = await Promise.all([
+                        db.fundTransactions.orderBy('date').reverse().toArray(),
+                        db.incomes.orderBy('date').reverse().toArray(),
+                        db.expenses.orderBy('date').reverse().toArray(),
+                        db.payments.orderBy('date').reverse().toArray(),
+                        db.governmentFinalizedPayments.orderBy('date').reverse().toArray(),
+                        db.customerPayments.orderBy('date').reverse().toArray(),
+                        db.loans.orderBy('startDate').reverse().toArray(),
+                        db.suppliers.orderBy('srNo').reverse().toArray(),
+                        db.bankAccounts.toArray(),
+                    ]);
+                    
+                    setFundTransactions(funds as FundTransaction[]);
+                    setIncomes(incomes as Income[]);
+                    setExpenses(expenses as Expense[]);
+                    setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
+                    setCustomerPayments(customerPayments as CustomerPayment[]);
+                    setLoans(loans as Loan[]);
+                    setSuppliers(suppliers as Customer[]);
+                    setBankAccounts(bankAccounts as BankAccount[]);
+                    setRefreshKey(prev => prev + 1);
+                } catch (error) {
+                    console.error('Error refreshing data on visibility change:', error);
+                }
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
         return () => {
             unsubFunds();
             unsubIncomes();
@@ -112,6 +226,9 @@ export default function CashBankClient() {
             unsubLoans();
             unsubSuppliers();
             unsubBankAccounts();
+            window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
+            window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
     // All data is now fetched directly via useState hooks above
@@ -224,7 +341,7 @@ export default function CashBankClient() {
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers]);
+    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers, refreshKey]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)

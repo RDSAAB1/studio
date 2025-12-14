@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, FormProvider, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -16,7 +16,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
+import { Loader2, Percent } from "lucide-react";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -35,6 +39,12 @@ const formSchema = z.object({
     rate: z.coerce.number().min(0),
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
+    brokerageRate: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return 0;
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+    }, z.number().min(0).default(0)),
+    brokerageAddSubtract: z.boolean().optional(),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     forceUnique: z.boolean().optional(),
@@ -87,6 +97,8 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
             rate: 0,
             kartaPercentage: 1,
             labouryRate: 2,
+            brokerageRate: 0,
+            brokerageAddSubtract: true,
             kanta: 50,
             paymentType: 'Full',
         },
@@ -206,9 +218,11 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 grossWeight: supplierToUse.grossWeight || 0,
                 teirWeight: supplierToUse.teirWeight || 0,
                 rate: supplierToUse.rate || 0,
-                kartaPercentage: supplierToUse.kartaPercentage || 1,
-                labouryRate: supplierToUse.labouryRate || 2,
-                kanta: supplierToUse.kanta || 50,
+                kartaPercentage: Number(supplierToUse.kartaPercentage) || 1,
+                labouryRate: Number(supplierToUse.labouryRate) || 2,
+                brokerageRate: Number(supplierToUse.brokerageRate) || 0,
+                brokerageAddSubtract: supplierToUse.brokerageAddSubtract ?? true,
+                kanta: Number(supplierToUse.kanta) || 50,
                 paymentType: supplierToUse.paymentType || 'Full',
                 forceUnique: supplierToUse.forceUnique || false,
             };
@@ -368,6 +382,8 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 address: toTitleCase(values.address),
                 variety: toTitleCase(values.variety),
                 vehicleNo: toTitleCase(values.vehicleNo),
+                brokerageRate: values.brokerageRate || 0,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
             };
             
             const { warning, suggestedTerm, ...calculatedFields } = calculateSupplierEntry(
@@ -391,6 +407,8 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 address: toTitleCase(values.address),
                 variety: toTitleCase(values.variety),
                 vehicleNo: toTitleCase(values.vehicleNo),
+                brokerageRate: values.brokerageRate || 0,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
                 forceUnique: values.forceUnique || false,
             };
 
@@ -512,9 +530,73 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                                 handleCalculationFieldChange={handleCalculationFieldChange}
                                 onAutoFill={null}
                             />
+                            
+                            {/* Brokerage Field */}
+                            <Card>
+                                <CardContent className="p-3 space-y-2">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="brokerageRate" className="text-xs whitespace-nowrap">Brokerage Rate</Label>
+                                            <Controller
+                                                name="brokerageAddSubtract"
+                                                control={form.control}
+                                                render={({ field }) => (
+                                                    <SegmentedSwitch
+                                                        id="brokerage-toggle"
+                                                        checked={field.value ?? true}
+                                                        onCheckedChange={(checked) => {
+                                                            field.onChange(checked);
+                                                            const currentValues = form.getValues();
+                                                            performCalculations({ ...currentValues, brokerageAddSubtract: checked }, false);
+                                                        }}
+                                                        leftLabel="EXCLUDE"
+                                                        rightLabel="INCLUDE"
+                                                        className="w-36 h-6"
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+                                        <div className="relative">
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                <Percent className="h-4 w-4 text-muted-foreground" />
+                                            </div>
+                                            <Controller
+                                                name="brokerageRate"
+                                                control={form.control}
+                                                render={({ field }) => (
+                                                    <Input 
+                                                        id="brokerageRate" 
+                                                        type="number" 
+                                                        step="0.01"
+                                                        value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                                        onChange={(e) => {
+                                                            const value = parseFloat(e.target.value) || 0;
+                                                            field.onChange(value);
+                                                            const currentValues = form.getValues();
+                                                            performCalculations({ ...currentValues, brokerageRate: value }, false);
+                                                        }}
+                                                        onBlur={field.onBlur}
+                                                        className="h-8 text-sm pl-10" 
+                                                        placeholder="0.00"
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Brokerage Amount = Final Weight × Brokerage Rate
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            
                             {currentSupplier && (
                                 <CalculatedSummary 
-                                    customer={currentSupplier}
+                                    customer={{
+                                        ...currentSupplier,
+                                        weight: currentSupplier.weight || (Number(form.watch('grossWeight') || 0) - Number(form.watch('teirWeight') || 0)),
+                                        brokerageRate: Number(form.watch('brokerageRate')) || 0,
+                                        brokerageAddSubtract: form.watch('brokerageAddSubtract') ?? true,
+                                    }}
                                     onSave={() => form.handleSubmit(onSubmit)()}
                                     isEditing={true}
                                     isCustomerForm={false}

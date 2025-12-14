@@ -283,12 +283,22 @@ export default function SimpleSupplierEntryAllFields() {
             // Build a temporary customer object from current form values for preview/print
             const v = form.getValues();
             const finalWeight = Number(v.grossWeight || 0) - Number(v.teirWeight || 0);
-            const kartaWeight = Math.round(((finalWeight * Number(v.kartaPercentage || 0)) / 100) * 100) / 100;
+            // Calculate Karta Weight with proper rounding: round UP when Final Wt decimal part >= 0.50
+            const rawKartaWt = (finalWeight * Number(v.kartaPercentage || 0)) / 100;
+            const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
+            let kartaWeight;
+            if (decimalPart >= 5) {
+                kartaWeight = Math.ceil(rawKartaWt * 100) / 100;
+            } else {
+                kartaWeight = Math.floor(rawKartaWt * 100) / 100;
+            }
             const netWeight = Math.round((finalWeight - kartaWeight) * 100) / 100;
             const amount = finalWeight * Number(v.rate || 0);
             const kartaAmount = kartaWeight * Number(v.rate || 0);
+            // Labour Amount calculated on Final Wt, not Net Wt
             const labouryAmount = finalWeight * Number(v.labouryRate || 0);
-            const brokerageAmount = Math.round(Number(v.brokerageRate || 0) * netWeight * 100) / 100;
+            // Brokerage calculated on Final Wt, not Net Wt
+            const brokerageAmount = Math.round(Number(v.brokerageRate || 0) * finalWeight * 100) / 100;
             const signedBrokerage = (v.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
             const netAmount = amount - kartaAmount - labouryAmount - Number(v.kanta || 0) + signedBrokerage;
             const temp: Customer = {
@@ -296,7 +306,12 @@ export default function SimpleSupplierEntryAllFields() {
                 srNo: v.srNo,
                 date: format(v.date, 'yyyy-MM-dd'),
                 term: String(v.term),
-                dueDate: format(new Date(v.date.getTime() + v.term * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                dueDate: (() => {
+                    const termDays = Number(v.term) || 20;
+                    const dueDate = new Date(v.date);
+                    dueDate.setDate(dueDate.getDate() + termDays);
+                    return format(dueDate, 'yyyy-MM-dd');
+                })(),
                 name: toTitleCase(v.name),
                 so: toTitleCase(v.so),
                 address: toTitleCase(v.address),
@@ -477,19 +492,40 @@ export default function SimpleSupplierEntryAllFields() {
             const rate = Number(values.rate) || 0;
             const labouryRate = Number(values.labouryRate) || 0;
             const kanta = Number(values.kanta) || 0;
+            const brokerageRate = Number(values.brokerageRate || 0) || 0;
             
-            const netWeight = grossWeight - teirWeight;
-            const amount = netWeight * rate;
-            const kartaAmount = (netWeight * kartaPercentage) / 100 * rate;
-            const labouryAmount = netWeight * labouryRate;
-            const netAmount = amount - kartaAmount - labouryAmount - kanta;
+            const finalWeight = grossWeight - teirWeight;
+            // Calculate Karta Weight with proper rounding: round UP when Final Wt decimal part >= 0.50
+            const rawKartaWt = (finalWeight * kartaPercentage) / 100;
+            const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
+            let kartaWeight;
+            if (decimalPart >= 5) {
+                kartaWeight = Math.ceil(rawKartaWt * 100) / 100;
+            } else {
+                kartaWeight = Math.floor(rawKartaWt * 100) / 100;
+            }
+            const netWeight = finalWeight - kartaWeight;
+            const amount = finalWeight * rate;
+            const kartaAmount = kartaWeight * rate;
+            // Labour Amount calculated on Final Wt, not Net Wt
+            const labouryAmount = finalWeight * labouryRate;
+            // Brokerage calculated on Final Wt, not Net Wt
+            const brokerageAmount = Math.round(brokerageRate * finalWeight * 100) / 100;
+            const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+            const netAmount = amount - kartaAmount - labouryAmount - kanta + signedBrokerage;
 
+            // Calculate due date: date + term (in days)
+            const termDays = Number(values.term) || 20;
+            const entryDate = values.date || new Date();
+            const dueDate = new Date(entryDate);
+            dueDate.setDate(dueDate.getDate() + termDays);
+            
             setCurrentSupplier(prev => ({
                 ...prev,
                 srNo: values.srNo || 'S----',
                 date: values.date ? format(values.date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                term: String(values.term || 20),
-                dueDate: values.date ? format(new Date(values.date.getTime() + (values.term || 20) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                term: String(termDays),
+                dueDate: format(dueDate, 'yyyy-MM-dd'),
                 name: values.name || '',
                 so: values.so || '',
                 address: values.address || '',
@@ -498,14 +534,18 @@ export default function SimpleSupplierEntryAllFields() {
                 variety: values.variety || '',
                 grossWeight: grossWeight,
                 teirWeight: teirWeight,
-                weight: netWeight,
+                weight: finalWeight, // Final Weight (Gross - Teir), not Net Weight
                 kartaPercentage: kartaPercentage,
-                kartaWeight: (netWeight * kartaPercentage) / 100,
+                kartaWeight: kartaWeight, // Use calculated kartaWeight with proper rounding
                 kartaAmount: kartaAmount,
-                netWeight: netWeight,
+                netWeight: netWeight, // Net Weight (Final - Karta)
                 rate: rate,
                 labouryRate: labouryRate,
                 labouryAmount: labouryAmount,
+                brokerage: brokerageAmount,
+                brokerageRate: brokerageRate,
+                brokerageAmount: brokerageAmount,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
                 kanta: kanta,
                 amount: amount,
                 netAmount: netAmount,
@@ -728,20 +768,34 @@ export default function SimpleSupplierEntryAllFields() {
             // Align DB save with summary calculations
             const finalWeight = Number(values.grossWeight) - Number(values.teirWeight);
             const rawKartaWt = (finalWeight * Number(values.kartaPercentage)) / 100;
-            const kartaWeight = Math.round(rawKartaWt * 100) / 100; // 2-dec rounding; 0.875 -> 0.88
+            // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
+            const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
+            let kartaWeight;
+            if (decimalPart >= 5) {
+                kartaWeight = Math.ceil(rawKartaWt * 100) / 100;
+            } else {
+                kartaWeight = Math.floor(rawKartaWt * 100) / 100;
+            }
             const netWeight = Math.round((finalWeight - kartaWeight) * 100) / 100; // 2-dec net
             const amount = finalWeight * Number(values.rate);
             const kartaAmount = kartaWeight * Number(values.rate);
+            // Labour Amount calculated on Final Wt, not Net Wt
             const labouryAmount = finalWeight * Number(values.labouryRate);
-            const brokerageAmount = Math.round(Number(values.brokerageRate || 0) * netWeight * 100) / 100;
+            // Brokerage calculated on Final Wt, not Net Wt
+            const brokerageAmount = Math.round(Number(values.brokerageRate || 0) * finalWeight * 100) / 100;
             const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
             const netAmount = amount - kartaAmount - labouryAmount - Number(values.kanta) + signedBrokerage;
 
+            // Calculate due date: date + term (in days)
+            const termDays = Number(values.term) || 20;
+            const dueDate = new Date(values.date);
+            dueDate.setDate(dueDate.getDate() + termDays);
+            
             const supplierBase: Omit<Customer, 'id'> = {
                 srNo: values.srNo,
                 date: format(values.date, 'yyyy-MM-dd'),
-                term: String(values.term),
-                dueDate: format(new Date(values.date.getTime() + values.term * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                term: String(termDays),
+                dueDate: format(dueDate, 'yyyy-MM-dd'),
                 name: toTitleCase(values.name),
                 so: toTitleCase(values.so),
                 address: toTitleCase(values.address),
@@ -1286,7 +1340,16 @@ export default function SimpleSupplierEntryAllFields() {
                                 brokerageRate: form.watch('brokerageRate') || 0,
                                 brokerageAddSubtract: form.watch('brokerageAddSubtract') ?? true,
                                 kanta: form.watch('kanta') || 0,
-                                dueDate: form.watch('date') ? format(form.watch('date'), 'yyyy-MM-dd') : currentSupplier.dueDate,
+                                dueDate: (() => {
+                                    const date = form.watch('date');
+                                    const term = Number(form.watch('term')) || 20;
+                                    if (date) {
+                                        const dueDate = new Date(date);
+                                        dueDate.setDate(dueDate.getDate() + term);
+                                        return format(dueDate, 'yyyy-MM-dd');
+                                    }
+                                    return currentSupplier.dueDate;
+                                })(),
                             }}
                             onSave={() => {
                                 calculateSummary(); // Calculate before saving

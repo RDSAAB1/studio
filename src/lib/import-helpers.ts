@@ -200,6 +200,7 @@ export function calculateMissingFields(data: Partial<Customer>): Partial<Custome
   const kanta = data.kanta || 0;
   
   // Calculate karta weight with rounding logic (same as utils.ts)
+  // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
   const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
   const rawKartaWeight = finalWeight * kartaPercentage / 100;
   let kartaWeight: number;
@@ -216,8 +217,13 @@ export function calculateMissingFields(data: Partial<Customer>): Partial<Custome
   // Calculate amounts with rounding (same as utils.ts)
   const amount = Math.round(finalWeight * rate);
   const kartaAmount = Math.round(finalKartaWeight * rate);
+  // Labour Amount calculated on Final Wt, not Net Wt
   const labouryAmount = Math.round(finalWeight * labouryRate);
-  const netAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
+  // Brokerage calculated on Final Wt, not Net Wt
+  const brokerageRate = Number(data.brokerage || data.brokerageRate) || 0;
+  const brokerageAmount = Math.round(finalWeight * brokerageRate);
+  const signedBrokerage = (data.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+  const netAmount = Math.round(amount - labouryAmount - kanta - kartaAmount + signedBrokerage);
   
   return {
     ...data,
@@ -227,6 +233,9 @@ export function calculateMissingFields(data: Partial<Customer>): Partial<Custome
     netWeight: netWeight,
     amount: amount,
     labouryAmount: labouryAmount,
+    brokerage: brokerageAmount,
+    brokerageRate: brokerageRate,
+    brokerageAmount: brokerageAmount,
     netAmount: netAmount,
     originalNetAmount: netAmount,
   };

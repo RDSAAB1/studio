@@ -13,7 +13,7 @@
 
 import { db } from './database';
 import { firestoreDB } from './firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy, writeBatch } from 'firebase/firestore';
 import { enqueueSyncTask } from './sync-queue';
 
 type CollectionName = 
@@ -353,13 +353,16 @@ export async function syncToFirestore() {
             const firestoreCollection = getFirestoreCollection(change.collection);
             const docRef = doc(firestoreCollection, change.id);
 
+            // ✅ Use batch write to ensure atomicity with sync registry
+            const batch = writeBatch(firestoreDB);
+            
             switch (change.type) {
                 case 'create':
                     if (change.data) {
                         try {
                             // Convert ISO string dates to Firestore Timestamps
                             const firestoreData = convertDatesToTimestamps(change.data);
-                            await setDoc(docRef, firestoreData);
+                            batch.set(docRef, firestoreData);
                         } catch (error: any) {
                             if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
                                 // Queue for later sync
@@ -368,6 +371,7 @@ export async function syncToFirestore() {
                                     { id: change.id, data: change.data },
                                     { dedupeKey: `${change.collection}:${change.id}` }
                                 );
+                                continue; // Skip this change
                             } else {
                                 throw error;
                             }
@@ -383,12 +387,12 @@ export async function syncToFirestore() {
                             if (docSnap.exists()) {
                                 // Convert ISO string dates to Firestore Timestamps
                                 const firestoreChanges = convertDatesToTimestamps(change.changes);
-                                await updateDoc(docRef, firestoreChanges);
+                                batch.update(docRef, firestoreChanges);
                             } else {
                                 // If doesn't exist, create it
                                 if (change.data) {
                                     const firestoreData = convertDatesToTimestamps(change.data);
-                                    await setDoc(docRef, firestoreData);
+                                    batch.set(docRef, firestoreData);
                                 }
                             }
                         } catch (error: any) {
@@ -398,6 +402,7 @@ export async function syncToFirestore() {
                                     { id: change.id, changes: change.changes },
                                     { dedupeKey: `${change.collection}:update:${change.id}` }
                                 );
+                                continue; // Skip this change
                             } else {
                                 throw error;
                             }
@@ -407,7 +412,7 @@ export async function syncToFirestore() {
 
                 case 'delete':
                     try {
-                        await deleteDoc(docRef);
+                        batch.delete(docRef);
                     } catch (error: any) {
                         if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
                             await enqueueSyncTask(
@@ -415,11 +420,33 @@ export async function syncToFirestore() {
                                 { id: change.id },
                                 { dedupeKey: `${change.collection}:delete:${change.id}` }
                             );
+                            continue; // Skip this change
                         } else {
                             throw error;
                         }
                     }
                     break;
+            }
+            
+            // ✅ Update sync registry atomically for this change
+            try {
+                const { notifySyncRegistry } = await import('./sync-registry');
+                await notifySyncRegistry(change.collection, { batch });
+            } catch (registryError) {
+                console.error(`Error updating sync registry for ${change.collection}:`, registryError);
+                // Continue even if registry update fails
+            }
+            
+            // Commit batch for this change
+            try {
+                await batch.commit();
+            } catch (error: any) {
+                if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
+                    // Re-queue the change
+                    pendingChanges.set(`${change.collection}:${change.id}`, change);
+                } else {
+                    throw error;
+                }
             }
         } catch (error) {
             console.error(`Error syncing ${change.collection}/${change.id} to Firestore:`, error);

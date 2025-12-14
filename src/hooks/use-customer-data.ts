@@ -35,6 +35,7 @@ export const useCustomerData = () => {
         let isSubscribed = true;
         let dataLoadCount = 0;
         const totalListeners = 9; // 8 realtime + 1 receipt settings
+        let initialLoadComplete = false; // Track when initial load is done
         
         const checkAllLoaded = () => {
             dataLoadCount++;
@@ -42,13 +43,19 @@ export const useCustomerData = () => {
                 startTransition(() => {
                     setLoading(false);
                 });
+                // Mark initial load complete after all data is loaded
+                initialLoadComplete = true;
             }
         };
         
         const unsubFunctions = [
             getCustomersRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setCustomers(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setCustomers(data));
+                    } else {
+                        setCustomers(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -57,7 +64,13 @@ export const useCustomerData = () => {
             }),
             getCustomerPaymentsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setPaymentHistory(data as Payment[]));
+                    // ✅ Real-time updates should be immediate on device Y
+                    if (!initialLoadComplete) {
+                        startTransition(() => setPaymentHistory(data as Payment[]));
+                    } else {
+                        // Immediate update for real-time changes from other devices
+                        setPaymentHistory(data as Payment[]);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -66,7 +79,11 @@ export const useCustomerData = () => {
             }),
             getIncomeRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setIncomes(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setIncomes(data));
+                    } else {
+                        setIncomes(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -75,7 +92,11 @@ export const useCustomerData = () => {
             }),
             getExpensesRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setExpenses(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setExpenses(data));
+                    } else {
+                        setExpenses(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -84,7 +105,11 @@ export const useCustomerData = () => {
             }),
             getFundTransactionsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setFundTransactions(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setFundTransactions(data));
+                    } else {
+                        setFundTransactions(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -93,7 +118,11 @@ export const useCustomerData = () => {
             }),
             getBanksRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBanks(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBanks(data));
+                    } else {
+                        setBanks(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -102,7 +131,11 @@ export const useCustomerData = () => {
             }),
             getBankBranchesRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBankBranches(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBankBranches(data));
+                    } else {
+                        setBankBranches(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {
@@ -111,7 +144,11 @@ export const useCustomerData = () => {
             }),
             getBankAccountsRealtime(data => { 
                 if (isSubscribed) {
-                    startTransition(() => setBankAccounts(data));
+                    if (!initialLoadComplete) {
+                        startTransition(() => setBankAccounts(data));
+                    } else {
+                        setBankAccounts(data);
+                    }
                     checkAllLoaded();
                 }
             }, error => {

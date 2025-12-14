@@ -76,6 +76,10 @@ export const CalculatedSummary = ({
     const isLoading = !customer || !customer.srNo || isDeleting;
     const isPrintActionForSelected = selectedIdsCount > 0;
     
+    // Determine which summary to show
+    const showKantaParchiSummary = isCustomerForm;
+    const showSupplierSummary = !isCustomerForm;
+    
     const averageBagWeight = useMemo(() => {
         if (!customer || !customer.weight || !customer.bags) return 0;
         return (customer.weight / customer.bags) * 100;
@@ -86,9 +90,13 @@ export const CalculatedSummary = ({
         return customer.bags * customer.bagWeightKg;
     }, [customer]);
 
-    // Determine which summary to show
-    const showKantaParchiSummary = isCustomerForm;
-    const showSupplierSummary = !isCustomerForm;
+    // Calculate brokerage amount for suppliers: Final Weight × Brokerage Rate
+    const brokerageAmount = useMemo(() => {
+        if (!customer || !showSupplierSummary) return 0;
+        const finalWeight = customer.weight || 0;
+        const brokerageRate = Number(customer.brokerageRate) || 0;
+        return brokerageRate * finalWeight;
+    }, [customer, showSupplierSummary]);
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
@@ -119,6 +127,12 @@ export const CalculatedSummary = ({
                             <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
                             <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
+                            {(customer.brokerageRate || brokerageAmount > 0) && (
+                                <SummaryItem 
+                                    label={`Brokerage (${customer.brokerageAddSubtract ? 'INCLUDE' : 'EXCLUDE'})`} 
+                                    value={formatCurrency(brokerageAmount || customer.brokerageAmount || 0)} 
+                                />
+                            )}
                             <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
                             <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
                         </>

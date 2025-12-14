@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Hourglass, Settings, Hash, Percent, Weight } from "lucide-react";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { OptionsManagerDialog } from "./options-manager-dialog";
@@ -362,37 +363,30 @@ const SimpleSupplierFormAllFields = ({
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <div className="flex items-center gap-1">
-                                    <Label htmlFor="brokerage" className="text-xs whitespace-nowrap">Brokerage</Label>
-                                    <div className="flex gap-1">
-                                        <Button
-                                            type="button"
-                                            variant={form.watch('brokerageAddSubtract') ? "default" : "outline"}
-                                            size="sm"
-                                            className="h-5 px-2 text-xs"
-                                            onClick={() => form.setValue('brokerageAddSubtract', true)}
-                                        >
-                                            +
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant={!form.watch('brokerageAddSubtract') ? "default" : "outline"}
-                                            size="sm"
-                                            className="h-5 px-2 text-xs"
-                                            onClick={() => form.setValue('brokerageAddSubtract', false)}
-                                        >
-                                            -
-                                        </Button>
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="brokerageRate" className="text-xs whitespace-nowrap">Brokerage Rate</Label>
+                                    <SegmentedSwitch
+                                        id="brokerage-toggle"
+                                        checked={form.watch('brokerageAddSubtract') ?? true}
+                                        onCheckedChange={(checked) => form.setValue('brokerageAddSubtract', checked)}
+                                        leftLabel="EXCLUDE"
+                                        rightLabel="INCLUDE"
+                                        className="w-36 h-6"
+                                    />
                                 </div>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
                                     <Input 
-                                        id="brokerage" 
+                                        id="brokerageRate" 
                                         type="number" 
-                                        {...form.register('brokerage')} 
+                                        step="0.01"
+                                        {...form.register('brokerageRate')} 
                                         className="h-8 text-sm pl-10" 
+                                        placeholder="0.00"
                                     />
                                 </InputWithIcon>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Brokerage Amount = Final Weight × Brokerage Rate
+                                </p>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="kanta" className="text-xs">Kanta</Label>

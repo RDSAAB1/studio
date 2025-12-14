@@ -1,7 +1,7 @@
 import { registerSyncProcessor } from "./sync-queue";
 import { firestoreDB } from "./firebase";
-import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
-import type { Customer, Payment } from "./definitions";
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp, collection, writeBatch } from "firebase/firestore";
+import type { Customer, Payment, CustomerPayment } from "./definitions";
 import { markFirestoreDisabled, isQuotaError } from "./realtime-guard";
 
 // Supplier upsert
@@ -10,7 +10,14 @@ registerSyncProcessor<Customer>("upsert:supplier", async (task) => {
 	if (!payload?.id) throw new Error("Missing supplier id");
 	try {
 		const ref = doc(firestoreDB, "suppliers", payload.id);
-		await setDoc(ref, payload, { merge: true });
+		const batch = writeBatch(firestoreDB);
+		batch.set(ref, payload, { merge: true });
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('suppliers', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -23,7 +30,14 @@ registerSyncProcessor<{ id: string; data: Partial<Customer> }>("update:supplier"
 	if (!id) throw new Error("Missing supplier id");
 	try {
 		const ref = doc(firestoreDB, "suppliers", id);
-		await updateDoc(ref, data as any);
+		const batch = writeBatch(firestoreDB);
+		batch.update(ref, data as any);
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('suppliers', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -36,7 +50,14 @@ registerSyncProcessor<{ id: string }>("delete:supplier", async (task) => {
 	if (!id) throw new Error("Missing supplier id");
 	try {
 		const ref = doc(firestoreDB, "suppliers", id);
-		await deleteDoc(ref);
+		const batch = writeBatch(firestoreDB);
+		batch.delete(ref);
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('suppliers', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -54,7 +75,14 @@ registerSyncProcessor<Payment>("upsert:payment", async (task) => {
 			...payload,
 			updatedAt: payload.updatedAt || Timestamp.now()
 		};
-		await setDoc(ref, paymentWithTimestamp, { merge: true });
+		const batch = writeBatch(firestoreDB);
+		batch.set(ref, paymentWithTimestamp, { merge: true });
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('payments', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -67,7 +95,14 @@ registerSyncProcessor<{ id: string }>("delete:payment", async (task) => {
 	if (!id) throw new Error("Missing payment id");
 	try {
 		const ref = doc(firestoreDB, "payments", id);
-		await deleteDoc(ref);
+		const batch = writeBatch(firestoreDB);
+		batch.delete(ref);
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('payments', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -88,7 +123,14 @@ registerSyncProcessor<Payment>("upsert:governmentFinalizedPayment", async (task)
 			...payload,
 			updatedAt: payload.updatedAt || Timestamp.now()
 		};
-		await setDoc(ref, paymentWithTimestamp, { merge: true });
+		const batch = writeBatch(firestoreDB);
+		batch.set(ref, paymentWithTimestamp, { merge: true });
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('governmentFinalizedPayments', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
@@ -104,7 +146,61 @@ registerSyncProcessor<{ id: string }>("delete:governmentFinalizedPayment", async
 		const { firestoreDB } = await import("./firebase");
 		const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
 		const ref = doc(governmentFinalizedPaymentsCollection, id);
-		await deleteDoc(ref);
+		const batch = writeBatch(firestoreDB);
+		batch.delete(ref);
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('governmentFinalizedPayments', { batch });
+		
+		await batch.commit();
+	} catch (e) {
+		if (isQuotaError(e)) markFirestoreDisabled();
+		throw e;
+	}
+});
+
+// Customer Payment upsert
+registerSyncProcessor<CustomerPayment>("upsert:customerPayment", async (task) => {
+	const payload = task.payload as CustomerPayment;
+	if (!payload?.id) throw new Error("Missing customer payment id");
+	try {
+		const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
+		const ref = doc(customerPaymentsCollection, payload.id);
+		// Ensure updatedAt is set for incremental sync
+		const paymentWithTimestamp = {
+			...payload,
+			updatedAt: payload.updatedAt || Timestamp.now()
+		};
+		const batch = writeBatch(firestoreDB);
+		batch.set(ref, paymentWithTimestamp, { merge: true });
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('customerPayments', { batch });
+		
+		await batch.commit();
+	} catch (e) {
+		if (isQuotaError(e)) markFirestoreDisabled();
+		throw e;
+	}
+});
+
+// Customer Payment delete
+registerSyncProcessor<{ id: string }>("delete:customerPayment", async (task) => {
+	const { id } = task.payload as { id: string };
+	if (!id) throw new Error("Missing customer payment id");
+	try {
+		const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
+		const ref = doc(customerPaymentsCollection, id);
+		const batch = writeBatch(firestoreDB);
+		batch.delete(ref);
+		
+		// ✅ Update sync registry atomically
+		const { notifySyncRegistry } = await import('./sync-registry');
+		await notifySyncRegistry('customerPayments', { batch });
+		
+		await batch.commit();
 	} catch (e) {
 		if (isQuotaError(e)) markFirestoreDisabled();
 		throw e;
