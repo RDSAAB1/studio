@@ -89,11 +89,11 @@ const SettingsCard = ({ title, description, children, footer }: { title: string;
     </Card>
 );
 
-const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'variety' | 'paymentType', options: OptionItem[], onAdd: Function, onUpdate: Function, onDelete: Function }) => {
+const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'variety' | 'paymentType' | 'centerName', options: OptionItem[], onAdd: Function, onUpdate: Function, onDelete: Function }) => {
     const [newItemName, setNewItemName] = useState("");
     const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
 
-    const collectionName = type === 'variety' ? 'varieties' : 'paymentTypes';
+    const collectionName = type === 'variety' ? 'varieties' : type === 'paymentType' ? 'paymentTypes' : 'centerNames';
 
     return (
         <Card>
@@ -112,14 +112,14 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
                             {editingItem?.id === option.id ? (
                                 <Input value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })} onBlur={() => { onUpdate(collectionName, editingItem.id, editingItem); setEditingItem(null); }} autoFocus className="h-8"/>
                             ) : (
-                                <span className="text-sm">{toTitleCase(option.name)}</span>
+                                <span className="text-sm">{String(option.name).toUpperCase()}</span>
                             )}
                             <div className="flex gap-1">
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ id: option.id, name: option.name })}><Pen className="h-4 w-4" /></Button>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Delete "{toTitleCase(option.name)}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><AlertDialogTitle>Delete "{String(option.name).toUpperCase()}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
                                         <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(collectionName, option.id, option.name)}>Delete</AlertDialogAction></AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
@@ -143,6 +143,7 @@ export default function SettingsPage() {
     // States for settings
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
+    const [centerNameOptions, setCenterNameOptions] = useState<OptionItem[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [banks, setBanks] = useState<Bank[]>([]);
@@ -226,11 +227,12 @@ export default function SettingsPage() {
                 const fetchedHolidays = await getHolidays();
                 setHolidays(fetchedHolidays);
 
-                const unsubVariety = getOptionsRealtime('varieties', setVarietyOptions, console.error);
-                const unsubPayment = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
-                const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-                const unsubBanks = getBanksRealtime(setBanks, console.error);
-                const unsubBranches = getBankBranchesRealtime(setBankBranches, console.error);
+                const unsubVariety = getOptionsRealtime('varieties', setVarietyOptions, );
+                const unsubPayment = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, );
+                const unsubCenterName = getOptionsRealtime('centerNames', setCenterNameOptions, );
+                const unsubAccounts = getBankAccountsRealtime(setBankAccounts, );
+                const unsubBanks = getBanksRealtime(setBanks, );
+                const unsubBranches = getBankBranchesRealtime(setBankBranches, );
                 
                 navigator.serviceWorker.ready.then(async (registration) => {
                     if ('periodicSync' in registration) {
@@ -247,6 +249,7 @@ export default function SettingsPage() {
                 return () => {
                     unsubVariety();
                     unsubPayment();
+                    unsubCenterName();
                     unsubAccounts();
                     unsubBanks();
                     unsubBranches();
@@ -281,7 +284,7 @@ export default function SettingsPage() {
                  toast({ title: 'Not Supported', description: 'Your browser does not support periodic background sync.', variant: 'destructive' });
             }
         } catch (error) {
-            console.error('Failed to set periodic sync:', error);
+
             toast({ title: 'Error', description: 'Could not update auto-sync settings.', variant: 'destructive' });
         }
     };
@@ -350,7 +353,7 @@ export default function SettingsPage() {
             setUser(null); // Update local state
             router.push('/login');
         } catch (error) {
-            console.error("Error signing out: ", error);
+
             toast({ title: "Failed to sign out", variant: "destructive" });
         }
     };
@@ -362,7 +365,7 @@ export default function SettingsPage() {
             const provider = getGoogleProvider();
             await signInWithRedirect(auth, provider);
         } catch (error) {
-            console.error("Sign-in error", error);
+
             toast({ title: "Sign-in failed", variant: "destructive" });
             setLoading(false);
         }
@@ -399,7 +402,7 @@ export default function SettingsPage() {
             setIsBankAccountDialogOpen(false);
             setCurrentBankAccount({});
         } catch (error) {
-            console.error("Error saving bank account:", error);
+
             toast({ title: "Failed to save bank account", variant: "destructive" });
         }
     };
@@ -756,6 +759,7 @@ export default function SettingsPage() {
                         <div className="space-y-6">
                             <OptionsManager type="variety" options={varietyOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                             <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
+                            <OptionsManager type="centerName" options={centerNameOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                              <SettingsCard title="Holiday Management" description="Add or remove holidays. Due dates will automatically skip these days and Sundays.">
                                 <div className="flex gap-2 mb-4">
                                     <Popover>

@@ -141,3 +141,8 @@ public
 # Temporary folders
 tmp/
 temp/
+
+# Capacitor
+android/
+ios/
+.capacitor/

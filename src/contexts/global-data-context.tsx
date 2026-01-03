@@ -93,7 +93,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Suppliers fetch error:", error);
+
                 }
             ),
             getPaymentsRealtime(
@@ -104,7 +104,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Payments fetch error:", error);
+
                 }
             ),
             
@@ -117,7 +117,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Customers fetch error:", error);
+
                 }
             ),
             getCustomerPaymentsRealtime(
@@ -128,7 +128,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Customer payments fetch error:", error);
+
                 }
             ),
             
@@ -140,7 +140,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Banks fetch error:", error);
+
                 }
             ),
             getBankBranchesRealtime(
@@ -150,7 +150,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Bank branches fetch error:", error);
+
                 }
             ),
             getBankAccountsRealtime(
@@ -160,7 +160,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Bank accounts fetch error:", error);
+
                 }
             ),
             getSupplierBankAccountsRealtime(
@@ -170,7 +170,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Supplier bank accounts fetch error:", error);
+
                 }
             ),
             getFundTransactionsRealtime(
@@ -180,7 +180,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Fund transactions fetch error:", error);
+
                 }
             ),
             getExpensesRealtime(
@@ -190,7 +190,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Expenses fetch error:", error);
+
                 }
             ),
             getIncomeRealtime(
@@ -200,7 +200,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     }
                 },
                 (error) => {
-                    console.error("Income fetch error:", error);
+
                 }
             ),
         ];
@@ -213,7 +213,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 }
             })
             .catch((error) => {
-                console.error("Receipt settings fetch error:", error);
+
             });
         
         // Cleanup function

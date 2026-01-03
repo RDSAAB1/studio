@@ -31,11 +31,11 @@ export const RtgsForm = (props: any) => {
     
     const bankOptions = React.useMemo(() => {
         if (!Array.isArray(banks)) {
-            console.log('RtgsForm: banks is not an array', typeof banks, banks);
+
             return [];
         }
         if (banks.length === 0) {
-            console.log('RtgsForm: banks array is empty');
+
         }
         const options = banks
             .filter(bank => bank && (bank.name || bank.id)) // Filter out invalid banks
@@ -44,9 +44,9 @@ export const RtgsForm = (props: any) => {
                 label: toTitleCase(bank.name || bank.id || '')
             }))
             .filter(opt => opt.value && opt.label); // Filter out invalid options
-        console.log('RtgsForm: bankOptions created', options.length, 'options from', banks.length, 'banks');
+
         if (options.length === 0 && banks.length > 0) {
-            console.warn('RtgsForm: No valid bank options created, sample bank:', banks[0]);
+
         }
         return options;
     }, [banks]);
@@ -100,12 +100,7 @@ export const RtgsForm = (props: any) => {
         // If filtering results in empty list, show all accounts (fallback)
         // This helps debug the issue
         if (filtered.length === 0 && (bankDetails.bank || bankDetails.branch)) {
-            console.log('No accounts match filter:', {
-                bank: bankDetails.bank,
-                branch: bankDetails.branch,
-                totalAccounts: bankAccounts.length,
-                sampleAccount: bankAccounts[0]
-            });
+
         }
         
         return filtered;
@@ -315,7 +310,7 @@ export const RtgsForm = (props: any) => {
                                                     });
                                                 }
                                             } catch (error: any) {
-                                                console.error('Error saving supplier bank account:', error);
+
                                                 // Don't show error toast, just continue
                                             }
                                         }

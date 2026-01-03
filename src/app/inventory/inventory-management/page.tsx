@@ -39,7 +39,7 @@ export default function InventoryManagementPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = getInventoryItemsRealtime(setInventoryItems, console.error);
+    const unsubscribe = getInventoryItemsRealtime(setInventoryItems, );
     return () => unsubscribe();
   }, []);
 
@@ -83,13 +83,19 @@ export default function InventoryManagementPage() {
       setCurrentInventoryItem({});
       setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
     } catch (error) {
-      console.error("Error saving inventory item:", error);
+
       toast({ title: "Failed to save item", variant: "destructive" });
     }
   };
 
   const handleDeleteInventoryItem = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm("Are you sure you want to delete this item?", {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (confirmed) {
       try {
         await deleteInventoryItem(id);
         toast({
@@ -97,7 +103,7 @@ export default function InventoryManagementPage() {
           variant: "success",
         });
       } catch (error) {
-        console.error("Error deleting inventory item:", error);
+
         toast({
           title: "Failed to delete item",
           variant: "destructive",

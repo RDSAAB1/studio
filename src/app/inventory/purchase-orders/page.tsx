@@ -76,7 +76,7 @@ export default function PurchaseOrdersPage() {
         localStorage.setItem('lastSync:purchaseOrders', String(Date.now()));
       }
     }, (error) => {
-      console.error("Error fetching purchase orders: ", error);
+
       toast({
         title: "Failed to load purchase orders",
         variant: "destructive",
@@ -111,7 +111,7 @@ export default function PurchaseOrdersPage() {
         totalAmount: 0,
       }); // Reset form
     } catch (error) {
-      console.error("Error adding purchase order: ", error);
+
       toast({
         title: "Failed to add purchase order",
         variant: "destructive",
@@ -131,7 +131,7 @@ export default function PurchaseOrdersPage() {
       setIsEditing(false);
       setEditingOrder(null);
     } catch (error) {
-      console.error("Error updating purchase order: ", error);
+
       toast({
         title: "Failed to update purchase order",
         variant: "destructive",
@@ -147,7 +147,7 @@ export default function PurchaseOrdersPage() {
         variant: "success",
       });
     } catch (error) {
-      console.error("Error deleting purchase order: ", error);
+
       toast({
         title: "Failed to delete purchase order",
         variant: "destructive",

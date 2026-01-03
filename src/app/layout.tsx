@@ -4,6 +4,7 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { GlobalConfirmDialog } from "@/components/ui/global-confirm-dialog";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store.tsx';
@@ -70,9 +71,23 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 					};
 					// Initialize local-first sync (async IIFE to handle await)
 					(async () => {
-						const { initLocalFirstSync } = await import('@/lib/local-first-sync');
-						initLocalFirstSync();
-						schedule(() => { try { syncAllData(); } catch {} });
+						try {
+							const { initLocalFirstSync } = await import('@/lib/local-first-sync');
+							initLocalFirstSync();
+							schedule(() => { try { syncAllData(); } catch {} });
+						} catch (error) {
+
+							// Retry after a delay
+							setTimeout(async () => {
+								try {
+									const { initLocalFirstSync } = await import('@/lib/local-first-sync');
+									initLocalFirstSync();
+									schedule(() => { try { syncAllData(); } catch {} });
+								} catch (retryError) {
+
+								}
+							}, 1000);
+						}
 					})();
 				}
 			} else {
@@ -146,9 +161,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     useEffect(() => {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(registration => {
-                console.log('Service Worker registered successfully. ✅');
+
             }).catch(err => {
-                console.error('Service Worker registration failed. ❌', err);
+
             });
         }
     }, []);
@@ -178,6 +193,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html lang="en" suppressHydrationWarning className="dark">
             <head>
+                <link rel="manifest" href="/manifest.json" />
+                <meta name="theme-color" content="#000000" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+                <meta name="apple-mobile-web-app-title" content="JRMD Studio" />
+                <meta name="mobile-web-app-capable" content="yes" />
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
                 <StateProvider>
@@ -187,7 +208,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                         </AuthWrapper>
                     </GlobalDataProvider>
                 </StateProvider>
-                <Toaster />
+                {/* Toaster hidden - using DynamicIslandToaster in header instead */}
+                {/* <Toaster /> */}
+                <GlobalConfirmDialog />
             </body>
         </html>
     );

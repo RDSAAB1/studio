@@ -83,7 +83,7 @@ export function QuickExpenseEntry({
         setCustomTemplates(templates);
       },
       (error) => {
-        console.error('Error loading custom templates:', error);
+
       }
     );
 
@@ -108,7 +108,7 @@ export function QuickExpenseEntry({
         description: "Template removed successfully",
       });
     } catch (error) {
-      console.error('Error deleting template:', error);
+
       toast({
         title: "Error",
         description: "Failed to delete template",

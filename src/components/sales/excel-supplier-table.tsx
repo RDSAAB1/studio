@@ -65,7 +65,7 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
                 variant: "success"
             });
         } catch (error) {
-            console.error("Error updating supplier:", error);
+
             toast({ 
                 title: "Update failed", 
                 description: "Please try again.",
@@ -93,7 +93,7 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
                 variant: "success"
             });
         } catch (error) {
-            console.error("Error deleting supplier:", error);
+
             toast({ 
                 title: "Failed to delete entry", 
                 description: "Please try again.",

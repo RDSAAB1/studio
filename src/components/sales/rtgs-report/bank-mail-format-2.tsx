@@ -150,61 +150,203 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     };
     
      const handlePrint = () => {
-         const node = printRef.current;
-         if (!node) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+         if (!settings || !payments || payments.length === 0) {
+             toast({ variant: 'destructive', title: 'Error', description: 'No data to print.' });
              return;
          }
 
-        const newWindow = window.open('', '', 'height=800,width=1200');
-        if (newWindow) {
-            const document = newWindow.document;
-            document.write('<html><head><title>Print</title>');
-
-            // Copy all stylesheets from the main document to the new window
-            Array.from(window.document.styleSheets).forEach(styleSheet => {
-                try {
-                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                    const styleElement = document.createElement('style');
-                    styleElement.appendChild(document.createTextNode(css));
-                    newWindow.document.head.appendChild(styleElement);
-                } catch (e) {
-                    console.warn('Could not copy stylesheet:', e);
-                }
-            });
-            
-             // Inject specific print styles
-            document.write(`
-                <style>
-                    @media print {
-                        @page { size: A4 landscape; margin: 10mm; }
-                        body { 
-                            -webkit-print-color-adjust: exact !important; 
-                            print-color-adjust: exact !important; 
-                            background-color: #fff !important;
-                        }
-                        .printable-area, .printable-area * {
-                            color: #000 !important;
-                            border-color: #000 !important;
-                        }
-                       .print-header-bg {
-                            background-color: #fce5d5 !important;
-                        }
-                    }
-                </style>
-            `);
-            
-            document.write('</head><body></body></html>');
-            document.body.innerHTML = node.innerHTML;
-            
-            setTimeout(() => {
-                newWindow.focus();
-                newWindow.print();
-                newWindow.close();
-            }, 500);
-        } else {
-             toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            document.body.removeChild(iframe);
+            return;
         }
+
+        const today = format(new Date(), 'dd-MM-yyyy');
+        const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
+        const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
+        const companyAddress = `${settings.companyAddress1 || ""}${settings.companyAddress2 ? `, ${settings.companyAddress2}` : ""}`;
+
+        const rowsHtml = payments.map((p: any, index: number) => {
+            const place = toTitleCase(p.supplierAddress || p.branch || '');
+            return `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${toTitleCase(p.supplierName || '')}</td>
+                    <td class="mono">${p.acNo || ''}</td>
+                    <td class="mono">${p.ifscCode || ''}</td>
+                    <td class="right">${(p.amount || 0).toFixed(2)}</td>
+                    <td>${place}</td>
+                    <td>${p.bank || ''}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        const html = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Bank Mail Format 2</title>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 10mm;
+      }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: Arial, sans-serif;
+        color: #000 !important;
+        background: #fff;
+        font-size: 13px;
+      }
+      * {
+        color: #000 !important;
+      }
+      h1, h2, h3, p {
+        margin: 0;
+        padding: 0;
+        color: #000 !important;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .company-block {
+        max-width: 70%;
+      }
+      .company-name {
+        font-weight: 700;
+        font-size: 18px;
+        margin-bottom: 2px;
+        color: #000 !important;
+      }
+      .company-address {
+        font-size: 11px;
+        margin-bottom: 2px;
+        color: #000 !important;
+      }
+      .date-block {
+        text-align: right;
+        font-size: 12px;
+        color: #000 !important;
+      }
+      .date-block p, .date-block strong {
+        color: #000 !important;
+      }
+      .company-block p {
+        color: #000 !important;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 13px;
+      }
+      th, td {
+        border: 1px solid #000;
+        padding: 4px 6px;
+        color: #000 !important;
+      }
+      th {
+        font-weight: 700;
+        color: #000 !important;
+      }
+      .right {
+        text-align: right;
+      }
+      .mono {
+        font-family: monospace;
+      }
+      tfoot td {
+        font-weight: 700;
+        color: #000 !important;
+      }
+      @media print {
+        * {
+          color: #000 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        body {
+          color: #000 !important;
+          background: #fff !important;
+        }
+        table, th, td, p, div, span {
+          color: #000 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="company-block">
+        <div class="company-name">${companyName}</div>
+        <div class="company-address">${companyAddress}</div>
+        <p>BoB - ${bankToUse?.bankName || ''}</p>
+        <p>${bankToUse?.branchName || ''}</p>
+        <p>A/C.NO. ${bankToUse?.accountNumber || ''}</p>
+      </div>
+      <div class="date-block">
+        <p><strong>DATE: </strong>${today}</p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>S.N</th>
+          <th>Name</th>
+          <th>Account no</th>
+          <th>IFCS Code</th>
+          <th>Amount</th>
+          <th>Place</th>
+          <th>BANK</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" class="right">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+          <td class="right">${formatCurrency(totalAmount)}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </body>
+</html>`;
+
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            const printWindow = iframe.contentWindow;
+            if (printWindow) {
+                printWindow.focus();
+                printWindow.print();
+            }
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+        }, 500);
      };
 
     const handleSendMail = async () => {
@@ -233,7 +375,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 throw new Error(result.error || "An unknown error occurred.");
             }
         } catch (error: any) {
-            console.error("Error sending email:", error);
+
             toast({ title: "Failed to Send Email", description: error.message, variant: "destructive" });
         } finally {
             setIsSending(false);
@@ -284,58 +426,58 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                 {isPreview ? (
                      <>
                         <ScrollArea className="flex-grow p-4">
-                            <div ref={printRef} className="bg-white">
-                                <div className="p-4 text-black text-sm printable-area">
-                                    <div className="grid grid-cols-2 items-start mb-4">
-                                        <div className='space-y-1'>
-                                            <p className="font-bold text-lg">{companyName}</p>
-                                            <p className="text-xs">{companyAddress}</p>
-                                            <p>BoB - {bankToUse?.bankName}</p>
-                                            <p>{bankToUse?.branchName}</p>
-                                            <p>A/C.NO. {bankToUse?.accountNumber}</p>
+                            <div ref={printRef} className="bg-white" style={{ color: '#000' }}>
+                                <div className="p-4 text-sm printable-area" style={{ color: '#000', backgroundColor: '#fff' }}>
+                                    <div className="grid grid-cols-2 items-start mb-4" style={{ color: '#000' }}>
+                                        <div className='space-y-1' style={{ color: '#000' }}>
+                                            <p className="font-bold text-lg" style={{ color: '#000' }}>{companyName}</p>
+                                            <p className="text-xs" style={{ color: '#000' }}>{companyAddress}</p>
+                                            <p style={{ color: '#000' }}>BoB - {bankToUse?.bankName}</p>
+                                            <p style={{ color: '#000' }}>{bankToUse?.branchName}</p>
+                                            <p style={{ color: '#000' }}>A/C.NO. {bankToUse?.accountNumber}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p><span className="font-bold">DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
+                                        <div className="text-right" style={{ color: '#000' }}>
+                                            <p style={{ color: '#000' }}><span className="font-bold" style={{ color: '#000' }}>DATE: </span>{format(new Date(), 'dd-MM-yyyy')}</p>
                                         </div>
                                     </div>
                                     
-                                    <div>
-                                        <table className="w-full table-auto border-collapse border border-black">
+                                    <div style={{ color: '#000' }}>
+                                        <table className="w-full table-auto border-collapse border border-black text-sm" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>
                                             <thead className="font-bold">
-                                                <tr className="border-b border-black">
-                                                    <th className="p-1 text-left border border-black">S.N</th>
-                                                    <th className="p-1 text-left border border-black">Name</th>
-                                                    <th className="p-1 text-left border border-black">Account no</th>
-                                                    <th className="p-1 text-left border border-black">IFCS Code</th>
-                                                    <th className="p-1 text-right border border-black">Amount</th>
-                                                    <th className="p-1 text-left border border-black">Place</th>
-                                                    <th className="p-1 text-left border border-black">BANK</th>
+                                                <tr className="border-b border-black" style={{ color: '#000', borderColor: '#000' }}>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>S.N</th>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>Name</th>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>Account no</th>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>IFCS Code</th>
+                                                    <th className="p-1 text-right border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>Amount</th>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>Place</th>
+                                                    <th className="p-1 text-left border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>BANK</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {payments && payments.map((p: any, index: number) => (
-                                                    <tr key={`${p.paymentId}-${index}`} className="border-b border-black">
-                                                        <td className="p-1 border border-black">{index + 1}</td>
-                                                        <td className="p-1 border border-black">{toTitleCase(p.supplierName)}</td>
-                                                        <td className="p-1 border border-black font-mono">{p.acNo}</td>
-                                                        <td className="p-1 border border-black font-mono">{p.ifscCode}</td>
-                                                        <td className="p-1 text-right border border-black">{p.amount.toFixed(2)}</td>
-                                                        <td className="p-1 border border-black">{toTitleCase(p.supplierAddress || p.branch || '')}</td>
-                                                        <td className="p-1 border border-black">{p.bank}</td>
+                                                    <tr key={`${p.paymentId}-${index}`} className="border-b border-black" style={{ color: '#000', borderColor: '#000' }}>
+                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{index + 1}</td>
+                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{toTitleCase(p.supplierName)}</td>
+                                                        <td className="p-1 border border-black font-mono" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.acNo}</td>
+                                                        <td className="p-1 border border-black font-mono" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.ifscCode}</td>
+                                                        <td className="p-1 text-right border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.amount.toFixed(2)}</td>
+                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{toTitleCase(p.supplierAddress || p.branch || '')}</td>
+                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.bank}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                             <tfoot>
                                                  <tr>
-                                                      <td colSpan={7} className="h-4 p-1 border-x border-black"></td>
+                                                      <td colSpan={7} className="h-4 p-1 border-x border-black" style={{ borderColor: '#000', borderLeft: '1px solid #000', borderRight: '1px solid #000' }}></td>
                                                  </tr>
                                                  <tr>
-                                                      <td colSpan={7} className="h-4 p-1 border-x border-b border-black"></td>
+                                                      <td colSpan={7} className="h-4 p-1 border-x border-b border-black" style={{ borderColor: '#000', borderLeft: '1px solid #000', borderRight: '1px solid #000', borderBottom: '1px solid #000' }}></td>
                                                  </tr>
-                                                 <tr className="font-bold">
-                                                     <td colSpan={4} className="p-1 text-right border border-black">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
-                                                     <td className="p-1 text-right font-semibold border border-black">{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
-                                                     <td className="p-1 border border-black" colSpan={2}></td>
+                                                 <tr className="font-bold" style={{ color: '#000', borderColor: '#000' }}>
+                                                     <td colSpan={4} className="p-1 text-right border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
+                                                     <td className="p-1 text-right font-semibold border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{formatCurrency(payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)}</td>
+                                                     <td className="p-1 border border-black" colSpan={2} style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}></td>
                                                  </tr>
                                             </tfoot>
                                         </table>

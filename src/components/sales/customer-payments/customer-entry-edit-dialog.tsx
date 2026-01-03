@@ -202,7 +202,7 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                 try {
                     fullEntry = await db.customers.get(entry.id) as Customer | null;
                 } catch (error) {
-                    console.error('[CustomerEntryEdit] Error fetching customer by id:', error);
+
                 }
             }
             
@@ -210,7 +210,7 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                 try {
                     fullEntry = await db.customers.where('srNo').equals(entry.srNo).first() as Customer | null;
                 } catch (error) {
-                    console.error('[CustomerEntryEdit] Error fetching customer by srNo:', error);
+
                 }
             }
             
@@ -223,7 +223,7 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                         Object.assign(customerToUse, { id: found.id });
                     }
                 } catch (error) {
-                    console.error('[CustomerEntryEdit] Error finding id for entry:', error);
+
                 }
             }
             
@@ -308,8 +308,8 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
     useEffect(() => {
         if (!open) return;
 
-        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
+        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
 
         return () => {
             unsubVarieties();
@@ -368,7 +368,7 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                         customerId = foundCustomer.id;
                     }
                 } catch (error) {
-                    console.error('[CustomerEntryEdit] Error finding customer by srNo:', error);
+
                 }
             }
             
@@ -379,7 +379,7 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                         customerId = foundCustomer.id;
                     }
                 } catch (error) {
-                    console.error('[CustomerEntryEdit] Error finding customer by currentCustomer.srNo:', error);
+
                 }
             }
 
@@ -389,11 +389,15 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
 
             const calculatedState = calculateCustomerEntry(values, safePaymentHistory as CustomerPayment[]);
 
+            // Check if SR No is being changed
+            const srNoChanged = currentCustomer.srNo && values.srNo && currentCustomer.srNo !== values.srNo;
+            
             const completeEntry: Customer = {
                 ...currentCustomer,
                 ...values,
                 ...calculatedState,
                 id: customerId,
+                srNo: values.srNo, // Ensure SR No is included
                 customerId: currentCustomer.customerId || `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
                 date: format(values.date, 'yyyy-MM-dd'),
                 dueDate: format(values.date, 'yyyy-MM-dd'),
@@ -423,50 +427,35 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
 
             const { id, ...updateData } = completeEntry as any;
             
-            // Update in local database first for immediate UI update
-            const success = await updateCustomer(id, updateData);
-            
-            // Verify the update actually happened in local DB
-            if (success && db) {
-                const updatedEntry = await db.customers.get(id);
-                console.log('[CustomerEntryEdit] Verification - Entry after update:', {
-                    id,
-                    found: !!updatedEntry,
-                    name: updatedEntry?.name,
-                    variety: updatedEntry?.variety,
-                    grossWeight: updatedEntry?.grossWeight,
-                    rate: updatedEntry?.rate,
-                    netAmount: updatedEntry?.netAmount,
-                    originalNetAmount: updatedEntry?.originalNetAmount
-                });
-                
-                if (!updatedEntry) {
-                    console.error('[CustomerEntryEdit] ERROR: Entry not found in local DB after update!');
-                    throw new Error('Entry was not updated in local database');
-                }
+            // Ensure all required fields are present in updateData
+            if (!updateData.srNo) {
+                updateData.srNo = values.srNo || currentCustomer.srNo;
             }
             
+            // Update in local database first for immediate UI update (optimistic)
+            // updateCustomer handles SR No changes automatically
+            const success = await updateCustomer(id, updateData);
+            
             if (success) {
-                // Force immediate sync to Firestore for hand-to-hand update
-                try {
-                    const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
-                    // Wait a bit for the local update to complete
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    await forceSyncToFirestore();
-                    console.log('[CustomerEntryEdit] Sync to Firestore completed - Outstanding updated');
-                } catch (syncError) {
-                    console.error('[CustomerEntryEdit] Sync error (non-critical):', syncError);
-                    // Don't fail the update if sync fails - it will retry later
-                }
-                
+                // Show success immediately - sync happens in background
                 toast({ title: "Entry updated successfully!", description: "Outstanding updated in database", variant: "success" });
                 onSuccess?.();
                 onOpenChange(false);
+                
+                // Sync to Firestore in background (non-blocking)
+                (async () => {
+                    try {
+                        const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
+                        await forceSyncToFirestore();
+                    } catch (syncError) {
+                        // Silent fail - sync will retry automatically
+                    }
+                })();
             } else {
                 throw new Error('Failed to update customer');
             }
         } catch (error) {
-            console.error("Error updating customer:", error);
+
             toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
         } finally {
             setIsSubmitting(false);

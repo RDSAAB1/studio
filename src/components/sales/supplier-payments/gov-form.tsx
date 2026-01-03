@@ -2,194 +2,252 @@
 
 import React, { useMemo } from 'react';
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
+import { Receipt, Calculator, TrendingUp, Wallet, Package, Coins, AlertCircle, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const GovForm = (props: any) => {
     const {
         govQuantity = 0,
-        setGovQuantity,
         govRate = 0,
-        setGovRate,
         govAmount = 0,
-        setGovAmount,
         govRequiredAmount = 0,
-        setGovRequiredAmount,
         extraAmount = 0,
-        setExtraAmount,
         calcTargetAmount = 0,
         minRate = 0,
         selectedPaymentOption = null,
+        extraAmountBaseType = 'receipt',
+        setExtraAmountBaseType,
     } = props;
 
-    // Auto-calculate amount when quantity or rate changes
-    // Always round to nearest whole number (no paise)
-    React.useEffect(() => {
-        if (govQuantity > 0 && govRate > 0) {
-            const calculatedAmount = govQuantity * govRate;
-            const roundedAmount = Math.round(calculatedAmount); // Round to whole number
-            if (setGovAmount) {
-                setGovAmount(roundedAmount);
-            }
-        }
-    }, [govQuantity, govRate, setGovAmount]);
-
-    // Calculate all derived fields (Extra Amount is NOT auto-calculated, use manual value)
     const calculations = useMemo(() => {
         const baseQty = minRate > 0 ? calcTargetAmount / minRate : 0;
         const govQty = govQuantity || (selectedPaymentOption?.quantity || 0);
-        const qtyDifference = govQty - baseQty; // Final (selected) - Base
+        const qtyDifference = govQty - baseQty;
         const baseAmt = calcTargetAmount;
-        const govAmt = govAmount || (selectedPaymentOption?.calculatedAmount || 0);
         const pendingAmt = selectedPaymentOption?.amountRemaining || 0;
         const bags = selectedPaymentOption?.bags || null;
-        // Use manual extraAmount from form (NOT auto-calculated)
         const extraAmt = extraAmount || 0;
-        const selectedReceiptFinalWt = govQty; // Assuming this is the selected quantity
-        const incrementalRate = selectedReceiptFinalWt > 0 ? extraAmt / selectedReceiptFinalWt : 0;
+        const incrementalRate = govQty > 0 ? extraAmt / govQty : 0;
 
         return {
             baseQty: baseQty.toFixed(2),
-            govQty: govQty.toFixed(2),
             qtyDifference: qtyDifference.toFixed(2),
             baseAmt,
-            govAmt,
             pendingAmt,
             bags,
-            extraAmt,
             incrementalRate: incrementalRate.toFixed(2),
         };
-    }, [calcTargetAmount, minRate, govQuantity, govAmount, selectedPaymentOption, extraAmount]);
+    }, [calcTargetAmount, minRate, govQuantity, selectedPaymentOption, extraAmount]);
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] font-semibold text-muted-foreground">Government Payment Details</CardTitle>
-            </div>
-            
-            {/* Row 1: Quantity, Rate, Amount */}
-            <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                    <Label className="text-[10px] font-medium">Quantity (Qty)</Label>
-                    <Input
-                        type="number"
-                        step="0.10"
-                        value={govQuantity || ''}
-                        onChange={(e) => setGovQuantity?.(Number(e.target.value) || 0)}
-                        className="h-8 text-[11px] font-medium"
-                        placeholder="Enter quantity"
-                    />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-[10px] font-medium">Rate (per Qty)</Label>
-                    <Input
-                        type="number"
-                        value={govRate || ''}
-                        onChange={(e) => setGovRate?.(Number(e.target.value) || 0)}
-                        className="h-8 text-[11px] font-medium"
-                        placeholder="Enter rate"
-                    />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-[10px] font-medium">Amount</Label>
-                    <Input
-                        type="number"
-                        value={govAmount || ''}
-                        onChange={(e) => {
-                            const newAmount = Number(e.target.value) || 0;
-                            const roundedAmount = Math.round(newAmount);
-                            setGovAmount?.(roundedAmount);
-                            if (govQuantity > 0 && roundedAmount > 0) {
-                                const newRate = roundedAmount / govQuantity;
-                                setGovRate?.(newRate);
-                            }
-                        }}
-                        className="h-8 text-[11px] font-medium"
-                        placeholder="Auto-calculated"
-                    />
-                </div>
-            </div>
-
-            {/* Row 2: Gov Required Amount */}
-            <div className="grid grid-cols-1 gap-2">
-                <div className="space-y-1">
-                    <Label className="text-[10px] font-medium">Gov Required Amount</Label>
-                    <Input
-                        type="number"
-                        value={govRequiredAmount || ''}
-                        onChange={(e) => setGovRequiredAmount?.(Number(e.target.value) || 0)}
-                        className="h-8 text-[11px] font-medium"
-                        placeholder="Enter Gov Required Amount"
-                    />
-                </div>
-            </div>
-
-            {/* Calculation Fields - 3 columns per row */}
-            <div className="border-t border-border/50 pt-3 mt-3">
-                <Label className="text-xs font-bold text-foreground mb-3 block">Calculations</Label>
-                <div className="space-y-2">
-                    {/* Row 1: BASE QTY, QTY DIFFERENCE, BASE AMT */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">BASE QTY</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-accent/40 backdrop-blur-sm rounded-md border border-accent/50 text-foreground shadow-sm">
-                                {calculations.baseQty}
-                            </div>
+        <div className="space-y-2">
+            {/* Government Payment Details Section - Compact */}
+            <div className="border-2 border-primary/25 rounded-lg shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card/98 to-card/95 backdrop-blur-md">
+                <div className="bg-gradient-to-r from-primary/18 via-primary/12 to-primary/8 border-b-2 border-primary/25 px-3 py-2 shadow-sm">
+                    <CardTitle className="text-[11px] font-extrabold flex items-center gap-2 text-foreground tracking-tight">
+                        <div className="p-1 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-md">
+                            <Receipt className="h-3.5 w-3.5 text-primary drop-shadow-sm" />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">QTY DIFFERENCE</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-accent/40 backdrop-blur-sm rounded-md border border-accent/50 text-foreground shadow-sm">
-                                {calculations.qtyDifference}
+                        <span className="bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent">Government Payment Details</span>
+                    </CardTitle>
+                </div>
+                <div className="bg-gradient-to-br from-primary/10 via-muted/75 to-muted/55 p-2 grid grid-cols-2 gap-1.5 border-t border-primary/20">
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-muted/70 border border-border/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                                <Package className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                             </div>
+                            <span className="text-muted-foreground font-extrabold">Quantity:</span>
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">BASE AMT</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-primary/30 backdrop-blur-sm rounded-md border border-primary/40 text-primary shadow-sm">
-                                {formatCurrency(calculations.baseAmt)}
-                            </div>
-                        </div>
+                        <span className="font-black text-foreground text-[11px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">{govQuantity || 0}</span>
                     </div>
-
-                    {/* Row 2: PENDING AMT, BAGS, EXTRA AMT */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">PENDING AMT</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-primary/30 backdrop-blur-sm rounded-md border border-primary/40 text-primary shadow-sm">
-                                {formatCurrency(calculations.pendingAmt)}
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-primary/18 border-2 border-primary/30 hover:bg-primary/25 hover:border-primary/45 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-primary/25 border border-primary/40">
+                                <TrendingUp className="h-3 w-3 text-primary drop-shadow-sm" />
                             </div>
+                            <span className="text-muted-foreground font-extrabold">Rate:</span>
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">BAGS</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-accent/40 backdrop-blur-sm rounded-md border border-accent/50 text-foreground shadow-sm">
-                                {calculations.bags !== null ? calculations.bags : '-'}
-                            </div>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">EXTRA AMT</Label>
-                            <Input
-                                type="number"
-                                value={extraAmount || ''}
-                                onChange={(e) => setExtraAmount?.(Number(e.target.value) || 0)}
-                                className="h-9 text-sm font-bold px-3 bg-primary/30 backdrop-blur-sm rounded-md border border-primary/40 text-primary shadow-sm"
-                                placeholder="Enter Extra Amount"
-                            />
-                        </div>
+                        <span className="font-black text-primary text-[11px] px-1.5 py-0.5 rounded-md bg-primary/20 border border-primary/30">{govRate || 0}</span>
                     </div>
-
-                    {/* Row 3: INCREMENTAL RATE */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-foreground block">INCREMENTAL RATE</Label>
-                            <div className="h-9 text-sm font-bold flex items-center px-3 bg-accent/40 backdrop-blur-sm rounded-md border border-accent/50 text-foreground shadow-sm">
-                                {calculations.incrementalRate}
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-muted/70 border border-border/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                                <Wallet className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                             </div>
+                            <span className="text-muted-foreground font-extrabold">Amount:</span>
                         </div>
-                        <div className="col-span-2"></div>
+                        <span className="font-black text-foreground text-[11px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">{formatCurrency(govAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-primary/18 border-2 border-primary/30 hover:bg-primary/25 hover:border-primary/45 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-primary/25 border border-primary/40">
+                                <Coins className="h-3 w-3 text-primary drop-shadow-sm" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">Gov Required:</span>
+                        </div>
+                        <span className="font-black text-primary text-[11px] px-1.5 py-0.5 rounded-md bg-primary/20 border border-primary/30">{formatCurrency(govRequiredAmount || 0)}</span>
                     </div>
                 </div>
             </div>
+
+            {/* Calculations Section - Compact */}
+            <div className="border-2 border-primary/25 rounded-lg shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card/98 to-card/95 backdrop-blur-md">
+                <div className="bg-gradient-to-r from-primary/18 via-primary/12 to-primary/8 border-b-2 border-primary/25 px-3 py-2 shadow-sm">
+                    <Label className="text-[11px] font-extrabold flex items-center gap-2 text-foreground tracking-tight">
+                        <div className="p-1 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-md">
+                            <Calculator className="h-3.5 w-3.5 text-primary drop-shadow-sm" />
+                        </div>
+                        <span className="bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent">Calculations</span>
+                    </Label>
+                </div>
+                <div className="bg-gradient-to-br from-primary/10 via-muted/75 to-muted/55 p-2 grid grid-cols-2 gap-1.5 border-t border-primary/20">
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-muted/70 border border-border/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                                <Package className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">BASE QTY:</span>
+                        </div>
+                        <span className="font-black text-foreground text-[11px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">{calculations.baseQty}</span>
+                    </div>
+                    <div className={cn(
+                        "flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md border-2 hover:opacity-95 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer",
+                        parseFloat(calculations.qtyDifference) >= 0 
+                            ? "bg-green-500/18 border-green-500/35" 
+                            : "bg-orange-500/18 border-orange-500/35"
+                    )}>
+                        <div className="flex items-center gap-1.5">
+                            <div className={cn(
+                                "p-0.5 rounded border",
+                                parseFloat(calculations.qtyDifference) >= 0 
+                                    ? "bg-green-500/25 border-green-500/40" 
+                                    : "bg-orange-500/25 border-orange-500/40"
+                            )}>
+                                <TrendingUp className={cn(
+                                    "h-3 w-3",
+                                    parseFloat(calculations.qtyDifference) >= 0 ? "text-green-600" : "text-orange-600"
+                                )} />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">QTY DIFF:</span>
+                        </div>
+                        <span className={cn(
+                            "font-black text-[11px] px-1.5 py-0.5 rounded-md border",
+                            parseFloat(calculations.qtyDifference) >= 0 
+                                ? "text-green-600 bg-green-500/20 border-green-500/30" 
+                                : "text-orange-600 bg-orange-500/20 border-orange-500/30"
+                        )}>
+                            {calculations.qtyDifference}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-muted/70 border border-border/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                                <Wallet className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">BASE AMT:</span>
+                        </div>
+                        <span className="font-black text-foreground text-[11px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">{formatCurrency(calculations.baseAmt)}</span>
+                    </div>
+                    <div className={cn(
+                        "flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md border-2 hover:opacity-95 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer",
+                        calculations.pendingAmt > 0 
+                            ? "bg-orange-500/18 border-orange-500/35" 
+                            : "bg-green-500/18 border-green-500/35"
+                    )}>
+                        <div className="flex items-center gap-1.5">
+                            <div className={cn(
+                                "p-0.5 rounded border",
+                                calculations.pendingAmt > 0 
+                                    ? "bg-orange-500/25 border-orange-500/40" 
+                                    : "bg-green-500/25 border-green-500/40"
+                            )}>
+                                <AlertCircle className={cn(
+                                    "h-3 w-3",
+                                    calculations.pendingAmt > 0 ? "text-orange-600" : "text-green-600"
+                                )} />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">PENDING:</span>
+                        </div>
+                        <span className={cn(
+                            "font-black text-[11px] px-1.5 py-0.5 rounded-md border",
+                            calculations.pendingAmt > 0 
+                                ? "text-orange-600 bg-orange-500/20 border-orange-500/30" 
+                                : "text-green-600 bg-green-500/20 border-green-500/30"
+                        )}>
+                            {formatCurrency(calculations.pendingAmt)}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-muted/70 border border-border/50 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                                <Package className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">BAGS:</span>
+                        </div>
+                        <span className="font-black text-foreground text-[11px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">
+                            {calculations.bags !== null ? calculations.bags : '-'}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-primary/18 border-2 border-primary/30 hover:bg-primary/25 hover:border-primary/45 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-primary/25 border border-primary/40">
+                                <Coins className="h-3 w-3 text-primary drop-shadow-sm" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">EXTRA AMT:</span>
+                        </div>
+                        <span className="font-black text-primary text-[11px] px-1.5 py-0.5 rounded-md bg-primary/20 border border-primary/30">{formatCurrency(extraAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded-md bg-primary/18 border-2 border-primary/30 hover:bg-primary/25 hover:border-primary/45 hover:shadow-lg transition-all duration-300 shadow-md cursor-pointer col-span-2">
+                        <div className="flex items-center gap-1.5">
+                            <div className="p-0.5 rounded bg-primary/25 border border-primary/40">
+                                <TrendingUp className="h-3 w-3 text-primary drop-shadow-sm" />
+                            </div>
+                            <span className="text-muted-foreground font-extrabold">INCREMENTAL RATE:</span>
+                        </div>
+                        <span className="font-black text-primary text-[11px] px-1.5 py-0.5 rounded-md bg-primary/20 border border-primary/30">{calculations.incrementalRate}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Extra Amount Base Type Toggle */}
+            {setExtraAmountBaseType && (
+                <div className="border-2 border-primary/25 rounded-lg shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card/98 to-card/95 backdrop-blur-md">
+                    <div className="bg-gradient-to-r from-primary/18 via-primary/12 to-primary/8 border-b-2 border-primary/25 px-3 py-2 shadow-sm">
+                        <Label className="text-[11px] font-extrabold flex items-center gap-2 text-foreground tracking-tight">
+                            <div className="p-1 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-md">
+                                <Calculator className="h-3.5 w-3.5 text-primary drop-shadow-sm" />
+                            </div>
+                            <span className="bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent">Extra Amount Base</span>
+                        </Label>
+                    </div>
+                    <div className="bg-gradient-to-br from-primary/10 via-muted/75 to-muted/55 p-2 border-t border-primary/20">
+                        <div className="flex items-center justify-between gap-2">
+                            <Label className="text-[10px] font-extrabold text-muted-foreground">Calculation Base:</Label>
+                            <Select 
+                                value={extraAmountBaseType} 
+                                onValueChange={(v) => setExtraAmountBaseType(v as 'receipt' | 'target')}
+                            >
+                                <SelectTrigger className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner w-40">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="receipt">Receipt Based</SelectItem>
+                                    <SelectItem value="target">Target Based</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="mt-2 text-[9px] text-muted-foreground px-1">
+                            {extraAmountBaseType === 'receipt' 
+                                ? 'Extra amount = Gov Required - Receipt Outstanding'
+                                : 'Extra amount = Gov Required - Target Amount'}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
-

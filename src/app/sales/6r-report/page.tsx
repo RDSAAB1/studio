@@ -345,7 +345,7 @@ export default function SixRReportPage() {
                         await db.payments.put({ ...existing, sixRNo: trimmed6RNo || undefined });
                     }
                 } catch (localError) {
-                    console.warn('Failed to update local IndexedDB:', localError);
+
                 }
             }
 
@@ -358,7 +358,7 @@ export default function SixRReportPage() {
             setEditing6RNo(null);
             setEdited6RNo('');
         } catch (error: any) {
-            console.error('Error updating 6R No:', error);
+
             toast({ 
                 title: "Error", 
                 description: error?.message || "Failed to update 6R No.", 

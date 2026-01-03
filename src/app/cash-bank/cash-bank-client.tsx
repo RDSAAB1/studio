@@ -96,7 +96,7 @@ export default function CashBankClient() {
                 setLoans(data);
                 setRefreshKey(prev => prev + 1); // Force re-render
             },
-            (error) => console.error('Error fetching loans:', error)
+            (error) => ('Error fetching loans:', error)
         );
         
         // ✅ Listen for payment updates to refresh immediately when payment is finalized
@@ -117,7 +117,7 @@ export default function CashBankClient() {
                         }
                         setRefreshKey(prev => prev + 1); // Force re-render
                     } catch (error) {
-                        console.error('Error refreshing payments after update:', error);
+
                     }
                 }
             }
@@ -141,7 +141,7 @@ export default function CashBankClient() {
                         }
                         setRefreshKey(prev => prev + 1); // Force re-render
                     } catch (error) {
-                        console.error('Error refreshing payments after delete:', error);
+
                     }
                 }
             }
@@ -177,7 +177,7 @@ export default function CashBankClient() {
                     setBankAccounts(bankAccounts as BankAccount[]);
                     setRefreshKey(prev => prev + 1);
                 } catch (error) {
-                    console.error('Error refreshing data on visibility change:', error);
+
                 }
             }
         };
@@ -263,6 +263,7 @@ export default function CashBankClient() {
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
+        balances.set('GovAccount', 0); // Separate account for Gov payments
 
         fundTransactions.forEach(t => {
             if (balances.has(t.source)) {
@@ -296,8 +297,16 @@ export default function CashBankClient() {
         });
 
         allExpenses.forEach(t => {
-            const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || t.paymentMethod === 'Cash' ? 'CashInHand' : '');
-             if (balanceKey && balances.has(balanceKey)) {
+            // CRITICAL: Gov payments should deduct from GovAccount, NOT Cash
+            let balanceKey = '';
+            if (('receiptType' in t && t.receiptType === 'Gov.')) {
+                balanceKey = 'GovAccount';
+            } else if (t.bankAccountId) {
+                balanceKey = t.bankAccountId;
+            } else if (('receiptType' in t && t.receiptType === 'Cash') || ('paymentMethod' in t && t.paymentMethod === 'Cash')) {
+                balanceKey = 'CashInHand';
+            }
+            if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
             }
         });
@@ -316,7 +325,7 @@ export default function CashBankClient() {
                 toast({ title: "Transaction recorded successfully", variant: "success" });
             })
             .catch((error) => {
-                console.error("Error adding fund transaction:", error);
+
                 toast({ title: "Failed to record transaction", variant: "destructive" });
                 throw error; // Re-throw to handle in the caller
             });
@@ -435,7 +444,7 @@ export default function CashBankClient() {
             }
             setIsLoanDialogOpen(false);
         } catch (error) {
-            console.error("Error saving loan: ", error);
+
             toast({ title: `Failed to ${loanData.id ? 'update' : 'add'} loan`, description: (error as Error).message, variant: "destructive" });
         }
     };
@@ -471,7 +480,7 @@ export default function CashBankClient() {
             setIsFundTransactionDialogOpen(false);
         } catch (error) {
             toast({ title: 'Failed to update transaction', variant: 'destructive' });
-            console.error(error);
+
         }
     };
 
@@ -481,7 +490,7 @@ export default function CashBankClient() {
             toast({ title: 'Transaction deleted successfully', variant: 'success' });
         } catch (error) {
             toast({ title: 'Failed to delete transaction', variant: 'destructive' });
-            console.error(error);
+
         }
     };
 

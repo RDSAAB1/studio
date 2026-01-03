@@ -40,7 +40,7 @@ export const IndependentSupplierTable = () => {
                 variant: "success"
             });
         } catch (error) {
-            console.error("Error deleting supplier:", error);
+
             toast({ 
                 title: "Failed to delete entry", 
                 description: "Please try again.",

@@ -146,10 +146,10 @@ const SimpleSupplierFormAllFields = ({
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="rate" className="text-xs">Rate</Label>
+                            <Label htmlFor="supplier-rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="rate" 
+                                    id="supplier-rate" 
                                     type="number" 
                                     {...form.register('rate')} 
                                     className="h-8 text-sm pl-10" 
@@ -157,10 +157,10 @@ const SimpleSupplierFormAllFields = ({
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
+                            <Label htmlFor="simple-supplier-all-fields-gross-weight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="grossWeight" 
+                                    id="simple-supplier-all-fields-gross-weight" 
                                     type="number" 
                                     {...form.register('grossWeight')} 
                                     className="h-8 text-sm pl-10" 
@@ -271,16 +271,18 @@ const SimpleSupplierFormAllFields = ({
                                 <Label className="text-xs flex items-center gap-2">
                                     Payment Type
                                     <Button 
+                                        type="button"
                                         variant="ghost" 
                                         size="icon" 
                                         onClick={() => openManagementDialog('paymentType')} 
                                         className="h-5 w-5 shrink-0"
+                                        tabIndex={-1}
                                     >
                                         <Settings className="h-3 w-3"/>
                                     </Button>
                                 </Label>
                                 <CustomDropdown 
-                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
                                     value={form.watch('paymentType')} 
                                     onChange={(val) => {
                                         form.setValue("paymentType", val || '');
@@ -289,23 +291,27 @@ const SimpleSupplierFormAllFields = ({
                                     onAdd={(newItem) => {
                                         handleAddOption('paymentTypes', newItem);
                                     }}
-                                    placeholder="Select type..." 
+                                    placeholder="Select type..."
+                                    maxRows={5}
+                                    showScrollbar={true}
                                 />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">
                                     Variety 
                                     <Button 
+                                        type="button"
                                         variant="ghost" 
                                         size="icon" 
                                         onClick={() => openManagementDialog('variety')} 
                                         className="h-5 w-5 shrink-0"
+                                        tabIndex={-1}
                                     >
                                         <Settings className="h-3 w-3"/>
                                     </Button>
                                 </Label>
                                 <CustomDropdown 
-                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
                                     value={form.watch('variety')} 
                                     onChange={(val) => {
                                         form.setValue("variety", val || '');
@@ -314,7 +320,9 @@ const SimpleSupplierFormAllFields = ({
                                     onAdd={(newItem) => {
                                         handleAddOption('varieties', newItem);
                                     }}
-                                    placeholder="Select variety..." 
+                                    placeholder="Select variety..."
+                                    maxRows={5}
+                                    showScrollbar={true}
                                 />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (

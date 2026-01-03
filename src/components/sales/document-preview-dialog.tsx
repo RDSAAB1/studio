@@ -70,7 +70,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     const expenseRef = doc(firestoreDB, "expenses", customer.advanceExpenseId);
                     const expenseSnap = await getDoc(expenseRef);
                     if (!expenseSnap.exists()) {
-                        console.warn("Stale expense ID found, clearing advance payment.");
+
                         verifiedExpenseId = undefined;
                          setInvoiceDetails(prev => ({ ...prev, advanceFreight: 0, advancePaymentMethod: 'CashInHand'}));
                     }
@@ -105,7 +105,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         };
 
         initialize();
-        const unsub = getBankAccountsRealtime(setBankAccounts, console.error);
+        const unsub = getBankAccountsRealtime(setBankAccounts, );
         return () => unsub();
 
     }, [customer, receiptSettings, isOpen]);
@@ -272,7 +272,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     } as Customer;
                     await db.customers.put(customerToUpdate);
                 } catch (error) {
-                    console.warn('Failed to update local database:', error);
+
                 }
             }
 
@@ -305,7 +305,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
                     iframeDoc.head.appendChild(style);
                 } catch (e) {
-                    console.warn("Could not copy stylesheet:", e);
+
                 }
             });
 
@@ -322,7 +322,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
 
         } catch (error) {
-            console.error("Transaction failed: ", error);
+
             toast({ title: "Save Failed", description: "The changes could not be saved due to an error.", variant: "destructive" });
         }
     };

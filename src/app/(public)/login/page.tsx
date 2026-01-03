@@ -46,7 +46,7 @@ export default function AuthPage() {
         try {
             await signInWithRedirect(auth, provider);
         } catch (error) {
-           console.error("Login with redirect failed", error);
+
            setLoading(false);
            toast({ title: "Login Failed", description: "Could not start the login process.", variant: "destructive" });
         }
@@ -59,7 +59,7 @@ export default function AuthPage() {
             await signInWithEmailAndPassword(auth, data.email, data.password);
             toast({ title: "Login Successful", variant: "success" });
         } catch (error: any) {
-            console.error("Login error:", error);
+
             const errorCode = error.code || '';
             let errorMessage = "An unexpected error occurred.";
             if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
@@ -78,7 +78,7 @@ export default function AuthPage() {
             await createUserWithEmailAndPassword(auth, data.email, data.password);
             toast({ title: "Signup Successful", description: "You will be redirected to setup your company.", variant: "success" });
         } catch (error: any) {
-            console.error("Signup error:", error);
+
             const errorCode = error.code || '';
             let errorMessage = "An unexpected error occurred.";
             if (errorCode === 'auth/email-already-in-use') {

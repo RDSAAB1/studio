@@ -298,8 +298,8 @@ export default function SupplierEntryClient() {
     };
     fetchSettings();
 
-    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
+    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -391,7 +391,7 @@ export default function SupplierEntryClient() {
           form.setValue('name', latestEntryForContact.name);
           form.setValue('so', latestEntryForContact.so);
           form.setValue('address', latestEntryForContact.address);
-          toast({ title: "Supplier Found: Details auto-filled from last entry." });
+          // Removed unnecessary toast message
       }
     }
   };
@@ -442,7 +442,7 @@ const handleDelete = async (id: string) => {
             handleNew();
         }
     } catch (error) {
-        console.error("Error deleting supplier and payments: ", error);
+
         toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
 };
@@ -462,7 +462,7 @@ const handleDelete = async (id: string) => {
         so: toTitleCase(values.so),
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
-        variety: toTitleCase(values.variety),
+        variety: values.variety ? String(values.variety).toUpperCase() : values.variety,
         customerId: isForcedUnique 
             ? `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}|${Date.now()}` 
             : `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
@@ -487,7 +487,7 @@ const handleDelete = async (id: string) => {
             if (callback) callback(savedEntry); else handleNew();
         }
     } catch (error) {
-        console.error("Error saving supplier:", error);
+
         toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
@@ -665,7 +665,7 @@ const handleDelete = async (id: string) => {
                 }
                 toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
             } catch (error) {
-                console.error("Import failed:", error);
+
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
             }
         };
@@ -679,7 +679,7 @@ const handleDelete = async (id: string) => {
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
-            console.error("Error deleting all entries:", error);
+
             toast({ title: "Failed to delete all entries", variant: "destructive" });
         }
     };

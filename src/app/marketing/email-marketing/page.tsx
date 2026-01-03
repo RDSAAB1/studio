@@ -73,7 +73,7 @@ export default function EmailMarketingPage() {
         localStorage.setItem('lastSync:emailCampaigns', String(Date.now()));
       }
     }, (err) => {
-      console.error("Error fetching email campaigns:", err);
+
       setError("Failed to load email campaigns.");
       setLoading(false);
       toast({ title: "Failed to load email campaigns", variant: "destructive" });
@@ -117,7 +117,7 @@ export default function EmailMarketingPage() {
       setFormData({ name: "", subject: "", body: "" });
       setCurrentCampaign(null);
     } catch (e) {
-      console.error("Error saving campaign:", e);
+
       toast({ title: "Failed to save email campaign", variant: "destructive" });
     }
   };
@@ -129,12 +129,18 @@ export default function EmailMarketingPage() {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (confirm("Are you sure you want to delete this campaign?")) {
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm("Are you sure you want to delete this campaign?", {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (confirmed) {
       try {
         await deleteDoc(doc(firestoreDB, "emailCampaigns", id));
         toast({ title: "Email campaign deleted successfully", variant: "success" });
       } catch (e) {
-        console.error("Error deleting campaign:", e);
+
         toast({ title: "Failed to delete email campaign", variant: "destructive" });
       }
     }

@@ -49,7 +49,7 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
+
             }
         });
         
@@ -148,7 +148,7 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
+
             }
         });
         
@@ -247,7 +247,7 @@ export const CombinedReceiptPrintDialog = ({ receipts, consolidatedData, allCons
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
+
             }
         });
         

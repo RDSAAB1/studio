@@ -78,7 +78,7 @@ const NotificationBell = () => {
     useEffect(() => {
         const unsubscribe = getLoansRealtime(
             (data) => setLoans(data),
-            (error) => console.error('Error fetching loans:', error)
+            (error) => ('Error fetching loans:', error)
         );
         return () => unsubscribe();
     }, []);
@@ -235,11 +235,51 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   
-  const handleSyncClick = () => {
-    setSyncDialogOpen(true);
+  const handleSyncClick = async () => {
+    // Always do hard sync (full sync) when user clicks sync button
+    // This ensures all entries are fetched, even if they don't have updatedAt or are old
+    setIsSyncing(true);
+    try {
+      await hardSyncAllData();
+      toast({ title: "Full sync completed", description: "All data has been synced from Firestore", variant: "success" });
+    } catch (error) {
+
+      toast({ title: "Sync failed", description: "Failed to sync data. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSync = async (selectedCollections?: string[], onProgress?: (collections: any[]) => void) => {
+    // For sync dialog - clear lastSync times for selected collections to force full sync
+    if (typeof window !== 'undefined') {
+      const syncKeys = [
+        'lastSync:suppliers',
+        'lastSync:customers',
+        'lastSync:payments',
+        'lastSync:customerPayments',
+        'lastSync:incomes',
+        'lastSync:expenses',
+        'lastSync:projects',
+        'lastSync:loans',
+        'lastSync:fundTransactions',
+      ];
+      
+      // If specific collections selected, clear only those
+      if (selectedCollections && selectedCollections.length > 0) {
+        selectedCollections.forEach(collectionName => {
+          const key = `lastSync:${collectionName}`;
+          if (syncKeys.includes(key)) {
+            localStorage.removeItem(key);
+          }
+        });
+      } else {
+        // Clear all if no specific selection
+        syncKeys.forEach(key => localStorage.removeItem(key));
+      }
+    }
+    
+    // Now do sync - it will do full sync since lastSync times are cleared
     return await syncAllDataWithDetails(selectedCollections, onProgress);
   }
 

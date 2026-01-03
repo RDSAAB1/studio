@@ -71,21 +71,17 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
             return;
         }
-        
-        // Show instruction toast
-        toast({ 
-            title: 'Print Instructions', 
-            description: 'In the print dialog, please uncheck "Headers and footers" to remove date/time and website link.',
-            duration: 5000
-        });
 
+        // Simple, robust print: open a hidden iframe with minimal CSS and the exact HTML we see in preview
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
         iframe.style.width = '0';
         iframe.style.height = '0';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
-        
+
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
@@ -93,231 +89,139 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             return;
         }
 
-        iframeDoc.open();
-        iframeDoc.write(`
-            <html>
-            <head>
-                <title>RTGS Advice</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        `);
-        
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.textContent = css;
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
-            }
-        });
-        
-        const printStyles = iframeDoc.createElement('style');
-        printStyles.textContent = `
-            @page {
-                size: A4 landscape;
-                margin: 0 !important;
-                margin-top: 0 !important;
-                margin-bottom: 0 !important;
-                margin-left: 10mm !important;
-                margin-right: 10mm !important;
-            }
-            @media print {
-                @page {
-                    size: A4 landscape;
-                    margin: 0 !important;
-                    margin-top: 0 !important;
-                    margin-bottom: 0 !important;
-                    margin-left: 10mm !important;
-                    margin-right: 10mm !important;
-                }
-                * {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-                html, body {
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                }
-                body {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    margin: 0 !important;
-                    padding: 10mm 0 10mm 0 !important;
-                }
-                .printable-area {
-                    background-color: #fff !important;
-                    color: #000 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-                .printable-area * {
-                    border-color: #000 !important;
-                    color: #000 !important;
-                }
-                .print-header-bg {
-                     background-color: #fce5d5 !important;
-                }
-                .page-break {
-                    page-break-after: always;
-                }
-                header, footer {
-                    display: none !important;
-                    visibility: hidden !important;
-                    height: 0 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-            }
-            .information-table {
-                border: 1px solid #666 !important;
-                border-collapse: separate !important;
-                border-spacing: 0 !important;
-                border-radius: 4px !important;
-                overflow: hidden !important;
-            }
-            .information-table th:first-child {
-                border-top-left-radius: 4px !important;
-            }
-            .information-table th:last-child {
-                border-top-right-radius: 4px !important;
-            }
-            .information-table tr:last-child td:first-child {
-                border-bottom-left-radius: 4px !important;
-            }
-            .information-table tr:last-child td:last-child {
-                border-bottom-right-radius: 4px !important;
-            }
-            .information-table th,
-            .information-table td {
-                border-right: 1px solid #666 !important;
-                border-bottom: 1px solid #666 !important;
-            }
-            .information-table th:last-child,
-            .information-table td:last-child {
-                border-right: none !important;
-            }
-            .information-table tr:last-child td {
-                border-bottom: none !important;
-            }
-            .information-table thead tr th {
-                border-top: 1px solid #666 !important;
-            }
-            .information-table tbody tr:first-child td {
-                border-top: none !important;
-            }
-            @media print {
-                .information-table {
-                    border: 1px solid #000 !important;
-                    border-collapse: separate !important;
-                    border-spacing: 0 !important;
-                    border-radius: 4px !important;
-                    overflow: hidden !important;
-                }
-                .information-table th:first-child {
-                    border-top-left-radius: 4px !important;
-                }
-                .information-table th:last-child {
-                    border-top-right-radius: 4px !important;
-                }
-                .information-table tr:last-child td:first-child {
-                    border-bottom-left-radius: 4px !important;
-                }
-                .information-table tr:last-child td:last-child {
-                    border-bottom-right-radius: 4px !important;
-                }
-                .information-table th,
-                .information-table td {
-                    border-right: 1px solid #000 !important;
-                    border-bottom: 1px solid #000 !important;
-                }
-                .information-table th:last-child,
-                .information-table td:last-child {
-                    border-right: none !important;
-                }
-                .information-table tr:last-child td {
-                    border-bottom: none !important;
-                }
-                .information-table thead tr th {
-                    border-top: 1px solid #000 !important;
-                }
-                .information-table tbody tr:first-child td {
-                    border-top: none !important;
-                }
-            }
-        `;
-        iframeDoc.head.appendChild(printStyles);
+        const printHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charSet="utf-8" />
+    <title>RTGS Advice</title>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 10mm;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #000;
+        background: #fff;
+      }
+      .printable-area {
+        color: #000 !important;
+      }
+      .printable-area * {
+        color: #000 !important;
+      }
+      /* Tighten line height and margins so header lines don't look too spaced out */
+      .printable-area h2,
+      .printable-area h3,
+      .printable-area p,
+      .printable-area span {
+        margin-top: 0;
+        margin-bottom: 2px;
+        line-height: 1.1;
+      }
 
-        iframeDoc.write('</head><body></body></html>');
-        iframeDoc.body.innerHTML = node.innerHTML;
+      /* Minimal Tailwind layout utilities used in this component */
+      .flex {
+        display: flex;
+      }
+      .justify-between {
+        justify-content: space-between;
+      }
+      .items-start {
+        align-items: flex-start;
+      }
+      .items-end {
+        align-items: flex-end;
+      }
+      .text-center {
+        text-align: center;
+      }
+      .text-right {
+        text-align: right;
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+      .text-xs {
+        font-size: 0.75rem;
+      }
+      .text-sm {
+        font-size: 0.875rem;
+      }
+      .text-xl {
+        font-size: 1.25rem;
+      }
+      .mb-1 {
+        margin-bottom: 0.25rem;
+      }
+      .mb-2 {
+        margin-bottom: 0.5rem;
+      }
+      .mb-4 {
+        margin-bottom: 1rem;
+      }
+      .mt-12 {
+        margin-top: 3rem;
+      }
+      .information-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .information-table th,
+      .information-table td {
+        border: 1px solid #000;
+        padding: 3px 5px;
+        font-size: 13px;
+      }
+      .print-header-bg {
+        background-color: #fce5d5;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    </style>
+  </head>
+  <body>
+    ${node.outerHTML}
+  </body>
+</html>`;
+
+        iframeDoc.open();
+        iframeDoc.write(printHtml);
         iframeDoc.close();
-        
+
         setTimeout(() => {
-            const printWindow = iframe.contentWindow;
-            if (printWindow) {
-                printWindow.focus();
-                // Try to suppress headers/footers via print command
-                try {
-                    printWindow.print();
-                } catch (e) {
-                    console.warn('Print error:', e);
-                    printWindow.print();
-                }
+            if (iframe.contentWindow) {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
             }
             setTimeout(() => {
                 document.body.removeChild(iframe);
-            }, 1000);
-        }, 500);
+            }, 500);
+        }, 300);
     };
 
     return (
         <>
             <style>{`
-                 .information-table {
-                     border: 1px solid #666 !important;
-                     border-collapse: separate !important;
-                     border-spacing: 0 !important;
-                     border-radius: 4px !important;
-                     overflow: hidden !important;
-                 }
-                 .information-table th:first-child {
-                     border-top-left-radius: 4px !important;
-                 }
-                 .information-table th:last-child {
-                     border-top-right-radius: 4px !important;
-                 }
-                 .information-table tr:last-child td:first-child {
-                     border-bottom-left-radius: 4px !important;
-                 }
-                 .information-table tr:last-child td:last-child {
-                     border-bottom-right-radius: 4px !important;
-                 }
-                 .information-table th,
-                 .information-table td {
-                     border-right: 1px solid #666 !important;
-                     border-bottom: 1px solid #666 !important;
-                 }
-                 .information-table th:last-child,
-                 .information-table td:last-child {
-                     border-right: none !important;
-                 }
-                 .information-table tr:last-child td {
-                     border-bottom: none !important;
-                 }
-                 .information-table thead tr th {
-                     border-top: 1px solid #666 !important;
-                 }
-                 .information-table tbody tr:first-child td {
-                     border-top: none !important;
-                 }
+                .information-table {
+                    border: 1px solid #666 !important;
+                    border-collapse: collapse !important;
+                }
+                .information-table th,
+                .information-table td {
+                    border: 1px solid #666 !important;
+                }
                 .printable-area {
                     color: #000 !important;
                 }
                 .printable-area * {
                     color: #000 !important;
                 }
+                /* Preview ke andar bhi line spacing compact rakhen */
                 .printable-area p,
                 .printable-area h2,
                 .printable-area h3,
@@ -325,6 +229,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 .printable-area td,
                 .printable-area th {
                     color: #000 !important;
+                    margin-top: 0;
+                    margin-bottom: 2px;
+                    line-height: 1.1;
                 }
             `}</style>
             <DialogHeader className="p-4 pb-0 print:hidden">
@@ -379,7 +286,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 </div>
                                 
                                 <p className="text-center font-bold mb-1 text-black">INFORMATION</p>
-                                <table className="information-table w-full text-xs" style={{ borderCollapse: 'separate', borderSpacing: 0, borderRadius: '4px', overflow: 'hidden' }}>
+                                <table className="information-table w-full text-xs" style={{ borderCollapse: 'collapse' }}>
                                     <thead className="text-black font-bold">
                                         <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
                                             <th className="p-1 text-black">SR.NO.</th>

@@ -66,7 +66,7 @@ export default function BankAccountsPage() {
         setLoading(false);
       },
       (error) => {
-        console.error('Error loading bank accounts:', error);
+
         toast({
           title: "Error",
           description: "Failed to load bank accounts",
@@ -143,7 +143,7 @@ export default function BankAccountsPage() {
       setEditingAccount(null);
       reset();
     } catch (error: any) {
-      console.error('Error saving bank account:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to save bank account",
@@ -160,7 +160,7 @@ export default function BankAccountsPage() {
         description: "Bank account deleted successfully",
       });
     } catch (error: any) {
-      console.error('Error deleting bank account:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to delete bank account",
@@ -242,7 +242,7 @@ export default function BankAccountsPage() {
             savedCount++;
           }
         } catch (error: any) {
-          console.error('Error importing account:', accountData.accountNumber, error);
+
           errorCount++;
         }
       }
@@ -252,7 +252,7 @@ export default function BankAccountsPage() {
         description: `Imported ${savedCount} bank account(s). ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
       });
     } catch (error: any) {
-      console.error('Error importing from RTGS:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to import accounts from RTGS payments",

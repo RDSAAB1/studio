@@ -51,7 +51,7 @@ export default function AnalyticsPage() {
         localStorage.setItem('lastSync:customers', String(Date.now()));
       }
     }, (error) => {
-      console.error("Error fetching customers: ", error);
+
       setLoading(false);
     });
 

@@ -72,7 +72,13 @@ export const useOutsiderPayments = (data: any) => {
     }, [form]);
 
     const handleDeletePayment = useCallback(async (payment: Payment) => {
-        if (!confirm(`Are you sure you want to delete payment ${payment.paymentId || payment.rtgsSrNo || payment.id}?`)) {
+        const { confirm } = await import("@/lib/confirm-dialog");
+        const confirmed = await confirm(`Are you sure you want to delete payment ${payment.paymentId || payment.rtgsSrNo || payment.id}?`, {
+            title: "Confirm Delete",
+            variant: "destructive",
+            confirmText: "Delete",
+        });
+        if (!confirmed) {
             return;
         }
 

@@ -50,7 +50,7 @@ export default function ProductCatalogPage() {
         localStorage.setItem('lastSync:products', String(Date.now()));
       }
     }, (err) => {
-      console.error("Error fetching products:", err);
+
       setError("Failed to load products.");
       setLoading(false);
     });

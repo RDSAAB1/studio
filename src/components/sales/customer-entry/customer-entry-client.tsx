@@ -6,13 +6,12 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData, CustomerDocument } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry, formatDateLocal } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument } from "@/lib/firestore";
+import { addCustomer, updateCustomer, deleteCustomer, bulkUpsertCustomers, getOptionsRealtime, addOption, updateOption, deleteOption, updateReceiptSettings, deleteCustomerPaymentsForSrNo, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument } from "@/lib/firestore";
 import { useGlobalData } from '@/contexts/global-data-context';
 import { format } from "date-fns";
 
@@ -24,13 +23,13 @@ import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialo
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
-import { CustomerImportDialog } from "./customer-import-dialog";
-import { Hourglass } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Hourglass, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 
 export const formSchema = z.object({
-    srNo: z.string(),
+    srNo: z.string().optional().or(z.literal('')),
     date: z.date(),
     bags: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required."),
@@ -47,7 +46,9 @@ export const formSchema = z.object({
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
+    kartaPercentage: z.coerce.number().min(0),
     cd: z.coerce.number().min(0),
+    cdAmount: z.coerce.number().min(0).optional(),
     brokerage: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     isBrokerageIncluded: z.boolean(),
@@ -68,6 +69,7 @@ export const formSchema = z.object({
     grNo: z.string().optional(),
     grDate: z.string().optional(),
     transport: z.string().optional(),
+    transportationRate: z.coerce.number().min(0).default(0),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -75,7 +77,7 @@ export type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = formatDateLocal(today);
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
@@ -85,6 +87,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
+    transportationRate: 0, transportAmount: 0, cdAmount: 0,
   };
 };
 
@@ -93,12 +96,8 @@ export default function CustomerEntryClient() {
   // Use global context for receipt settings (customers and payment history are managed via pagination for now)
   const globalData = useGlobalData();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [lastVisibleCustomer, setLastVisibleCustomer] = useState<any>(null);
-  const [hasMoreCustomers, setHasMoreCustomers] = useState(true);
 
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
-  const [lastVisiblePayment, setLastVisiblePayment] = useState<any>(null);
-  const [hasMorePayments, setHasMorePayments] = useState(true);
 
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
@@ -109,10 +108,8 @@ export default function CustomerEntryClient() {
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
   const [documentType, setDocumentType] = useState<DocumentType>('tax-invoice');
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
@@ -125,29 +122,67 @@ export default function CustomerEntryClient() {
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 10);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
+  const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+
+  // Import progress state
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importStatus, setImportStatus] = useState('');
+  const [importCurrent, setImportCurrent] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
+  const [importStartTime, setImportStartTime] = useState<number | null>(null);
 
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
   
-  // All entries are now just customers
-  const allEntries = useMemo(() => {
-    return safeCustomers;
+  // Pre-index customers for faster search
+  const indexedCustomers = useMemo(() => {
+    return safeCustomers.map(customer => ({
+      ...customer,
+      searchIndex: [
+        customer.name?.toLowerCase() || '',
+        customer.contact || '',
+        customer.srNo?.toLowerCase() || '',
+        customer.companyName?.toLowerCase() || '',
+        customer.address?.toLowerCase() || ''
+      ].join(' ')
+    }));
+  }, [safeCustomers]);
+  
+  // Search result cache
+  const searchCache = useRef(new Map<string, any[]>());
+  
+  // Clear cache when customers change
+  useEffect(() => {
+    searchCache.current.clear();
   }, [safeCustomers]);
   
   const filteredCustomers = useMemo(() => {
-    const entriesToFilter = allEntries;
-    if (!debouncedSearchTerm) {
-      return entriesToFilter;
+    // Immediate return for empty search - no processing needed
+    if (!debouncedSearchTerm || !debouncedSearchTerm.trim()) {
+      return safeCustomers;
     }
-    const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-    return entriesToFilter.filter(customer => {
-      return (
-        customer.name?.toLowerCase().startsWith(lowercasedFilter) ||
-        customer.contact?.startsWith(lowercasedFilter) ||
-        customer.srNo?.toLowerCase().startsWith(lowercasedFilter)
-      );
-    });
-  }, [safeCustomers, debouncedSearchTerm]);
+    
+    const filter = debouncedSearchTerm.trim().toLowerCase();
+    
+    // Check cache first
+    if (searchCache.current.has(filter)) {
+      return searchCache.current.get(filter) || [];
+    }
+    
+    // Use indexed search for faster filtering
+    const results = indexedCustomers.filter(customer => 
+      customer.searchIndex.includes(filter)
+    );
+    
+    // Cache the results (limit cache size to prevent memory issues)
+    if (searchCache.current.size < 50) {
+      searchCache.current.set(filter, results);
+    }
+    
+    return results;
+  }, [safeCustomers, indexedCustomers, debouncedSearchTerm]);
 
 
   const form = useForm<FormValues>({
@@ -177,7 +212,7 @@ export default function CustomerEntryClient() {
         }
       }
     } catch (error) {
-      console.warn('Error restoring form state:', error);
+
     }
   }, [isClient, form]);
 
@@ -187,59 +222,14 @@ export default function CustomerEntryClient() {
     }
   }, []);
 
-  const loadInitialData = useCallback(async () => {
-    // NO LOADING - Data loads initially via global context, this is just for pagination
-    try {
-        const [custResult, paymentResult] = await Promise.all([
-            getInitialCustomers(),
-            getInitialCustomerPayments()
-        ]);
-        setCustomers(custResult.data);
-        setLastVisibleCustomer(custResult.lastVisible);
-        setHasMoreCustomers(custResult.hasMore);
-        
-        setPaymentHistory(paymentResult.data);
-        setLastVisiblePayment(paymentResult.lastVisible);
-        setHasMorePayments(paymentResult.hasMore);
-        
-        const nextSrNum = custResult.data.length > 0 ? Math.max(...custResult.data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const initialSrNo = formatSrNo(nextSrNum, 'C');
-        form.setValue('srNo', initialSrNo);
-        setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
-
-    } catch (error) {
-        console.error("Error loading initial data:", error);
-        toast({ title: 'Error', description: 'Could not load initial data.', variant: 'destructive' });
-    }
-    // Removed toast from dependencies - it's stable from useToast hook
-    // form reference is stable, only need to include if form instance changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form]);
-
+  // Use global data context - NO duplicate listeners
   useEffect(() => {
-    if (isClient) {
-      // Load data - NO loading states, instant UI
-      loadInitialData();
-    }
-  }, [isClient, loadInitialData]);
-
-
-  const loadMoreData = useCallback(async () => {
-      if (!hasMoreCustomers) return;
-      // NO LOADING STATE - Instant update
-      try {
-          const result = await getMoreCustomers(lastVisibleCustomer);
-          setCustomers(prev => [...prev, ...result.data]);
-          setLastVisibleCustomer(result.lastVisible);
-          setHasMoreCustomers(result.hasMore);
-      } catch (error) {
-          console.error("Error loading more customers:", error);
-          toast({ title: 'Error', description: 'Could not load more entries.', variant: 'destructive' });
-      }
-      // Removed toast from dependencies - it's stable from useToast hook
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastVisibleCustomer, hasMoreCustomers]);
-
+    if (!isClient) return;
+    // Sync customers from global context (which has real-time listener)
+    setCustomers(globalData.customers);
+    setPaymentHistory(globalData.customerPayments);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, globalData.customers, globalData.customerPayments]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -247,8 +237,8 @@ export default function CustomerEntryClient() {
     // ✅ Global context handles customers and customerPayments realtime listeners - no duplicate listeners needed
     // Receipt settings are also provided by global context
 
-    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
+    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -306,7 +296,7 @@ export default function CustomerEntryClient() {
                         localStorage.setItem('customer-entry-form-state', JSON.stringify(value));
                     }
                 } catch (error) {
-                    console.warn('Error saving form state:', error);
+
                 }
             }, 500);
         }
@@ -341,12 +331,14 @@ export default function CustomerEntryClient() {
       vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, 
+      kartaPercentage: customerState.kartaPercentage || 0,
       // For CD: prioritize cdRate (percentage), if not available and we have cd (amount) and amount, calculate percentage
       cd: customerState.cdRate !== undefined && customerState.cdRate !== null 
         ? customerState.cdRate 
         : (customerState.cd && customerState.amount && customerState.amount > 0 
           ? (customerState.cd / customerState.amount) * 100 
           : 0),
+      cdAmount: (customerState as any).cdAmount || (customerState.cd || 0),
       // For Brokerage: prioritize brokerageRate (rate), if not available and we have brokerage (amount) and netWeight, calculate rate
       brokerage: customerState.brokerageRate !== undefined && customerState.brokerageRate !== null
         ? customerState.brokerageRate
@@ -363,6 +355,7 @@ export default function CustomerEntryClient() {
       grNo: customerState.grNo || '',
       grDate: customerState.grDate || '',
       transport: customerState.transport || '',
+      transportationRate: (customerState as any).transportationRate || 0,
       bagWeightKg: customerState.bagWeightKg || 0,
       bagRate: customerState.bagRate || 0,
       shippingName: customerState.shippingName || '',
@@ -391,8 +384,8 @@ export default function CustomerEntryClient() {
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
+    newState.date = formatDateLocal(today);
+    newState.dueDate = formatDateLocal(today);
     resetFormToState(newState);
     // Clear saved form state when creating new entry
     if (typeof window !== 'undefined') {
@@ -400,15 +393,6 @@ export default function CustomerEntryClient() {
     }
     setTimeout(() => form.setFocus('srNo'), 50);
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
-
-  const handleEdit = (id: string) => {
-    const customerToEdit = safeCustomers.find(c => c.id === id);
-    if (customerToEdit) {
-      setIsEditing(true);
-      resetFormToState(customerToEdit);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
 
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
@@ -444,10 +428,46 @@ export default function CustomerEntryClient() {
           form.setValue('shippingGstin', latestEntryForContact.shippingGstin || latestEntryForContact.gstin || '');
           form.setValue('shippingStateName', latestEntryForContact.shippingStateName || latestEntryForContact.stateName || '');
           form.setValue('shippingStateCode', latestEntryForContact.shippingStateCode || latestEntryForContact.stateCode || '');
-          toast({ title: "Customer Found: Details auto-filled from last entry." });
+          // Removed unnecessary toast message
       }
     }
   }
+
+  const handleDeleteCurrent = async () => {
+    if (!currentCustomer.id) {
+      toast({ title: "Cannot delete: no entry selected.", variant: "destructive" });
+      return;
+    }
+    
+    const id = currentCustomer.id;
+    // Optimistic delete - update UI immediately
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    handleNew();
+    toast({ title: "Entry and payments deleted.", variant: "success" });
+    
+    // Delete in background (non-blocking)
+    setTimeout(() => {
+      (async () => {
+        try {
+          await deleteCustomer(id);
+          if (currentCustomer.srNo) {
+            await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
+          }
+        } catch (error) {
+          toast({ title: "Failed to delete entry.", variant: "destructive" });
+        }
+      })();
+    }, 0);
+  };
+
+  const handleEdit = (id: string) => {
+    const customerToEdit = safeCustomers.find(c => c.id === id);
+    if (customerToEdit) {
+      setIsEditing(true);
+      resetFormToState(customerToEdit);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!id) {
@@ -455,34 +475,65 @@ export default function CustomerEntryClient() {
       return;
     }
     
-    // Delete customer entry
-    try {
-      const customerToDelete = safeCustomers.find(c => c.id === id);
-      await deleteCustomer(id);
-      if (customerToDelete) {
-        await deleteCustomerPaymentsForSrNo(customerToDelete.srNo);
-      }
-      setCustomers(prev => prev.filter(c => c.id !== id));
-      toast({ title: "Entry and payments deleted.", variant: "success" });
-      if (currentCustomer.id === id) {
-        handleNew();
-      }
-    } catch (error) {
-      console.error("Error deleting customer and payments: ", error);
-      toast({ title: "Failed to delete entry.", variant: "destructive" });
+    // Optimistic delete - update UI immediately
+    const customerToDelete = customers.find(c => c.id === id);
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    if (currentCustomer.id === id) {
+      handleNew();
     }
+    
+    // Delete in background (non-blocking)
+    (async () => {
+      try {
+        await Promise.all([
+          deleteCustomer(id),
+          customerToDelete ? deleteCustomerPaymentsForSrNo(customerToDelete.srNo) : Promise.resolve()
+        ]);
+      } catch (error) {
+        // Revert on error
+        if (customerToDelete) {
+          setCustomers(prev => [...prev, customerToDelete].sort((a, b) => b.srNo.localeCompare(a.srNo)));
+        }
+        toast({ title: "Failed to delete entry.", variant: "destructive" });
+      }
+    })();
+  };
+
+  const handleShowDetails = (customer: Customer) => {
+    setDetailsCustomer(customer);
+  };
+
+  const handleSinglePrint = (entry: Customer) => {
+    setReceiptsToPrint([entry]);
+    setConsolidatedReceiptData(null);
   };
 
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
+    // Auto-generate SR No if missing or invalid (optimized - no sort)
+    let srNo = formValues.srNo?.trim();
+    if (!srNo || srNo === 'C----' || srNo === '') {
+      // Generate next SR No (use max instead of sort for better performance)
+      let nextSrNum = 1;
+      if (safeCustomers.length > 0) {
+        const maxSrNo = safeCustomers.reduce((max, c) => {
+          const num = parseInt(c.srNo.substring(1)) || 0;
+          return num > max ? num : max;
+        }, 0);
+        nextSrNum = maxSrNo + 1;
+      }
+      srNo = formatSrNo(nextSrNum, 'C');
+      form.setValue('srNo', srNo);
+    }
+    
     const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
-        srNo: formValues.srNo,
-        date: formValues.date.toISOString().split('T')[0],
+        srNo: srNo,
+        date: formatDateLocal(formValues.date),
         term: '0', 
-        dueDate: formValues.date.toISOString().split('T')[0],
+        dueDate: formatDateLocal(formValues.date),
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
@@ -491,7 +542,7 @@ export default function CustomerEntryClient() {
         stateName: formValues.stateName,
         stateCode: formValues.stateCode,
         vehicleNo: toTitleCase(formValues.vehicleNo),
-        variety: toTitleCase(formValues.variety),
+        variety: formValues.variety ? String(formValues.variety).toUpperCase() : formValues.variety,
         paymentType: formValues.paymentType,
         customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
         grossWeight: formValues.grossWeight,
@@ -516,12 +567,17 @@ export default function CustomerEntryClient() {
         grNo: formValues.grNo || '',
         grDate: formValues.grDate || '',
         transport: formValues.transport || '',
+        transportationRate: (formValues as any).transportationRate || 0,
         cdRate: formValues.cd || 0, // Save CD percentage as cdRate
+        cd: currentCustomer.cd || 0, // Save calculated CD amount
+        cdAmount: (formValues as any).cdAmount || 0, // Save CD amount if entered directly
         brokerageRate: formValues.brokerage || 0, // Save brokerage percentage as brokerageRate
         so: '',
-        kartaPercentage: 0,
-        kartaWeight: 0,
-        kartaAmount: 0,
+        kartaPercentage: formValues.kartaPercentage || 0,
+        kartaWeight: currentCustomer.kartaWeight || 0, // Use calculated value
+        kartaAmount: currentCustomer.kartaAmount || 0, // Use calculated value
+        bagWeightDeductionAmount: (currentCustomer as any).bagWeightDeductionAmount || 0, // Bag Weight deduction amount
+        transportAmount: (currentCustomer as any).transportAmount || 0, // Transport Amount = Transportation Rate × Final Weight
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
@@ -529,47 +585,164 @@ export default function CustomerEntryClient() {
     };
     
     try {
+        // If editing and SR No changed, delete old entry first (optimistic)
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
-            await deleteCustomer(currentCustomer.id);
+            // Update UI immediately
             setCustomers(prev => prev.filter(c => c.id !== currentCustomer.id));
+            
+            // Write using sync system (triggers Firestore sync)
+            deleteCustomer(currentCustomer.id).catch(() => {});
         }
         
         if (deletePayments) {
-            await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
-            const savedEntry = await addCustomer(entryWithRestoredAmount as Customer);
-            setCustomers(prev => {
-                const existingIndex = prev.findIndex(c => c.id === savedEntry.id);
-                if (existingIndex > -1) {
-                    const newCustomers = [...prev];
-                    newCustomers[existingIndex] = savedEntry;
-                    return newCustomers;
-                }
-                return [savedEntry, ...prev].sort((a,b) => b.srNo.localeCompare(a.srNo));
-            });
-            toast({ title: "Entry updated, payments deleted.", variant: "success" });
-            if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
-        } else {
-            const entryToSave = { ...dataToSave, id: dataToSave.srNo };
-            const savedEntry = await addCustomer(entryToSave as Customer);
-            setCustomers(prev => {
-                const existingIndex = prev.findIndex(c => c.id === savedEntry.id);
-                if (existingIndex > -1) {
-                    const newCustomers = [...prev];
-                    newCustomers[existingIndex] = savedEntry;
-                    return newCustomers;
-                }
-                return [savedEntry, ...prev].sort((a,b) => b.srNo.localeCompare(a.srNo));
-            });
-            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            // Clear saved form state after successful save
-            if (typeof window !== 'undefined' && !callback) {
-                localStorage.removeItem('customer-entry-form-state');
+            
+            // If editing with same ID, use updateCustomer; otherwise addCustomer (optimistic)
+            if (isEditing && currentCustomer.id === dataToSave.srNo) {
+                const { id, ...updateData } = entryWithRestoredAmount as any;
+                const updatedEntry = entryWithRestoredAmount as Customer;
+                
+                // Update UI immediately (optimistic)
+                setCustomers(prev => {
+                    const existingIndex = prev.findIndex(c => c.id === id);
+                    if (existingIndex > -1) {
+                        const newCustomers = [...prev];
+                        newCustomers[existingIndex] = updatedEntry;
+                        return newCustomers;
+                    }
+                    return [updatedEntry, ...prev];
+                });
+                // Highlight and scroll to entry in table
+                setHighlightEntryId(updatedEntry.id);
+                setTimeout(() => setHighlightEntryId(null), 3000);
+                toast({ title: "Entry updated, payments deleted.", variant: "success" });
+                if (callback) callback(updatedEntry); else handleNew();
+                
+                // Write using sync system (triggers Firestore sync)
+                updateCustomer(id, updateData).catch(() => {});
+                deleteCustomerPaymentsForSrNo(dataToSave.srNo!).catch(() => {});
+            } else {
+                // Update UI immediately (optimistic)
+                setCustomers(prev => {
+                    const existingIndex = prev.findIndex(c => c.id === entryWithRestoredAmount.id);
+                    if (existingIndex > -1) {
+                        const newCustomers = [...prev];
+                        newCustomers[existingIndex] = entryWithRestoredAmount as Customer;
+                        return newCustomers;
+                    }
+                    return [entryWithRestoredAmount as Customer, ...prev];
+                });
+                // Highlight and scroll to entry in table
+                setHighlightEntryId(entryWithRestoredAmount.id);
+                setTimeout(() => setHighlightEntryId(null), 3000);
+                toast({ title: "Entry updated, payments deleted.", variant: "success" });
+                if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
+                
+                // Write using sync system (triggers Firestore sync)
+                addCustomer(entryWithRestoredAmount as Customer).catch(() => {});
+                deleteCustomerPaymentsForSrNo(dataToSave.srNo!).catch(() => {});
             }
-            if (callback) callback(savedEntry as Customer); else handleNew();
+        } else {
+            // Ensure ID is set to SR No
+            const entryToSave = { ...dataToSave, id: srNo };
+            
+            // If editing, always use updateCustomer if we have an existing ID
+            if (isEditing && currentCustomer.id) {
+                // Check if SR No changed - if yes, we need to handle it differently
+                if (currentCustomer.id !== srNo && currentCustomer.srNo && currentCustomer.srNo !== srNo) {
+                    // SR No changed - delete old and create new (optimistic)
+                    const tempEntry = { ...entryToSave, id: srNo } as Customer;
+                    
+                    // Update UI immediately (optimistic)
+                    setCustomers(prev => {
+                        const filtered = prev.filter(c => c.id !== currentCustomer.id);
+                        const existingIndex = filtered.findIndex(c => c.id === tempEntry.id);
+                        if (existingIndex > -1) {
+                            const newCustomers = [...filtered];
+                            newCustomers[existingIndex] = tempEntry;
+                            return newCustomers;
+                        }
+                        return [tempEntry, ...filtered];
+                    });
+                    
+                    // Highlight and scroll to entry in table
+                    setHighlightEntryId(tempEntry.id);
+                    setTimeout(() => setHighlightEntryId(null), 3000);
+                    toast({ title: "Entry updated successfully.", variant: "success" });
+                    if (typeof window !== 'undefined' && !callback) {
+                        localStorage.removeItem('customer-entry-form-state');
+                    }
+                    if (callback) callback(tempEntry); else handleNew();
+                    
+                    // Write using sync system (triggers Firestore sync)
+                    deleteCustomer(currentCustomer.id).catch(() => {});
+                    addCustomer(tempEntry).catch(() => {});
+                } else {
+                    // Same ID or updating existing - use updateCustomer (optimistic update)
+                    const updateId = currentCustomer.id || srNo;
+                    const { id, ...updateData } = entryToSave as any;
+                    const updatedEntry = { ...entryToSave, id: updateId } as Customer;
+                    
+                    // Update UI immediately (optimistic) - no sort for better performance
+                    setCustomers(prev => {
+                        const existingIndex = prev.findIndex(c => c.id === updateId);
+                        if (existingIndex > -1) {
+                            const newCustomers = [...prev];
+                            newCustomers[existingIndex] = updatedEntry;
+                            return newCustomers;
+                        }
+                        // Insert at beginning without sort (faster)
+                        return [updatedEntry, ...prev];
+                    });
+                    // Highlight and scroll to entry in table
+                    setHighlightEntryId(updatedEntry.id);
+                    setTimeout(() => setHighlightEntryId(null), 3000);
+                    toast({ title: "Entry updated successfully.", variant: "success" });
+                    
+                    // Defer form reset to avoid blocking
+                    if (callback) {
+                        callback(updatedEntry);
+                    } else {
+                        setTimeout(() => {
+                            if (typeof window !== 'undefined') {
+                                localStorage.removeItem('customer-entry-form-state');
+                            }
+                            handleNew();
+                        }, 0);
+                    }
+                    
+                    // Write using sync system (triggers Firestore sync)
+                    updateCustomer(updateId, updateData).catch(() => {});
+                }
+            } else {
+                // New entry - use addCustomer (optimistic add)
+                const tempEntry = entryToSave as Customer;
+                
+                // Update UI immediately (optimistic)
+                setCustomers(prev => {
+                    const existingIndex = prev.findIndex(c => c.id === tempEntry.id);
+                    if (existingIndex > -1) {
+                        const newCustomers = [...prev];
+                        newCustomers[existingIndex] = tempEntry;
+                        return newCustomers;
+                    }
+                    return [tempEntry, ...prev];
+                });
+                // Highlight and scroll to entry in table
+                setHighlightEntryId(tempEntry.id);
+                setTimeout(() => setHighlightEntryId(null), 3000);
+                toast({ title: "Entry saved successfully.", variant: "success" });
+                if (typeof window !== 'undefined' && !callback) {
+                    localStorage.removeItem('customer-entry-form-state');
+                }
+                if (callback) callback(tempEntry); else handleNew();
+                
+                // Write using sync system (triggers Firestore sync)
+                addCustomer(tempEntry).catch(() => {});
+            }
         }
     } catch (error) {
-        console.error("Error saving customer:", error);
+
         toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
@@ -595,45 +768,6 @@ export default function CustomerEntryClient() {
     });
   };
   
-  const handleShowDetails = (customer: Customer) => {
-    setDetailsCustomer(customer);
-  };
-
-  const handlePrint = (entriesToPrint: Customer[]) => {
-    if (!entriesToPrint || entriesToPrint.length === 0) {
-        toast({ title: "No entries selected to print.", variant: "destructive" });
-        return;
-    }
-
-    if (entriesToPrint.length === 1) {
-        setReceiptsToPrint(entriesToPrint);
-        setConsolidatedReceiptData(null);
-    } else {
-        const firstCustomerId = entriesToPrint[0].customerId;
-        const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-
-        if (!allSameCustomer) {
-            toast({ title: "Consolidated receipts are for a single customer.", variant: "destructive" });
-            return;
-        }
-        
-        const customer = entriesToPrint[0];
-        const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-        
-        setConsolidatedReceiptData({
-            supplier: { 
-                name: customer.name,
-                so: customer.so,
-                address: customer.address,
-                contact: customer.contact,
-            },
-            entries: entriesToPrint,
-            totalAmount: totalAmount,
-            date: format(new Date(), "dd-MMM-yy"),
-        });
-        setReceiptsToPrint([]);
-    }
-  };
 
   const handleOpenPrintPreview = (customer: Customer) => {
     setDocumentPreviewCustomer(customer);
@@ -641,39 +775,478 @@ export default function CustomerEntryClient() {
     setIsDocumentPreviewOpen(true);
   };
 
-    const handleExport = () => {
-        if (!customers) return;
-        const dataToExport = customers.map(c => ({
-            srNo: c.srNo,
-            date: c.date,
-            name: c.name,
-            companyName: c.companyName,
-            address: c.address,
-            contact: c.contact,
-            gstin: c.gstin,
-            vehicleNo: c.vehicleNo,
-            variety: c.variety,
-            grossWeight: c.grossWeight,
-            teirWeight: c.teirWeight,
-            rate: c.rate,
-            bags: c.bags,
-            bagWeightKg: c.bagWeightKg,
-            bagRate: c.bagRate,
-            cd: c.cd,
-            brokerage: c.brokerage,
-            isBrokerageIncluded: c.isBrokerageIncluded,
-            paymentType: c.paymentType,
-        }));
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
-        XLSX.writeFile(workbook, "CustomerEntries.xlsx");
-        toast({title: "Exported", description: "Customer data has been exported."});
+  const handleExport = useCallback(() => {
+    if (!safeCustomers || safeCustomers.length === 0) {
+      toast({ title: "No data to export", variant: "destructive" });
+      return;
     }
 
-    const handleImport = () => {
-        setIsImportDialogOpen(true);
+    const dataToExport = safeCustomers.map(c => {
+      const calculated = calculateCustomerEntry(c, paymentHistory);
+      return {
+        'SR NO.': c.srNo,
+        'DATE': c.date,
+        'BAGS': c.bags || 0,
+        'NAME': c.name,
+        'COMPANY NAME': c.companyName || '',
+        'ADDRESS': c.address,
+        'CONTACT': c.contact,
+        'GSTIN': c.gstin || '',
+        'STATE NAME': c.stateName || '',
+        'STATE CODE': c.stateCode || '',
+        'VEHICLE NO': c.vehicleNo,
+        'VARIETY': c.variety,
+        'GROSS WT': c.grossWeight,
+        'TIER WT': c.teirWeight,
+        'NET WT': calculated.netWeight,
+        'RATE': c.rate,
+        'CD RATE': c.cdRate || 0,
+        'CD AMOUNT': calculated.cd || 0,
+        'BROKERAGE RATE': c.brokerageRate || 0,
+        'BROKERAGE AMOUNT': calculated.brokerage || 0,
+        'BROKERAGE INCLUDED': c.isBrokerageIncluded ? 'Yes' : 'No',
+        'BAG WEIGHT KG': c.bagWeightKg || 0,
+        'BAG RATE': c.bagRate || 0,
+        'BAG AMOUNT': calculated.bagAmount || 0,
+        'KANTA': calculated.kanta || 0,
+        'AMOUNT': calculated.amount || 0,
+        'NET AMOUNT': calculated.originalNetAmount || 0,
+        'PAYMENT TYPE': c.paymentType,
+        'SHIPPING NAME': c.shippingName || '',
+        'SHIPPING COMPANY NAME': c.shippingCompanyName || '',
+        'SHIPPING ADDRESS': c.shippingAddress || '',
+        'SHIPPING CONTACT': c.shippingContact || '',
+        'SHIPPING GSTIN': c.shippingGstin || '',
+        'SHIPPING STATE NAME': c.shippingStateName || '',
+        'SHIPPING STATE CODE': c.shippingStateCode || '',
+        'HSN CODE': c.hsnCode || '',
+        'TAX RATE': c.taxRate || 0,
+        'GST INCLUDED': c.isGstIncluded ? 'Yes' : 'No',
+        '9R NO': c.nineRNo || '',
+        'GATE PASS NO': c.gatePassNo || '',
+        'GR NO': c.grNo || '',
+        'GR DATE': c.grDate || '',
+        'TRANSPORT': c.transport || '',
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+    XLSX.writeFile(workbook, "CustomerEntries.xlsx");
+    toast({ title: "Exported", description: "Customer data has been exported." });
+  }, [safeCustomers, paymentHistory, toast]);
+
+  const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      toast({ title: "No file selected", variant: "destructive" });
+      return;
+    }
+
+    // Validate file type
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+      toast({ title: "Invalid file type", description: "Please select an Excel file (.xlsx or .xls)", variant: "destructive" });
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportStatus('Reading file...');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          setIsImporting(false);
+          toast({ title: "File read error", description: "Could not read the file.", variant: "destructive" });
+          return;
+        }
+
+        setImportStatus('Parsing Excel file...');
+        setImportProgress(5);
+
+        const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setIsImporting(false);
+          toast({ title: "Invalid file", description: "The Excel file does not contain any sheets.", variant: "destructive" });
+          return;
+        }
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) {
+          setIsImporting(false);
+          toast({ title: "Invalid file", description: "Could not read the worksheet.", variant: "destructive" });
+          return;
+        }
+
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+        
+        if (!json || json.length === 0) {
+          setIsImporting(false);
+          setImportStartTime(null);
+          toast({ title: "Empty file", description: "The Excel file does not contain any data.", variant: "destructive" });
+          return;
+        }
+        
+        const totalRows = json.length;
+        setImportTotal(totalRows);
+        setImportStatus(`Processing ${totalRows} entries...`);
+        setImportProgress(10);
+        
+        let nextSrNum = safeCustomers.length > 0 
+          ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 
+          : 1;
+
+        const importedCustomers: Customer[] = [];
+        const customersToUpdate: { id: string; data: Customer }[] = [];
+        const processedSrNos = new Set<string>(); // Track processed SR Nos to avoid duplicates
+        let successCount = 0;
+        let updateCount = 0;
+        let errorCount = 0;
+
+        // Helper function to get value from multiple possible column names
+        const getValue = (item: any, ...possibleKeys: string[]): any => {
+          for (const key of possibleKeys) {
+            if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
+              return item[key];
+            }
+          }
+          return undefined;
+        };
+
+        for (let index = 0; index < json.length; index++) {
+          const item = json[index];
+          
+          // Calculate progress and time estimates
+          const processed = index + 1;
+          const remaining = totalRows - processed;
+          const progress = 10 + Math.floor((index / totalRows) * 70);
+          
+          // Calculate estimated time remaining
+          let timeRemaining = '';
+          if (importStartTime && processed > 0) {
+            const elapsed = (Date.now() - importStartTime) / 1000; // seconds
+            const avgTimePerItem = elapsed / processed; // seconds per item
+            const estimatedTotal = avgTimePerItem * totalRows; // total estimated time
+            const remainingTime = estimatedTotal - elapsed; // time remaining
+            
+            if (remainingTime > 0) {
+              if (remainingTime < 60) {
+                timeRemaining = `${Math.ceil(remainingTime)}s`;
+              } else if (remainingTime < 3600) {
+                const minutes = Math.floor(remainingTime / 60);
+                const seconds = Math.ceil(remainingTime % 60);
+                timeRemaining = `${minutes}m ${seconds}s`;
+              } else {
+                const hours = Math.floor(remainingTime / 3600);
+                const minutes = Math.floor((remainingTime % 3600) / 60);
+                timeRemaining = `${hours}h ${minutes}m`;
+              }
+            }
+          }
+          
+          setImportProgress(progress);
+          setImportCurrent(processed);
+          setImportStatus(`Processing entry ${processed} of ${totalRows}... ${remaining} remaining${timeRemaining ? ` (~${timeRemaining})` : ''}`);
+
+          // Skip empty rows - check multiple possible column name formats
+          const name = getValue(item, 'NAME', 'name', 'Name');
+          const srNo = getValue(item, 'SR NO.', 'srNo', 'SR NO', 'sr_no', 'SR_NO');
+          const contact = getValue(item, 'CONTACT', 'contact', 'Contact');
+          
+          if (!name && !srNo && !contact) {
+            continue;
+          }
+
+          try {
+            // Get date from multiple possible formats
+            const dateValue = getValue(item, 'DATE', 'date', 'Date');
+            let dateStr: string;
+            if (dateValue instanceof Date) {
+              dateStr = formatDateLocal(dateValue);
+            } else if (typeof dateValue === 'string') {
+              // Handle DD-MM-YYYY format
+              if (dateValue.includes('-')) {
+                const parts = dateValue.split('-');
+                if (parts.length === 3) {
+                  // Try DD-MM-YYYY format
+                  const day = parseInt(parts[0]);
+                  const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+                  const year = parseInt(parts[2]);
+                  const parsedDate = new Date(year, month, day);
+                  if (!isNaN(parsedDate.getTime())) {
+                    dateStr = formatDateLocal(parsedDate);
+                  } else {
+                    // Try standard date parsing
+                    const standardDate = new Date(dateValue);
+                    dateStr = isNaN(standardDate.getTime()) 
+                      ? formatDateLocal(new Date()) 
+                      : formatDateLocal(standardDate);
+                  }
+                } else {
+                  const standardDate = new Date(dateValue);
+                  dateStr = isNaN(standardDate.getTime()) 
+                    ? formatDateLocal(new Date()) 
+                    : formatDateLocal(standardDate);
+                }
+              } else {
+                const parsedDate = new Date(dateValue);
+                dateStr = isNaN(parsedDate.getTime()) 
+                  ? formatDateLocal(new Date()) 
+                  : formatDateLocal(parsedDate);
+              }
+            } else {
+              dateStr = formatDateLocal(new Date());
+            }
+
+            // Generate SR No if not provided - handle multiple formats
+            const srNoValue = srNo || getValue(item, 'SR NO.', 'srNo', 'SR NO', 'sr_no', 'SR_NO') || formatSrNo(nextSrNum++, 'C');
+            // Format SR No if it's just a number
+            let finalSrNo = srNoValue;
+            if (typeof srNoValue === 'number' || (typeof srNoValue === 'string' && /^\d+$/.test(srNoValue))) {
+              finalSrNo = formatSrNo(parseInt(String(srNoValue)), 'C');
+            }
+            
+            // Check if this SR No was already processed in this import batch
+            if (processedSrNos.has(finalSrNo)) {
+              console.warn(`Skipping duplicate SR No in import: ${finalSrNo}`);
+              continue;
+            }
+            processedSrNos.add(finalSrNo);
+            
+            // Check if customer with this SR No already exists in database
+            const existingCustomer = safeCustomers.find(c => c.srNo === finalSrNo || c.id === finalSrNo);
+            
+            // Calculate weight (gross - tier) - handle multiple column name formats
+            // Excel file mein weights kg mein hain, unhe qtl mein convert karo (divide by 100)
+            // 1 qtl = 100 kg, so 500 kg = 5 qtl
+            const grossWeightKg = parseFloat(getValue(item, 'GROSS WT', 'grossWeight', 'GROSS WEIGHT', 'gross_weight', 'GROSS_WEIGHT') || 0) || 0;
+            const teirWeightKg = parseFloat(getValue(item, 'TIER WT', 'teirWeight', 'TIER WEIGHT', 'teir_weight', 'TIER_WEIGHT', 'TIER WT', 'tierWeight') || 0) || 0;
+            
+            // Convert kg to qtl (always divide by 100)
+            const grossWeight = grossWeightKg / 100;
+            const teirWeight = teirWeightKg / 100;
+            const calculatedWeight = grossWeight - teirWeight;
+
+            const customerData: Customer = {
+              id: finalSrNo,
+              srNo: finalSrNo,
+              date: dateStr,
+              term: '0',
+              dueDate: dateStr,
+              name: toTitleCase(getValue(item, 'NAME', 'name', 'Name') || ''),
+              companyName: toTitleCase(getValue(item, 'COMPANY NAME', 'companyName', 'COMPANY NAME', 'company_name', 'COMPANY_NAME') || ''),
+              address: toTitleCase(getValue(item, 'ADDRESS', 'address', 'Address') || ''),
+              contact: String(getValue(item, 'CONTACT', 'contact', 'Contact') || ''),
+              gstin: getValue(item, 'GSTIN', 'gstin', 'GSTIN', 'gst_in', 'GST_IN') || '',
+              stateName: getValue(item, 'STATE NAME', 'stateName', 'STATE NAME', 'state_name', 'STATE_NAME') || '',
+              stateCode: getValue(item, 'STATE CODE', 'stateCode', 'STATE CODE', 'state_code', 'STATE_CODE') || '',
+              vehicleNo: toTitleCase(getValue(item, 'VEHICLE NO', 'vehicleNo', 'VEHICLE NO', 'vehicle_no', 'VEHICLE_NO') || ''),
+              variety: String(getValue(item, 'VARIETY', 'variety', 'Variety') || '').toUpperCase(),
+              grossWeight: grossWeight,
+              teirWeight: teirWeight,
+              weight: calculatedWeight,
+              netWeight: (() => {
+                const netWeightValue = parseFloat(getValue(item, 'NET WT', 'netWeight', 'NET WEIGHT', 'net_weight', 'NET_WEIGHT') || calculatedWeight) || calculatedWeight;
+                // Convert kg to qtl (always divide by 100)
+                return netWeightValue / 100;
+              })(),
+              rate: parseFloat(getValue(item, 'RATE', 'rate', 'Rate') || 0) || 0,
+              cdRate: parseFloat(getValue(item, 'CD RATE', 'cdRate', 'CD RATE', 'cd_rate', 'CD_RATE') || 0) || 0,
+              brokerageRate: parseFloat(getValue(item, 'BROKERAGE RATE', 'brokerageRate', 'BROKERAGE RATE', 'brokerage_rate', 'BROKERAGE_RATE') || 0) || 0,
+              isBrokerageIncluded: getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === 'Yes' || 
+                                   getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === 'yes' || 
+                                   getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === true,
+              bagWeightKg: (() => {
+                const bagWeightValue = parseFloat(getValue(item, 'BAG WEIGHT KG', 'bagWeightKg', 'BAG WEIGHT KG', 'bag_weight_kg', 'BAG_WEIGHT_KG') || 0) || 0;
+                // Convert kg to qtl (always divide by 100)
+                // Note: bagWeightKg field stores value in qtl, so we convert from kg to qtl
+                return bagWeightValue / 100;
+              })(),
+              bagRate: parseFloat(getValue(item, 'BAG RATE', 'bagRate', 'BAG RATE', 'bag_rate', 'BAG_RATE') || 0) || 0,
+              bags: parseFloat(getValue(item, 'BAGS', 'bags', 'Bags') || 0) || 0,
+              paymentType: getValue(item, 'PAYMENT TYPE', 'paymentType', 'PAYMENT TYPE', 'payment_type', 'PAYMENT_TYPE') || 'Full',
+              customerId: `${toTitleCase(getValue(item, 'NAME', 'name', 'Name') || '').toLowerCase()}|${String(getValue(item, 'CONTACT', 'contact', 'Contact') || '').toLowerCase()}`,
+              shippingName: toTitleCase(getValue(item, 'SHIPPING NAME', 'shippingName', 'SHIPPING NAME', 'shipping_name', 'SHIPPING_NAME') || ''),
+              shippingCompanyName: toTitleCase(getValue(item, 'SHIPPING COMPANY NAME', 'shippingCompanyName', 'SHIPPING COMPANY NAME', 'shipping_company_name', 'SHIPPING_COMPANY_NAME') || ''),
+              shippingAddress: toTitleCase(getValue(item, 'SHIPPING ADDRESS', 'shippingAddress', 'SHIPPING ADDRESS', 'shipping_address', 'SHIPPING_ADDRESS') || ''),
+              shippingContact: getValue(item, 'SHIPPING CONTACT', 'shippingContact', 'SHIPPING CONTACT', 'shipping_contact', 'SHIPPING_CONTACT') || '',
+              shippingGstin: getValue(item, 'SHIPPING GSTIN', 'shippingGstin', 'SHIPPING GSTIN', 'shipping_gstin', 'SHIPPING_GSTIN') || '',
+              shippingStateName: getValue(item, 'SHIPPING STATE NAME', 'shippingStateName', 'SHIPPING STATE NAME', 'shipping_state_name', 'SHIPPING_STATE_NAME') || '',
+              shippingStateCode: getValue(item, 'SHIPPING STATE CODE', 'shippingStateCode', 'SHIPPING STATE CODE', 'shipping_state_code', 'SHIPPING_STATE_CODE') || '',
+              hsnCode: getValue(item, 'HSN CODE', 'hsnCode', 'HSN CODE', 'hsn_code', 'HSN_CODE') || '1006',
+              taxRate: parseFloat(getValue(item, 'TAX RATE', 'taxRate', 'TAX RATE', 'tax_rate', 'TAX_RATE') || 5) || 5,
+              isGstIncluded: getValue(item, 'GST INCLUDED', 'isGstIncluded', 'GST INCLUDED') === 'Yes' || 
+                            getValue(item, 'GST INCLUDED', 'isGstIncluded', 'GST INCLUDED') === 'yes' || 
+                            getValue(item, 'GST INCLUDED', 'isGstIncluded', 'GST INCLUDED') === true,
+              nineRNo: getValue(item, '9R NO', 'nineRNo', '9R NO', 'nine_r_no', '9R_NO') || '',
+              gatePassNo: getValue(item, 'GATE PASS NO', 'gatePassNo', 'GATE PASS NO', 'gate_pass_no', 'GATE_PASS_NO') || '',
+              grNo: getValue(item, 'GR NO', 'grNo', 'GR NO', 'gr_no', 'GR_NO') || '',
+              grDate: getValue(item, 'GR DATE', 'grDate', 'GR DATE', 'gr_date', 'GR_DATE') || '',
+              transport: getValue(item, 'TRANSPORT', 'transport', 'Transport') || '',
+              barcode: '',
+              receiptType: 'Cash',
+              so: '',
+              kartaPercentage: 0,
+              kartaWeight: 0,
+              kartaAmount: 0,
+              labouryRate: 0,
+              labouryAmount: 0,
+              amount: 0,
+              netAmount: 0,
+              originalNetAmount: 0,
+              kanta: 0,
+            };
+
+            // Calculate all derived fields using calculateCustomerEntry
+            const calculated = calculateCustomerEntry(customerData, paymentHistory);
+            const finalCustomerData = { ...customerData, ...calculated };
+
+            if (existingCustomer) {
+              // Queue for batch update
+              customersToUpdate.push({ id: existingCustomer.id, data: finalCustomerData });
+              updateCount++;
+            } else {
+              // Queue for batch insert
+              importedCustomers.push(finalCustomerData);
+              successCount++;
+            }
+          } catch (error) {
+            console.error(`Error importing row:`, item, error);
+            errorCount++;
+          }
+        }
+        
+        setImportStatus(`Saving ${importedCustomers.length} new entries to database...`);
+        setImportProgress(80);
+
+        // Batch insert new customers
+        if (importedCustomers.length > 0) {
+          try {
+            await bulkUpsertCustomers(importedCustomers);
+            // Remove duplicates by id before adding to state
+            setCustomers(prev => {
+              const existingIds = new Set(prev.map(c => c.id));
+              const newCustomers = importedCustomers.filter(c => !existingIds.has(c.id));
+              return [...newCustomers, ...prev].sort((a, b) => b.srNo.localeCompare(a.srNo));
+            });
+          } catch (error) {
+            console.error('Bulk insert error:', error);
+            // Fallback to individual inserts
+            for (const customer of importedCustomers) {
+              try {
+                await addCustomer(customer);
+                setCustomers(prev => {
+                  // Check if customer already exists before adding
+                  if (prev.some(c => c.id === customer.id)) {
+                    return prev;
+                  }
+                  return [customer, ...prev].sort((a, b) => b.srNo.localeCompare(a.srNo));
+                });
+              } catch (err) {
+                console.error('Individual insert error:', err);
+                errorCount++;
+                successCount--;
+              }
+            }
+          }
+        }
+
+        // Batch update existing customers
+        if (customersToUpdate.length > 0) {
+          setImportStatus(`Updating ${customersToUpdate.length} existing entries...`);
+          setImportProgress(90);
+          
+          for (const { id, data } of customersToUpdate) {
+            try {
+              const { id: _, ...updateData } = data as any;
+              const updateSuccess = await updateCustomer(id, updateData);
+              
+              if (updateSuccess) {
+                const updatedCustomer = { ...data, id };
+                setCustomers(prev => {
+                  // Check if customer exists, update it; otherwise add it
+                  const existingIndex = prev.findIndex(c => c.id === id);
+                  if (existingIndex > -1) {
+                    const newCustomers = [...prev];
+                    newCustomers[existingIndex] = updatedCustomer;
+                    return newCustomers;
+                  }
+                  return [updatedCustomer, ...prev].sort((a, b) => b.srNo.localeCompare(a.srNo));
+                });
+                successCount++;
+              } else {
+                errorCount++;
+                updateCount--;
+              }
+            } catch (error) {
+              console.error('Update error:', error);
+              errorCount++;
+              updateCount--;
+            }
+          }
+        }
+        
+        setImportProgress(100);
+        setImportCurrent(importTotal);
+        
+        // Calculate total time taken
+        const totalTime = importStartTime ? ((Date.now() - importStartTime) / 1000).toFixed(1) : '0';
+        setImportStatus(`Import completed! Total time: ${totalTime}s`);
+
+        // Build success message
+        let message = '';
+        if (updateCount > 0 && importedCustomers.length > 0) {
+          message = `${importedCustomers.length} entries imported, ${updateCount} entries updated.`;
+        } else if (updateCount > 0) {
+          message = `${updateCount} entries updated.`;
+        } else if (importedCustomers.length > 0) {
+          message = `${importedCustomers.length} entries imported.`;
+        }
+        
+        // Close progress dialog after a short delay
+        setTimeout(() => {
+          setIsImporting(false);
+          setImportProgress(0);
+          setImportStatus('');
+          setImportCurrent(0);
+          setImportTotal(0);
+          setImportStartTime(null);
+        }, 1500);
+        
+        if (errorCount > 0) {
+          toast({ 
+            title: "Import Completed with Errors", 
+            description: `${message} ${errorCount} failed.`, 
+            variant: "destructive" 
+          });
+        } else {
+          toast({ 
+            title: "Import Successful", 
+            description: message || `${successCount} customer entries processed.` 
+          });
+        }
+      } catch (error) {
+        console.error("Import error:", error);
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportStatus('');
+        toast({ title: "Import Failed", description: "Please check the file format and content.", variant: "destructive" });
+      }
     };
+    reader.readAsBinaryString(file);
+    
+    // Reset file input
+    if (event.target) {
+      event.target.value = '';
+    }
+  }, [safeCustomers, toast]);
 
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
     if (event.ctrlKey) {
@@ -693,7 +1266,7 @@ export default function CustomerEntryClient() {
             case 'd':
                 event.preventDefault();
                 if (isEditing && currentCustomer.id) {
-                    handleDelete(currentCustomer.id);
+                    handleDeleteCurrent();
                 }
                 break;
         }
@@ -739,28 +1312,22 @@ export default function CustomerEntryClient() {
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
                 onImport={handleImport}
                 onExport={handleExport}
+                onSearch={setSearchTerm}
             />
         </form>
       </FormProvider>      
-      
-      <EntryTable
+
+      <EntryTable 
         entries={filteredCustomers} 
         onEdit={handleEdit} 
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails}
-        onPrint={handlePrint}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
+        onPrintRow={handleSinglePrint}
         entryType="Customer"
-        onPrintRow={(entry: Customer) => handlePrint([entry])}
+        highlightEntryId={highlightEntryId}
       />
-      {hasMoreCustomers && (
-        <div className="text-center">
-                <Button onClick={loadMoreData}>
-                Load More
-            </Button>
-        </div>
-       )}
 
       <CustomerDetailsDialog
         customer={detailsCustomer}
@@ -802,16 +1369,89 @@ export default function CustomerEntryClient() {
         }}
       />
 
-      <CustomerImportDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-        onImportComplete={() => {
-          // Refresh data after import
-          loadInitialData();
-        }}
-        existingKantaParchiSrNos={safeCustomers.map(c => c.srNo)}
-        existingDocumentSrNos={[]} // TODO: Get existing document srNos if needed
-      />
+      {/* Import Progress Dialog */}
+      <Dialog open={isImporting} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importing Customer Entries</DialogTitle>
+            <DialogDescription>
+              Please wait while we import your data...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{importStatus}</span>
+                <span className="font-medium">{importProgress}%</span>
+              </div>
+              <Progress value={importProgress} className="h-2" />
+            </div>
+            
+            {importTotal > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Progress:</span>
+                  <span className="font-medium text-foreground">
+                    {importCurrent} / {importTotal} entries
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Remaining:</span>
+                  <span className="font-medium text-foreground">
+                    {importTotal - importCurrent} entries
+                  </span>
+                </div>
+                {importStartTime && importCurrent > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Time elapsed:</span>
+                      <span className="font-medium text-foreground">
+                        {((Date.now() - importStartTime) / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                    {(() => {
+                      const elapsed = (Date.now() - importStartTime) / 1000;
+                      const avgTimePerItem = elapsed / importCurrent;
+                      const estimatedTotal = avgTimePerItem * importTotal;
+                      const remainingTime = estimatedTotal - elapsed;
+                      
+                      if (remainingTime > 0 && importCurrent < importTotal) {
+                        let timeStr = '';
+                        if (remainingTime < 60) {
+                          timeStr = `${Math.ceil(remainingTime)}s`;
+                        } else if (remainingTime < 3600) {
+                          const minutes = Math.floor(remainingTime / 60);
+                          const seconds = Math.ceil(remainingTime % 60);
+                          timeStr = `${minutes}m ${seconds}s`;
+                        } else {
+                          const hours = Math.floor(remainingTime / 3600);
+                          const minutes = Math.floor((remainingTime % 3600) / 60);
+                          timeStr = `${hours}h ${minutes}m`;
+                        }
+                        return (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Estimated time remaining:</span>
+                            <span className="font-medium text-primary">
+                              ~{timeStr}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
+                )}
+              </div>
+            )}
+            
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Processing...</span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

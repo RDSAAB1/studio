@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    unoptimized: process.env.ELECTRON === 'true', // Disable image optimization for Electron
   },
+  // For Electron builds, we might want to use static export
+  output: process.env.ELECTRON === 'true' ? 'export' : undefined,
+  trailingSlash: true,
 };
 
 export default nextConfig;

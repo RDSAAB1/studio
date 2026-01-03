@@ -1,28 +1,36 @@
 "use client";
 
-import { useState, useEffect, useMemo, startTransition } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getCustomersRealtime, getCustomerPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getReceiptSettings, getIncomeRealtime, getBankBranchesRealtime } from "@/lib/firestore";
+import { useGlobalData } from "@/contexts/global-data-context";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, levenshteinDistance } from '@/lib/utils';
 
 
 export const useCustomerData = () => {
     const { toast } = useToast();
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
+    // Map global data to local variables for backward compatibility
+    // For customers, suppliers = customers, paymentHistory = customerPayments
+    const suppliers = globalData.customers; // Customers are treated as suppliers in payment context
+    const paymentHistory = globalData.customerPayments as any as Payment[]; // Customer payments as Payment[]
+    const customerPayments = globalData.customerPayments;
+    const incomes = globalData.incomes;
+    const expenses = globalData.expenses;
+    const fundTransactions = globalData.fundTransactions;
+    const banks = globalData.banks;
+    const bankBranches = globalData.bankBranches;
+    const bankAccounts = globalData.bankAccounts;
+    const supplierBankAccounts = globalData.supplierBankAccounts;
+    const receiptSettings = globalData.receiptSettings;
+    
+    const [loading, setLoading] = useState(false); // No loading needed - data is already available
     const [isClient, setIsClient] = useState(false);
     
     const allExpenses = useMemo(() => [...(expenses || [])], [expenses]);
-    const allIncomes = useMemo(() => [...(incomes || []), ...(paymentHistory || [])], [incomes, paymentHistory]);
+    const allIncomes = useMemo(() => [...(incomes || []), ...(customerPayments || [])], [incomes, customerPayments]);
     
 
     useEffect(() => {
@@ -32,29 +40,30 @@ export const useCustomerData = () => {
     }, []);
     
     const customerSummaryMap = useMemo(() => {
-    const safeCustomers = Array.isArray(customers) ? customers : [];
-        if (safeCustomers.length === 0) return new Map<string, CustomerSummary>();
+    const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
+        if (safeSuppliers.length === 0) return new Map<string, CustomerSummary>();
 
         const summaryList: CustomerSummary[] = [];
         const normalize = (str: string) => (str || '').trim().toLowerCase().replace(/\s+/g, ' ');
-        // For customers, use customerId as key (name|contact format)
-        const makeKey = (customerId: string) => customerId || '';
+        const makeKey = (name: string, father: string, address: string) => `${normalize(name)}|${normalize(father)}|${normalize(address)}`;
         const byKey = new Map<string, CustomerSummary>();
 
-        safeCustomers.forEach(c => {
-            const key = c.customerId || makeKey(`${c.name || ''}|${c.contact || ''}`);
+        safeSuppliers.forEach(s => {
+            const father = (s as any).fatherName || s.so || '';
+            const key = makeKey(s.name || '', father, s.address || '');
             const existing = byKey.get(key);
             if (existing) {
-                existing.allTransactions!.push({ ...c });
+                existing.allTransactions!.push({ ...s });
                 return;
             }
             const newSummary: CustomerSummary = {
-                name: c.name, so: '', address: c.address,
-                contact: c.contact, 
+                name: s.name, so: father, address: s.address,
+                contact: '', 
+                acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                 totalOutstanding: 0, totalCdAmount: 0,
                 paymentHistory: [], outstandingEntryIds: [],
-                allTransactions: [{...c}], allPayments: [], transactionsByVariety: {},
+                allTransactions: [{...s}], allPayments: [], transactionsByVariety: {},
                 totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0,
                 totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
                 totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0,
@@ -69,16 +78,45 @@ export const useCustomerData = () => {
 
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
     safePaymentHistory.forEach(p => {
-            // Match by customerId from payment
-            if (p.customerId) {
-                const matched = summaryList.find(s => s.name === (p as any).customerName || byKey.has(p.customerId));
+            // NEW LOGIC: Match by Serial Number from paidFor array
+            if (p.paidFor && p.paidFor.length > 0) {
+                // This payment has paidFor array - match by srNo
+                p.paidFor.forEach(pf => {
+                    // Find which supplier has a transaction with this srNo
+                    for (const summary of summaryList) {
+                        const matchingTransaction = summary.allTransactions?.find(t => t.srNo === pf.srNo);
+                        if (matchingTransaction) {
+                            // Found the supplier with this srNo - add payment to their allPayments
+                            if (!summary.allPayments!.some(existingP => existingP.id === p.id)) {
+                                summary.allPayments!.push(p);
+                            }
+                            break; // Found match, no need to check other summaries
+                        }
+                    }
+                });
+            } else {
+                // STRICT: Match payments by exact normalized name + father (+ address if provided)
+                const nameNorm = normalize(p.supplierName || 'Outsider');
+                const fatherNorm = normalize(p.supplierFatherName || '');
+                const addrNorm = normalize((p as any).supplierAddress || '');
+
+                let matched: CustomerSummary | null = null;
+                if (addrNorm) {
+                    // Try composite match first (name+father+address)
+                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm && normalize(s.address || '') === addrNorm) || null;
+                }
+                if (!matched) {
+                    // Fallback to name+father exact match
+                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm) || null;
+                }
+
                 if (matched) {
                     matched.allPayments!.push(p);
-                } else {
-                    // Create new summary for payments without matching customer entry
+                } else if (p.rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
-                        name: (p as any).customerName || 'Customer', so: '', address: '',
+                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
                         contact: '', 
+                        acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
                         totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                         totalOutstanding: 0, totalCdAmount: 0,
                         paymentHistory: [], outstandingEntryIds: [],
@@ -92,44 +130,32 @@ export const useCustomerData = () => {
                         totalBrokerage: 0, totalCd: 0,
                     };
                     summaryList.push(newSummary);
-                    byKey.set(p.customerId, newSummary);
                 }
-            } else if (p.paidFor && p.paidFor.length > 0) {
-                // Match by srNo from paidFor array
-                p.paidFor.forEach(pf => {
-                    for (const summary of summaryList) {
-                        const matchingTransaction = summary.allTransactions?.find(t => t.srNo === pf.srNo);
-                        if (matchingTransaction) {
-                            if (!summary.allPayments!.some(existingP => existingP.id === p.id)) {
-                                summary.allPayments!.push(p);
-                            }
-                            break;
-                        }
-                    }
-                });
             }
         });
 
         const finalSummaryMap = new Map<string, CustomerSummary>();
 
         summaryList.forEach((data, index) => {
-            // Use customerId as key for customers
-            const uniqueKey = (data.allTransactions?.[0]?.customerId || `${data.name || ''}|${data.contact || ''}`) + `_${index}`;
+            // Use the same composite key (name|father|address) for final map to ensure proper grouping
+            const uniqueKey = makeKey(data.name || '', data.so || '', data.address || '') + `_${index}`;
             const allContacts = new Set(data.allTransactions!.map(t => t.contact));
             data.contact = Array.from(allContacts).join(', ');
 
             data.allTransactions!.forEach(transaction => {
-                // Calculate payments for this entry
+                // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
                 const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
             
                 let totalPaidForEntry = 0;
                 let totalCdForEntry = 0;
                 const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string }> = [];
 
+                // Simply sum all amounts directly from database without any calculation or normalization
                 paymentsForThisEntry.forEach(p => {
                     const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
                     if (!paidForThisDetail) return;
                 
+                    // Direct database value - no calculation
                     const paidAmount = Number(paidForThisDetail.amount || 0);
                     totalPaidForEntry += paidAmount;
 
@@ -146,7 +172,7 @@ export const useCustomerData = () => {
                     totalCdForEntry += cdForThisDetail;
 
                     paymentBreakdown.push({
-                        paymentId: p.paymentId || p.id || 'N/A',
+                        paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
                         amount: Math.round(paidAmount * 100) / 100,
                         cdAmount: Math.round(cdForThisDetail * 100) / 100,
                         receiptType: p.receiptType,
@@ -154,76 +180,44 @@ export const useCustomerData = () => {
                     });
                 });
             
+                // Store direct values (round only for display precision)
                 transaction.totalPaid = Math.round(totalPaidForEntry * 100) / 100;
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                // Check for Gov. payment extra amount
-                let adjustedOriginal = transaction.originalNetAmount || transaction.netAmount || 0;
-                let totalExtraAmount = 0;
+                // Outstanding: Original - (Payment + CD)
+                const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
                 
-                // Find Gov. payment for this entry
-                const govPayment = paymentsForThisEntry.find(p => 
-                    (p as any).receiptType === 'Gov.' && 
-                    p.paidFor?.some(pf => pf.srNo === transaction.srNo)
-                );
-                
-                if (govPayment) {
-                    const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === transaction.srNo);
-                    // IMPORTANT: Check for adjustedOriginal first (most reliable)
-                    // If adjustedOriginal is available, use it directly
-                    if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
-                        adjustedOriginal = paidForThisEntry.adjustedOriginal;
-                        totalExtraAmount = adjustedOriginal - (transaction.originalNetAmount || transaction.netAmount || 0);
-                    } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
-                        // Fallback: Use extraAmount to calculate adjustedOriginal
-                        // IMPORTANT: Check for extraAmount even if it's 0 (use !== undefined, not truthy check)
-                        // extraAmount can be 0 if Gov. Required = Receipt Outstanding
-                        totalExtraAmount = paidForThisEntry.extraAmount || 0;
-                        adjustedOriginal = (transaction.originalNetAmount || transaction.netAmount || 0) + totalExtraAmount;
-                    } else if (paidForThisEntry && (govPayment as any).extraAmount !== undefined) {
-                        // Fallback: Check payment-level extraAmount if paidFor doesn't have it
-                        totalExtraAmount = (govPayment as any).extraAmount || 0;
-                        adjustedOriginal = (transaction.originalNetAmount || transaction.netAmount || 0) + totalExtraAmount;
-                    }
-                }
-                
-                // Outstanding: Adjusted Original - (Payment + CD)
-                // Adjusted Original = Original + Extra Amount (from Gov. payment)
-                const calculatedNetAmount = adjustedOriginal - totalPaidForEntry - totalCdForEntry;
-                
+                // Handle very small negative amounts due to rounding - treat as zero
                 if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
                     transaction.netAmount = 0;
                 } else {
                     transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
-                
-                // Store extra amount and adjusted original for reference
-                (transaction as any).extraAmount = totalExtraAmount;
-                (transaction as any).adjustedOriginal = adjustedOriginal;
         });
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || t.netAmount || 0), 0);
-        data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + (t.grossWeight || 0), 0);
-        data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + (t.teirWeight || 0), 0);
-        data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + (t.weight || 0), 0);
-            data.totalKartaWeight = data.allTransactions!.reduce((sum, t) => sum + (t.kartaWeight || 0), 0);
-        data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + (t.netWeight || 0), 0);
-            data.totalKartaAmount = data.allTransactions!.reduce((sum, t) => sum + (t.kartaAmount || 0), 0);
-            data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + (t.labouryAmount || 0), 0);
-        data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + (t.kanta || 0), 0);
+        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+        data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
+        data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
+        data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
+            data.totalKartaWeight = data.allTransactions!.reduce((sum, t) => sum + t.kartaWeight, 0);
+        data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + t.netWeight, 0);
+            data.totalKartaAmount = data.allTransactions!.reduce((sum, t) => sum + t.kartaAmount, 0);
+            data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + t.labouryAmount, 0);
+        data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + t.kanta, 0);
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
         
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.amount || 0), 0);
+        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
         data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
+        // Calculate totalOutstanding as sum of individual transaction netAmount values
         const netAmountSum = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
         data.totalOutstanding = netAmountSum;
         
-        data.totalCashPaid = data.allPayments!.filter(p => (p as any).paymentMethod === 'Cash' || p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        data.totalRtgsPaid = data.allPayments!.filter(p => (p as any).paymentMethod !== 'Cash' && p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
+        data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
+        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
         
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
@@ -232,8 +226,8 @@ export const useCustomerData = () => {
 
         const rateData = data.allTransactions!.reduce((acc, s) => {
             if(s.rate > 0) {
-                acc.karta += s.kartaPercentage || 0;
-                acc.laboury += s.labouryRate || 0;
+                acc.karta += s.kartaPercentage;
+                acc.laboury += s.labouryRate;
                 acc.count++;
             }
             return acc;
@@ -248,7 +242,7 @@ export const useCustomerData = () => {
         });
 
     return finalSummaryMap;
-}, [customers, paymentHistory]);
+}, [suppliers, paymentHistory]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -281,19 +275,20 @@ export const useCustomerData = () => {
     return {
         isClient,
         loading,
-        suppliers: customers, // Use customers as suppliers for compatibility
+        suppliers,
         paymentHistory,
-        customerPayments: paymentHistory as CustomerPayment[],
+        customerPayments,
         incomes,
         expenses,
         fundTransactions,
         banks,
         bankBranches,
         bankAccounts,
-        supplierBankAccounts: [], // Not used for customers
+        supplierBankAccounts,
         receiptSettings,
         customerSummaryMap,
         financialState,
     };
 };
+
 

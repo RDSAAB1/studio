@@ -271,7 +271,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
           setCompanyName(settings.companyName);
         }
       } catch (error) {
-        console.error("Could not fetch company settings:", error);
+
       }
     };
     fetchCompanyName();

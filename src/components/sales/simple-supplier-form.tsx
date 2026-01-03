@@ -154,10 +154,10 @@ const SimpleSupplierForm = ({ form, handleSrNoBlur }: SimpleSupplierFormProps) =
                         </div>
                         
                         <div className="space-y-2">
-                            <Label htmlFor="grossWeight">Gross Weight</Label>
+                            <Label htmlFor="simple-supplier-gross-weight">Gross Weight</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="grossWeight" 
+                                    id="simple-supplier-gross-weight" 
                                     type="number" 
                                     {...form.register('grossWeight')} 
                                     className="pl-10" 
@@ -166,10 +166,10 @@ const SimpleSupplierForm = ({ form, handleSrNoBlur }: SimpleSupplierFormProps) =
                         </div>
                         
                         <div className="space-y-2">
-                            <Label htmlFor="rate">Rate</Label>
+                            <Label htmlFor="simple-supplier-rate">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="rate" 
+                                    id="simple-supplier-rate" 
                                     type="number" 
                                     {...form.register('rate')} 
                                     className="pl-10" 

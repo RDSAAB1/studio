@@ -82,11 +82,11 @@ export default function DashboardClient() {
         setBankAccounts(globalData.bankAccounts);
         
         // Only fetch data that's not in global context
-        const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, console.error);
-        const unsubLoans = getLoansRealtime(setLoans, console.error);
-        const unsubProjects = getProjectsRealtime(setProjects, console.error);
-        const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, console.error);
-        const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, console.error);
+        const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, () => {});
+        const unsubLoans = getLoansRealtime(setLoans, () => {});
+        const unsubProjects = getProjectsRealtime(setProjects, () => {});
+        const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, () => {});
+        const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, () => {});
         
         setIsLoading(false);
 

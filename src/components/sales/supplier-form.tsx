@@ -30,9 +30,8 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
 const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers, handleCalculationFieldChange, onAutoFill }: any) => {
     
     // Debug logging for options
-    console.log('SupplierForm - Variety Options:', varietyOptions);
-    console.log('SupplierForm - Payment Type Options:', paymentTypeOptions);
-    
+
+
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
     // REMOVED: Name suggestions state to prevent lag
@@ -174,10 +173,10 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="rate" className="text-xs">Rate</Label>
+                            <Label htmlFor="supplier-form-rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="rate" 
+                                    id="supplier-form-rate" 
                                     type="number" 
                                     value={getDisplayValue('rate', form.watch('rate'))}
                                     onChange={createImmediateOnChange('rate', true)}
@@ -188,10 +187,10 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
+                            <Label htmlFor="supplier-gross-weight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                                 <Input 
-                                    id="grossWeight" 
+                                    id="supplier-gross-weight" 
                                     type="number" 
                                     value={getDisplayValue('grossWeight', form.watch('grossWeight'))}
                                     onChange={createImmediateOnChange('grossWeight', true)}
@@ -287,10 +286,10 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <CustomDropdown 
-                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
                                     value={getDisplayValue('paymentType', form.watch('paymentType'))} 
                                     onChange={(val) => {
-                                        console.log('Payment type selected:', val);
+
                                         setImmediateValues(prev => ({ ...prev, paymentType: val || '' }));
                                         setTimeout(() => {
                                             form.setValue("paymentType", val || '');
@@ -298,19 +297,21 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                                         }, 0);
                                     }} 
                                     onAdd={(newItem) => {
-                                        console.log('Adding new payment type:', newItem);
+
                                         handleAddOption('paymentTypes', newItem);
                                     }}
-                                    placeholder="Select type..." 
+                                    placeholder="Select type..."
+                                    maxRows={5}
+                                    showScrollbar={true}
                                 />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <CustomDropdown 
-                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} 
+                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
                                     value={getDisplayValue('variety', form.watch('variety'))} 
                                     onChange={(val) => {
-                                        console.log('Variety selected:', val);
+
                                         setImmediateValues(prev => ({ ...prev, variety: val || '' }));
                                         setTimeout(() => {
                                             form.setValue("variety", val || '');
@@ -318,10 +319,12 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                                         }, 0);
                                     }} 
                                     onAdd={(newItem) => {
-                                        console.log('Adding new variety:', newItem);
+
                                         handleAddOption('varieties', newItem);
                                     }}
-                                    placeholder="Select variety..." 
+                                    placeholder="Select variety..."
+                                    maxRows={5}
+                                    showScrollbar={true}
                                 />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (

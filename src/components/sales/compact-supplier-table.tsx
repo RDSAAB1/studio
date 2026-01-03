@@ -26,7 +26,13 @@ export const CompactSupplierTable = ({
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const handleDelete = async (supplier: Customer) => {
-        if (window.confirm(`Delete entry ${supplier.srNo} - ${supplier.name}?`)) {
+        const { confirm } = await import("@/lib/confirm-dialog");
+        const confirmed = await confirm(`Delete entry ${supplier.srNo} - ${supplier.name}?`, {
+            title: "Confirm Delete",
+            variant: "destructive",
+            confirmText: "Delete",
+        });
+        if (confirmed) {
             setDeletingId(supplier.id);
             try {
                 await onDeleteSupplier(supplier.id);

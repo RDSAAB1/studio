@@ -60,7 +60,7 @@ function notifyListeners(stats: SyncQueueStats) {
     try {
       listener(stats);
     } catch (error) {
-      console.warn("Sync queue listener error:", error);
+
     }
   });
 }
@@ -174,7 +174,7 @@ export async function processSyncQueue(limit = 10): Promise<number> {
       if (task.id === undefined) continue;
       const processor = processors.get(task.type);
       if (!processor) {
-        console.warn(`No sync processor registered for task type "${task.type}". Removing task.`);
+
         await db.syncQueue.delete(task.id);
         processed++;
         continue;
@@ -206,10 +206,7 @@ export async function processSyncQueue(limit = 10): Promise<number> {
           nextRetryAt: nextRetry,
           attempts,
         });
-        console.warn(
-          `Sync task "${task.type}" failed (attempt ${attempts}):`,
-          message,
-        );
+
       } finally {
         void refreshStats();
       }

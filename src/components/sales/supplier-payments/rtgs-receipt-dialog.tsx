@@ -42,7 +42,7 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
+
             }
         });
         

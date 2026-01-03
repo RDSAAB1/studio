@@ -47,7 +47,6 @@ const COLLECTION_MAP: Record<string, string> = {
     'ledgerCashAccounts': 'ledgerCashAccounts',
     
     // Other collections
-    'payeeProfiles': 'payeeProfiles',
     'mandiReports': 'mandiReports',
     'kantaParchi': 'kantaParchi',
     'customerDocuments': 'customerDocuments',
@@ -79,6 +78,9 @@ export async function notifySyncRegistry(
         last_updated: serverTimestamp(),
         updated_at: Timestamp.now(), // Fallback if serverTimestamp fails
         collection_name: collectionName,
+        // Add a random component to ensure timestamp is always different
+        // This helps payment listeners detect changes when suppliers/customers are updated
+        _trigger: Math.random(), // Random value to ensure change is detected
     };
     
     if (options?.batch) {
@@ -118,7 +120,7 @@ export async function getSyncRegistryTimestamp(collectionName: string): Promise<
         }
         return null;
     } catch (error) {
-        console.error(`Error getting sync registry timestamp for ${collectionName}:`, error);
+
         return null;
     }
 }

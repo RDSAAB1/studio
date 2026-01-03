@@ -16,7 +16,7 @@ import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 
-export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier', isDeleting = false }: any) {
+export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier', isDeleting = false, highlightEntryId }: any) {
     
     // Infinite scroll pagination
     const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(entries, {
@@ -46,7 +46,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                     }
                 }
             } catch (error) {
-                console.warn('Error restoring scroll position:', error);
+
             }
         };
         
@@ -71,7 +71,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                 try {
                     localStorage.setItem(`entry-table-scroll-position-${entryType}`, String(viewport.scrollTop));
                 } catch (error) {
-                    console.warn('Error saving scroll position:', error);
+
                 }
             }, 200);
         };
@@ -128,8 +128,15 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {visibleEntries.map((entry: Customer) => (
-                                <TableRow key={entry.id} className="h-12" data-state={selectedIds.has(entry.id) ? 'selected' : ''}>
+                            {visibleEntries.map((entry: Customer) => {
+                                const isHighlighted = highlightEntryId === entry.id;
+                                return (
+                                <TableRow 
+                                    key={entry.id} 
+                                    id={`entry-row-${entry.id}`}
+                                    className={`h-12 transition-colors ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : ''}`}
+                                    data-state={selectedIds.has(entry.id) ? 'selected' : ''}
+                                >
                                     <TableCell className="px-3 py-1">
                                         <Checkbox
                                             checked={selectedIds.has(entry.id)}
@@ -189,7 +196,8 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                                );
+                            })}
                             {/* NO LOADING STATES - Data loads instantly */}
                             {!hasMore && entries.length > 30 && (
                                 <TableRow>

@@ -30,10 +30,9 @@ function normalizeRtgsId(id: string | undefined): string | null {
 }
 
 export async function fixRtgsPaymentIds() {
-    console.log('Starting RTGS Payment ID migration...');
-    console.log('Fixing duplicate IDs and R##### → RT##### conversion');
-    console.log('-------------------------------------------');
-    
+
+
+
     try {
         const paymentsRef = collection(firestoreDB, 'payments');
         const snapshot = await getDocs(paymentsRef);
@@ -64,7 +63,7 @@ export async function fixRtgsPaymentIds() {
                 let correctId: string | null = normalizedRtgsSrNo || normalizedPaymentId || normalizedDocId;
                 
                 if (!correctId) {
-                    console.warn(`⚠️ RTGS payment ${docSnap.id} has no valid RTGS ID format!`);
+
                     skippedCount++;
                     return;
                 }
@@ -108,8 +107,7 @@ export async function fixRtgsPaymentIds() {
                 }
             } else {
                 // Multiple documents with same ID - assign unique IDs
-                console.log(`\n⚠️ Found ${documents.length} duplicate RTGS IDs: ${correctId}`);
-                
+
                 documents.forEach((docInfo, index) => {
                     let uniqueId: string;
                     
@@ -132,7 +130,7 @@ export async function fixRtgsPaymentIds() {
                             }
                             
                             uniqueId = `RT${newNum.toString().padStart(5, '0')}`;
-                            console.log(`  → Assigning unique ID to document ${docInfo.docId}: ${correctId} → ${uniqueId}`);
+
                         } else {
                             // Fallback: use timestamp or random suffix
                             uniqueId = `${correctId}_${index}`;
@@ -173,24 +171,22 @@ export async function fixRtgsPaymentIds() {
         
         
         // Report duplicate IDs (before fixing)
-        console.log('\n-------------------------------------------');
-        console.log('Duplicate ID Summary (before fixing):');
+
+
         const duplicateIds = Array.from(rtgsIdToDocuments.entries()).filter(([_, docs]) => docs.length > 1);
         if (duplicateIds.length > 0) {
             duplicateIds.forEach(([id, docs]) => {
-                console.warn(`  ⚠️ ${id}: ${docs.length} duplicate(s) found`);
+
             });
         } else {
-            console.log('  ✓ No duplicate IDs found');
+
         }
-        
-        console.log('\n-------------------------------------------');
-        console.log(`Total RTGS payments processed: ${snapshot.size}`);
-        console.log(`Payments updated: ${updateCount}`);
-        console.log(`Documents renamed: ${renamedCount}`);
-        console.log(`Duplicate IDs fixed: ${duplicateFixedCount}`);
-        console.log(`Skipped (invalid format): ${skippedCount}`);
-        
+
+
+
+
+
+
         if (updateCount > 0 || documentsToRename.length > 0) {
             // Commit in batches to avoid Firestore limits (500 operations per batch)
             const BATCH_SIZE = 450; // Leave room for safety
@@ -200,9 +196,8 @@ export async function fixRtgsPaymentIds() {
             
             // First, commit field updates (from documentsToFix)
             if (documentsToFix.length > 0) {
-                console.log(`\n-------------------------------------------`);
-                console.log(`Updating ${documentsToFix.length} document(s)...`);
-                
+
+
                 for (const { docId, correctId, data } of documentsToFix) {
                     if (batchOps >= BATCH_SIZE) {
                         await currentBatch.commit();
@@ -230,9 +225,8 @@ export async function fixRtgsPaymentIds() {
             
             // Then, process renames (each rename = 2 ops: set + delete)
             if (documentsToRename.length > 0) {
-                console.log(`\n-------------------------------------------`);
-                console.log(`Renaming ${documentsToRename.length} document(s)...`);
-                
+
+
                 for (const { oldId, newId, data } of documentsToRename) {
                     if (batchOps >= BATCH_SIZE - 1) { // Reserve 1 op for delete
                         await currentBatch.commit();
@@ -248,8 +242,7 @@ export async function fixRtgsPaymentIds() {
                     const oldDocRef = doc(firestoreDB, 'payments', oldId);
                     currentBatch.delete(oldDocRef);
                     batchOps++;
-                    
-                    console.log(`  ✓ Renamed: ${oldId} → ${newId}`);
+
                 }
             }
             
@@ -258,22 +251,21 @@ export async function fixRtgsPaymentIds() {
                 await currentBatch.commit();
                 batchesCommitted++;
             }
-            
-            console.log(`\n✅ Successfully processed ${updateCount} RTGS payment(s)`);
+
             if (renamedCount > 0) {
-                console.log(`✅ Renamed ${renamedCount} document(s)`);
+
             }
             if (duplicateFixedCount > 0) {
-                console.log(`✅ Fixed ${duplicateFixedCount} duplicate ID(s)`);
+
             }
             return { success: true, count: updateCount, renamed: renamedCount, duplicatesFixed: duplicateFixedCount, skipped: skippedCount };
         } else {
-            console.log('\n✅ No RTGS payments need updating');
+
             return { success: true, count: 0, renamed: 0, duplicatesFixed: 0, skipped: skippedCount };
         }
         
     } catch (error) {
-        console.error('\n❌ Error fixing RTGS payment IDs:', error);
+
         return { success: false, error };
     }
 }

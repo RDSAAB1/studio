@@ -70,7 +70,6 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
 
     const [currentSupplier, setCurrentSupplier] = useState<Customer | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
     const loadedEntryIdRef = useRef<string | null>(null);
@@ -144,21 +143,16 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
         }
         
         const loadEntryData = async () => {
-            console.log('[SupplierEntryEdit] Loading entry data:', {
-                entryId: entry.id,
-                entrySrNo: entry.srNo,
-                entryName: entry.name
-            });
-            
+
             let fullEntry: Customer | null = null;
             
             // Try to get full entry from database using id or srNo
             if (entry.id && db) {
                 try {
                     fullEntry = await db.suppliers.get(entry.id) as Customer | null;
-                    console.log('[SupplierEntryEdit] Found by id:', !!fullEntry);
+
                 } catch (error) {
-                    console.error('[SupplierEntryEdit] Error fetching supplier by id:', error);
+
                 }
             }
             
@@ -166,9 +160,9 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
             if (!fullEntry && entry.srNo && db) {
                 try {
                     fullEntry = await db.suppliers.where('srNo').equals(entry.srNo).first() as Customer | null;
-                    console.log('[SupplierEntryEdit] Found by srNo:', !!fullEntry, fullEntry?.id);
+
                 } catch (error) {
-                    console.error('[SupplierEntryEdit] Error fetching supplier by srNo:', error);
+
                 }
             }
             
@@ -181,19 +175,13 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                     const found = await db.suppliers.where('srNo').equals(supplierToUse.srNo).first() as Customer | null;
                     if (found) {
                         Object.assign(supplierToUse, { id: found.id });
-                        console.log('[SupplierEntryEdit] Added missing id:', found.id);
+
                     }
                 } catch (error) {
-                    console.error('[SupplierEntryEdit] Error finding id for entry:', error);
+
                 }
             }
-            
-            console.log('[SupplierEntryEdit] Final supplier to use:', {
-                id: supplierToUse.id,
-                srNo: supplierToUse.srNo,
-                name: supplierToUse.name
-            });
-            
+
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
@@ -264,8 +252,8 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
         };
         fetchSettings();
 
-        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
+        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
 
         return () => {
             unsubVarieties();
@@ -309,178 +297,114 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
             return;
         }
 
-        setIsSubmitting(true);
-        try {
-            // Find supplier ID - try multiple methods
-            let supplierId = currentSupplier.id;
-            
-            console.log('[SupplierEntryEdit] Looking for supplier ID:', {
-                currentSupplierId: currentSupplier.id,
-                entryId: entry?.id,
-                srNo: values.srNo,
-                currentSupplierSrNo: currentSupplier.srNo
-            });
-            
-            // Try entry.id first (from prop)
-            if (!supplierId && entry?.id) {
-                supplierId = entry.id;
-                console.log('[SupplierEntryEdit] Using entry.id:', supplierId);
-            }
-            
-            // Try finding by srNo in database
-            if (!supplierId && values.srNo && db) {
-                try {
-                    const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
-                    if (foundSupplier?.id) {
-                        supplierId = foundSupplier.id;
-                        console.log('[SupplierEntryEdit] Found by srNo:', supplierId);
-                    }
-                } catch (error) {
-                    console.error('[SupplierEntryEdit] Error finding supplier by srNo:', error);
-                }
-            }
-            
-            // Try currentSupplier.srNo if values.srNo didn't work
-            if (!supplierId && currentSupplier.srNo && db) {
-                try {
-                    const foundSupplier = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
-                    if (foundSupplier?.id) {
-                        supplierId = foundSupplier.id;
-                        console.log('[SupplierEntryEdit] Found by currentSupplier.srNo:', supplierId);
-                    }
-                } catch (error) {
-                    console.error('[SupplierEntryEdit] Error finding supplier by currentSupplier.srNo:', error);
-                }
-            }
-
-            if (!supplierId) {
-                console.error('[SupplierEntryEdit] Cannot find supplier ID:', {
-                    currentSupplier: {
-                        id: currentSupplier.id,
-                        srNo: currentSupplier.srNo
-                    },
-                    entry: {
-                        id: entry?.id,
-                        srNo: entry?.srNo
-                    },
-                    values: {
-                        srNo: values.srNo
-                    }
-                });
-                throw new Error('Cannot update: Supplier ID not found. Please ensure the entry exists in the database.');
-            }
-            
-            console.log('[SupplierEntryEdit] Using supplier ID:', supplierId);
-
-            // Recalculate all fields using calculateSupplierEntry
-            const entryDataForCalculation = {
-                ...currentSupplier,
-                ...values,
-                date: format(values.date, 'yyyy-MM-dd'),
-                name: toTitleCase(values.name),
-                so: toTitleCase(values.so),
-                address: toTitleCase(values.address),
-                variety: toTitleCase(values.variety),
-                vehicleNo: toTitleCase(values.vehicleNo),
-                brokerageRate: values.brokerageRate || 0,
-                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
-            };
-            
-            const { warning, suggestedTerm, ...calculatedFields } = calculateSupplierEntry(
-                entryDataForCalculation,
-                safePaymentHistory,
-                holidays,
-                dailyPaymentLimit,
-                safeSuppliers || []
-            );
-
-            const completeEntry: Customer = {
-                ...currentSupplier,
-                ...values,
-                ...calculatedFields, // Include all calculated fields
-                id: supplierId,
-                customerId: currentSupplier.customerId || '',
-                date: format(values.date, 'yyyy-MM-dd'),
-                dueDate: format(new Date(values.date.getTime() + (values.term * 24 * 60 * 60 * 1000)), 'yyyy-MM-dd'),
-                name: toTitleCase(values.name),
-                so: toTitleCase(values.so),
-                address: toTitleCase(values.address),
-                variety: toTitleCase(values.variety),
-                vehicleNo: toTitleCase(values.vehicleNo),
-                brokerageRate: values.brokerageRate || 0,
-                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
-                forceUnique: values.forceUnique || false,
-            };
-
-            const { id, ...updateData } = completeEntry as any;
-            
-            // Log what we're updating
-            console.log('[SupplierEntryEdit] Updating supplier:', {
-                id,
-                updateDataKeys: Object.keys(updateData),
-                calculatedFields: Object.keys(calculatedFields),
-                sampleData: {
-                    name: updateData.name,
-                    variety: updateData.variety,
-                    grossWeight: updateData.grossWeight,
-                    rate: updateData.rate,
-                    weight: updateData.weight,
-                    netWeight: updateData.netWeight,
-                    amount: updateData.amount,
-                    originalNetAmount: updateData.originalNetAmount
-                }
-            });
-            
-            // Verify the update data is not empty
-            if (!updateData || Object.keys(updateData).length === 0) {
-                throw new Error('Update data is empty');
-            }
-            
-            const success = await updateSupplier(id, updateData);
-            
-            // Verify the update actually happened in local DB
-            if (success && db) {
-                const updatedEntry = await db.suppliers.get(id);
-                console.log('[SupplierEntryEdit] Verification - Entry after update:', {
-                    id,
-                    found: !!updatedEntry,
-                    name: updatedEntry?.name,
-                    variety: updatedEntry?.variety,
-                    grossWeight: updatedEntry?.grossWeight,
-                    rate: updatedEntry?.rate
-                });
-                
-                if (!updatedEntry) {
-                    console.error('[SupplierEntryEdit] ERROR: Entry not found in local DB after update!');
-                    throw new Error('Entry was not updated in local database');
-                }
-            }
-            
-            if (success) {
-                // Force immediate sync to Firestore
-                try {
-                    const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
-                    // Wait a bit for the local update to complete
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    await forceSyncToFirestore();
-                    console.log('[SupplierEntryEdit] Sync to Firestore completed');
-                } catch (syncError) {
-                    console.error('[SupplierEntryEdit] Sync error (non-critical):', syncError);
-                    // Don't fail the update if sync fails - it will retry later
-                }
-                
-                toast({ title: "Entry updated successfully!", variant: "success" });
-                onSuccess?.();
-                onOpenChange(false);
-            } else {
-                throw new Error('Failed to update supplier');
-            }
-        } catch (error) {
-            console.error("Error updating supplier:", error);
-            toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
+        // Get supplier ID from cache (no DB lookup)
+        const supplierId = currentSupplier.id || entry?.id || values.srNo || currentSupplier.srNo;
+        
+        if (!supplierId) {
+            toast({ title: "Error", description: "Supplier ID not found", variant: "destructive" });
+            return;
         }
+
+        // Optimistic update - close dialog IMMEDIATELY (no blocking operations)
+        // Don't set isSubmitting to true at all - just close immediately
+        onSuccess?.();
+        onOpenChange(false);
+        
+        // Perform ALL heavy operations in background (non-blocking)
+        (async () => {
+            try {
+                // Find supplier ID if needed (background lookup)
+                let finalSupplierId = supplierId;
+                
+                if (!finalSupplierId && values.srNo && db) {
+                    try {
+                        const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
+                        if (foundSupplier?.id) {
+                            finalSupplierId = foundSupplier.id;
+                        }
+                    } catch (error) {
+                        // Ignore lookup errors
+                    }
+                }
+                
+                if (!finalSupplierId && currentSupplier.srNo && db) {
+                    try {
+                        const foundSupplier = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
+                        if (foundSupplier?.id) {
+                            finalSupplierId = foundSupplier.id;
+                        }
+                    } catch (error) {
+                        // Ignore lookup errors
+                    }
+                }
+
+                if (!finalSupplierId) {
+                    throw new Error('Cannot update: Supplier ID not found.');
+                }
+
+                // Recalculate all fields using calculateSupplierEntry (in background)
+                const entryDataForCalculation = {
+                    ...currentSupplier,
+                    ...values,
+                    date: format(values.date, 'yyyy-MM-dd'),
+                    name: toTitleCase(values.name),
+                    so: toTitleCase(values.so),
+                    address: toTitleCase(values.address),
+                    variety: toTitleCase(values.variety),
+                    vehicleNo: toTitleCase(values.vehicleNo),
+                    brokerageRate: values.brokerageRate || 0,
+                    brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                };
+                
+                const { warning, suggestedTerm, ...calculatedFields } = calculateSupplierEntry(
+                    entryDataForCalculation,
+                    safePaymentHistory,
+                    holidays,
+                    dailyPaymentLimit,
+                    safeSuppliers || []
+                );
+
+                const completeEntry: Customer = {
+                    ...currentSupplier,
+                    ...values,
+                    ...calculatedFields,
+                    id: finalSupplierId,
+                    customerId: currentSupplier.customerId || '',
+                    date: format(values.date, 'yyyy-MM-dd'),
+                    dueDate: format(new Date(values.date.getTime() + (values.term * 24 * 60 * 60 * 1000)), 'yyyy-MM-dd'),
+                    name: toTitleCase(values.name),
+                    so: toTitleCase(values.so),
+                    address: toTitleCase(values.address),
+                    variety: toTitleCase(values.variety),
+                    vehicleNo: toTitleCase(values.vehicleNo),
+                    brokerageRate: values.brokerageRate || 0,
+                    brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                    forceUnique: values.forceUnique || false,
+                };
+
+                const { id, ...updateData } = completeEntry as any;
+                
+                // Ensure srNo is included in updateData
+                if (!updateData.srNo) {
+                    updateData.srNo = values.srNo || currentSupplier.srNo;
+                }
+                
+                // Perform database update
+                const success = await updateSupplier(id, updateData);
+                if (!success) {
+                    console.error('Background updateSupplier returned false');
+                    toast({ title: "Update failed", description: "Failed to update entry in database", variant: "destructive" });
+                    return;
+                }
+                
+                // Sync to Firestore
+                const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
+                await forceSyncToFirestore();
+            } catch (error) {
+                console.error('Background update failed:', error);
+                toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+            }
+        })();
     };
 
     if (!entry) return null;
@@ -496,16 +420,13 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                                 type="button"
                                 variant="outline"
                                 onClick={() => onOpenChange(false)}
-                                disabled={isSubmitting}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 form="supplier-entry-edit-form"
-                                disabled={isSubmitting}
                             >
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Update Entry
                             </Button>
                         </div>

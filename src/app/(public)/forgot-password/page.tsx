@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
             toast({ title: "Password Reset Email Sent", description: "Please check your inbox to reset your password.", variant: "success" });
             router.push('/login');
         } catch (error: any) {
-            console.error("Password reset error:", error);
+
             let errorMessage = "Failed to send reset email. Please try again.";
             if (error.code === 'auth/user-not-found') {
                 errorMessage = "No account found with this email address.";

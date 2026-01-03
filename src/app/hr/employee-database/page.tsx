@@ -32,7 +32,7 @@ export default function EmployeeDatabasePage() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = getEmployeesRealtime(setEmployees, console.error);
+    const unsubscribe = getEmployeesRealtime(setEmployees, );
     return () => unsubscribe();
   }, []);
 
@@ -74,7 +74,7 @@ export default function EmployeeDatabasePage() {
         }
         closeDialog();
     } catch (error) {
-        console.error("Error saving employee: ", error);
+
         toast({ title: `Failed to ${currentEmployee.id ? 'update' : 'add'} employee`, variant: "destructive" });
     }
   };
@@ -106,7 +106,7 @@ export default function EmployeeDatabasePage() {
         variant: "success",
       });
     } catch (error) {
-      console.error("Error deleting employee: ", error);
+
       toast({
         title: "Failed to delete employee",
         variant: "destructive",

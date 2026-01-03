@@ -1,7 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllPayeeProfiles, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -121,6 +121,31 @@ export class AppDatabase extends Dexie {
             mandiReports: '&id, voucherNo, sellerName, purchaseDate',
             syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
         });
+
+        this.version(5).stores({
+            suppliers: '&id, &srNo, name, contact, date, customerId',
+            customers: '++id, &srNo, name, contact, date, customerId',
+            payments: '++id, paymentId, customerId, date',
+            customerPayments: '++id, paymentId, customerId, date',
+            governmentFinalizedPayments: '++id, paymentId, customerId, date',
+            transactions: '++id, transactionId, date, category, subCategory, type',
+            options: '++id, type, name',
+            banks: '&id, name',
+            bankBranches: '++id, &ifscCode, bankName, branchName',
+            bankAccounts: '++id, &accountNumber',
+            settings: '&id',
+            projects: '++id, name, startDate',
+            loans: '++id, loanId, startDate, date, srNo',
+            fundTransactions: '++id, date, type',
+            employees: '++id, employeeId, name',
+            payroll: '++id, employeeId, payPeriod',
+            attendance: '&id, employeeId, date', 
+            inventoryItems: '++id, sku, name',
+            ledgerAccounts: '&id, name, date, srNo',
+            ledgerEntries: '&id, accountId, date',
+            mandiReports: '&id, voucherNo, sellerName, purchaseDate',
+            syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
+        });
     }
 }
 
@@ -139,49 +164,46 @@ export { db };
 export async function syncAllData() {
     if (!db) return;
 
-    console.log("Starting incremental data sync...");
-
     // ✅ Use incremental sync from local-first-sync manager
     // This will only sync changed documents, not entire collections
     try {
         const { forceSyncFromFirestore } = await import('./local-first-sync');
         await forceSyncFromFirestore();
-        console.log("✅ Incremental sync completed - only changed documents synced");
+
     } catch (error) {
-        console.error("Sync Error:", error);
+
         // Fallback to old method if local-first-sync fails (only for first time)
-        console.warn("Falling back to full sync (first time only)...");
-        
+
         // First sync - get all (only once)
         getSuppliersRealtime(async (suppliers) => {
             if (suppliers.length > 0 && db) {
                 try {
                     await db.suppliers.bulkPut(suppliers);
-                    console.log(`Synced ${suppliers.length} suppliers (first sync).`);
+
                     // Save last sync time
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('lastSync:suppliers', String(Date.now()));
                     }
                 } catch (error: any) {
-                    console.error("Sync Error (Suppliers):", error);
+
                 }
             }
-        }, (error) => console.error("Sync Error (Suppliers):", error));
+        }, (error) => {});
 
         getPaymentsRealtime(async (payments) => {
             if (payments.length > 0 && db) {
                 try {
                     await db.payments.bulkPut(payments);
-                    console.log(`Synced ${payments.length} payments (first sync).`);
+
                     // Save last sync time
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('lastSync:payments', String(Date.now()));
                     }
                 } catch (error: any) {
-                    console.error("Sync Error (Payments):", error);
+
                 }
             }
-        }, (error) => console.error("Sync Error (Payments):", error));
+        }, (error) => {});
     }
 }
 
@@ -228,7 +250,6 @@ export async function syncAllDataWithDetails(
     { name: 'loans', displayName: 'Loans', getAllFn: getAllLoans, localTable: () => db.loans },
     { name: 'fundTransactions', displayName: 'Fund Transactions', getAllFn: getAllFundTransactions, localTable: () => db.fundTransactions },
     { name: 'mandiReports', displayName: 'Mandi Reports', getAllFn: fetchMandiReports, localTable: () => db.mandiReports },
-    { name: 'payeeProfiles', displayName: 'Payee Profiles', getAllFn: getAllPayeeProfiles, localTable: () => db.options, isSpecial: true },
     { name: 'incomeCategories', displayName: 'Income Categories', getAllFn: getAllIncomeCategories, localTable: () => db.options, isSpecial: true },
     { name: 'expenseCategories', displayName: 'Expense Categories', getAllFn: getAllExpenseCategories, localTable: () => db.options, isSpecial: true },
     { name: 'employees', displayName: 'Employees', getAllFn: getAllEmployees, localTable: () => db.employees },
@@ -318,12 +339,12 @@ export async function syncAllDataWithDetails(
                   const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
-                    console.warn(`Cleaned up ${deleteIds.length} duplicate bankBranches with IFSC: ${ifscCode}`);
+
                   }
                 }
               }
             } catch (cleanupError) {
-              console.warn('Error cleaning up existing duplicates:', cleanupError);
+
             }
             
             // Remove duplicates from incoming data, keep the most recent one
@@ -354,7 +375,7 @@ export async function syncAllDataWithDetails(
             
             dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutIfsc];
             if (dataToSync.length < allData.length) {
-              console.warn(`Removed ${allData.length - dataToSync.length} duplicate bankBranches from Firestore data based on IFSC code`);
+
             }
           } else if (config.name === 'bankAccounts' || config.name === 'supplierBankAccounts') {
             // First, clean up existing duplicates in local database
@@ -388,12 +409,12 @@ export async function syncAllDataWithDetails(
                   const deleteIds = toDelete.map((a: any) => a.id).filter((id: any) => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
-                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with account number: ${accountNumber}`);
+
                   }
                 }
               }
             } catch (cleanupError) {
-              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+
             }
           } else if (config.name === 'bankBranches') {
             // First, clean up existing duplicates in local database
@@ -427,12 +448,12 @@ export async function syncAllDataWithDetails(
                   const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
-                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with IFSC code: ${ifscCode}`);
+
                   }
                 }
               }
             } catch (cleanupError) {
-              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+
             }
             
             // Remove duplicates from incoming data, keep the most recent one
@@ -461,7 +482,7 @@ export async function syncAllDataWithDetails(
             
             dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutAccount];
             if (dataToSync.length < allData.length) {
-              console.warn(`Removed ${allData.length - dataToSync.length} duplicate ${config.name} from Firestore data based on account number`);
+
             }
           } else if (config.name === 'bankBranches') {
             // First, clean up existing duplicates in local database
@@ -495,12 +516,12 @@ export async function syncAllDataWithDetails(
                   const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
-                    console.warn(`Cleaned up ${deleteIds.length} duplicate ${config.name} with IFSC code: ${ifscCode}`);
+
                   }
                 }
               }
             } catch (cleanupError) {
-              console.warn(`Error cleaning up existing duplicates for ${config.name}:`, cleanupError);
+
             }
             
             // Remove duplicates from incoming data, keep the most recent one
@@ -528,7 +549,7 @@ export async function syncAllDataWithDetails(
             
             dataToSync = Array.from(uniqueMap.values());
             if (dataToSync.length < allData.length) {
-              console.warn(`Removed ${allData.length - dataToSync.length} duplicate ${config.name} from Firestore data based on IFSC code`);
+
             }
           }
           
@@ -552,7 +573,7 @@ export async function syncAllDataWithDetails(
           } catch (bulkError: any) {
             // If bulkPut fails, try individual puts to identify problematic records
             if (bulkError.name === 'BulkError' || bulkError.failures) {
-              console.warn(`BulkPut failed for ${config.name}, trying individual puts...`);
+
               let successCount = 0;
               let failureCount = 0;
               const failedItems: string[] = [];
@@ -565,7 +586,7 @@ export async function syncAllDataWithDetails(
                   failureCount++;
                   const itemId = item.id || item.ifscCode || item.accountNumber || 'unknown';
                   failedItems.push(itemId);
-                  console.warn(`Failed to sync ${config.name} item (${itemId}):`, itemError.message);
+
                 }
               }
               
@@ -574,7 +595,7 @@ export async function syncAllDataWithDetails(
               // Log warning but don't fail the entire sync if some items succeeded
               if (failureCount > 0) {
                 const warningMsg = `${failureCount} of ${dataToSync.length} ${config.name} items failed to sync. ${successCount} succeeded. Failed items: ${failedItems.join(', ')}`;
-                console.warn(warningMsg);
+
                 // Only throw error if ALL items failed
                 if (successCount === 0) {
                   throw new Error(warningMsg);
@@ -640,7 +661,7 @@ export async function syncAllDataWithDetails(
     } catch (error: any) {
       info.status = 'error';
       info.error = error.message || 'Unknown error';
-      console.error(`Error syncing ${config.name}:`, error);
+
     }
   }
 
@@ -666,8 +687,7 @@ export async function hardSyncAllData() {
     if (!db) return;
     
     try {
-        console.log('🔄 Starting full sync from Firestore...');
-        
+
         // ✅ Clear all lastSync times to force full sync on next realtime listener update
         if (typeof window !== 'undefined') {
             const syncKeys = [
@@ -682,7 +702,7 @@ export async function hardSyncAllData() {
                 'lastSync:fundTransactions',
             ];
             syncKeys.forEach(key => localStorage.removeItem(key));
-            console.log('✅ Cleared all lastSync timestamps');
+
         }
         
         // ✅ Fetch all data from Firestore in parallel
@@ -694,12 +714,12 @@ export async function hardSyncAllData() {
             incomes,
             expenses
         ] = await Promise.all([
-            getAllSuppliers().catch(e => { console.warn('Failed to sync suppliers:', e); return []; }),
-            getAllCustomers().catch(e => { console.warn('Failed to sync customers:', e); return []; }),
-            getAllPayments().catch(e => { console.warn('Failed to sync payments:', e); return []; }),
-            getAllCustomerPayments().catch(e => { console.warn('Failed to sync customerPayments:', e); return []; }),
-            getAllIncomes().catch(e => { console.warn('Failed to sync incomes:', e); return []; }),
-            getAllExpenses().catch(e => { console.warn('Failed to sync expenses:', e); return []; }),
+            getAllSuppliers().catch(e => { return []; }),
+            getAllCustomers().catch(e => { return []; }),
+            getAllPayments().catch(e => { return []; }),
+            getAllCustomerPayments().catch(e => { return []; }),
+            getAllIncomes().catch(e => { return []; }),
+            getAllExpenses().catch(e => { return []; }),
         ]);
         
         // ✅ Update IndexedDB with fresh data
@@ -713,19 +733,19 @@ export async function hardSyncAllData() {
             // Add fresh data
             if (suppliers?.length) {
                 await db.suppliers.bulkAdd(suppliers);
-                console.log(`✅ Synced ${suppliers.length} suppliers`);
+
             }
             if (customers?.length) {
                 await db.customers.bulkAdd(customers);
-                console.log(`✅ Synced ${customers.length} customers`);
+
             }
             if (payments?.length) {
                 await db.payments.bulkAdd(payments);
-                console.log(`✅ Synced ${payments.length} payments`);
+
             }
             if (customerPayments?.length) {
                 await db.customerPayments.bulkAdd(customerPayments);
-                console.log(`✅ Synced ${customerPayments.length} customer payments`);
+
             }
             
             // Handle incomes and expenses (stored in transactions table)
@@ -741,7 +761,7 @@ export async function hardSyncAllData() {
                         await db.transactions.bulkDelete(existing.map(t => t.id!));
                     }
                     await db.transactions.bulkAdd(allTransactions);
-                    console.log(`✅ Synced ${incomes?.length || 0} incomes and ${expenses?.length || 0} expenses`);
+
                 }
             }
         });
@@ -756,10 +776,9 @@ export async function hardSyncAllData() {
             localStorage.setItem('lastSync:incomes', String(now));
             localStorage.setItem('lastSync:expenses', String(now));
         }
-        
-        console.log('✅ Full sync completed successfully');
+
     } catch (e) {
-        console.error('❌ Hard sync failed:', e);
+
         throw e;
     }
 }

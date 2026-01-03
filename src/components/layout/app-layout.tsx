@@ -129,26 +129,15 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     
     if (isSalesPage && menuParam && tabParam) {
       // Get menu type from URL
-      let menuItemId: string;
-      if (menuParam === 'entry') {
-        menuItemId = 'sales-entry';
-      } else if (menuParam === 'payments') {
-        menuItemId = 'sales-payments';
-      } else if (menuParam === 'reports') {
-        menuItemId = 'sales-reports';
-      } else {
-        menuItemId = 'sales-entry';
-      }
-      
+      const menuItemId = menuParam === 'entry' ? 'sales-entry' : 'sales-payments';
       const menuItem = allMenuItems.find(item => item.id === menuItemId);
       
       if (menuItem) {
         setOpenTabs(prev => {
-          // Remove old entry/payment/reports tabs
+          // Remove old entry/payment tabs
           const filtered = prev.filter(tab => 
             tab.id !== 'sales-entry' &&
             tab.id !== 'sales-payments' &&
-            tab.id !== 'sales-reports' &&
             !tab.id.startsWith('entry-') &&
             !tab.id.startsWith('payments-')
           );
@@ -310,7 +299,6 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           try {
             router.push(targetPath, { scroll: false });
           } catch (error) {
-            console.error('Navigation error:', error);
             window.location.href = targetPath;
           }
         });
@@ -338,7 +326,6 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         // Use router.push - Next.js 15 returns void
         router.push(targetPath);
       } catch (err) {
-        console.warn('Navigation error:', err);
         // As a resilience fallback (e.g., dev server hiccup), force a hard navigation
         try {
           if (typeof window !== 'undefined') {

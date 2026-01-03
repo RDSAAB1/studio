@@ -104,6 +104,7 @@ export default function SupplierEntryClient() {
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
   const [suggestedSupplier, setSuggestedSupplier] = useState<Customer | null>(null);
+  const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
 
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   
@@ -293,8 +294,8 @@ export default function SupplierEntryClient() {
     };
     fetchSettings();
 
-    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
+    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -385,7 +386,7 @@ export default function SupplierEntryClient() {
           form.setValue('name', latestEntryForContact.name);
           form.setValue('so', latestEntryForContact.so);
           form.setValue('address', latestEntryForContact.address);
-          toast({ title: "Supplier Found: Details auto-filled from last entry." });
+          // Removed unnecessary toast message
       }
     }
   };
@@ -404,7 +405,7 @@ export default function SupplierEntryClient() {
         form.setValue('address', toTitleCase(suggestedSupplier.address));
         form.setValue('contact', suggestedSupplier.contact);
         setSuggestedSupplier(null);
-        toast({ title: "Details Updated", description: "Supplier details have been corrected." });
+        // Removed unnecessary toast message
     }
   };
 
@@ -414,29 +415,44 @@ export default function SupplierEntryClient() {
       toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
       return;
     }
-    try {
-      await deleteSupplier(id);
-      await deletePaymentsForSrNo(currentSupplier.srNo);
-      setSuppliers(prev => prev.filter(s => s.id !== id));
-      toast({ title: "Entry and payments deleted.", variant: "success" });
-      if (currentSupplier.id === id) {
-        handleNew();
-      }
-    } catch (error) {
-      console.error("Error deleting supplier and payments: ", error);
-      toast({ title: "Failed to delete entry.", variant: "destructive" });
+    
+    // Optimistic delete - update UI immediately
+    const supplierToDelete = suppliers.find(s => s.id === id);
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+    if (currentSupplier.id === id) {
+      handleNew();
     }
+    // Removed unnecessary toast message
+    
+    // Delete in background (non-blocking)
+    (async () => {
+      try {
+        await Promise.all([
+          deleteSupplier(id),
+          supplierToDelete ? deletePaymentsForSrNo(supplierToDelete.srNo) : Promise.resolve()
+        ]);
+      } catch (error) {
+        // Revert on error
+        if (supplierToDelete) {
+          setSuppliers(prev => [...prev, supplierToDelete].sort((a, b) => b.srNo.localeCompare(a.srNo)));
+        }
+        toast({ title: "Failed to delete entry.", variant: "destructive" });
+      }
+    })();
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    
+    // Prepare entry data IMMEDIATELY (minimal processing)
     const isForcedUnique = values.forceUnique || false;
-
+    const dateStr = values.date.toISOString().split("T")[0];
+    const nameLower = values.name.toLowerCase();
+    const soLower = values.so.toLowerCase();
+    
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: values.date.toISOString().split("T")[0],
+        date: dateStr,
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
@@ -445,33 +461,100 @@ export default function SupplierEntryClient() {
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
         customerId: isForcedUnique 
-            ? `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}|${Date.now()}` 
-            : `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
+            ? `${nameLower}|${soLower}|${Date.now()}` 
+            : `${nameLower}|${soLower}`,
         forceUnique: isForcedUnique,
     };
 
 
     try {
+        // If editing and SR No changed, delete old entry first (optimistic)
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          await deleteSupplier(currentSupplier.id);
+          // Update UI immediately
           setSuppliers(prev => prev.filter(s => s.id !== currentSupplier.id));
+          
+          // Delete in background (non-blocking)
+          (async () => {
+            try {
+              await deleteSupplier(currentSupplier.id);
+            } catch (error) {
+              // Revert on error
+              setSuppliers(prev => [...prev, currentSupplier].sort((a, b) => b.srNo.localeCompare(a.srNo)));
+            }
+          })();
         }
 
         if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            const savedEntry = await addSupplier(updatedEntry);
-            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
-            toast({ title: "Entry updated and payments deleted.", variant: "success" });
-            if (callback) callback(savedEntry); else handleNew();
+            
+            // Update UI immediately (optimistic)
+            setSuppliers(prev => [updatedEntry, ...prev.filter(s => s.id !== updatedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
+            // Removed unnecessary toast message
+            // Highlight and scroll to entry in table
+            setHighlightEntryId(updatedEntry.id);
+            setTimeout(() => setHighlightEntryId(null), 3000);
+            if (callback) callback(updatedEntry); else handleNew();
+            
+            // Save and delete payments in background (non-blocking)
+            (async () => {
+              try {
+                await Promise.all([
+                  addSupplier(updatedEntry),
+                  deletePaymentsForSrNo(completeEntry.srNo)
+                ]);
+              } catch (error) {
+                console.error('Background save/delete failed:', error);
+              }
+            })();
         } else {
-            const savedEntry = await addSupplier(completeEntry);
-            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
-            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            if (callback) callback(savedEntry); else handleNew();
+            // If editing with same ID, use updateSupplier; otherwise addSupplier (optimistic)
+            if (isEditing && currentSupplier.id === completeEntry.id) {
+              // Update UI immediately (optimistic)
+              setSuppliers(prev => {
+                const existingIndex = prev.findIndex(s => s.id === completeEntry.id);
+                if (existingIndex > -1) {
+                  const newSuppliers = [...prev];
+                  newSuppliers[existingIndex] = completeEntry;
+                  return newSuppliers;
+                }
+                return [completeEntry, ...prev.filter(s => s.id !== completeEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo));
+              });
+              // Removed unnecessary toast message
+              // Highlight and scroll to entry in table
+              setHighlightEntryId(completeEntry.id);
+              setTimeout(() => setHighlightEntryId(null), 3000);
+              if (callback) callback(completeEntry); else handleNew();
+              
+              // Update in background (non-blocking)
+              (async () => {
+                try {
+                  const { id, ...updateData } = completeEntry as any;
+                  await updateSupplier(id, updateData);
+                } catch (error) {
+                  console.error('Background update failed:', error);
+                }
+              })();
+            } else {
+              // New entry or SR No changed - use addSupplier (optimistic)
+              setSuppliers(prev => [completeEntry, ...prev.filter(s => s.id !== completeEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
+              // Removed unnecessary toast message
+              // Highlight and scroll to entry in table
+              setHighlightEntryId(completeEntry.id);
+              setTimeout(() => setHighlightEntryId(null), 3000);
+              if (callback) callback(completeEntry); else handleNew();
+              
+              // Save in background (non-blocking)
+              (async () => {
+                try {
+                  await addSupplier(completeEntry);
+                } catch (error) {
+                  console.error('Background save failed:', error);
+                }
+              })();
+            }
         }
     } catch (error) {
-        console.error("Error saving supplier:", error);
+        console.error('Save error:', error);
         toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
@@ -480,14 +563,36 @@ export default function SupplierEntryClient() {
     if (suggestedSupplier && !values.forceUnique) {
       return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
-    if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
-        if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
-            setIsUpdateConfirmOpen(true);
-            return;
+    
+    // Fast payment check (non-blocking) - only if editing
+    if (isEditing && paymentHistory.length > 0) {
+        // Quick check - if no payments array or empty, skip
+        const srNoToCheck = currentSupplier.srNo;
+        if (srNoToCheck) {
+            // Use a quick find instead of nested some for better performance
+            let hasPayments = false;
+            for (let i = 0; i < paymentHistory.length; i++) {
+                const p = paymentHistory[i];
+                if (p.paidFor) {
+                    for (let j = 0; j < p.paidFor.length; j++) {
+                        if (p.paidFor[j].srNo === srNoToCheck) {
+                            hasPayments = true;
+                            break;
+                        }
+                    }
+                    if (hasPayments) break;
+                }
+            }
+            
+            if (hasPayments) {
+                setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+                setIsUpdateConfirmOpen(true);
+                return;
+            }
         }
     }
+    
+    // Execute immediately (optimistic) - no blocking operations
     executeSubmit(values, false, callback);
   };
 
@@ -609,7 +714,7 @@ export default function SupplierEntryClient() {
                 setReceiptsToPrint([]);
             }
         } catch (error) {
-            console.error('Error processing print data:', error);
+
             toast({
                 title: "Error",
                 description: "Failed to process print data. Please try again.",
@@ -661,7 +766,7 @@ export default function SupplierEntryClient() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
         XLSX.writeFile(workbook, "SupplierEntries.xlsx");
-        toast({title: "Exported", description: "Supplier data has been exported."});
+        // Removed unnecessary toast message
     };
 
     const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -714,9 +819,9 @@ export default function SupplierEntryClient() {
 
                     await addSupplier(supplierData);
                 }
-                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+                // Removed unnecessary toast message
             } catch (error) {
-                console.error("Import failed:", error);
+
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
             }
         };
@@ -732,7 +837,7 @@ export default function SupplierEntryClient() {
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
-            console.error("Error deleting all entries:", error);
+
             toast({ title: "Failed to delete all entries", variant: "destructive" });
         }
     };
@@ -830,7 +935,14 @@ export default function SupplierEntryClient() {
             
             <CalculatedSummary 
                 customer={currentSupplier}
-                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSave={() => {
+                    // Get values directly without blocking validation
+                    const values = form.getValues();
+                    // Validate in background, submit immediately (optimistic)
+                    onSubmit(values);
+                    // Run validation in background to show errors if any
+                    form.trigger().catch(() => {});
+                }}
                 onSaveAndPrint={handleSaveAndPrint}
                 onClear={handleNew}
                 isEditing={isEditing}
@@ -878,6 +990,7 @@ export default function SupplierEntryClient() {
         selectedIds={selectedSupplierIds}
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
+        highlightEntryId={highlightEntryId}
       />
       
 
@@ -938,7 +1051,7 @@ export default function SupplierEntryClient() {
 
             setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
 
-            toast({ title: "Entry updated and payments deleted.", variant: "success" });
+            // Removed unnecessary toast message
 
             if (callback) callback(savedEntry); else handleNew();
 
@@ -948,15 +1061,13 @@ export default function SupplierEntryClient() {
 
             setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
 
-            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
+            // Removed unnecessary toast message
 
             if (callback) callback(savedEntry); else handleNew();
 
         }
 
     } catch (error) {
-
-        console.error("Error saving supplier:", error);
 
         toast({ title: "Failed to save entry.", variant: "destructive" });
 
@@ -1201,7 +1312,7 @@ export default function SupplierEntryClient() {
 
         XLSX.writeFile(workbook, "SupplierEntries.xlsx");
 
-        toast({title: "Exported", description: "Supplier data has been exported."});
+        // Removed unnecessary toast message
 
     };
 
@@ -1307,11 +1418,9 @@ export default function SupplierEntryClient() {
 
                 }
 
-                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+                // Removed unnecessary toast message
 
             } catch (error) {
-
-                console.error("Import failed:", error);
 
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
 
@@ -1337,13 +1446,11 @@ export default function SupplierEntryClient() {
 
             setPaymentHistory([]);
 
-            toast({ title: "All entries deleted successfully", variant: "success" });
+            // Removed unnecessary toast message
 
             handleNew();
 
         } catch (error) {
-
-            console.error("Error deleting all entries:", error);
 
             toast({ title: "Failed to delete all entries", variant: "destructive" });
 
@@ -1536,7 +1643,14 @@ export default function SupplierEntryClient() {
 
                 customer={currentSupplier}
 
-                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSave={() => {
+                    // Get values directly without blocking validation
+                    const values = form.getValues();
+                    // Submit immediately (optimistic)
+                    onSubmit(values);
+                    // Run validation in background to show errors if any
+                    form.trigger().catch(() => {});
+                }}
 
                 onSaveAndPrint={handleSaveAndPrint}
 

@@ -177,7 +177,7 @@ export default function DailySupplierReportClient() {
                 style.appendChild(iframeDoc.createTextNode(cssText));
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
+
             }
         });
         

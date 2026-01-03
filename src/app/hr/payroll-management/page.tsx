@@ -38,8 +38,8 @@ export default function PayrollManagementPage() {
   
   useEffect(() => {
     setIsClient(true);
-    const unsubPayroll = getPayrollRealtime(setPayrollEntries, console.error);
-    const unsubEmployees = getEmployeesRealtime(setEmployees, console.error);
+    const unsubPayroll = getPayrollRealtime(setPayrollEntries, );
+    const unsubEmployees = getEmployeesRealtime(setEmployees, );
     return () => {
         unsubPayroll();
         unsubEmployees();
@@ -92,7 +92,7 @@ export default function PayrollManagementPage() {
         setAttendanceSummary({ present, absent, leave, halfDay, totalDays: daysInMonth, payableDays });
         setCurrentEntry(prev => ({...prev, amount: Math.round(payableSalary)}));
     } catch(err) {
-        console.error("Error calculating salary:", err);
+
         setError("Failed to calculate salary due to a database error.");
         toast({ title: "Error calculating salary", variant: "destructive" });
     }
@@ -120,7 +120,7 @@ export default function PayrollManagementPage() {
       setAttendanceSummary(null);
       toast({ title: "Payroll entry saved.", variant: "success" });
     } catch (e) {
-      console.error("Error saving payroll entry: ", e);
+
       toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
@@ -137,12 +137,18 @@ export default function PayrollManagementPage() {
   }
 
   const handleDeleteEntry = async (id: string) => {
-    if (confirm("Are you sure you want to delete this payroll entry?")) {
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm("Are you sure you want to delete this payroll entry?", {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (confirmed) {
       try {
         await deletePayrollEntry(id);
         toast({ title: "Entry deleted.", variant: "success" });
       } catch (e) {
-        console.error("Error deleting payroll entry: ", e);
+
         toast({ title: "Failed to delete entry.", variant: "destructive" });
       }
     }

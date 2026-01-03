@@ -164,10 +164,17 @@ function toast({ ...props }: Toast) {
     },
   })
 
-  // Auto-dismiss after a delay
+  // Calculate duration based on message length
+  // Base: 2000ms, + 50ms per character (min 2000ms, max 8000ms)
+  const titleText = props.title ? String(props.title).length : 0;
+  const descText = props.description ? String(props.description).length : 0;
+  const messageLength = titleText + descText;
+  const calculatedDuration = Math.min(Math.max(2000 + (messageLength * 50), 2000), 8000);
+
+  // Auto-dismiss after calculated delay
   setTimeout(() => {
     dismiss()
-  }, TOAST_REMOVE_DELAY - 500); // Start fade-out slightly before removal
+  }, calculatedDuration - 500); // Start fade-out slightly before removal
 
   return {
     id: id,

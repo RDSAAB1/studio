@@ -98,7 +98,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 styleElement.appendChild(iframeDoc.createTextNode(css));
                 iframeDoc.head.appendChild(styleElement);
             } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
+
             }
         });
         

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
@@ -19,11 +19,15 @@ type SortConfig = {
     direction: 'ascending' | 'descending';
 };
 
+export type ExtraAmountBase = 'netQty' | 'finalQty' | 'outstanding';
+
 interface UsePaymentCombinationProps {
     calcTargetAmount: number;
     minRate: number;
     maxRate: number;
     rsValue?: number;
+    extraAmountBase?: ExtraAmountBase;
+    selectedReceipts?: any[]; // For net/final qty calculation
 }
 
 export const usePaymentCombination = ({ 
@@ -31,6 +35,8 @@ export const usePaymentCombination = ({
     minRate,
     maxRate,
     rsValue = 0,
+    extraAmountBase = 'outstanding',
+    selectedReceipts = [],
 }: UsePaymentCombinationProps) => {
     const { toast } = useToast();
     const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
@@ -42,18 +48,56 @@ export const usePaymentCombination = ({
     // New: bag size for quantity (e.g. 50 kg per bag) to ensure qty / bagSize is whole number
     const [bagSize, setBagSize] = useState<number | undefined>(undefined);
 
-    const handleGeneratePaymentOptions = () => {
-        if (isNaN(calcTargetAmount) || isNaN(minRate) || isNaN(maxRate) || minRate > maxRate) {
-            toast({ title: 'Invalid input for payment calculation.', variant: 'destructive' });
+    // Store current values in refs to use latest values in generate function
+    const currentValuesRef = useRef({ calcTargetAmount, minRate, maxRate, rsValue, extraAmountBase, selectedReceipts });
+    useEffect(() => {
+        currentValuesRef.current = { calcTargetAmount, minRate, maxRate, rsValue, extraAmountBase, selectedReceipts };
+    }, [calcTargetAmount, minRate, maxRate, rsValue, extraAmountBase, selectedReceipts]);
+
+    const handleGeneratePaymentOptions = (overrideValues?: { calcTargetAmount?: number; minRate?: number; maxRate?: number; rsValue?: number; extraAmountBase?: ExtraAmountBase; selectedReceipts?: any[]; bagSize?: number }) => {
+        // Use override values if provided, otherwise use current values from ref
+        const calcTargetAmountValue = overrideValues?.calcTargetAmount !== undefined 
+            ? overrideValues.calcTargetAmount
+            : (typeof currentValuesRef.current.calcTargetAmount === 'function' 
+                ? currentValuesRef.current.calcTargetAmount() 
+                : currentValuesRef.current.calcTargetAmount);
+        const currentMinRate = overrideValues?.minRate !== undefined ? overrideValues.minRate : currentValuesRef.current.minRate;
+        const currentMaxRate = overrideValues?.maxRate !== undefined ? overrideValues.maxRate : currentValuesRef.current.maxRate;
+        const currentRsValue = overrideValues?.rsValue !== undefined ? overrideValues.rsValue : currentValuesRef.current.rsValue;
+        const currentExtraAmountBase = overrideValues?.extraAmountBase !== undefined ? overrideValues.extraAmountBase : currentValuesRef.current.extraAmountBase;
+        const currentSelectedReceipts = overrideValues?.selectedReceipts !== undefined ? overrideValues.selectedReceipts : currentValuesRef.current.selectedReceipts;
+        const currentBagSize = overrideValues?.bagSize !== undefined ? overrideValues.bagSize : bagSize;
+
+        if (isNaN(calcTargetAmountValue) || isNaN(currentMinRate) || isNaN(currentMaxRate) || currentMinRate > currentMaxRate || currentMinRate <= 0 || calcTargetAmountValue <= 0) {
+            toast({ 
+                title: 'Invalid input for payment calculation.', 
+                description: currentMinRate <= 0 ? 'Rate must be greater than 0' : calcTargetAmountValue <= 0 ? 'Target amount must be greater than 0' : 'Please check your inputs',
+                variant: 'destructive' 
+            });
             return;
         }
 
-        // If Rs value is provided, adjust the targeted amount
-        // Process: targeted amount / min rate = quantity, then original target + (quantity * rsValue) = new targeted amount
-        let adjustedTargetAmount = calcTargetAmount;
-        if (rsValue && rsValue > 0 && minRate > 0) {
-            const quantity = calcTargetAmount / minRate;
-            adjustedTargetAmount = calcTargetAmount + (quantity * rsValue);
+        // Calculate base quantity based on extraAmountBase selection
+        let baseQuantity = 0;
+        if (currentExtraAmountBase === 'netQty' && currentSelectedReceipts && currentSelectedReceipts.length > 0) {
+            // Sum of net weights from selected receipts
+            baseQuantity = currentSelectedReceipts.reduce((sum, receipt) => {
+                return sum + (Number(receipt.netWeight) || 0);
+            }, 0);
+        } else if (currentExtraAmountBase === 'finalQty' && currentSelectedReceipts && currentSelectedReceipts.length > 0) {
+            // Sum of final weights from selected receipts
+            baseQuantity = currentSelectedReceipts.reduce((sum, receipt) => {
+                return sum + (Number(receipt.weight) || 0);
+            }, 0);
+        } else {
+            // 'outstanding' - use calcTargetAmount / minRate (default behavior)
+            baseQuantity = currentMinRate > 0 ? calcTargetAmountValue / currentMinRate : 0;
+        }
+
+        // If Rs value is provided, adjust the targeted amount based on selected base
+        let adjustedTargetAmount = calcTargetAmountValue;
+        if (currentRsValue && currentRsValue > 0) {
+            adjustedTargetAmount = calcTargetAmountValue + (baseQuantity * currentRsValue);
         }
 
         const rawOptions: PaymentOption[] = [];
@@ -63,11 +107,11 @@ export const usePaymentCombination = ({
         const qtyStep = 0.10; // Quantity should be divisible by 0.10
         // Significantly increase max quantity to generate many more options
         // Calculate based on target amount and minimum rate, but allow much larger range
-        const baseMaxQty = adjustedTargetAmount / Math.max(minRate, 1);
+        const baseMaxQty = adjustedTargetAmount / Math.max(currentMinRate, 1);
         const maxQty = Math.min(20000, baseMaxQty * 10); // Much larger multiplier and max for many more combinations
 
-        const normalizedMinRate = Math.ceil(Math.max(minRate, 0) / rateStep) * rateStep;
-        const normalizedMaxRate = Math.floor(Math.max(maxRate, normalizedMinRate) / rateStep) * rateStep;
+        const normalizedMinRate = Math.ceil(Math.max(currentMinRate, 0) / rateStep) * rateStep;
+        const normalizedMaxRate = Math.floor(Math.max(currentMaxRate, normalizedMinRate) / rateStep) * rateStep;
 
         // Start from 0.10 and increment by 0.10 (quantity divisible by 0.10)
         // Use integer-based loop to avoid floating point precision issues and generate many more options
@@ -89,8 +133,8 @@ export const usePaymentCombination = ({
                 let bags: number | null = null;
 
                 // If bagSize is provided, enforce that q / bagSize is a whole number
-                if (bagSize && bagSize > 0) {
-                    const approxBags = q / bagSize;
+                if (currentBagSize && currentBagSize > 0) {
+                    const approxBags = q / currentBagSize;
                     const epsilonBags = 0.0000001;
                     const roundedBags = Math.round(approxBags);
                     const isWholeBags = Math.abs(approxBags - roundedBags) < epsilonBags;
@@ -141,14 +185,26 @@ export const usePaymentCombination = ({
 
                 // Calculate remaining amount (can be decimal when paise is allowed)
                 // Use adjusted target amount
-                const amountRemaining = adjustedTargetAmount - calculatedAmount;
-                if (amountRemaining < 0) continue;
+                let amountRemaining = adjustedTargetAmount - calculatedAmount;
+                
+                // Round to 2 decimal places to handle floating point precision
+                amountRemaining = Math.round(amountRemaining * 100) / 100;
+                
+                // IMPORTANT: If amountRemaining is very close to 0 (within 0.01), set it to exactly 0
+                // This ensures exact matches are properly identified
+                if (Math.abs(amountRemaining) <= 0.01) {
+                    amountRemaining = 0;
+                }
+                
+                // Only filter out truly negative values (less than -0.01)
+                // This ensures options with amountRemaining === 0 are included
+                if (amountRemaining < -0.01) continue;
                 
                 rawOptions.push({
                     quantity: parseFloat(q.toFixed(2)), // Ensure 2 decimal places (0.10, 0.20, etc.)
                     rate: currentRate,
                     calculatedAmount: calculatedAmount,
-                    amountRemaining: Math.round(amountRemaining * 100) / 100,
+                    amountRemaining: amountRemaining, // Already rounded above
                     bags,
                 });
             }
@@ -189,7 +245,7 @@ export const usePaymentCombination = ({
         setPaymentOptions(limitedOptions);
         setSortConfig(null);
         
-        toast({ title: `Generated ${limitedOptions.length} payment options.`, variant: 'success' });
+        // Removed unnecessary toast message
     };
     
     const requestSort = (key: keyof PaymentOption) => {

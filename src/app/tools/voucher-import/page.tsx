@@ -753,7 +753,7 @@ export default function VoucherImportTool() {
     try {
       await saveMandiHeaderSettings(settings);
     } catch (error) {
-      console.warn("Failed to persist header settings to Firestore:", error);
+
     }
 
     if (typeof window !== "undefined") {
@@ -774,7 +774,7 @@ export default function VoucherImportTool() {
         variant: "success",
       });
     } catch (error) {
-      console.error("Failed to save header settings:", error);
+
       toast({
         title: "Save failed",
         description: "Could not save mandi header details. Try again.",
@@ -812,7 +812,7 @@ export default function VoucherImportTool() {
           return;
         }
       } catch (error) {
-        console.warn("Failed to fetch header settings from Firestore:", error);
+
       }
 
       try {
@@ -828,7 +828,7 @@ export default function VoucherImportTool() {
           }
         }
       } catch (error) {
-        console.warn("Failed to load header settings from IndexedDB:", error);
+
         }
 
         if (typeof window !== "undefined") {
@@ -871,7 +871,7 @@ export default function VoucherImportTool() {
           );
         }
       } catch (error) {
-        console.warn("Failed to load local mandi reports:", error);
+
       }
     };
     loadLocal();
@@ -892,7 +892,7 @@ export default function VoucherImportTool() {
           );
         }
       } catch (error) {
-        console.error("Failed to load mandi reports:", error);
+
         if (mounted) {
           toast({
             title: "Load Failed",
@@ -1005,7 +1005,7 @@ export default function VoucherImportTool() {
         variant: "success",
       });
     } catch (error) {
-      console.error("Failed to delete entry:", error);
+
       toast({
         title: "Delete Failed",
         description: "Unable to delete the selected entry.",
@@ -1031,7 +1031,7 @@ export default function VoucherImportTool() {
 
     // Validate payload before saving
     if (!payload.id || payload.id.trim() === '') {
-      console.error('[handleSaveEntry] Invalid payload ID:', payload);
+
       toast({
         title: "Save Failed",
         description: "Entry ID is missing or invalid. Please check the voucher number.",
@@ -1040,20 +1040,14 @@ export default function VoucherImportTool() {
       return;
     }
 
-    console.log('[handleSaveEntry] Attempting to save entry:', {
-      id: payload.id,
-      voucherNo: payload.voucherNo,
-      exists: entries.some((entry) => entry.id === payload.id),
-    });
-
     try {
       setIsSaving(true);
       const exists = entries.some((entry) => entry.id === payload.id);
       if (exists) {
-        console.log('[handleSaveEntry] Updating existing entry:', payload.id);
+
         await updateMandiReport(payload.id, payload);
       } else {
-        console.log('[handleSaveEntry] Adding new entry:', payload.id);
+
         await addMandiReport(payload);
       }
       
@@ -1070,14 +1064,13 @@ export default function VoucherImportTool() {
       setFormState(payload);
       setActiveId(payload.id);
 
-      console.log('[handleSaveEntry] Successfully saved entry:', payload.id);
       toast({
         title: exists ? "Entry Updated" : "Entry Saved",
         description: "Entry stored in the mandi report collection.",
         variant: "success",
       });
     } catch (error) {
-      console.error("[handleSaveEntry] Failed to save entry:", error);
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast({
         title: "Save Failed",
@@ -1103,7 +1096,7 @@ export default function VoucherImportTool() {
         variant: "success",
       });
     } catch (error) {
-      console.error("Clipboard read failed:", error);
+
       toast({
         title: "Clipboard Error",
         description: "Unable to access clipboard contents.",
@@ -1644,7 +1637,7 @@ export default function VoucherImportTool() {
         printWindow.print();
       }
     } catch (error) {
-      console.error("Failed to populate print window:", error);
+
       printWindow.close();
       toast({
         title: "Preview unavailable",

@@ -71,12 +71,12 @@ export default function RtgsReportClient() {
                 const savedSettings = await getRtgsSettings();
                 setSettings(savedSettings);
             } catch (error) {
-                console.error("Error fetching initial settings: ", error);
+
             }
         };
         fetchSettings();
         
-        const unsubscribe = getPaymentsRealtime(setPayments, console.error);
+        const unsubscribe = getPaymentsRealtime(setPayments, );
         return () => unsubscribe();
     }, []);
 
@@ -238,7 +238,7 @@ export default function RtgsReportClient() {
                 `));
                 iframeDoc.head.appendChild(style);
             } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
+
             }
         });
         

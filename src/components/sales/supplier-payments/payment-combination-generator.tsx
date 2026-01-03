@@ -74,10 +74,13 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
 
     // Show Rs and Bag Qty fields only for Gov. payment method
     const showRsAndBagFields = paymentMethod === 'Gov.';
+    // Hide Min/Max Rate and Rs fields for Gov. payment method (Gov Rate and Extra Rs/Qtl are used instead)
+    const hideRateFields = paymentMethod === 'Gov.';
 
     return (
         <div className="space-y-3 text-[11px]">
-            <div className={cn("grid grid-cols-1 gap-2", showRsAndBagFields ? "sm:grid-cols-5" : "sm:grid-cols-3")}>
+            <div className={cn("grid grid-cols-1 gap-2", 
+                hideRateFields ? "sm:grid-cols-1" : showRsAndBagFields ? "sm:grid-cols-5" : "sm:grid-cols-3")}>
                 <div className="space-y-1">
                     <Label className="text-[11px] whitespace-nowrap">Target Amt</Label>
                     <Input
@@ -87,26 +90,30 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         className="h-8 text-[11px]"
                     />
                 </div>
-                <div className="space-y-1">
-                    <Label className="text-[11px] whitespace-nowrap">Min Rate</Label>
-                    <Input
-                        type="number"
-                        value={minRate}
-                        onChange={(e) => setMinRate(Number(e.target.value))}
-                        className="h-8 text-[11px]"
-                    />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-[11px] whitespace-nowrap">Max Rate</Label>
-                    <Input
-                        type="number"
-                        value={maxRate}
-                        onChange={(e) => setMaxRate(Number(e.target.value))}
-                        className="h-8 text-[11px]"
-                    />
-                </div>
-                {/* Rs and Bag Qty fields - only show for Gov. payment */}
-                {showRsAndBagFields && setRsValue && (
+                {!hideRateFields && (
+                    <>
+                        <div className="space-y-1">
+                            <Label className="text-[11px] whitespace-nowrap">Min Rate</Label>
+                            <Input
+                                type="number"
+                                value={minRate}
+                                onChange={(e) => setMinRate(Number(e.target.value))}
+                                className="h-8 text-[11px]"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[11px] whitespace-nowrap">Max Rate</Label>
+                            <Input
+                                type="number"
+                                value={maxRate}
+                                onChange={(e) => setMaxRate(Number(e.target.value))}
+                                className="h-8 text-[11px]"
+                            />
+                        </div>
+                    </>
+                )}
+                {/* Rs field - only show for Gov. payment if rate fields are not hidden */}
+                {showRsAndBagFields && setRsValue && !hideRateFields && (
                     <div className="space-y-1">
                         <Label className="text-[11px] whitespace-nowrap">Rs</Label>
                         <Input

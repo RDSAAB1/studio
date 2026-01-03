@@ -55,7 +55,7 @@ export default function OrderTrackingPage() {
         localStorage.setItem('lastSync:orders', String(Date.now()));
       }
     }, (err) => {
-      console.error("Error fetching orders: ", err);
+
       setError("Failed to load orders.");
       setLoading(false);
     });
@@ -73,17 +73,17 @@ export default function OrderTrackingPage() {
 
   // Basic functions for actions (implement detailed logic as needed)
   const handleView = (orderId: string) => {
-    console.log(`View order: ${orderId}`);
+
     // Implement navigation or modal to view order details
   };
 
   const handleEdit = (orderId: string) => {
-    console.log(`Edit order: ${orderId}`);
+
     // Implement navigation or modal to edit order
   };
 
   const handleDelete = (orderId: string) => {
-    console.log(`Delete order: ${orderId}`);
+
     // Implement delete logic using Firestore deleteDoc
   };
 

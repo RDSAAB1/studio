@@ -29,6 +29,7 @@ interface CustomerFormValues {
     rate?: number;
     brokerageRate?: number;
     cd?: number;
+    cdAmount?: number;
     kanta?: number;
     bagRate?: number;
     isBrokerageIncluded?: boolean;
@@ -46,6 +47,14 @@ export function toTitleCase(str: any) {
     /\w\S*/g,
     (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
   );
+}
+
+// Format date to YYYY-MM-DD in local timezone (no UTC conversion)
+export function formatDateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function formatSrNo(num: number | string, prefix: 'S' | 'C' | 'R' = 'S') {
@@ -249,25 +258,60 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
     
+    // ✅ Calculate KRTA (same logic as supplier)
+    const kartaPercentage = values.kartaPercentage || 0;
+    const rate = values.rate || 0;
+    
+    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
+    const rawKartaWeight = weight * kartaPercentage / 100;
+
+    let kartaWeight;
+    // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
+    // Only round down if decimal part < 0.50 (e.g., 179.40 -> 1.79)
+    if (decimalPart >= 5) {
+        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
+    } else {
+        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
+    }
+
+    const kartaAmount = Math.round(kartaWeight * rate);
+    
     const bags = Number(values.bags) || 0;
     const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
     const totalBagWeightKg = bags * bagWeightPerBagKg;
-    const totalBagWeightQuintals = totalBagWeightKg / 100;
-    const netWeight = weight - totalBagWeightQuintals;
+    const totalBagWeightQuintals = totalBagWeightKg / 100; // Convert KG to QTL
+    // ✅ Net weight = weight - kartaWeight - bagWeight (like supplier: weight - kartaWeight)
+    const netWeight = weight - kartaWeight - totalBagWeightQuintals;
     
-    const rate = values.rate || 0;
-    const amount = Math.round(netWeight * rate);
+    const amount = Math.round(weight * rate); // Amount calculated on final weight (before karta and bags)
+    
+    // ✅ Calculate Bag Weight Deduction: Bag Weight (QTL) × Rate
+    const bagWeightDeductionAmount = Math.round(totalBagWeightQuintals * rate);
     
     const brokerageRate = Number(values.brokerage || values.brokerageRate) || 0;
-    const brokerageAmount = Math.round(netWeight * brokerageRate);
+    const brokerageAmount = Math.round(weight * brokerageRate); // Brokerage on final weight
 
-    const cdRate = Number(values.cd) || 0;
-    const cdAmount = Math.round((amount * cdRate) / 100);
+    // CD calculation: If cdAmount is provided directly, use it; otherwise calculate from cdRate
+    let finalCdAmount = 0;
+    if (values.cdAmount !== undefined && values.cdAmount !== null && values.cdAmount > 0) {
+        // User entered CD Amount directly
+        finalCdAmount = Math.round(values.cdAmount);
+    } else {
+        // User entered CD% - calculate amount from percentage
+        const cdRate = Number(values.cd) || 0;
+        finalCdAmount = Math.round((amount * cdRate) / 100);
+    }
     
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = Math.round(bags * bagRate);
 
-    let originalNetAmount = Math.round(amount + bagAmount - cdAmount);
+    // ✅ Calculate Transport Amount: Transportation Rate × Final Weight (per QTL)
+    const transportationRate = Number((values as any).transportationRate || 0);
+    const transportAmount = Math.round(weight * transportationRate);
+
+    // ✅ Original net amount = amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount
+    // Net Receivable = Amount - Karta - Bag Wt Deduction + Bag Amount - CD - Transport
+    let originalNetAmount = Math.round(amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount);
     // Brokerage logic: Include = Add, Exclude = Subtract
     if (values.isBrokerageIncluded) {
         originalNetAmount += brokerageAmount; // Add when included
@@ -294,11 +338,16 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         date: format(entryDate, 'yyyy-MM-dd'),
         dueDate: format(entryDate, 'yyyy-MM-dd'),
         weight: weight,
+        kartaWeight: kartaWeight,
+        kartaAmount: kartaAmount,
         netWeight: netWeight,
         amount: amount,
         brokerage: brokerageAmount,
-        cd: cdAmount,
+        cd: finalCdAmount,
         bagAmount: bagAmount,
+        bagWeightDeductionAmount: bagWeightDeductionAmount, // Bag Weight deduction amount
+        transportationRate: transportationRate,
+        transportAmount: transportAmount, // Transport Amount = Transportation Rate × Final Weight
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
     }

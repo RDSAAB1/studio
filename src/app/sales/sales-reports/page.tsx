@@ -98,7 +98,7 @@ export default function SalesReportsPage() {
         localStorage.setItem('lastSync:customers', String(Date.now()));
       }
     }, (error) => {
-      console.error("Error fetching sales data:", error);
+
       setLoading(false);
     });
 

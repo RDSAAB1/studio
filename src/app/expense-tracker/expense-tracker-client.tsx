@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment, PayeeProfile } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment, Account } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency, generateReadableId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getPayeeProfilesRealtime, getAllIncomes } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getAllIncomes, updateExpensePayee, updateIncomePayee, deleteExpensesForPayee, deleteIncomesForPayee, addAccount, updateAccount, deleteAccount, getAccount, getAccountsRealtime } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,7 +32,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc,
 import { firestoreDB } from "@/lib/firebase"; 
 
 
-import { Loader2, Pen, PlusCircle, Save, Trash, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer } from "lucide-react";
+import { Loader2, Pen, Save, Trash, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X } from "lucide-react";
 import { format, addMonths, parse, isValid } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
@@ -297,11 +298,16 @@ export default function IncomeExpenseClient() {
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isEditAccountOpen, setIsEditAccountOpen] = useState(false);
+  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
+  const [newAccount, setNewAccount] = useState({ name: '', contact: '', address: '', nature: '' as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
+  const [editAccount, setEditAccount] = useState({ name: '', contact: '', address: '', nature: '' as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
+  const [accounts, setAccounts] = useState<Map<string, Account>>(new Map());
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   const [bulkDate, setBulkDate] = useState<string>("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   
-  const [payeeProfiles, setPayeeProfiles] = useState<Map<string, PayeeProfile>>(new Map());
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
 
     useEffect(() => {
@@ -314,17 +320,12 @@ export default function IncomeExpenseClient() {
         // First, fetch ALL income transactions for payee extraction (expenses already from global)
         const fetchAllTransactions = async () => {
             try {
-                console.log('[Income/Expense] Fetching income transactions for payee extraction...');
+
                 const allIncomes = await getAllIncomes();
-                console.log('[Income/Expense] Fetched:', {
-                    incomes: allIncomes.length,
-                    expenses: globalData.expenses.length,
-                    incomePayees: [...new Set(allIncomes.map(i => i.payee).filter(Boolean))].slice(0, 10),
-                    expensePayees: [...new Set(globalData.expenses.map(e => e.payee).filter(Boolean))].slice(0, 10)
-                });
+
                 setIncome(allIncomes);
             } catch (error) {
-                console.error('[Income/Expense] Error fetching income transactions:', error);
+
             }
         };
 
@@ -332,12 +333,12 @@ export default function IncomeExpenseClient() {
 
         // Then set up realtime listeners for updates (only for data not in global context)
         const unsubIncome = getIncomeRealtime((data) => {
-            console.log('[Income] Realtime update:', data.length, 'income transactions');
+
             setIncome(data);
-        }, console.error);
-        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
-        const unsubLoans = getLoansRealtime(setLoans, console.error);
-        const unsubProjects = getProjectsRealtime(setProjects, console.error);
+        }, () => {});
+        const unsubPayments = getPaymentsRealtime(setPayments, () => {});
+        const unsubLoans = getLoansRealtime(setLoans, () => {});
+        const unsubProjects = getProjectsRealtime(setProjects, () => {});
 
         return () => {
             unsubIncome(); unsubLoans(); unsubProjects(); unsubPayments();
@@ -347,13 +348,7 @@ export default function IncomeExpenseClient() {
   // NO PAGE LOADING - Components render immediately
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
-      console.log('[AllTransactions] Checking data:', {
-          income: income?.length || 0,
-          expenses: expenses?.length || 0,
-          incomeSample: income?.slice(0, 3).map(i => ({ id: i.id, payee: i.payee, transactionId: i.transactionId })),
-          expensesSample: expenses?.slice(0, 3).map(e => ({ id: e.id, payee: e.payee, transactionId: e.transactionId }))
-      });
-      
+
       // Handle empty arrays - income and expenses might be [] initially
       const incomeArray = income || [];
       const expensesArray = expenses || [];
@@ -365,22 +360,13 @@ export default function IncomeExpenseClient() {
       // Check payees in transactions
       const transactionsWithPayees = sorted.filter(t => t.payee && typeof t.payee === 'string' && t.payee.trim() !== '');
       const uniquePayeesFromTransactions = [...new Set(transactionsWithPayees.map(t => toTitleCase(t.payee.trim())))];
-      
-      console.log('[AllTransactions] Combined transactions:', {
-          incomeCount: incomeArray.length,
-          expensesCount: expensesArray.length,
-          totalTransactions: sorted.length,
-          transactionsWithPayees: transactionsWithPayees.length,
-          uniquePayeesFromTransactions: uniquePayeesFromTransactions.length,
-          uniquePayeesList: uniquePayeesFromTransactions,
-          samplePayees: sorted.slice(0, 20).map(t => ({ payee: t.payee, hasPayee: !!(t.payee && t.payee.trim()) }))
-      });
+
       return sorted;
   }, [income, expenses]);
 
   const uniquePayees = useMemo(() => {
       if (!allTransactions || allTransactions.length === 0) {
-          console.log('[UniquePayees] No transactions found');
+
           return [];
       }
       
@@ -388,23 +374,10 @@ export default function IncomeExpenseClient() {
       const allPayees = allTransactions
           .map(t => t.payee)
           .filter(p => p && typeof p === 'string' && p.trim() !== '');
-      
-      console.log('[UniquePayees] Raw payees from transactions:', {
-          totalTransactions: allTransactions.length,
-          payeesWithValue: allPayees.length,
-          samplePayees: allPayees.slice(0, 20)
-      });
-      
+
       const payees = new Set(allPayees.map(p => toTitleCase(p.trim())));
       const uniqueList = Array.from(payees).sort();
-      
-      console.log('[UniquePayees] From transactions:', {
-          totalTransactions: allTransactions.length,
-          payeesWithValue: allPayees.length,
-          uniquePayeesCount: uniqueList.length,
-          uniquePayees: uniqueList
-      });
-      
+
       return uniqueList;
   }, [allTransactions]);
 
@@ -418,56 +391,30 @@ export default function IncomeExpenseClient() {
   const accountOptions = useMemo(() => {
       const names = new Set<string>();
       
-      // Add payees from payeeProfiles collection
-      payeeProfiles.forEach((_profile, name) => {
-          const normalized = toTitleCase(name.trim());
-          if (normalized) names.add(normalized);
-      });
-      
       // Add payees from transactions (income/expense)
       uniquePayees.forEach(name => {
           const normalized = toTitleCase(name.trim());
           if (normalized) names.add(normalized);
       });
 
-      console.log('[Payee Dropdown] Building options:', {
-          payeeProfilesCount: payeeProfiles.size,
-          uniquePayeesCount: uniquePayees.length,
-          totalUniqueNames: names.size,
-          payeeProfilesKeys: Array.from(payeeProfiles.keys()).slice(0, 10),
-          uniquePayeesSample: uniquePayees.slice(0, 10)
+      // Add accounts from accounts Map (includes newly created accounts)
+      accounts.forEach((account, accountName) => {
+          if (account?.name) {
+              const normalized = toTitleCase(account.name.trim());
+              if (normalized) names.add(normalized);
+          }
       });
 
       const options = Array.from(names)
           .sort((a, b) => a.localeCompare(b))
-          .map(name => {
-              const profile = payeeProfiles.get(name) || payeeProfiles.get(toTitleCase(name));
-              const labelParts = [name];
-              if (profile?.category) {
-                  labelParts.push(profile.subCategory ? `${profile.category} › ${profile.subCategory}` : profile.category);
-              }
-              if (profile?.contact) {
-                  labelParts.push(profile.contact);
-              }
-              return {
-                  value: name,
-                  label: labelParts.join(' | '),
-                  displayValue: name, // Show only name in input field
-                  data: {
-                      name,
-                      category: profile?.category,
-                      subCategory: profile?.subCategory,
-                      contact: profile?.contact,
-                      address: profile?.address,
-                  },
-              };
-          });
-      
-      console.log('[Payee Dropdown] Final options count:', options.length);
-      console.log('[Payee Dropdown] First 10 options:', options.slice(0, 10).map(o => o.value));
-      
+          .map(name => ({
+              value: name,
+              label: name,
+          }));
+
+
       return options;
-  }, [payeeProfiles, uniquePayees]);
+  }, [uniquePayees, accounts]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -536,48 +483,6 @@ export default function IncomeExpenseClient() {
     payeeValue
   ] = watchedValues;
 
-  const selectedAccountProfile = useMemo(() => {
-      if (!payeeValue) return undefined;
-      return payeeProfiles.get(toTitleCase(payeeValue));
-  }, [payeeValue, payeeProfiles]);
-
-  const summaryDetails = useMemo(() => {
-      const displayName = selectedAccountProfile?.name || selectedAccount || 'Select an account';
-      const fallbackNature = filteredTransactions.find(tx => (tx as any).expenseNature)?.expenseNature;
-      const fallbackCategory = filteredTransactions.find(tx => tx.category)?.category;
-      const fallbackSubCategory = filteredTransactions.find(tx => tx.subCategory)?.subCategory;
-
-      const normalize = (value: string | undefined | null) => {
-          if (!value) return '—';
-          return toTitleCase(value);
-      };
-
-      return {
-          name: displayName,
-          contact: selectedAccountProfile?.contact || '—',
-          address: selectedAccountProfile?.address || '—',
-          nature: normalize(selectedAccountProfile?.nature || fallbackNature || undefined),
-          category: normalize(selectedAccountProfile?.category || fallbackCategory || undefined),
-          subCategory: normalize(selectedAccountProfile?.subCategory || fallbackSubCategory || undefined),
-      };
-  }, [selectedAccountProfile, selectedAccount, filteredTransactions]);
-
-  const applyAccountProfile = useCallback((accountName: string | null) => {
-      const normalized = accountName ? toTitleCase(accountName) : '';
-      const profile = normalized ? payeeProfiles.get(normalized) : undefined;
-
-      setValue('expenseNature', profile?.nature || '', { shouldValidate: false });
-      setValue('category', profile?.category || '', { shouldValidate: false });
-      setValue('subCategory', profile?.subCategory || '', { shouldValidate: false });
-  }, [payeeProfiles, setValue]);
-
-  useEffect(() => {
-      if (payeeValue) {
-          applyAccountProfile(payeeValue);
-      } else {
-          applyAccountProfile(null);
-      }
-  }, [payeeValue, applyAccountProfile]);
 
   useEffect(() => {
       const incomeValue = Number(incomeAmountValue || 0);
@@ -649,10 +554,18 @@ export default function IncomeExpenseClient() {
       if (!value) return;
 
       const prefix = selectedTransactionType === 'Income' ? 'IN' : 'EX';
-      if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
+      
+      // If user entered just a number, format it with prefix
+      // If user entered a full ID (with prefix), preserve it as-is
+      if (value && !isNaN(parseInt(value)) && isFinite(Number(value)) && !value.match(/^(IN|EX)\d+$/i)) {
+          // Only format if it's a plain number without prefix
           value = generateReadableId(prefix, parseInt(value) - 1, 5);
           setValue('transactionId', value);
+      } else if (value) {
+          // Preserve the value as user entered it (could be full ID like IN00001)
+          setValue('transactionId', value);
       }
+      
       const foundTransaction = allTransactions.find(t => t.transactionId === value);
       if (foundTransaction) {
           handleEdit(foundTransaction);
@@ -666,8 +579,6 @@ export default function IncomeExpenseClient() {
 
 
   const handleAutoFill = useCallback((payeeName: string) => {
-    applyAccountProfile(payeeName);
-
     if (!uniquePayees.includes(payeeName)) return;
 
     const trimmedPayeeName = toTitleCase(payeeName.trim());
@@ -687,9 +598,9 @@ export default function IncomeExpenseClient() {
                 }, 50);
             }, 50);
         }, 0);
-        toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
+        // Removed unnecessary toast message
     }
-  }, [allTransactions, applyAccountProfile, setValue, toast, uniquePayees]);
+  }, [allTransactions, setValue, toast, uniquePayees]);
 
   const handleNew = useCallback(() => {
     setEditingTransaction(null);
@@ -711,9 +622,158 @@ export default function IncomeExpenseClient() {
       setEditingTransaction(transaction);
   }, []);
 
-  const handleAddNewAccount = useCallback(() => {
-      router.push('/expense-tracker/payee-profile?create=1');
-  }, [router]);
+  // Load accounts from Firestore
+  useEffect(() => {
+    const unsubscribe = getAccountsRealtime((accountList) => {
+      const mappedAccounts = new Map<string, Account>();
+      accountList.forEach(account => {
+        if (account?.name) {
+          const normalizedName = toTitleCase(account.name.trim());
+          mappedAccounts.set(normalizedName, account);
+        }
+      });
+      setAccounts(mappedAccounts);
+    }, (error) => {
+
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Auto-fill form when account is selected
+  useEffect(() => {
+    if (selectedAccount) {
+      const account = accounts.get(selectedAccount);
+      if (account) {
+        if (account.contact) setValue('description', account.contact, { shouldValidate: false });
+        if (account.nature) setValue('expenseNature', account.nature, { shouldValidate: false });
+        if (account.category) setValue('category', account.category, { shouldValidate: false });
+        if (account.subCategory) setValue('subCategory', account.subCategory, { shouldValidate: false });
+      }
+    }
+  }, [selectedAccount, accounts, setValue]);
+
+  const handleAddAccount = useCallback(() => {
+      setNewAccount({ name: '', contact: '', address: '', nature: '', category: '', subCategory: '' });
+      setIsAddAccountOpen(true);
+  }, []);
+
+  const handleSaveNewAccount = useCallback(async () => {
+      if (!newAccount.name.trim()) {
+          toast({ title: 'Error', description: 'Please enter an account name', variant: 'destructive' });
+          return;
+      }
+      try {
+          setIsSubmitting(true);
+          const accountData: Account = {
+              name: newAccount.name.trim(),
+              contact: (newAccount.contact?.trim() || '').length > 0 ? newAccount.contact.trim() : undefined,
+              address: (newAccount.address?.trim() || '').length > 0 ? newAccount.address.trim() : undefined,
+              nature: newAccount.nature || undefined,
+              category: (newAccount.category?.trim() || '').length > 0 ? newAccount.category.trim() : undefined,
+              subCategory: (newAccount.subCategory?.trim() || '').length > 0 ? newAccount.subCategory.trim() : undefined,
+          };
+          await addAccount(accountData);
+          
+          const normalized = toTitleCase(newAccount.name.trim());
+          setSelectedAccount(normalized);
+          setValue('payee', normalized, { shouldValidate: true });
+          setIsAddAccountOpen(false);
+          setNewAccount({ name: '', contact: '', address: '', nature: '', category: '', subCategory: '' });
+          toast({ title: 'Success', description: `Account "${normalized}" added successfully.` });
+      } catch (error) {
+
+          toast({ title: 'Error', description: 'Failed to add account', variant: 'destructive' });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }, [newAccount, setValue, toast]);
+
+  const handleEditAccount = useCallback(() => {
+      if (!selectedAccount) return;
+      const account = accounts.get(selectedAccount);
+      if (account) {
+          setEditAccount({
+              name: account.name || '',
+              contact: account.contact || '',
+              address: account.address || '',
+              nature: (account.nature as 'Permanent' | 'Seasonal' | '') || '',
+              category: account.category || '',
+              subCategory: account.subCategory || '',
+          });
+      } else {
+          setEditAccount({ name: selectedAccount, contact: '', address: '', nature: '', category: '', subCategory: '' });
+      }
+      setIsEditAccountOpen(true);
+  }, [selectedAccount, accounts]);
+
+  const handleSaveEditAccount = useCallback(async () => {
+      if (!selectedAccount || !editAccount.name.trim()) {
+          toast({ title: 'Error', description: 'Please enter an account name', variant: 'destructive' });
+          return;
+      }
+      const oldName = selectedAccount;
+      const newName = toTitleCase(editAccount.name.trim());
+      
+      try {
+          setIsSubmitting(true);
+          const accountData: Account = {
+              name: newName,
+              contact: editAccount.contact.trim() || undefined,
+              address: editAccount.address.trim() || undefined,
+              nature: editAccount.nature || undefined,
+              category: editAccount.category.trim() || undefined,
+              subCategory: editAccount.subCategory.trim() || undefined,
+          };
+          
+          // Update account in accounts collection
+          await updateAccount(accountData, oldName);
+          
+          // If name changed, update all transactions
+          if (oldName !== newName) {
+              await Promise.all([
+                  updateExpensePayee(oldName, newName),
+                  updateIncomePayee(oldName, newName)
+              ]);
+              setSelectedAccount(newName);
+              setValue('payee', newName, { shouldValidate: true });
+          }
+          
+          setIsEditAccountOpen(false);
+          toast({ title: 'Success', description: `Account "${oldName}" updated successfully.` });
+      } catch (error) {
+
+          toast({ title: 'Error', description: 'Failed to update account', variant: 'destructive' });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }, [selectedAccount, editAccount, setValue, toast]);
+
+  const handleDeleteAccount = useCallback(async () => {
+      if (!selectedAccount) return;
+
+      try {
+          setIsSubmitting(true);
+          // Delete account from accounts collection
+          await deleteAccount(selectedAccount);
+          // Delete all transactions for this payee
+          await Promise.all([
+              deleteExpensesForPayee(selectedAccount),
+              deleteIncomesForPayee(selectedAccount)
+          ]);
+          
+          setSelectedAccount(null);
+          setValue('payee', '', { shouldValidate: true });
+          setIsDeleteAccountOpen(false);
+          toast({ title: 'Success', description: `Account "${selectedAccount}" and all its transactions have been deleted` });
+      } catch (error) {
+
+          toast({ title: 'Error', description: 'Failed to delete account', variant: 'destructive' });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }, [selectedAccount, setValue, toast]);
+
 
   useEffect(() => {
       if (selectedAccount) {
@@ -761,7 +821,18 @@ export default function IncomeExpenseClient() {
         }, 50);
     }, 50);
     
-    setIsAdvanced(!!(transaction.status || transaction.taxAmount || (transaction as any).cdAmount || transaction.expenseType || transaction.mill || transaction.projectId));
+    // When editing, always turn on advanced option so user can see and edit all fields
+    // Check if any advanced fields have values (status always exists, so this will be true)
+    const hasAdvancedFields = 
+      transaction.status !== undefined || // Status always exists
+      (transaction.taxAmount !== undefined && transaction.taxAmount !== null) || // Tax amount field exists
+      ((transaction as any).cdAmount !== undefined && (transaction as any).cdAmount !== null) || // CD amount field exists
+      transaction.expenseType !== undefined || // Expense type field exists
+      (transaction.mill !== undefined && transaction.mill !== null) || // Mill field exists
+      (transaction.projectId !== undefined && transaction.projectId !== null); // Project field exists
+    
+    // When editing, turn on advanced - this ensures user can see all options
+    setIsAdvanced(hasAdvancedFields || true); // Always true when editing
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
   }, [editingTransaction, loans, setValue, reset]);
@@ -849,7 +920,7 @@ export default function IncomeExpenseClient() {
         setIncomeCategories(incomeCats);
         setExpenseCategories(expenseCats);
       } catch (error) {
-        console.error('Error loading categories:', error);
+
       }
     };
     loadAllCategories();
@@ -862,7 +933,7 @@ export default function IncomeExpenseClient() {
         newCats.forEach(cat => existingMap.set(cat.id, cat));
         return Array.from(existingMap.values());
       });
-    }, console.error);
+    }, () => {});
     const unsubExpenseCats = getExpenseCategories((newCats) => {
       setExpenseCategories(prev => {
         // Merge new categories with existing ones
@@ -870,7 +941,7 @@ export default function IncomeExpenseClient() {
         newCats.forEach(cat => existingMap.set(cat.id, cat));
         return Array.from(existingMap.values());
       });
-    }, console.error);
+    }, () => {});
     
     return () => {
       unsubIncomeCats();
@@ -878,37 +949,6 @@ export default function IncomeExpenseClient() {
     };
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = getPayeeProfilesRealtime((profiles) => {
-        console.log('[PayeeProfiles] ========================================');
-        console.log('[PayeeProfiles] Received profiles in component:', profiles.length);
-        console.log('[PayeeProfiles] All profile names from Firestore:', profiles.map(p => p.name));
-        console.log('[PayeeProfiles] ========================================');
-        const mappedProfiles = new Map<string, PayeeProfile>();
-        profiles.forEach(profile => {
-            if (!profile?.name) {
-                console.warn('[PayeeProfiles] Profile without name:', profile);
-                return;
-            }
-            const normalizedName = toTitleCase(profile.name.trim());
-            if (normalizedName) {
-                // Store with normalized name as key
-                mappedProfiles.set(normalizedName, profile);
-                // Also store with original case if different
-                if (profile.name !== normalizedName) {
-                    mappedProfiles.set(profile.name, profile);
-                }
-            }
-        });
-        console.log('[PayeeProfiles] Mapped profiles count:', mappedProfiles.size);
-        console.log('[PayeeProfiles] Mapped profile keys (all):', Array.from(mappedProfiles.keys()));
-        setPayeeProfiles(mappedProfiles);
-    }, (error) => {
-        console.error('[PayeeProfiles] Error in component:', error);
-    });
-
-    return () => unsubscribe();
-  }, []);
   
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -949,7 +989,7 @@ export default function IncomeExpenseClient() {
       toast({ title: "Transaction deleted.", variant: "success" });
       if (editingTransaction?.id === transaction.id) handleNew();
     } catch (error) {
-      console.error("Error deleting transaction: ", error);
+
       toast({ title: "Failed to delete transaction.", variant: "destructive" });
     }
   };
@@ -1054,6 +1094,8 @@ export default function IncomeExpenseClient() {
         }
         toast({ title: "Transaction updated.", variant: "success" });
       } else {
+        // For new transactions, preserve user-entered transactionId if provided, otherwise let the function generate one
+        // transactionId is already validated for uniqueness above, so we can safely pass it
         if (activeType === 'Income') {
             await addIncome(transactionData as Omit<Income, 'id'>);
         } else {
@@ -1072,7 +1114,7 @@ export default function IncomeExpenseClient() {
       
       handleNew();
     } catch (error) {
-        console.error("Error saving transaction: ", error);
+
         toast({ title: "Failed to save transaction.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
@@ -1235,7 +1277,7 @@ export default function IncomeExpenseClient() {
       }
       
       // If all parsing fails, return 0 (will be sorted last)
-      console.warn(`[Balance Calc] Failed to parse date: ${dateStr}`);
+
       return 0;
     };
     
@@ -1384,7 +1426,7 @@ export default function IncomeExpenseClient() {
       });
       setSelectedTransactionIds(new Set());
     } catch (error) {
-      console.error("Bulk date update failed:", error);
+
       toast({
         title: "Failed to update dates",
         description: "Please try again.",
@@ -1546,13 +1588,22 @@ export default function IncomeExpenseClient() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">
-                New Account
-              </p>
-              <Button onClick={handleAddNewAccount} size="sm" variant="outline" className="whitespace-nowrap">
+              <Button onClick={handleAddAccount} size="sm" variant="outline" className="whitespace-nowrap" title="Add New Account">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Add New Account
+                Add Account
               </Button>
+              {selectedAccount && (
+                <>
+                  <Button onClick={handleEditAccount} size="sm" variant="outline" className="whitespace-nowrap" title="Edit Account Name">
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                  <Button onClick={() => setIsDeleteAccountOpen(true)} size="sm" variant="outline" className="whitespace-nowrap text-destructive hover:text-destructive" title="Delete Account">
+                    <X className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </>
+              )}
               <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="whitespace-nowrap" title="Manage Categories & Subcategories">
                 <Settings className="mr-2 h-4 w-4" />
                 Categories
@@ -1633,28 +1684,6 @@ export default function IncomeExpenseClient() {
                   </div>
                 </div>
 
-                {selectedAccountProfile && (
-                  <div className="flex flex-wrap gap-2 rounded-md border border-muted-foreground/10 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium text-foreground/70">Nature:</span>
-                      {selectedAccountProfile.nature || '—'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium text-foreground/70">Category:</span>
-                      {selectedAccountProfile.category || '—'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium text-foreground/70">Sub Category:</span>
-                      {selectedAccountProfile.subCategory || '—'}
-                    </span>
-                    {selectedAccountProfile.contact && (
-                      <span className="flex items-center gap-1">
-                        <span className="font-medium text-foreground/70">Contact:</span>
-                        {selectedAccountProfile.contact}
-                      </span>
-                    )}
-                  </div>
-                )}
 
                 <div className="grid grid-cols-2 gap-2">
                 <Controller
@@ -1867,8 +1896,8 @@ export default function IncomeExpenseClient() {
                     </div>
 
                       <div className="space-y-0.5">
-                      <Label htmlFor="rate" className="text-xs">Rate</Label>
-                        <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-7 text-xs" />} />
+                      <Label htmlFor="expense-rate" className="text-xs">Rate</Label>
+                        <Controller name="rate" control={control} render={({ field }) => <Input id="expense-rate" type="number" {...field} className="h-7 text-xs" />} />
                     </div>
                   </div>
                 </div>
@@ -1968,46 +1997,46 @@ export default function IncomeExpenseClient() {
         <Card>
           <CardHeader className="flex flex-col gap-0 p-0">
             {(() => {
-              const profile = selectedAccount ? payeeProfiles.get(toTitleCase(selectedAccount)) : selectedAccountProfile;
-              const accountName = selectedAccount || (profile?.name ? toTitleCase(profile.name) : null);
-              
-              // If no profile or profile missing details, check transactions
-              const accountTransactions = accountName ? filteredTransactions.filter(
-                tx => toTitleCase(tx.payee) === accountName
-              ) : [];
-              
-              // Get nature from profile or transactions
-              const nature = profile?.nature || 
-                accountTransactions.find(tx => (tx as any).expenseNature)?.expenseNature ||
-                null;
-              
-              // Get category from profile or transactions
-              const category = profile?.category || 
-                accountTransactions.find(tx => tx.category)?.category ||
-                null;
-              
-              // Get subCategory from profile or transactions
-              const subCategory = profile?.subCategory || 
-                accountTransactions.find(tx => tx.subCategory)?.subCategory ||
-                null;
+              const accountName = selectedAccount;
               
               // Only show if we have account selected
               if (!accountName) return null;
+              
+              // Get account details from accounts map
+              const account = accounts.get(accountName);
+              
+              // Get details from transactions
+              const accountTransactions = filteredTransactions.filter(
+                tx => toTitleCase(tx.payee) === accountName
+              );
+              
+              // Get nature from account or transactions
+              const nature = account?.nature || accountTransactions.find(tx => (tx as any).expenseNature)?.expenseNature || null;
+              
+              // Get category from account or transactions
+              const category = account?.category || accountTransactions.find(tx => tx.category)?.category || null;
+              
+              // Get subCategory from account or transactions
+              const subCategory = account?.subCategory || accountTransactions.find(tx => tx.subCategory)?.subCategory || null;
               
               return (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 pt-4 pb-0">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Name</p>
-                    <p className="text-xs text-foreground">{profile?.name || accountName || '—'}</p>
+                    <p className="text-xs text-foreground">{accountName || '—'}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Contact No</p>
-                    <p className="text-xs text-foreground">{profile?.contact || '—'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Address</p>
-                    <p className="text-xs text-foreground">{profile?.address || '—'}</p>
-                  </div>
+                  {account?.contact && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Contact</p>
+                      <p className="text-xs text-foreground">{account.contact}</p>
+                    </div>
+                  )}
+                  {account?.address && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Address</p>
+                      <p className="text-xs text-foreground">{account.address}</p>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Nature</p>
                     <p className="text-xs text-foreground">{nature ? toTitleCase(nature) : '—'}</p>
@@ -2071,6 +2100,273 @@ export default function IncomeExpenseClient() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Account Dialog */}
+      <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+        <DialogContent className="max-w-2xl p-0 gap-0 bg-emerald-950 border-emerald-800">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-emerald-800">
+            <DialogTitle className="text-lg font-semibold text-white">Add New Account</DialogTitle>
+            <DialogDescription className="text-sm text-emerald-300 mt-1">
+              Enter account details for auto-fill in transactions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-2 max-h-[calc(90vh-200px)] overflow-y-auto bg-emerald-950">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountName" className="text-xs text-emerald-200">
+                    Account Name <span className="text-rose-400">*</span>
+                  </Label>
+                  <Input
+                    id="newAccountName"
+                    value={newAccount.name}
+                    onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
+                    placeholder="Enter account name..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountContact" className="text-xs text-emerald-200">Contact No.</Label>
+                  <Input
+                    id="newAccountContact"
+                    value={newAccount.contact}
+                    onChange={(e) => setNewAccount({ ...newAccount, contact: e.target.value })}
+                    placeholder="Enter contact number..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountNature" className="text-xs text-emerald-200">Nature</Label>
+                  <div className="bg-emerald-900 border border-emerald-500 rounded-md">
+                    <CustomDropdown
+                      options={[
+                        { value: 'Permanent', label: 'Permanent' },
+                        { value: 'Seasonal', label: 'Seasonal' },
+                      ]}
+                      value={newAccount.nature || null}
+                      onChange={(value) => {
+                        setNewAccount({ ...newAccount, nature: value as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
+                      }}
+                      placeholder="Select nature..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountAddress" className="text-xs text-emerald-200">Address</Label>
+                  <Input
+                    id="newAccountAddress"
+                    value={newAccount.address}
+                    onChange={(e) => setNewAccount({ ...newAccount, address: e.target.value })}
+                    placeholder="Enter address..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountCategory" className="text-xs text-emerald-200">Category</Label>
+                  <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!newAccount.nature ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <CustomDropdown
+                      options={newAccount.nature 
+                        ? expenseCategories
+                            .filter(cat => cat.nature === newAccount.nature)
+                            .map(cat => ({ value: cat.name, label: cat.name }))
+                        : []
+                      }
+                      value={newAccount.category || null}
+                      onChange={(value) => {
+                        setNewAccount({ ...newAccount, category: value || '', subCategory: '' });
+                      }}
+                      placeholder="Select category..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountSubCategory" className="text-xs text-emerald-200">Sub Category</Label>
+                  <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!newAccount.category ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <CustomDropdown
+                      options={newAccount.category
+                        ? (expenseCategories.find(cat => cat.name === newAccount.category)?.subCategories || 
+                           incomeCategories.find(cat => cat.name === newAccount.category)?.subCategories || [])
+                            .map(sub => ({ value: sub, label: sub }))
+                        : []
+                      }
+                      value={newAccount.subCategory || null}
+                      onChange={(value) => {
+                        setNewAccount({ ...newAccount, subCategory: value || '' });
+                      }}
+                      placeholder="Select sub category..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t border-emerald-800 bg-emerald-950">
+            <Button variant="outline" onClick={() => setIsAddAccountOpen(false)} disabled={isSubmitting} className="h-9 border-emerald-700 text-emerald-200 hover:bg-emerald-900 hover:text-white">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNewAccount} disabled={!newAccount.name.trim() || isSubmitting} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Add Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Account Dialog */}
+      <Dialog open={isEditAccountOpen} onOpenChange={setIsEditAccountOpen}>
+        <DialogContent className="max-w-2xl p-0 gap-0 bg-emerald-950 border-emerald-800">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-emerald-800">
+            <DialogTitle className="text-lg font-semibold text-white">Edit Account</DialogTitle>
+            <DialogDescription className="text-sm text-emerald-300 mt-1">
+              Update account details. Changing name will update all related transactions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-2 max-h-[calc(90vh-200px)] overflow-y-auto bg-emerald-950">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountName" className="text-xs text-emerald-200">
+                    Account Name <span className="text-rose-400">*</span>
+                  </Label>
+                  <Input
+                    id="editAccountName"
+                    value={editAccount.name}
+                    onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value })}
+                    placeholder="Enter account name..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountContact" className="text-xs text-emerald-200">Contact No.</Label>
+                  <Input
+                    id="editAccountContact"
+                    value={editAccount.contact}
+                    onChange={(e) => setEditAccount({ ...editAccount, contact: e.target.value })}
+                    placeholder="Enter contact number..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountNature" className="text-xs text-emerald-200">Nature</Label>
+                  <div className="bg-emerald-900 border border-emerald-500 rounded-md">
+                    <CustomDropdown
+                      options={[
+                        { value: 'Permanent', label: 'Permanent' },
+                        { value: 'Seasonal', label: 'Seasonal' },
+                      ]}
+                      value={editAccount.nature || null}
+                      onChange={(value) => {
+                        setEditAccount({ ...editAccount, nature: value as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
+                      }}
+                      placeholder="Select nature..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountAddress" className="text-xs text-emerald-200">Address</Label>
+                  <Input
+                    id="editAccountAddress"
+                    value={editAccount.address}
+                    onChange={(e) => setEditAccount({ ...editAccount, address: e.target.value })}
+                    placeholder="Enter address..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountCategory" className="text-xs text-emerald-200">Category</Label>
+                  <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!editAccount.nature ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <CustomDropdown
+                      options={editAccount.nature 
+                        ? expenseCategories
+                            .filter(cat => cat.nature === editAccount.nature)
+                            .map(cat => ({ value: cat.name, label: cat.name }))
+                        : []
+                      }
+                      value={editAccount.category || null}
+                      onChange={(value) => {
+                        setEditAccount({ ...editAccount, category: value || '', subCategory: '' });
+                      }}
+                      placeholder="Select category..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="editAccountSubCategory" className="text-xs text-emerald-200">Sub Category</Label>
+                  <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!editAccount.category ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <CustomDropdown
+                      options={editAccount.category
+                        ? (expenseCategories.find(cat => cat.name === editAccount.category)?.subCategories || 
+                           incomeCategories.find(cat => cat.name === editAccount.category)?.subCategories || [])
+                            .map(sub => ({ value: sub, label: sub }))
+                        : []
+                      }
+                      value={editAccount.subCategory || null}
+                      onChange={(value) => {
+                        setEditAccount({ ...editAccount, subCategory: value || '' });
+                      }}
+                      placeholder="Select sub category..."
+                      maxRows={5}
+                      showScrollbar={true}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t border-emerald-800 bg-emerald-950">
+            <Button variant="outline" onClick={() => setIsEditAccountOpen(false)} disabled={isSubmitting} className="h-9 border-emerald-700 text-emerald-200 hover:bg-emerald-900 hover:text-white">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditAccount} disabled={!editAccount.name.trim() || isSubmitting} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <AlertDialog open={isDeleteAccountOpen} onOpenChange={setIsDeleteAccountOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the account "{selectedAccount}"? This will permanently delete all income and expense transactions associated with this account. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CategoryManagerDialog
         isOpen={isCategoryManagerOpen}

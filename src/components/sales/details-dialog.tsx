@@ -414,7 +414,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                         setPaymentToDelete(null);
                                         onOpenChange(false);
                                     } catch (error) {
-                                        console.error('Error deleting payment:', error);
+
                                         toast({
                                             title: "Error",
                                             description: "Failed to delete payment. Please try again.",

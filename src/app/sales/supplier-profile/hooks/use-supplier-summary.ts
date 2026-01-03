@@ -41,6 +41,101 @@ const buildProfileKey = (profile: FuzzySupplierProfile, index: number): string =
   return `profile_${index}`;
 };
 
+// Helper function to parse payment ID for proper sorting
+// Handles IDs like: E832, EX00039, EX00138, EX00138.1, P00081, RT00393, etc.
+const parsePaymentIdForSort = (id: string): { prefix: string; numericValue: number; decimalValue: number } => {
+  if (!id || typeof id !== 'string') return { prefix: '', numericValue: 0, decimalValue: 0 };
+  
+  // Clean the ID - remove any non-alphanumeric characters except dots
+  const cleanId = id.trim().replace(/[^A-Za-z0-9.]/g, '');
+  if (!cleanId) return { prefix: '', numericValue: 0, decimalValue: 0 };
+  
+  // Extract prefix (letters), number, and optional decimal part
+  // Pattern: letters + digits + optional decimal point + optional decimal digits
+  const match = cleanId.match(/^([A-Za-z]*)(\d+)(?:\.(\d+))?$/);
+  if (match && match[2]) {
+    const prefix = match[1] || '';
+    const numberStr = match[2] || '0';
+    const decimalStr = match[3] || '0';
+    
+    // Convert to numbers for proper numeric comparison
+    const numericValue = parseInt(numberStr, 10);
+    const decimalValue = decimalStr ? parseInt(decimalStr, 10) : 0;
+    
+    // Validate that parsing was successful
+    if (!isNaN(numericValue)) {
+      return { prefix, numericValue, decimalValue };
+    }
+  }
+  
+  // Fallback: if no match or parsing failed, treat entire ID as string for prefix comparison
+  return { prefix: cleanId || id, numericValue: 0, decimalValue: 0 };
+};
+
+// Sort payment by ID (ascending for chronological processing order)
+const sortPaymentByIdAscending = (a: Payment, b: Payment): number => {
+  try {
+    const idA = (a.id || a.paymentId || '').toString().trim();
+    const idB = (b.id || b.paymentId || '').toString().trim();
+    
+    if (!idA && !idB) return 0;
+    if (!idA) return 1;
+    if (!idB) return -1;
+    
+    const parsedA = parsePaymentIdForSort(idA);
+    const parsedB = parsePaymentIdForSort(idB);
+    
+    // First compare prefixes alphabetically (case-insensitive)
+    const prefixA = parsedA.prefix.toUpperCase();
+    const prefixB = parsedB.prefix.toUpperCase();
+    const prefixCompare = prefixA.localeCompare(prefixB);
+    if (prefixCompare !== 0) return prefixCompare;
+    
+    // If prefixes are same, compare numbers numerically (ascending for chronological order)
+    if (parsedA.numericValue !== parsedB.numericValue) {
+      return parsedA.numericValue - parsedB.numericValue;
+    }
+    
+    // If numbers are same, compare decimal parts (ascending)
+    return parsedA.decimalValue - parsedB.decimalValue;
+  } catch (error) {
+    console.error('Error sorting payment:', error, a, b);
+    return 0;
+  }
+};
+
+// Sort payment by ID (descending for display - highest ID first)
+const sortPaymentByIdDescending = (a: Payment, b: Payment): number => {
+  try {
+    const idA = (a.id || a.paymentId || '').toString().trim();
+    const idB = (b.id || b.paymentId || '').toString().trim();
+    
+    if (!idA && !idB) return 0;
+    if (!idA) return 1;
+    if (!idB) return -1;
+    
+    const parsedA = parsePaymentIdForSort(idA);
+    const parsedB = parsePaymentIdForSort(idB);
+    
+    // First compare prefixes alphabetically (case-insensitive)
+    const prefixA = parsedA.prefix.toUpperCase();
+    const prefixB = parsedB.prefix.toUpperCase();
+    const prefixCompare = prefixA.localeCompare(prefixB);
+    if (prefixCompare !== 0) return prefixCompare;
+    
+    // If prefixes are same, compare numbers numerically (descending - highest first)
+    if (parsedA.numericValue !== parsedB.numericValue) {
+      return parsedB.numericValue - parsedA.numericValue;
+    }
+    
+    // If numbers are same, compare decimal parts (descending)
+    return parsedB.decimalValue - parsedA.decimalValue;
+  } catch (error) {
+    console.error('Error sorting payment:', error, a, b);
+    return 0;
+  }
+};
+
 export const useSupplierSummary = (
   suppliers: Supplier[],
   paymentHistory: Payment[],
@@ -110,41 +205,67 @@ export const useSupplierSummary = (
       const finalTotalPaid = Math.round(totalPaidForEntry * 100) / 100;
       const finalTotalCd = Math.round(totalCdForEntry * 100) / 100;
       
-      // Check for Gov. payment extra amount
-      // If Gov. payment exists, use adjusted original (Original + Extra Amount)
+      // Initialize variables (will be calculated in outstanding calculation)
       let adjustedOriginal = s.originalNetAmount || 0;
       let totalExtraAmount = 0;
       
-      // Find Gov. payment for this entry
-      const govPayment = paymentsForEntry.find(p => 
-        (p as any).receiptType === 'Gov.' && 
-        p.paidFor?.some(pf => pf.srNo === s.srNo)
-      );
+      // Outstanding calculation using new method:
+      // 1. Get base outstanding from supplier data (originalNetAmount - this is the actual outstanding before any payments)
+      // 2. Add all extra amounts from Gov payments (chronologically by payment ID order)
+      // 3. This gives Total Payable Amount
+      // 4. Subtract all payments made (chronologically by payment ID order) from Total Payable Amount
+      // 5. Result = Outstanding (no capping needed)
       
-      if (govPayment) {
-        // Get extra amount from paidFor array
-        const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === s.srNo);
-        // IMPORTANT: Check for adjustedOriginal first (most reliable)
-        // If adjustedOriginal is available, use it directly
-        if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
-          adjustedOriginal = paidForThisEntry.adjustedOriginal;
-          totalExtraAmount = adjustedOriginal - (s.originalNetAmount || 0);
-        } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
-          // Fallback: Use extraAmount to calculate adjustedOriginal
-          // IMPORTANT: Check for extraAmount even if it's 0 (use !== undefined, not truthy check)
-          // extraAmount can be 0 if Gov. Required = Receipt Outstanding
-          totalExtraAmount = paidForThisEntry.extraAmount || 0;
-          adjustedOriginal = (s.originalNetAmount || 0) + totalExtraAmount;
-        } else if (paidForThisEntry && (govPayment as any).extraAmount !== undefined) {
-          // Fallback: Check payment-level extraAmount if paidFor doesn't have it
-          totalExtraAmount = (govPayment as any).extraAmount || 0;
-          adjustedOriginal = (s.originalNetAmount || 0) + totalExtraAmount;
+      // Step 1: Get base outstanding from supplier entry
+      // IMPORTANT: Use originalNetAmount as the base (original amount before any payments)
+      // This is the "actual outstanding" from supplier data as per user's requirement
+      const baseOutstanding = s.originalNetAmount || 0;
+      
+      // Step 2: Find all Gov payments for this entry and sort chronologically (by payment ID/processing order)
+      const allGovPayments = paymentsForEntry
+        .filter(p => {
+          const receiptType = ((p as any).receiptType || '').trim().toLowerCase();
+          const isGovByType = receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov');
+          const hasGovFields = (p as any).govQuantity !== undefined || 
+                              (p as any).govRate !== undefined || 
+                              (p as any).govAmount !== undefined ||
+                              (p as any).extraAmount !== undefined ||
+                              (p as any).govRequiredAmount !== undefined;
+          return (isGovByType || hasGovFields) && p.paidFor?.some(pf => pf.srNo === s.srNo);
+        })
+        .sort(sortPaymentByIdAscending);
+      
+      // Step 3: Add all extra amounts chronologically (as they were added)
+      // IMPORTANT: If one receipt has multiple Gov payments, each payment's extraAmount is added separately
+      // Example: If receipt S001 has 3 Gov payments (RT001, RT002, RT003), all 3 extraAmounts will be summed
+      // Reset totalExtraAmount (already declared above)
+      totalExtraAmount = 0;
+      allGovPayments.forEach(govPayment => {
+        const paidForEntry = govPayment.paidFor?.find(pf => pf.srNo === s.srNo);
+        if (paidForEntry && paidForEntry.extraAmount !== undefined) {
+          // Add extraAmount from THIS payment (each payment contributes separately)
+          totalExtraAmount += paidForEntry.extraAmount || 0;
         }
-      }
+      });
       
-      // Outstanding = Adjusted Original - Paid - CD
-      // Adjusted Original = Original + Extra Amount (for Gov. payments)
-      const finalOutstanding = adjustedOriginal - finalTotalPaid - finalTotalCd;
+      // Step 4: Calculate Total Payable Amount = Base Outstanding + All Extra Amounts
+      const totalPayableAmount = baseOutstanding + totalExtraAmount;
+      
+      // Step 5: Subtract all payments made (chronologically by payment ID order)
+      // Sort all payments by ID to get processing order
+      const allPaymentsSorted = [...paymentsForEntry].sort(sortPaymentByIdAscending);
+      
+      // Step 5: Use finalTotalPaid (already calculated from all payments) for consistency
+      // This ensures we use the same payment amount that was used for totalPaidForEntry
+      // IMPORTANT: finalTotalPaid is the direct sum from all payments, which is more reliable
+      // than recalculating from sorted payments which might have rounding differences
+      
+      // Step 6: Calculate Outstanding = Total Payable - All Payments - All CD (no capping)
+      // Use finalTotalPaid instead of recalculating totalPaidAmount to ensure consistency
+      let finalOutstanding = totalPayableAmount - finalTotalPaid - finalTotalCd;
+      
+      // Also calculate adjustedOriginal for display (Base + Extra Amounts)
+      adjustedOriginal = baseOutstanding + totalExtraAmount;
       
       return {
         ...s,
@@ -163,9 +284,6 @@ export const useSupplierSummary = (
         outstandingForEntry: Math.round(finalOutstanding * 100) / 100,
         // netAmount mirrors outstandingForEntry for downstream logic
         netAmount: Math.round(finalOutstanding * 100) / 100,
-        // Store extra amount for reference
-        extraAmount: totalExtraAmount,
-        adjustedOriginal: adjustedOriginal,
       };
     });
 
@@ -210,11 +328,11 @@ export const useSupplierSummary = (
       const displayFather = groupProfile.fatherName || firstSupplier.so || firstSupplier.fatherName || '';
       const displayAddress = groupProfile.address || firstSupplier.address || '';
       
-      // Get all unique payments for this group
+      // Get all unique payments for this group and sort them for display
       const allPayments = groupSuppliers.flatMap(s => s.paymentsForEntry);
       const uniquePayments = Array.from(
         new Map(allPayments.map(p => [p.id || p.paymentId || `${p.date}_${p.amount}`, p])).values()
-      );
+      ).sort(sortPaymentByIdDescending);
       
       // Calculate total RTGS paid from actual RTGS payments
       // IMPORTANT: Use sum of paidFor.amount, not rtgsAmount
@@ -270,14 +388,13 @@ export const useSupplierSummary = (
         totalCashPaid: totalCashPaidFromPayments,
         totalRtgsPaid: totalRtgsPaidFromPayments,
         totalCdAmount,
-        // IMPORTANT: Outstanding = Adjusted Original - Paid - CD
-        // Adjusted Original = Original + Extra Amount (from Gov. payments)
-        // This handles Gov. payment overpayment scenarios
-        totalOutstanding: totalAdjustedOriginal - totalPaid - totalCdAmount,
-        paymentHistory: groupSuppliers.flatMap(s => s.paymentsForEntry),
+        // IMPORTANT: Final Outstanding = Sum of all individual entry outstanding amounts
+        // This ensures consistency: Final Outstanding = Sum of all Outstanding column values
+        totalOutstanding: groupSuppliers.reduce((sum, s) => sum + toNumber(s.outstandingForEntry), 0),
+        paymentHistory: [...groupSuppliers.flatMap(s => s.paymentsForEntry)].sort(sortPaymentByIdDescending),
         outstandingEntryIds: groupSuppliers.filter(s => s.outstandingForEntry > 0).map(s => s.srNo),
         allTransactions: groupSuppliers,
-        allPayments: groupSuppliers.flatMap(s => s.paymentsForEntry),
+        allPayments: [...groupSuppliers.flatMap(s => s.paymentsForEntry)].sort(sortPaymentByIdDescending),
         transactionsByVariety: groupSuppliers.reduce((acc, s) => {
           const variety = toTitleCase(s.variety);
           acc[variety] = (acc[variety] || 0) + 1;
@@ -342,12 +459,12 @@ export const useSupplierSummary = (
             const otherCharges = toNumber(s.otherCharges);
             // Safety check: prevent extremely large values (likely data corruption)
             if (Math.abs(otherCharges) > 1000000000) { // 1 billion limit
-                console.warn(`Invalid otherCharges value for ${s.srNo}:`, otherCharges);
+
                 return sum;
             }
             return sum + otherCharges;
         }, 0),
-        totalDeductions: groupSuppliers.reduce((sum, s) => sum + toNumber(s.deductions), 0),
+        totalDeductions: groupSuppliers.reduce((sum, s) => sum + toNumber((s as any).deductions || 0), 0),
         averageRate: 0, // Will be calculated below
         minRate: 0, // Will be calculated below
         maxRate: 0, // Will be calculated below
@@ -447,10 +564,11 @@ export const useSupplierSummary = (
 
     // Set mill overview data properly
     millSummary.allTransactions = processedSuppliers;
-    millSummary.allPayments = paymentHistory;
-    // IMPORTANT: Outstanding = Original - Paid - CD (use totalPaid, not totalCashPaid + totalRtgsPaid)
-    // totalPaid is calculated from paidFor.amount which is the correct amount
-    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
+    // Sort paymentHistory for display (descending - highest ID first)
+    millSummary.allPayments = [...paymentHistory].sort(sortPaymentByIdDescending);
+    // IMPORTANT: Final Outstanding = Sum of all individual entry outstanding amounts
+    // This ensures consistency: Final Outstanding = Sum of all Outstanding column values
+    millSummary.totalOutstanding = processedSuppliers.reduce((sum, s) => sum + toNumber(s.outstandingForEntry), 0);
     
     // Ensure mill summary has all the necessary data
     millSummary.paymentHistory = millSummary.allPayments;

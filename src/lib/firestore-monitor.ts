@@ -88,10 +88,7 @@ class FirestoreMonitor {
 
   private logToConsole(collection: string, operation: string, type: string, count: number) {
     if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `[Firestore ${type.toUpperCase()}] ${collection}.${operation} (${count} docs)`,
-        `Total: R:${this.readCount} W:${this.writeCount} D:${this.deleteCount}`
-      );
+
     }
   }
 

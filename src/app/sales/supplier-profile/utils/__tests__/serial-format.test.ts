@@ -32,25 +32,23 @@ const numericTestCases = [
 ];
 
 // Run tests
-console.log('Testing Serial Number Formatting:');
+
 testCases.forEach(({ input, expected }) => {
   const result = formatSerialNumber(input);
   const status = result === expected ? '✅ PASS' : '❌ FAIL';
-  console.log(`${status}: formatSerialNumber('${input}') = '${result}' (expected: '${expected}')`);
+
 });
 
-console.log('\nTesting Serial Number Parsing:');
 parseTestCases.forEach(({ input, expected }) => {
   const result = parseSerialNumber(input);
   const status = result === expected ? '✅ PASS' : '❌ FAIL';
-  console.log(`${status}: parseSerialNumber('${input}') = '${result}' (expected: '${expected}')`);
+
 });
 
-console.log('\nTesting Numeric Extraction:');
 numericTestCases.forEach(({ input, expected }) => {
   const result = getSerialNumberNumeric(input);
   const status = result === expected ? '✅ PASS' : '❌ FAIL';
-  console.log(`${status}: getSerialNumberNumeric('${input}') = '${result}' (expected: '${expected}')`);
+
 });
 
 export { testCases, parseTestCases, numericTestCases };

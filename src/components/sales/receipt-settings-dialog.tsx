@@ -38,7 +38,7 @@ export const ReceiptSettingsDialog = ({ isOpen, setIsOpen, settings, setSettings
                 setIsOpen(false);
                 toast({ title: "Success", description: "Receipt details saved successfully." });
             } catch (error) {
-                console.error("Error saving receipt settings:", error);
+
                 toast({ title: "Error", description: "Failed to save details.", variant: "destructive" });
             }
         }

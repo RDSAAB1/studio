@@ -349,7 +349,7 @@ export const useCustomerPayments = () => {
             handleSettleAmountChange(0);
             handleToBePaidChange(0);
         } catch (error) {
-            console.error("Error processing payment:", error);
+
             toast({ title: "Failed to process payment", description: (error as Error).message, variant: "destructive" });
         } finally {
             setIsProcessing(false);
@@ -403,7 +403,7 @@ export const useCustomerPayments = () => {
             });
             toast({ title: "Payment deleted successfully", variant: "success" });
         } catch (error) {
-            console.error("Error deleting payment:", error);
+
             toast({ title: "Failed to delete payment", description: (error as Error).message, variant: "destructive" });
         }
     }, [data, toast]);

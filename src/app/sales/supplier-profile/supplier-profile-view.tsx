@@ -66,15 +66,76 @@ const PaymentHistoryTable = ({
     payments: (Payment | CustomerPayment)[]; 
     onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
 }) => {
-    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(payments, {
-        totalItems: payments.length,
+    // Helper function to get payment ID for sorting
+    const getPaymentIdForSort = (payment: Payment | CustomerPayment): string => {
+        return (payment?.id || payment?.paymentId || '').toString();
+    };
+
+    // Helper: parse ID into prefix and numeric part for proper sorting
+    // Handles IDs like EX00118, EX0000174, EX00839.1
+    const parseIdForSort = React.useCallback((id: string): { prefix: string; numericValue: number; decimalValue: number } => {
+        if (!id) return { prefix: '', numericValue: 0, decimalValue: 0 };
+        
+        // Extract prefix (letters), number, and optional decimal part
+        // Pattern: letters + digits + optional decimal point + optional decimal digits
+        const match = id.match(/^([A-Za-z]*)(\d+)(?:\.(\d+))?$/);
+        if (match) {
+            const prefix = match[1] || '';
+            const numberStr = match[2] || '0';
+            const decimalStr = match[3] || '0';
+            
+            // Convert to numbers for proper numeric comparison
+            const numericValue = parseInt(numberStr, 10) || 0;
+            const decimalValue = parseFloat('0.' + decimalStr) || 0;
+            
+            return { prefix, numericValue, decimalValue };
+        }
+        
+        // Fallback: if no match, treat entire ID as string for prefix comparison
+        return { prefix: id, numericValue: 0, decimalValue: 0 };
+    }, []);
+
+    // Sort payments by ID (descending - high to low)
+    const sortedPayments = React.useMemo(() => {
+        return [...payments].sort((a, b) => {
+            const idA = getPaymentIdForSort(a);
+            const idB = getPaymentIdForSort(b);
+            if (!idA && !idB) return 0;
+            if (!idA) return 1;
+            if (!idB) return -1;
+            
+            const parsedA = parseIdForSort(idA);
+            const parsedB = parseIdForSort(idB);
+            
+            // First compare prefixes alphabetically (case-insensitive)
+            const prefixA = parsedA.prefix.toUpperCase();
+            const prefixB = parsedB.prefix.toUpperCase();
+            const prefixCompare = prefixA.localeCompare(prefixB);
+            if (prefixCompare !== 0) return prefixCompare;
+            
+            // If prefixes are same, compare numeric part (descending - high to low)
+            if (parsedB.numericValue !== parsedA.numericValue) {
+                return parsedB.numericValue - parsedA.numericValue;
+            }
+            
+            // If numeric parts are equal, compare decimal parts (descending)
+            if (parsedB.decimalValue !== parsedA.decimalValue) {
+                return parsedB.decimalValue - parsedA.decimalValue;
+            }
+            
+            return 0;
+        });
+    }, [payments, parseIdForSort]);
+
+    const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedPayments, {
+        totalItems: sortedPayments.length,
         initialLoad: 30,
         loadMore: 30,
         threshold: 5,
-        enabled: payments.length > 30,
+        enabled: sortedPayments.length > 30,
     });
 
-    const visiblePayments = payments.slice(0, visibleItems);
+    const visiblePayments = sortedPayments.slice(0, visibleItems);
 
     return (
         <Card>
@@ -114,14 +175,14 @@ const PaymentHistoryTable = ({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {!hasMore && payments.length > 30 && (
+                                {!hasMore && sortedPayments.length > 30 && (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center py-2 text-xs text-muted-foreground">
-                                            Showing all {payments.length} payments
+                                            Showing all {sortedPayments.length} payments
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {payments.length === 0 && (
+                                {sortedPayments.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
                                     </TableRow>
@@ -395,10 +456,31 @@ export const SupplierProfileView = ({
                                     </div>
                                     {(() => {
                                         // Calculate total extra amount from Gov. payments
-                                        const totalExtraAmount = (selectedSupplierData.allTransactions || []).reduce((sum, t) => {
-                                            const extra = (t as any).extraAmount || 0;
-                                            return sum + extra;
-                                        }, 0);
+                                        // IMPORTANT: Calculate extra amount from ALL Gov payments' paidFor entries
+                                        // This ensures:
+                                        // 1. All entries in a single Gov payment are counted
+                                        // 2. If one receipt has multiple Gov payments, ALL payments' extraAmounts are summed
+                                        // Example: Receipt S001 with 3 Gov payments (RT001, RT002, RT003) = sum of all 3 extraAmounts
+                                        const totalExtraAmount = (selectedSupplierData.allPayments || [])
+                                            .filter(p => {
+                                                const receiptType = ((p as any).receiptType || '').trim();
+                                                return receiptType === 'Gov.' || receiptType.toLowerCase() === 'gov' || receiptType.toLowerCase().startsWith('gov');
+                                            })
+                                            .reduce((sum, govPayment) => {
+                                                // Sum ALL paidFor entries' extraAmount for this Gov payment
+                                                const matchingPaidFor = govPayment.paidFor?.filter(pf => 
+                                                    (selectedSupplierData.allTransactions || []).some(t => t.srNo === pf.srNo)
+                                                ) || [];
+                                                
+                                                // Sum extraAmount from ALL matching paidFor entries in THIS payment
+                                                // Each Gov payment contributes its extraAmount separately
+                                                const extraForThisPayment = matchingPaidFor.reduce((paymentSum, pf) => {
+                                                    return paymentSum + ((pf as any).extraAmount || 0);
+                                                }, 0);
+                                                
+                                                // Add this payment's extraAmount to total (each payment counted separately)
+                                                return sum + extraForThisPayment;
+                                            }, 0);
                                         
                                         if (totalExtraAmount > 0) {
                                             const adjustedOriginal = (selectedSupplierData.totalOriginalAmount || 0) + totalExtraAmount;
@@ -438,10 +520,31 @@ export const SupplierProfileView = ({
                                     </div>
                                     {(() => {
                                         // Calculate total extra amount from Gov. payments
-                                        const totalExtraAmount = (selectedSupplierData.allTransactions || []).reduce((sum, t) => {
-                                            const extra = (t as any).extraAmount || 0;
-                                            return sum + extra;
-                                        }, 0);
+                                        // IMPORTANT: Calculate extra amount from ALL Gov payments' paidFor entries
+                                        // This ensures:
+                                        // 1. All entries in a single Gov payment are counted
+                                        // 2. If one receipt has multiple Gov payments, ALL payments' extraAmounts are summed
+                                        // Example: Receipt S001 with 3 Gov payments (RT001, RT002, RT003) = sum of all 3 extraAmounts
+                                        const totalExtraAmount = (selectedSupplierData.allPayments || [])
+                                            .filter(p => {
+                                                const receiptType = ((p as any).receiptType || '').trim();
+                                                return receiptType === 'Gov.' || receiptType.toLowerCase() === 'gov' || receiptType.toLowerCase().startsWith('gov');
+                                            })
+                                            .reduce((sum, govPayment) => {
+                                                // Sum ALL paidFor entries' extraAmount for this Gov payment
+                                                const matchingPaidFor = govPayment.paidFor?.filter(pf => 
+                                                    (selectedSupplierData.allTransactions || []).some(t => t.srNo === pf.srNo)
+                                                ) || [];
+                                                
+                                                // Sum extraAmount from ALL matching paidFor entries in THIS payment
+                                                // Each Gov payment contributes its extraAmount separately
+                                                const extraForThisPayment = matchingPaidFor.reduce((paymentSum, pf) => {
+                                                    return paymentSum + ((pf as any).extraAmount || 0);
+                                                }, 0);
+                                                
+                                                // Add this payment's extraAmount to total (each payment counted separately)
+                                                return sum + extraForThisPayment;
+                                            }, 0);
                                         
                                         if (totalExtraAmount > 0) {
                                             const adjustedOriginal = (selectedSupplierData.totalOriginalAmount || 0) + totalExtraAmount;
@@ -478,13 +581,24 @@ export const SupplierProfileView = ({
                                         <span className="font-medium text-green-500 text-[10px]">{formatCurrency(selectedSupplierData.totalRtgsPaid || 0)}</span>
                                     </div>
                                     {(() => {
+                                        // IMPORTANT: Sum ALL paidFor amounts for Gov payments, not just one entry per payment
                                         const govPaid = (selectedSupplierData.allPayments || [])
-                                            .filter(p => (p as any).receiptType === 'Gov.')
+                                            .filter(p => {
+                                                const receiptType = ((p as any).receiptType || '').trim();
+                                                return receiptType === 'Gov.' || receiptType.toLowerCase() === 'gov' || receiptType.toLowerCase().startsWith('gov');
+                                            })
                                             .reduce((sum, p) => {
-                                                const paidForThis = p.paidFor?.find(pf => 
+                                                // Sum ALL paidFor amounts for this Gov payment that match filtered transactions
+                                                const matchingPaidFor = p.paidFor?.filter(pf => 
                                                     (selectedSupplierData.allTransactions || []).some(t => t.srNo === pf.srNo)
+                                                ) || [];
+                                                
+                                                // Sum ALL matching paidFor amounts, not just one
+                                                const govPaidForThisPayment = matchingPaidFor.reduce((paymentSum, pf) => 
+                                                    paymentSum + (pf.amount || 0), 0
                                                 );
-                                                return sum + (paidForThis?.amount || 0);
+                                                
+                                                return sum + govPaidForThisPayment;
                                             }, 0);
                                         if (govPaid > 0) {
                                             return (

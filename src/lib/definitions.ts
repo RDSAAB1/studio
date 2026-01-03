@@ -62,6 +62,9 @@ export type Customer = {
   bagWeightKg?: number;
   bagRate?: number;
   bagAmount?: number;
+  bagWeightDeductionAmount?: number; // Bag Weight (QTL) × Rate deduction from amount
+  transportationRate?: number; // Transportation rate per QTL
+  transportAmount?: number; // Transport Amount = Transportation Rate × Final Weight
   isGstIncluded?: boolean;
   gstin?: string;
   
@@ -210,14 +213,15 @@ export type Transaction = {
 export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
 export type Expense = Omit<Transaction, 'transactionType'> & { transactionType: 'Expense' };
 
-export type PayeeProfile = {
-    name: string;
-    contact?: string;
-    address?: string;
-    nature?: string;
-    category?: string;
-    subCategory?: string;
-    updatedAt?: string;
+export type Account = {
+  id?: string;
+  name: string;
+  contact?: string;
+  address?: string;
+  nature?: 'Permanent' | 'Seasonal';
+  category?: string;
+  subCategory?: string;
+  updatedAt?: string;
 };
 
 

@@ -17,7 +17,7 @@ import { Pen, Save, Trash } from "lucide-react";
 interface OptionsManagerDialogProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
-    type: 'variety' | 'paymentType' | null;
+    type: 'variety' | 'paymentType' | 'centerName' | null;
     options: OptionItem[];
     onAdd: (collectionName: string, optionData: { name: string }) => void;
     onUpdate: (collectionName: string, id: string, optionData: { name: string }) => void;
@@ -31,8 +31,8 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
 
     if (!type) return null;
 
-    const title = type === 'variety' ? "Manage Varieties" : "Manage Payment Types";
-    const collectionName = type === 'variety' ? 'varieties' : 'paymentTypes';
+    const title = type === 'variety' ? "Manage Varieties" : type === 'paymentType' ? "Manage Payment Types" : "Manage Center Names";
+    const collectionName = type === 'variety' ? 'varieties' : type === 'paymentType' ? 'paymentTypes' : 'centerNames';
 
     const handleSave = () => {
         if (editingOption) {
@@ -57,7 +57,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
             onUpdate(collectionName, editingOption.id, { name: trimmedName });
             toast({ 
                 title: "Option updated successfully.", 
-                description: `Updated to "${toTitleCase(trimmedName)}".`,
+                description: `Updated to "${trimmedName.toUpperCase()}".`,
                 variant: "success" 
             });
             setEditingOption(null);
@@ -74,11 +74,11 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
             });
             return;
         }
-        onAdd(collectionName, { name: toTitleCase(trimmedName) });
+        onAdd(collectionName, { name: trimmedName });
         setNewOptionName("");
         toast({ 
             title: "Option Added", 
-            description: `${toTitleCase(trimmedName)} has been added.`, 
+            description: `${trimmedName.toUpperCase()} has been added.`,
             variant: "success" 
         });
     };
@@ -114,7 +114,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                                         />
                                     ) : (
-                                        <span className="flex-grow">{toTitleCase(String(option.name))}</span>
+                                        <span className="flex-grow">{String(option.name).toUpperCase()}</span>
                                     )}
                                     <div className="flex gap-1">
                                         <Button 
@@ -133,7 +133,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>This will permanently delete the option "{toTitleCase(String(option.name))}".</AlertDialogDescription>
+                                                    <AlertDialogDescription>This will permanently delete the option "{String(option.name).toUpperCase()}".</AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>

@@ -12,9 +12,12 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { useSupplierData } from '@/hooks/use-supplier-data';
-import { addBank } from '@/lib/firestore';
+import { addBank, getOptionsRealtime, addOption, updateOption, deleteOption } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import type { OptionItem } from '@/lib/definitions';
+import { Settings } from 'lucide-react';
+import { OptionsManagerDialog } from '@/components/sales/options-manager-dialog';
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
@@ -43,12 +46,18 @@ export const PaymentForm = (props: any) => {
         checkNo, setCheckNo,
         onPaymentMethodChange, // Explicitly extract onPaymentMethodChange
         setPaymentMethod, // Also get setPaymentMethod directly as fallback
-        hideRtgsToggle = false // New prop to hide RTGS toggle
+        hideRtgsToggle = false, // New prop to hide RTGS toggle
+        centerName, setCenterName, // Center Name for Gov payments
+        centerNameOptions = [] // Center Name options
     } = props;
 
     // Local state for To Be Paid to prevent lag - updates immediately, syncs to parent after debounce
     const [localToBePaid, setLocalToBePaid] = useState(finalAmountToBePaid);
     const toBePaidDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+    
+    // Center Name management dialog state
+    const [isCenterNameDialogOpen, setIsCenterNameDialogOpen] = useState(false);
+    const { toast } = useToast();
 
     // Sync local state when prop changes (e.g., from external updates)
     useEffect(() => {
@@ -66,7 +75,7 @@ export const PaymentForm = (props: any) => {
 
     // Debug: Log when parchiNo changes
     useEffect(() => {
-        console.log('[PaymentForm] parchiNo value changed:', parchiNo);
+
     }, [parchiNo]);
 
     const paymentFromOptions = useMemo(() => {
@@ -99,9 +108,9 @@ export const PaymentForm = (props: any) => {
     return (
         <>
             <div className="w-full max-w-full flex flex-col h-full">
-                <Card className="w-full max-w-full overflow-hidden flex flex-col h-full">
-                    <CardContent className="px-2.5 py-2.5 space-y-2 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto">
-                          <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
+                <Card className="w-full max-w-full overflow-hidden flex flex-col h-full border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+                    <CardContent className="px-3 py-2.5 space-y-2 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                                 {!hideRtgsToggle && (
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     {(['Cash', 'Online', 'RTGS', 'Gov.'] as const).map((method) => (
@@ -110,10 +119,10 @@ export const PaymentForm = (props: any) => {
                                             type="button"
                                             size="sm"
                                             className={cn(
-                                                "h-6 px-2 text-[10px] font-semibold transition-all",
+                                                "h-7 px-3 text-[10px] font-extrabold transition-all border-2",
                                                 paymentMethod === method 
-                                                    ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1" 
-                                                    : "border border-input bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                                                    ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg border-primary/30" 
+                                                    : "border-border/40 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-background/80 hover:border-primary/20"
                                             )}
                                             variant={paymentMethod === method ? "default" : "ghost"}
                                             onClick={(e) => {
@@ -132,97 +141,138 @@ export const PaymentForm = (props: any) => {
                                 </div>
                                 )}
                                 <div className="flex items-center shrink-0">
-                                    <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-32 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
-                                        <span className={cn("absolute right-3 text-[10px] font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
-                                        <span className={cn("absolute left-3 text-[10px] font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
-                                        <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-24px)]' : 'translate-x-[-4px]' )}>
-                                            <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
-                                                <span className="text-[10px] font-bold text-primary-foreground">CD</span>
-                                            </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setCdEnabled(!cdEnabled)} 
+                                        className="relative w-32 h-7 flex items-center rounded-lg p-0.5 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    >
+                                        <span className="absolute left-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">Off</span>
+                                        <span className="absolute right-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">On</span>
+                                        <div
+                                            className={cn(
+                                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-md shadow-xl flex items-center justify-center z-10 border",
+                                                cdEnabled 
+                                                    ? "left-[calc(50%+2px)] border-primary"
+                                                    : "left-[2px] border-[hsl(160_40%_20%)]"
+                                            )}
+                                            style={{
+                                                backgroundColor: cdEnabled 
+                                                    ? 'hsl(160 40% 45%)' // Light green for ON
+                                                    : 'hsl(160 40% 20%)' // Dark green for OFF
+                                            }}
+                                        >
+                                            <span className="text-[9px] font-black text-primary-foreground drop-shadow-sm">CD</span>
                                         </div>
                                     </button>
                                 </div>
                             </div>
-                          <div className="flex flex-wrap items-end gap-x-2 gap-y-1.5 w-full">
-                            {/* Payment Details */}
+                          {/* Payment Details - 2 fields per row */}
+                          <div className="grid grid-cols-2 gap-2 w-full">
                             {/* Payment Date - Hidden for RTGS (will be filled from RTGS Report) */}
                             {paymentMethod !== 'RTGS' && (
-                                <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
-                                    <Label className="text-[10px]">Payment Date</Label>
+                                <div className="space-y-1 col-span-2">
+                                    <Label className="text-[10px] font-bold">Payment Date</Label>
                                     <SmartDatePicker
                                         value={paymentDate}
                                         onChange={(val) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                         placeholder="Pick a date"
-                                        inputClassName="h-7 text-[10px]"
-                                        buttonClassName="h-7 w-7"
+                                        inputClassName="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
+                                        buttonClassName="h-8 w-8"
                                         returnDate={true}
                                     />
                                 </div>
                             )}
                             
                             {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
-                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                    <Label className="text-[10px]">{paymentMethod === 'Cash' ? 'Payment ID (Voucher No.)' : 'Payment ID'}</Label>
-                                    <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono" />
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold">{paymentMethod === 'Cash' ? 'Payment ID (Voucher No.)' : 'Payment ID'}</Label>
+                                    <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
                             )}
                              
                             {(paymentMethod === 'Cash' || paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
-                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                    <Label className="text-[10px]">Parchi No. (SR#)</Label>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold">Parchi No. (SR#)</Label>
                                     <Input 
                                         value={parchiNo || ''} 
                                         onChange={(e) => {
-                                            console.log('[PaymentForm] Input onChange:', e.target.value);
+
                                             if (setParchiNo) {
                                                 setParchiNo(e.target.value);
                                             }
                                         }} 
-                                        className="h-7 text-[10px]"
+                                        className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
                                         key={`parchi-${parchiNo}`}
                                     />
                                 </div>
                             )}
 
                              {paymentMethod === 'Online' && (
-                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                    <Label className="text-[10px]">Check No. / Ref</Label>
-                                    <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-7 text-[10px]"/>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold">Check No. / Ref</Label>
+                                    <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"/>
                                 </div>
                             )}
 
                              {paymentMethod === 'RTGS' && (
-                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                    <Label className="text-[10px]">RTGS SR No.</Label>
-                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono" />
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold">RTGS SR No.</Label>
+                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
                             )}
 
                              {paymentMethod === 'Gov.' && (
-                                <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                    <Label className="text-[10px]">Gov. SR No.</Label>
-                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono" />
+                                <>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold">Gov. SR No.</Label>
+                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold flex items-center gap-1">Center Name <Button variant="ghost" size="icon" className="h-3.5 w-3.5 shrink-0 hover:bg-primary/10" onClick={() => setIsCenterNameDialogOpen(true)} title="Manage Center Names"><Settings className="h-2.5 w-2.5"/></Button></Label>
+                                    <CustomDropdown
+                                        options={centerNameOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))}
+                                        value={centerName || null}
+                                        onChange={(value) => {
+                                            if (setCenterName) {
+                                                setCenterName(value || '');
+                                            }
+                                        }}
+                                        placeholder="Select center..."
+                                        inputClassName="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
+                                        maxRows={5}
+                                        showScrollbar={true}
+                                    />
+                                </div>
+                                <div className="space-y-1 hidden">
+                                    <Label className="text-[10px] font-bold">Gov Payment</Label>
+                                    <div className="h-8 text-[10px] flex items-center px-3 py-1.5 bg-primary/10 border-2 border-primary/20 rounded-md text-primary font-extrabold">
+                                        Gov Payment Account
+                                    </div>
+                                </div>
+                                </>
                             )}
 
-                            <div className="space-y-0.5 flex-1 min-w-[90px] max-w-full">
-                                <Label className="text-[10px]">Payment Type</Label>
+                            {/* Payment Type - Hidden for Gov. payments (they are always Partial) */}
+                            {paymentMethod !== 'Gov.' && (
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-bold">Payment Type</Label>
                                 <Select value={paymentType} onValueChange={setPaymentType}>
-                                    <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Full">Full</SelectItem>
                                         <SelectItem value="Partial">Partial</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+                            )}
                             
-                            <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
-                                <Label htmlFor="settle-amount" className="text-[10px]">Settle Amount</Label>
-                                <Input id="settle-amount" type="number" value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-7 text-[10px]", paymentType === 'Partial' && 'bg-muted/50')} />
+                            <div className="space-y-1">
+                                <Label htmlFor="settle-amount" className="text-[10px] font-bold">Settle Amount</Label>
+                                <Input id="settle-amount" type="number" value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-[10px] border-2 border-primary/20 focus:border-primary", paymentType === 'Partial' && 'bg-muted/50')} />
                             </div>
 
-                             <div className="space-y-0.5 flex-1 min-w-[100px] max-w-full">
-                                <Label className="text-[10px] font-bold text-green-600">To Be Paid</Label>
+                             <div className="space-y-1">
+                                <Label className="text-[10px] font-extrabold text-green-600">To Be Paid</Label>
                                 <Input 
                                     type="number" 
                                     value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)} 
@@ -241,26 +291,46 @@ export const PaymentForm = (props: any) => {
                                         }, 500); // 500ms debounce for parent updates
                                     }} 
                                     readOnly={paymentType === 'Full'} 
-                                    className={cn("h-7 text-[10px] font-bold text-green-600 border-green-500 bg-green-500/10", paymentType === 'Full' && 'bg-muted/50 border-input')} 
+                                    className={cn("h-8 text-[10px] font-extrabold text-green-600 border-2 border-green-500/30 bg-green-500/10 focus:border-green-500", paymentType === 'Full' && 'bg-muted/50 border-input')} 
                                 />
                             </div>
                             
-                            <div className="space-y-0.5 flex-1 min-w-[120px] max-w-full">
-                                <Label className="text-[10px]">Payment From</Label>
+                            {/* Payment From - Hidden for Gov. payments */}
+                            {paymentMethod !== 'Gov.' && (
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-bold">Payment From</Label>
                                 <CustomDropdown
                                     options={paymentFromOptions}
                                     value={selectedAccountId}
                                     onChange={(value) => setSelectedAccountId(value)}
                                     placeholder="Select Account"
-                                    inputClassName="h-7 text-[10px]"
+                                    inputClassName="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
                                 />
                             </div>
-                        </div>
+                            )}
+                            </div>
                         
                     </CardContent>
                 </Card>
             </div>
             <CardFooter className="p-0 pt-2" />
+            
+            {/* Center Name Management Dialog */}
+            <OptionsManagerDialog
+                isOpen={isCenterNameDialogOpen}
+                setIsOpen={setIsCenterNameDialogOpen}
+                type="centerName"
+                options={centerNameOptions}
+                onAdd={async (collectionName, optionData) => {
+                    await addOption(collectionName, optionData);
+                }}
+                onUpdate={async (collectionName, id, optionData) => {
+                    await updateOption(collectionName, id, optionData);
+                }}
+                onDelete={async (collectionName, id, name) => {
+                    await deleteOption(collectionName, id, name);
+                }}
+            />
         </>
     );
 };

@@ -85,7 +85,7 @@ function attachEventListeners() {
 export function initLocalFirstSync() {
     if (typeof window === 'undefined') return;
     attachEventListeners();
-    console.log('✅ Local-First Sync initialized');
+
 }
 
 /**
@@ -144,18 +144,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                         ...changes,
                         updatedAt: new Date().toISOString()
                     };
-                    
-                    console.log(`[writeLocalFirst] Updating ${collectionName}:${id}`, {
-                        existingKeys: Object.keys(existing),
-                        changesKeys: Object.keys(changes),
-                        updatedKeys: Object.keys(updated),
-                        sampleChanges: {
-                            name: changes.name || existing.name,
-                            variety: changes.variety || existing.variety,
-                            grossWeight: changes.grossWeight || existing.grossWeight
-                        }
-                    });
-                    
+
                     await localTable.put(updated);
                     
                     // Verify the update
@@ -163,8 +152,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                     if (!verify) {
                         throw new Error(`Failed to verify update: ${collectionName}:${id}`);
                     }
-                    console.log(`[writeLocalFirst] Update verified for ${collectionName}:${id}`);
-                    
+
                     pendingChanges.set(`${collectionName}:${id}`, {
                         id,
                         type: 'update',
@@ -178,7 +166,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                     await syncToFirestore();
                     return updated;
                 } else {
-                    console.warn(`[writeLocalFirst] Entry not found locally: ${collectionName}:${id}, treating as create`);
+
                     // If not found locally, treat as create
                     if (data) {
                         // ✅ Ensure updatedAt and createdAt fields exist with current timestamp
@@ -220,7 +208,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                 break;
         }
     } catch (error) {
-        console.error(`Error in writeLocalFirst (${collectionName}/${operation}):`, error);
+
         throw error;
     }
 }
@@ -247,7 +235,7 @@ export async function readLocalFirst<T extends { id: string }>(
             return items as T[];
         }
     } catch (error) {
-        console.error(`Error reading from local (${collectionName}):`, error);
+
         return null;
     }
 }
@@ -342,6 +330,26 @@ function convertDatesToTimestamps(data: any): any {
     return converted;
 }
 
+// Map collection names to sync processor task types
+function getSyncTaskType(collectionName: CollectionName, operation: ChangeType): string {
+    // Map plural collection names to singular task types for processors
+    const collectionMap: Record<string, string> = {
+        'suppliers': 'supplier',
+        'customers': 'customer',
+        'payments': 'payment',
+        'customerPayments': 'customerPayment',
+    };
+    
+    const mappedName = collectionMap[collectionName] || collectionName;
+    
+    // ✅ Map 'create' operations to 'upsert' for suppliers and customers (processors use 'upsert')
+    if (operation === 'create' && (collectionName === 'suppliers' || collectionName === 'customers')) {
+        return `upsert:${mappedName}`;
+    }
+    
+    return `${operation}:${mappedName}`;
+}
+
 export async function syncToFirestore() {
     if (!pendingChanges.size || typeof window === 'undefined') return;
 
@@ -365,10 +373,12 @@ export async function syncToFirestore() {
                             batch.set(docRef, firestoreData);
                         } catch (error: any) {
                             if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
-                                // Queue for later sync
+                                // Queue for later sync - use correct task type
+                                const taskType = getSyncTaskType(change.collection, 'create');
+                                // ✅ Pass the full data object directly (processors expect Customer/Supplier object, not {id, data})
                                 await enqueueSyncTask(
-                                    `create:${change.collection}`,
-                                    { id: change.id, data: change.data },
+                                    taskType,
+                                    change.data,
                                     { dedupeKey: `${change.collection}:${change.id}` }
                                 );
                                 continue; // Skip this change
@@ -397,8 +407,10 @@ export async function syncToFirestore() {
                             }
                         } catch (error: any) {
                             if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
+                                // Queue for later sync - use correct task type
+                                const taskType = getSyncTaskType(change.collection, 'update');
                                 await enqueueSyncTask(
-                                    `update:${change.collection}`,
+                                    taskType,
                                     { id: change.id, changes: change.changes },
                                     { dedupeKey: `${change.collection}:update:${change.id}` }
                                 );
@@ -411,18 +423,31 @@ export async function syncToFirestore() {
                     break;
 
                 case 'delete':
+                    // Use sync queue for delete operations to ensure proper multi-device sync
                     try {
-                        batch.delete(docRef);
+                        // Use correct task type
+                        const taskType = getSyncTaskType(change.collection, 'delete');
+                        await enqueueSyncTask(
+                            taskType,
+                            { id: change.id },
+                            { 
+                                attemptImmediate: true,
+                                dedupeKey: `${change.collection}:delete:${change.id}` 
+                            }
+                        );
+                        // Don't add to batch since sync queue will handle it
+                        continue;
                     } catch (error: any) {
-                        if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
-                            await enqueueSyncTask(
-                                `delete:${change.collection}`,
-                                { id: change.id },
-                                { dedupeKey: `${change.collection}:delete:${change.id}` }
-                            );
-                            continue; // Skip this change
-                        } else {
-                            throw error;
+                        // If enqueue fails, try direct delete as fallback
+                        try {
+                            batch.delete(docRef);
+                        } catch (deleteError: any) {
+                            if (deleteError?.code === 'permission-denied' || deleteError?.code === 'unavailable') {
+                                // Re-queue for later
+                                pendingChanges.set(`${change.collection}:${change.id}`, change);
+                            } else {
+                                throw deleteError;
+                            }
                         }
                     }
                     break;
@@ -432,8 +457,17 @@ export async function syncToFirestore() {
             try {
                 const { notifySyncRegistry } = await import('./sync-registry');
                 await notifySyncRegistry(change.collection, { batch });
+                
+                // ✅ Also update payment sync registry when suppliers/customers are updated
+                // This ensures payment listeners refresh when entry data changes
+                if (change.collection === 'suppliers' || change.collection === 'customers') {
+                    await notifySyncRegistry('payments', { batch });
+                    if (change.collection === 'customers') {
+                        await notifySyncRegistry('customerPayments', { batch });
+                    }
+                }
             } catch (registryError) {
-                console.error(`Error updating sync registry for ${change.collection}:`, registryError);
+
                 // Continue even if registry update fails
             }
             
@@ -449,7 +483,7 @@ export async function syncToFirestore() {
                 }
             }
         } catch (error) {
-            console.error(`Error syncing ${change.collection}/${change.id} to Firestore:`, error);
+
             // Re-add to pending changes for retry
             pendingChanges.set(`${change.collection}:${change.id}`, change);
         }
@@ -526,7 +560,7 @@ async function syncFromFirestore() {
             await syncCollectionFromFirestore('expenses', 'expenses', getLastSyncTime('expenses'));
         } catch {}
     } catch (error) {
-        console.error('Error syncing from Firestore:', error);
+
     }
 }
 
@@ -599,7 +633,7 @@ async function syncCollectionFromFirestore(
         }
     } catch (error: any) {
         if (error?.code !== 'permission-denied' && error?.code !== 'unavailable') {
-            console.error(`Error syncing ${collectionName} from Firestore:`, error);
+
         }
     }
 }

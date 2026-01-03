@@ -217,7 +217,7 @@ export const ImportPreviewDialog = ({
       await onImport(previewRows);
       onOpenChange(false);
     } catch (error) {
-      console.error('Import failed:', error);
+
     } finally {
       setIsImporting(false);
     }
@@ -231,7 +231,7 @@ export const ImportPreviewDialog = ({
       await onImport(selectedRows);
       onOpenChange(false);
     } catch (error) {
-      console.error('Import failed:', error);
+
     } finally {
       setIsImporting(false);
     }
@@ -250,7 +250,7 @@ export const ImportPreviewDialog = ({
         return newSet;
       });
     } catch (error) {
-      console.error('Import failed:', error);
+
     } finally {
       setIsImporting(false);
     }

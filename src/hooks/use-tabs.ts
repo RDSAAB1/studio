@@ -10,9 +10,7 @@ import {
   Truck,
   UserPlus,
   Wallet,
-  UserCircle,
   Users,
-  Scale,
   Calculator,
   Landmark,
   Users2,
@@ -81,14 +79,6 @@ export const allMenuItems: MenuItem[] = [
     id: "cash-bank",
     name: "Cash & Bank",
     icon: Landmark,
-  },
-  { 
-    id: "income-expense", 
-    name: "Income & Expense", 
-    icon: Scale, 
-    subMenus: [
-      { id: "expense-tracker/payee-profile", name: "Payee Profile", icon: UserCircle },
-    ],
   },
   {
     id: "sales-reports",

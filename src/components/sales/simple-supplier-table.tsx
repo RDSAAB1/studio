@@ -40,13 +40,15 @@ interface SimpleSupplierTableProps {
     paymentTypeOptions: OptionItem[];
 }
 
-export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions }: SimpleSupplierTableProps) => {
+export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions, highlightEntryId }: SimpleSupplierTableProps) => {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
     const clickTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const lastClickTimeRef = React.useRef<number>(0);
     
+    // Highlight entry when highlightEntryId changes (no scrolling to avoid unresponsiveness)
+
     // Infinite scroll pagination - moved to top to be available for drag handlers
     const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(suppliers, {
         totalItems: suppliers.length,
@@ -75,7 +77,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     }
                 }
             } catch (error) {
-                console.warn('Error restoring scroll position:', error);
+
             }
         };
         
@@ -100,7 +102,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                 try {
                     localStorage.setItem('supplier-table-scroll-position', String(viewport.scrollTop));
                 } catch (error) {
-                    console.warn('Error saving scroll position:', error);
+
                 }
             }, 200);
         };
@@ -348,7 +350,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                 variant: "success"
             });
         } catch (error) {
-            console.error('Error deleting supplier:', error);
+
             toast({ 
                 title: "Error deleting entry", 
                 description: "Failed to delete supplier entry.",
@@ -470,23 +472,22 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                     
                     // Only update if there's data to update
                     if (Object.keys(updateData).length > 0) {
-                        console.log('Updating supplier:', supplier.id, updateData);
+
                         const updateResult = await updateSupplier(supplier.id, updateData);
-                        console.log('Update result:', updateResult);
-                        
+
                         if (updateResult) {
                             successCount++;
                             try {
                                 await db.suppliers.put({ ...supplier, ...updateData });
                             } catch (localError) {
-                                console.error('Failed to update local cache for supplier', supplier.id, localError);
+
                             }
                         } else {
                             errorCount++;
                         }
                     }
                 } catch (error) {
-                    console.error('Error updating supplier:', supplier.id, error);
+
                     errorCount++;
                 }
             }
@@ -509,7 +510,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
             setMultiEditTouched(new Set());
             setSelectedSuppliers(new Set());
         } catch (error) {
-            console.error('Error in multi-edit save:', error);
+
             toast({
                 title: "Error",
                 description: "Failed to update entries",
@@ -553,7 +554,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
             
             setSelectedSuppliers(new Set());
         } catch (error) {
-            console.error('Error in multi-delete:', error);
+
             toast({
                 title: "Error",
                 description: "Failed to delete entries",
@@ -1103,10 +1104,13 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         }
                                     };
                                     
+                                    const isHighlighted = highlightEntryId === supplier.id;
+                                    
                                     return (
                                     <tr 
+                                        id={`entry-row-${supplier.id}`}
                                         key={supplier.id} 
-                                        className="border-b hover:bg-muted/30 h-8 cursor-pointer"
+                                        className={`border-b hover:bg-muted/30 h-8 cursor-pointer ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : ''}`}
                                         onClick={handleRowClick}
                                         onDoubleClick={handleRowDoubleClick}
                                     >

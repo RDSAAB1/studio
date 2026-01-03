@@ -22,7 +22,7 @@ export default function DataCapturePage() {
                 variant: "success",
             });
         } catch (error) {
-            console.error('Failed to read clipboard contents: ', error);
+
             toast({
                 title: "Paste Failed",
                 description: "Could not read data from the clipboard.",

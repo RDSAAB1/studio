@@ -322,7 +322,7 @@ export default function MigrationsPage() {
                 });
             }
         } catch (error: any) {
-            console.error('Export failed', error);
+
             toast({
                 title: 'Export failed',
                 description: error?.message || 'Unable to export data.',
@@ -366,7 +366,7 @@ export default function MigrationsPage() {
                     await bulkUpsertSuppliers(suppliers);
                     summaryParts.push(`${suppliers.length} suppliers`);
                 } catch (error: any) {
-                    console.error('Supplier import failed', error);
+
                     errors.push(`Suppliers: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -377,7 +377,7 @@ export default function MigrationsPage() {
                     await bulkUpsertCustomers(customers);
                     summaryParts.push(`${customers.length} customers`);
                 } catch (error: any) {
-                    console.error('Customer import failed', error);
+
                     errors.push(`Customers: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -388,7 +388,7 @@ export default function MigrationsPage() {
                     await bulkUpsertPayments(payments);
                     summaryParts.push(`${payments.length} supplier payments`);
                 } catch (error: any) {
-                    console.error('Supplier payment import failed', error);
+
                     errors.push(`Supplier payments: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -399,7 +399,7 @@ export default function MigrationsPage() {
                     await bulkUpsertCustomerPayments(payments);
                     summaryParts.push(`${payments.length} customer payments`);
                 } catch (error: any) {
-                    console.error('Customer payment import failed', error);
+
                     errors.push(`Customer payments: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -410,7 +410,7 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerAccounts(accounts);
                     summaryParts.push(`${accounts.length} ledger accounts`);
                 } catch (error: any) {
-                    console.error('Ledger account import failed', error);
+
                     errors.push(`Ledger accounts: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -422,7 +422,7 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerEntries(recalculated);
                     summaryParts.push(`${recalculated.length} ledger entries`);
                 } catch (error: any) {
-                    console.error('Ledger entry import failed', error);
+
                     errors.push(`Ledger entries: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -433,7 +433,7 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerCashAccounts(cashAccounts);
                     summaryParts.push(`${cashAccounts.length} ledger cash accounts`);
                 } catch (error: any) {
-                    console.error('Ledger cash account import failed', error);
+
                     errors.push(`Ledger cash accounts: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -444,7 +444,7 @@ export default function MigrationsPage() {
                     await bulkUpsertMandiReports(reports);
                     summaryParts.push(`${reports.length} mandi reports`);
                 } catch (error: any) {
-                    console.error('Mandi report import failed', error);
+
                     errors.push(`Mandi reports: ${error?.message || 'Unknown error'}`);
                 }
             }
@@ -464,7 +464,7 @@ export default function MigrationsPage() {
                 setImportErrors(errors);
             }
         } catch (error: any) {
-            console.error('Import failed', error);
+
             setImportSummary(null);
             setImportErrors([error?.message || 'Unknown import error.']);
             toast({

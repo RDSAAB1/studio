@@ -30,7 +30,7 @@ export default function ProjectManagementPage() {
     useEffect(() => {
         const unsubscribe = getProjectsRealtime(
             (data) => setProjects(data),
-            (error) => console.error('Error fetching projects:', error)
+            (error) => ('Error fetching projects:', error)
         );
         return () => unsubscribe();
     }, []);
@@ -66,7 +66,7 @@ export default function ProjectManagementPage() {
             await deleteProject(id);
             toast({ title: "Project deleted successfully", variant: "success" });
         } catch (error) {
-            console.error("Error deleting project:", error);
+
             toast({ title: "Failed to delete project", variant: "destructive" });
         }
     };
@@ -94,7 +94,7 @@ export default function ProjectManagementPage() {
             setIsDialogOpen(false);
             setCurrentProject({});
         } catch (error) {
-            console.error("Error saving project:", error);
+
             toast({ title: "Failed to save project", variant: "destructive" });
         }
     };

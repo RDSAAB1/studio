@@ -2,6 +2,7 @@
   date: string;
   supplierCash: number;
   supplierRtgs: number;
+  govDistribution: number;
   supplierPayments: number;
   incomes: number;
   expenses: number;

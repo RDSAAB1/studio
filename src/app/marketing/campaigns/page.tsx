@@ -61,7 +61,7 @@ export default function CampaignsPage() {
         localStorage.setItem('lastSync:campaigns', String(Date.now()));
       }
     }, (error) => {
-      console.error("Error fetching campaigns: ", error);
+
       setLoading(false);
     });
 
@@ -91,11 +91,17 @@ export default function CampaignsPage() {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (confirm("Are you sure you want to delete this campaign?")) {
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm("Are you sure you want to delete this campaign?", {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (confirmed) {
       try {
         await deleteDoc(doc(firestoreDB, "campaigns", id));
       } catch (error) {
-        console.error("Error deleting campaign: ", error);
+
       }
     }
   };
@@ -120,7 +126,7 @@ export default function CampaignsPage() {
       setFormData({ name: '', description: '', startDate: '', endDate: '' });
       setCurrentCampaign(null);
     } catch (error) {
-      console.error("Error saving campaign: ", error);
+
     } finally {
       setLoading(false);
     }

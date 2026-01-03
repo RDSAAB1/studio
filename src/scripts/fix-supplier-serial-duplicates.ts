@@ -18,9 +18,8 @@ export interface FixResult {
 }
 
 export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
-    console.log('🔧 Starting Supplier Serial Number Duplicate Fix...');
-    console.log('=' .repeat(60));
-    
+
+
     try {
         const suppliersRef = collection(firestoreDB, 'suppliers');
         const snapshot = await getDocs(suppliersRef);
@@ -60,18 +59,15 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         const errors: string[] = [];
         
         // Fix duplicate srNos
-        console.log('\n🔧 FIXING DUPLICATE SERIAL NUMBERS:');
-        console.log('-' .repeat(40));
-        
+
+
         srNoMap.forEach((records, srNo) => {
             if (records.length > 1) {
-                console.log(`\n📋 Fixing srNo: "${srNo}" (${records.length} duplicates)`);
-                
+
                 // Keep first record, fix others
                 records.slice(1).forEach((record, index) => {
                     const newSrNo = generateUniqueSrNo(srNo, index + 1);
-                    console.log(`  ${index + 2}. ID: ${record.id} → New srNo: "${newSrNo}"`);
-                    
+
                     try {
                         const supplierRef = doc(firestoreDB, 'suppliers', record.id);
                         batch.update(supplierRef, { srNo: newSrNo });
@@ -84,18 +80,15 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         });
         
         // Fix duplicate IDs
-        console.log('\n🔧 FIXING DUPLICATE IDs:');
-        console.log('-' .repeat(40));
-        
+
+
         idMap.forEach((records, id) => {
             if (records.length > 1) {
-                console.log(`\n📋 Fixing ID: "${id}" (${records.length} duplicates)`);
-                
+
                 // Keep first record, fix others
                 records.slice(1).forEach((record, index) => {
                     const newId = generateUniqueId(id, index + 1);
-                    console.log(`  ${index + 2}. srNo: ${record.srNo} → New ID: "${newId}"`);
-                    
+
                     try {
                         // Note: We can't update document ID directly, so we'll update the id field
                         const supplierRef = doc(firestoreDB, 'suppliers', record.id);
@@ -109,14 +102,12 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         });
         
         // Fix empty srNos
-        console.log('\n🔧 FIXING EMPTY SERIAL NUMBERS:');
-        console.log('-' .repeat(40));
-        
+
+
         suppliers.forEach((supplier) => {
             if (!supplier.srNo || supplier.srNo.trim() === '') {
                 const newSrNo = generateUniqueSrNo('S', 0);
-                console.log(`  ID: ${supplier.id} → New srNo: "${newSrNo}"`);
-                
+
                 try {
                     const supplierRef = doc(firestoreDB, 'suppliers', supplier.id);
                     batch.update(supplierRef, { srNo: newSrNo });
@@ -128,14 +119,12 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         });
         
         // Fix empty IDs
-        console.log('\n🔧 FIXING EMPTY IDs:');
-        console.log('-' .repeat(40));
-        
+
+
         suppliers.forEach((supplier) => {
             if (!supplier.id || supplier.id.trim() === '') {
                 const newId = generateUniqueId('SUP', 0);
-                console.log(`  srNo: ${supplier.srNo} → New ID: "${newId}"`);
-                
+
                 try {
                     const supplierRef = doc(firestoreDB, 'suppliers', supplier.id);
                     batch.update(supplierRef, { id: newId });
@@ -148,22 +137,20 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         
         // Commit all changes
         if (fixedSrNos > 0 || fixedIds > 0) {
-            console.log('\n💾 Committing changes to database...');
+
             await batch.commit();
-            console.log('✅ All changes committed successfully!');
+
         } else {
-            console.log('\n✅ No fixes needed - all data is clean!');
+
         }
         
         const summary = `Fixed ${fixedSrNos} srNo duplicates, ${fixedIds} ID duplicates. ${errors.length} errors.`;
-        
-        console.log('\n' + '=' .repeat(60));
-        console.log('✅ Fix completed successfully!');
-        console.log(`📊 Summary: ${summary}`);
-        
+
+
+
         if (errors.length > 0) {
-            console.log('\n⚠️ Errors encountered:');
-            errors.forEach(error => console.log(`  - ${error}`));
+
+            errors.forEach(error => (`  - ${error}`));
         }
         
         return {
@@ -176,7 +163,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         };
         
     } catch (error) {
-        console.error('❌ Error during fix:', error);
+
         return {
             success: false,
             fixedSrNos: 0,
@@ -219,5 +206,5 @@ function generateUniqueId(baseId: string, index: number): string {
 // Auto-run if called directly
 if (typeof window !== 'undefined') {
     (window as any).fixSupplierDuplicates = fixSupplierSerialDuplicates;
-    console.log('🔧 Supplier duplicate fixer loaded! Run: fixSupplierDuplicates()');
+
 }

@@ -28,7 +28,7 @@ import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, PayeeProfile } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, Account } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
 
@@ -39,7 +39,7 @@ const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
 const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
 const incomesCollection = collection(firestoreDB, "incomes");
 const expensesCollection = collection(firestoreDB, "expenses");
-const payeeProfilesCollection = collection(firestoreDB, "payeeProfiles");
+const accountsCollection = collection(firestoreDB, "accounts");
 const loansCollection = collection(firestoreDB, "loans");
 const fundTransactionsCollection = collection(firestoreDB, "fund_transactions");
 const banksCollection = collection(firestoreDB, "banks");
@@ -107,7 +107,7 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
     return onSnapshot(docRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
-            const options = Array.isArray(data.items) ? data.items.map((name: string) => ({ id: name.toLowerCase(), name: toTitleCase(name) })) : [];
+            const options = Array.isArray(data.items) ? data.items.map((name: string) => ({ id: name.toLowerCase(), name: name.toUpperCase() })) : [];
             
             // Save to local IndexedDB
             if (db) {
@@ -128,8 +128,7 @@ export async function addOption(collectionName: string, optionData: { name: stri
         throw new Error('Option name cannot be empty');
     }
     
-    const name = toTitleCase(optionData.name.trim());
-    console.log('addOption called:', { collectionName, name });
+    const name = optionData.name.trim().toUpperCase();
     
     const docRef = doc(optionsCollection, collectionName);
     
@@ -152,8 +151,6 @@ export async function addOption(collectionName: string, optionData: { name: stri
         const optionItem = { id: name.toLowerCase(), name, type: collectionName };
         await db.options.put(optionItem);
     }
-    
-    console.log('addOption completed:', { collectionName, name });
 }
 
 
@@ -162,7 +159,7 @@ export async function updateOption(collectionName: string, id: string, optionDat
         throw new Error('Option name cannot be empty');
     }
     
-    const newName = toTitleCase(optionData.name.trim());
+    const newName = optionData.name.trim().toUpperCase();
     const docRef = doc(optionsCollection, collectionName);
     
     // Get current items
@@ -217,7 +214,6 @@ export async function updateOption(collectionName: string, id: string, optionDat
         await db.options.put(optionItem);
     }
     
-    console.log('updateOption completed:', { collectionName, oldName, newName });
 }
 
 export async function deleteOption(collectionName: string, id: string, name: string): Promise<void> {
@@ -445,9 +441,18 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // --- Supplier Functions ---
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
+    // ✅ Use srNo as document ID if available, otherwise use the provided id
+    // This ensures suppliers are saved with serial number as document ID in Firestore
+    const documentId = supplierData.srNo && supplierData.srNo.trim() !== '' && supplierData.srNo !== 'S----' 
+        ? supplierData.srNo 
+        : supplierData.id;
+    
+    // Ensure the id field matches the document ID
+    const supplierWithCorrectId = { ...supplierData, id: documentId };
+    
     // Use local-first sync manager
     const { writeLocalFirst } = await import('./local-first-sync');
-    return await writeLocalFirst('suppliers', 'create', supplierData.id, supplierData) as Customer;
+    return await writeLocalFirst('suppliers', 'create', documentId, supplierWithCorrectId) as Customer;
 }
 
 // Find supplier Firestore document ID by serial number
@@ -466,65 +471,64 @@ export async function getSupplierIdBySrNo(srNo: string): Promise<string | null> 
 
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
   if (!id) {
-    console.error('updateSupplier: No ID provided');
     return false;
   }
   
   if (!supplierData || Object.keys(supplierData).length === 0) {
-    console.error('updateSupplier: No data provided to update');
     return false;
   }
   
   // ✅ Check if SR No is being changed - need to update related payments
+  // Use IndexedDB instead of Firestore to avoid reads
   let oldSrNo: string | undefined;
   let newSrNo: string | undefined;
   
-  if (supplierData.srNo) {
-    // Get current supplier to check old SR No
-    const supplierDoc = await getDoc(doc(suppliersCollection, id));
-    if (supplierDoc.exists()) {
-      const currentData = supplierDoc.data() as Customer;
-      oldSrNo = currentData.srNo;
+  if (supplierData.srNo && db) {
+    // Get current supplier from IndexedDB (no Firestore read)
+    const currentSupplier = await db.suppliers.get(id);
+    if (currentSupplier) {
+      oldSrNo = currentSupplier.srNo;
       newSrNo = supplierData.srNo;
       
-      // If SR No is changing, update all related payments
+      // If SR No is changing, update all related payments (use IndexedDB)
       if (oldSrNo && newSrNo && oldSrNo !== newSrNo) {
         try {
-          // Find all payments with old SR No in paidFor
-          const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: oldSrNo }));
-          const paymentsSnapshot = await getDocs(paymentsQuery);
+          // Find all payments with old SR No in paidFor from IndexedDB (no Firestore read)
+          const allPayments = await db.payments.toArray();
+          const affectedPayments = allPayments.filter(p => 
+            p.paidFor?.some((pf: any) => pf.srNo === oldSrNo)
+          );
           
-          if (!paymentsSnapshot.empty) {
-            const batch = writeBatch(firestoreDB);
-            
-            paymentsSnapshot.forEach(paymentDoc => {
-              const payment = paymentDoc.data() as Payment;
+          if (affectedPayments.length > 0) {
+            // Update IndexedDB first
+            for (const payment of affectedPayments) {
               if (payment.paidFor) {
-                // Update paidFor array: replace old SR No with new SR No
-                const updatedPaidFor = payment.paidFor.map(pf => 
+                const updatedPaidFor = payment.paidFor.map((pf: any) => 
                   pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                 );
-                
-                batch.update(paymentDoc.ref, {
-                  paidFor: updatedPaidFor,
-                  updatedAt: new Date().toISOString()
-                });
-                
-                // Also update IndexedDB
-                if (db) {
-                  db.payments.update(paymentDoc.id, {
+                await db.payments.update(payment.id, {
                     paidFor: updatedPaidFor,
                     updatedAt: new Date().toISOString()
-                  }).catch(err => console.error('Error updating payment in IndexedDB:', err));
-                }
+                } as any).catch(() => {});
               }
-            });
+            }
             
-            await batch.commit();
-            console.log(`Updated ${paymentsSnapshot.size} payments with new SR No: ${oldSrNo} -> ${newSrNo}`);
+            // Queue Firestore updates via sync (no immediate Firestore read/write)
+            const { enqueueSyncTask } = await import('./sync-queue');
+            for (const payment of affectedPayments) {
+              if (payment.paidFor) {
+                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                  pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
+                );
+                await enqueueSyncTask(
+                  'update:payments',
+                  { id: payment.id, changes: { paidFor: updatedPaidFor, updatedAt: new Date().toISOString() } },
+                  { attemptImmediate: true, dedupeKey: `payments:${payment.id}` }
+                ).catch(() => {});
+              }
+            }
           }
         } catch (error) {
-          console.error('Error updating payments for SR No change:', error);
           // Continue with supplier update even if payment update fails
         }
       }
@@ -534,89 +538,194 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   // Use local-first sync manager
   try {
     const { writeLocalFirst } = await import('./local-first-sync');
-    await writeLocalFirst('suppliers', 'update', id, undefined, supplierData);
+    // Cast supplierData to match the expected type for writeLocalFirst
+    await writeLocalFirst('suppliers', 'update', id, undefined, supplierData as Partial<Customer>);
     return true;
   } catch (error) {
-    console.error('updateSupplier error:', error);
     return false;
   }
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
   if (!id) {
-    console.error("deleteSupplier requires a valid ID.");
     return;
   }
 
   try {
-    // Get the supplier data to find the serial number
-    const supplierDoc = await getDoc(doc(suppliersCollection, id));
-    if (!supplierDoc.exists()) {
-      console.error("Supplier not found for deletion");
-      return;
-    }
+    // Get supplier data from IndexedDB first (local-first)
+    let supplierData: any = null;
+    let supplierSrNo: string | null = null;
+    let documentId: string = id; // Default to provided id
     
-    const supplierData = supplierDoc.data();
-    const supplierSrNo = supplierData.srNo;
-    
-    // Find all payments associated with this supplier's serial number
-    const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: supplierSrNo }));
-    const paymentsSnapshot = await getDocs(paymentsQuery);
-    
-    const batch = writeBatch(firestoreDB);
-    const paymentsToDelete: string[] = [];
-    
-    // Process each payment
-    paymentsSnapshot.forEach(paymentDoc => {
-      const payment = paymentDoc.data() as Payment;
-      
-      if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === supplierSrNo) {
-        // Payment is only for this supplier, delete it completely
-        paymentsToDelete.push(paymentDoc.id);
-        batch.delete(paymentDoc.ref);
-      } else if (payment.paidFor && payment.paidFor.length > 1) {
-        // Payment is for multiple entries, remove this supplier from paidFor
-        const updatedPaidFor = payment.paidFor.filter(pf => pf.srNo !== supplierSrNo);
-        const amountToDeduct = payment.paidFor.find(pf => pf.srNo === supplierSrNo)?.amount || 0;
-        
-        if (updatedPaidFor.length > 0) {
-          batch.update(paymentDoc.ref, {
-            paidFor: updatedPaidFor,
-            amount: payment.amount - amountToDeduct
-          });
-        } else {
-          // If no more entries, delete the payment
-          paymentsToDelete.push(paymentDoc.id);
-          batch.delete(paymentDoc.ref);
+    if (db) {
+      // Try to get by id first
+      supplierData = await db.suppliers.get(id);
+      if (supplierData) {
+        supplierSrNo = supplierData.srNo;
+      } else {
+        // If not found by id, try to find by srNo (in case id is actually srNo)
+        const allSuppliers = await db.suppliers.toArray();
+        const foundBySrNo = allSuppliers.find(s => s.srNo === id);
+        if (foundBySrNo) {
+          supplierData = foundBySrNo;
+          supplierSrNo = foundBySrNo.srNo;
         }
       }
-    });
-    
-    // Delete the supplier
-    batch.delete(doc(suppliersCollection, id));
-    
-    // ✅ Update sync registry atomically for suppliers and payments
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('suppliers', { batch });
-    if (paymentsSnapshot.size > 0) {
-        await notifySyncRegistry('payments', { batch });
     }
     
-    // Commit all changes
-    await batch.commit();
-    
-    // Update IndexedDB
-    if (db) {
-      await db.suppliers.delete(id);
-      if (paymentsToDelete.length > 0) {
-        await db.payments.bulkDelete(paymentsToDelete);
+    // ✅ Determine the correct Firestore document ID
+    // Try multiple strategies to find the document:
+    // 1. Try with provided id (might be Firestore doc ID or srNo)
+    let supplierDoc = await getDoc(doc(suppliersCollection, id));
+    if (supplierDoc.exists()) {
+      documentId = id;
+      if (!supplierData) {
+        supplierData = supplierDoc.data();
+        supplierSrNo = supplierData.srNo;
+      }
+    } else if (supplierSrNo && supplierSrNo.trim() !== '' && supplierSrNo !== 'S----') {
+      // 2. Try with srNo as document ID (new entries are saved this way)
+      supplierDoc = await getDoc(doc(suppliersCollection, supplierSrNo));
+      if (supplierDoc.exists()) {
+        documentId = supplierSrNo;
+        if (!supplierData) {
+          supplierData = supplierDoc.data();
+        }
+      } else {
+        // 3. Try to find by srNo query (for old entries saved with random IDs)
+        const q = query(suppliersCollection, where('srNo', '==', supplierSrNo));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          supplierDoc = snap.docs[0];
+          documentId = supplierDoc.id; // Use the actual Firestore document ID
+          if (!supplierData) {
+            supplierData = supplierDoc.data();
+          }
+        } else {
+          // 4. Last resort: try id as srNo query
+          const q2 = query(suppliersCollection, where('srNo', '==', id));
+          const snap2 = await getDocs(q2);
+          if (!snap2.empty) {
+            supplierDoc = snap2.docs[0];
+            documentId = supplierDoc.id;
+            if (!supplierData) {
+              supplierData = supplierDoc.data();
+              supplierSrNo = supplierData.srNo;
+            }
+          } else {
+            console.warn(`[deleteSupplier] Supplier not found with id: ${id}`);
+            return; // Not found
+          }
+        }
+      }
+    } else {
+      // Try id as srNo query
+      const q = query(suppliersCollection, where('srNo', '==', id));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        supplierDoc = snap.docs[0];
+        documentId = supplierDoc.id;
+        if (!supplierData) {
+          supplierData = supplierDoc.data();
+          supplierSrNo = supplierData.srNo;
+        }
+      } else {
+        console.warn(`[deleteSupplier] Supplier not found with id: ${id}`);
+        return; // Not found
       }
     }
     
-    console.log(`Deleted supplier ${id} and ${paymentsToDelete.length} associated payments`);
+    if (!supplierSrNo && supplierData) {
+      supplierSrNo = supplierData.srNo;
+    }
+    
+    // Find all payments associated with this supplier's serial number from IndexedDB
+    const paymentsToDelete: string[] = [];
+    const paymentsToUpdate: Array<{ id: string; paidFor: any[]; amount: number }> = [];
+    
+    if (db) {
+      const allPayments = await db.payments.toArray();
+      for (const payment of allPayments) {
+        if (payment.paidFor && Array.isArray(payment.paidFor)) {
+          const matchingPaidFor = payment.paidFor.find((pf: any) => pf.srNo === supplierSrNo);
+          if (matchingPaidFor) {
+            if (payment.paidFor.length === 1) {
+              // Payment is only for this supplier, delete it completely
+              paymentsToDelete.push(payment.id);
+            } else {
+              // Payment is for multiple entries, remove this supplier from paidFor
+              const updatedPaidFor = payment.paidFor.filter((pf: any) => pf.srNo !== supplierSrNo);
+              const amountToDeduct = matchingPaidFor.amount || 0;
+              paymentsToUpdate.push({
+                id: payment.id,
+                paidFor: updatedPaidFor,
+                amount: payment.amount - amountToDeduct
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    // Delete payments from IndexedDB
+    if (db && paymentsToDelete.length > 0) {
+      await db.payments.bulkDelete(paymentsToDelete);
+    }
+    
+    // Update payments in IndexedDB
+    if (db && paymentsToUpdate.length > 0) {
+      for (const paymentUpdate of paymentsToUpdate) {
+        const existingPayment = await db.payments.get(paymentUpdate.id);
+        if (existingPayment) {
+          const updatedPayment = {
+            ...existingPayment,
+            paidFor: paymentUpdate.paidFor,
+            amount: paymentUpdate.amount
+          };
+          // Add updatedAt if it exists in the payment type
+          if ('updatedAt' in existingPayment) {
+            (updatedPayment as any).updatedAt = new Date().toISOString();
+          }
+          await db.payments.put(updatedPayment);
+        }
+      }
+    }
+    
+    // ✅ Use local-first sync for supplier deletion with correct document ID
+    const { writeLocalFirst } = await import('./local-first-sync');
+    // Use documentId (which should be srNo if available) instead of the provided id
+    await writeLocalFirst('suppliers', 'delete', documentId);
+    
+    // Enqueue sync tasks for payment deletions
+    if (paymentsToDelete.length > 0) {
+      const { enqueueSyncTask } = await import('./sync-queue');
+      for (const paymentId of paymentsToDelete) {
+        await enqueueSyncTask('delete:payment', { id: paymentId }, { 
+          attemptImmediate: true, 
+          dedupeKey: `delete:payment:${paymentId}` 
+        });
+      }
+    }
+    
+    // Enqueue sync tasks for payment updates
+    if (paymentsToUpdate.length > 0) {
+      const { enqueueSyncTask } = await import('./sync-queue');
+      for (const paymentUpdate of paymentsToUpdate) {
+        const existingPayment = await db?.payments.get(paymentUpdate.id);
+        if (existingPayment) {
+          await enqueueSyncTask('upsert:payment', {
+            ...existingPayment,
+            paidFor: paymentUpdate.paidFor,
+            amount: paymentUpdate.amount
+          }, { 
+            attemptImmediate: true, 
+            dedupeKey: `upsert:payment:${paymentUpdate.id}` 
+          });
+        }
+      }
+    }
     
   } catch (error) {
-    console.error('Error deleting supplier and payments:', error);
     throw error;
   }
 }
@@ -725,68 +834,76 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
 
 // --- Customer Functions ---
 export async function addCustomer(customerData: Customer): Promise<Customer> {
+    // ✅ Use srNo as document ID if available, otherwise use the provided id
+    // This ensures customers are saved with serial number as document ID in Firestore
+    const documentId = customerData.srNo && customerData.srNo.trim() !== '' && customerData.srNo !== 'C----' 
+        ? customerData.srNo 
+        : customerData.id;
+    
+    // Ensure the id field matches the document ID
+    const customerWithCorrectId = { ...customerData, id: documentId };
+    
     // Use local-first sync manager
     const { writeLocalFirst } = await import('./local-first-sync');
-    const id = customerData.id || customerData.srNo;
-    return await writeLocalFirst('customers', 'create', id, customerData) as Customer;
+    return await writeLocalFirst('customers', 'create', documentId, customerWithCorrectId) as Customer;
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
     if (!id) {
-        console.error("updateCustomer requires a valid ID.");
         return false;
     }
     
     // ✅ Check if SR No is being changed - need to update related customerPayments
+    // Use IndexedDB instead of Firestore to avoid reads
     let oldSrNo: string | undefined;
     let newSrNo: string | undefined;
     
-    if (customerData.srNo) {
-        // Get current customer to check old SR No
-        const customerDoc = await getDoc(doc(customersCollection, id));
-        if (customerDoc.exists()) {
-            const currentData = customerDoc.data() as Customer;
-            oldSrNo = currentData.srNo;
+    if (customerData.srNo && db) {
+        // Get current customer from IndexedDB (no Firestore read)
+        const currentCustomer = await db.customers.get(id);
+        if (currentCustomer) {
+            oldSrNo = currentCustomer.srNo;
             newSrNo = customerData.srNo;
             
-            // If SR No is changing, update all related customerPayments
+            // If SR No is changing, update all related customerPayments (use IndexedDB)
             if (oldSrNo && newSrNo && oldSrNo !== newSrNo) {
                 try {
-                    // Find all customerPayments with old SR No in paidFor
-                    const paymentsQuery = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo: oldSrNo }));
-                    const paymentsSnapshot = await getDocs(paymentsQuery);
+                    // Find all customerPayments with old SR No in paidFor from IndexedDB (no Firestore read)
+                    const allPayments = await db.customerPayments.toArray();
+                    const affectedPayments = allPayments.filter(p => 
+                        p.paidFor?.some((pf: any) => pf.srNo === oldSrNo)
+                    );
                     
-                    if (!paymentsSnapshot.empty) {
-                        const batch = writeBatch(firestoreDB);
-                        
-                        paymentsSnapshot.forEach(paymentDoc => {
-                            const payment = paymentDoc.data() as Payment;
+                    if (affectedPayments.length > 0) {
+                        // Update IndexedDB first
+                        for (const payment of affectedPayments) {
                             if (payment.paidFor) {
-                                // Update paidFor array: replace old SR No with new SR No
-                                const updatedPaidFor = payment.paidFor.map(pf => 
+                                const updatedPaidFor = payment.paidFor.map((pf: any) => 
                                     pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                                 );
-                                
-                                batch.update(paymentDoc.ref, {
+                                await db.customerPayments.update(payment.id, {
                                     paidFor: updatedPaidFor,
                                     updatedAt: new Date().toISOString()
-                                });
-                                
-                                // Also update IndexedDB
-                                if (db) {
-                                    db.customerPayments.update(paymentDoc.id, {
-                                        paidFor: updatedPaidFor,
-                                        updatedAt: new Date().toISOString()
-                                    }).catch(err => console.error('Error updating customerPayment in IndexedDB:', err));
-                                }
+                                } as any).catch(() => {});
                             }
-                        });
+                        }
                         
-                        await batch.commit();
-                        console.log(`Updated ${paymentsSnapshot.size} customerPayments with new SR No: ${oldSrNo} -> ${newSrNo}`);
+                        // Queue Firestore updates via sync (no immediate Firestore read/write)
+                        const { enqueueSyncTask } = await import('./sync-queue');
+                        for (const payment of affectedPayments) {
+                            if (payment.paidFor) {
+                                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                                    pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
+                                );
+                                await enqueueSyncTask(
+                                    'update:customerPayments',
+                                    { id: payment.id, changes: { paidFor: updatedPaidFor, updatedAt: new Date().toISOString() } },
+                                    { attemptImmediate: true, dedupeKey: `customerPayments:${payment.id}` }
+                                ).catch(() => {});
+                            }
+                        }
                     }
                 } catch (error) {
-                    console.error('Error updating customerPayments for SR No change:', error);
                     // Continue with customer update even if payment update fails
                 }
             }
@@ -799,14 +916,12 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         await writeLocalFirst('customers', 'update', id, undefined, customerData);
         return true;
     } catch (error) {
-        console.error('updateCustomer error:', error);
         return false;
     }
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
     if (!id) {
-        console.error("deleteCustomer requires a valid ID.");
         return;
     }
     // Use local-first sync manager
@@ -828,7 +943,6 @@ export async function addKantaParchi(kantaParchiData: KantaParchi): Promise<Kant
 
 export async function updateKantaParchi(srNo: string, kantaParchiData: Partial<Omit<KantaParchi, 'id' | 'srNo'>>): Promise<boolean> {
     if (!srNo) {
-        console.error("updateKantaParchi requires a valid srNo.");
         return false;
     }
     const docRef = doc(kantaParchiCollection, srNo);
@@ -841,7 +955,6 @@ export async function updateKantaParchi(srNo: string, kantaParchiData: Partial<O
 
 export async function deleteKantaParchi(srNo: string): Promise<void> {
     if (!srNo) {
-        console.error("deleteKantaParchi requires a valid srNo.");
         return;
     }
     await deleteDoc(doc(kantaParchiCollection, srNo));
@@ -878,7 +991,6 @@ export async function addCustomerDocument(documentData: CustomerDocument): Promi
 
 export async function updateCustomerDocument(documentSrNo: string, documentData: Partial<Omit<CustomerDocument, 'id' | 'documentSrNo' | 'kantaParchiSrNo'>>): Promise<boolean> {
     if (!documentSrNo) {
-        console.error("updateCustomerDocument requires a valid documentSrNo.");
         return false;
     }
     const docRef = doc(customerDocumentsCollection, documentSrNo);
@@ -891,7 +1003,6 @@ export async function updateCustomerDocument(documentSrNo: string, documentData:
 
 export async function deleteCustomerDocument(documentSrNo: string): Promise<void> {
     if (!documentSrNo) {
-        console.error("deleteCustomerDocument requires a valid documentSrNo.");
         return;
     }
     await deleteDoc(doc(customerDocumentsCollection, documentSrNo));
@@ -940,20 +1051,36 @@ export async function deleteInventoryItem(id: string) {
 // --- Payment Functions ---
 export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) return;
-  const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: srNo }));
-  const snapshot = await getDocs(paymentsQuery);
-  const batch = writeBatch(firestoreDB);
   
+  // Find payments from IndexedDB first (local-first)
   const paymentIdsToDelete: string[] = [];
-  snapshot.forEach(doc => {
-      batch.delete(doc.ref);
-      paymentIdsToDelete.push(doc.id);
-  });
   
-  await batch.commit();
-
   if (db) {
-    await db.payments.bulkDelete(paymentIdsToDelete);
+    const allPayments = await db.payments.toArray();
+    for (const payment of allPayments) {
+      if (payment.paidFor && Array.isArray(payment.paidFor)) {
+        const hasMatchingSrNo = payment.paidFor.some((pf: any) => pf.srNo === srNo);
+        if (hasMatchingSrNo) {
+          paymentIdsToDelete.push(payment.id);
+        }
+      }
+    }
+    
+    // Delete from IndexedDB
+    if (paymentIdsToDelete.length > 0) {
+      await db.payments.bulkDelete(paymentIdsToDelete);
+    }
+  }
+  
+  // Enqueue sync tasks for payment deletions
+  if (paymentIdsToDelete.length > 0) {
+    const { enqueueSyncTask } = await import('./sync-queue');
+    for (const paymentId of paymentIdsToDelete) {
+      await enqueueSyncTask('delete:payment', { id: paymentId }, { 
+        attemptImmediate: true, 
+        dedupeKey: `delete:payment:${paymentId}` 
+      });
+    }
   }
 }
 
@@ -971,13 +1098,37 @@ export async function deleteAllPayments(): Promise<void> {
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) return;
-  const paymentsQuery = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo: srNo }));
-  const snapshot = await getDocs(paymentsQuery);
-  const batch = writeBatch(firestoreDB);
-  snapshot.forEach(doc => {
-      batch.delete(doc.ref);
-  });
-  await batch.commit();
+  
+  // Find payments from IndexedDB first (local-first)
+  const paymentIdsToDelete: string[] = [];
+  
+  if (db) {
+    const allPayments = await db.customerPayments.toArray();
+    for (const payment of allPayments) {
+      if (payment.paidFor && Array.isArray(payment.paidFor)) {
+        const hasMatchingSrNo = payment.paidFor.some((pf: any) => pf.srNo === srNo);
+        if (hasMatchingSrNo) {
+          paymentIdsToDelete.push(payment.id);
+        }
+      }
+    }
+    
+    // Delete from IndexedDB
+    if (paymentIdsToDelete.length > 0) {
+      await db.customerPayments.bulkDelete(paymentIdsToDelete);
+    }
+  }
+  
+  // Enqueue sync tasks for payment deletions
+  if (paymentIdsToDelete.length > 0) {
+    const { enqueueSyncTask } = await import('./sync-queue');
+    for (const paymentId of paymentIdsToDelete) {
+      await enqueueSyncTask('delete:customerPayment', { id: paymentId }, { 
+        attemptImmediate: true, 
+        dedupeKey: `delete:customerPayment:${paymentId}` 
+      });
+    }
+  }
 }
 
 
@@ -1081,7 +1232,6 @@ export async function getAllIncomeCategories(): Promise<IncomeCategory[]> {
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeCategory));
     } catch (error) {
-        console.error('[getAllIncomeCategories] Error fetching from Firestore:', error);
         throw error;
     }
 }
@@ -1092,7 +1242,6 @@ export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseCategory));
     } catch (error) {
-        console.error('[getAllExpenseCategories] Error fetching from Firestore:', error);
         throw error;
     }
 }
@@ -1222,7 +1371,6 @@ export function getAttendanceRealtime(
             localStorage.setItem('lastSync:attendance', String(Date.now()));
         }
     }).catch((error) => {
-        console.error('Error fetching attendance:', error);
         onError(error);
     });
 
@@ -1256,7 +1404,6 @@ export function getAttendanceRealtime(
             localStorage.setItem('lastSync:attendance', String(Date.now()));
         }
     }, (err: any) => {
-        console.error('Error in attendance realtime listener:', err);
         onError(err);
     });
 }
@@ -1488,102 +1635,106 @@ export async function deleteIncomesForPayee(payee: string): Promise<void> {
     await batch.commit();
 }
 
-export type PayeeProfile = {
-    name: string;
-    contact?: string;
-    address?: string;
-    nature?: string;
-    category?: string;
-    subCategory?: string;
-    updatedAt?: string;
-};
-
-const buildPayeeProfileDocId = (name: string) =>
+// --- Account Management Functions ---
+const buildAccountDocId = (name: string) =>
     toTitleCase(name || '').trim().replace(/\s+/g, '_').toLowerCase();
 
-// Fetch ALL payee profiles (for manual sync or initial load)
-export async function getAllPayeeProfiles(): Promise<PayeeProfile[]> {
-    try {
-        const snapshot = await getDocs(payeeProfilesCollection);
-        const profiles = snapshot.docs.map(doc => ({
-            ...(doc.data() as PayeeProfile)
-        }));
-        console.log('[PayeeProfiles] getAllPayeeProfiles - Fetched:', profiles.length, 'profiles from Firestore');
-        console.log('[PayeeProfiles] All profile names in Firestore:', profiles.map(p => p.name));
-        console.log('[PayeeProfiles] Document IDs:', snapshot.docs.map(doc => doc.id));
-        console.log('[PayeeProfiles] Snapshot size:', snapshot.size);
-        return profiles;
-    } catch (error) {
-        console.error('[PayeeProfiles] Error in getAllPayeeProfiles:', error);
-        throw error;
-    }
-}
+export async function addAccount(account: Account): Promise<void> {
+    const normalizedName = toTitleCase(account.name || '').trim();
+    if (!normalizedName) throw new Error('Account name is required');
 
-export function getPayeeProfilesRealtime(
-    callback: (data: PayeeProfile[]) => void,
-    onError: (error: Error) => void,
-) {
-    // First, fetch all profiles using getAllPayeeProfiles
-    getAllPayeeProfiles()
-        .then((allProfiles) => {
-            console.log('[PayeeProfiles] Initial fetch - All profiles:', allProfiles.length);
-            console.log('[PayeeProfiles] Profile names:', allProfiles.map(p => p.name));
-            callback(allProfiles);
-        })
-        .catch((error) => {
-            console.error('[PayeeProfiles] Error in initial fetch:', error);
-            onError(error);
-        });
-
-    // Then set up realtime listener for changes (without orderBy to avoid index issues)
-    const q = query(payeeProfilesCollection);
-    return onSnapshot(q, (snapshot) => {
-        const profiles = snapshot.docs.map(doc => {
-            const data = doc.data() as PayeeProfile;
-            return {
-                ...data,
-                id: doc.id,
-            };
-        });
-        console.log('[PayeeProfiles] Realtime update - Profiles:', profiles.length);
-        callback(profiles);
-    }, (error) => {
-        console.error('[PayeeProfiles] Error in realtime listener:', error);
-        // Don't call onError here as we already have initial data
-    });
-}
-
-export async function upsertPayeeProfile(profile: PayeeProfile, previousName?: string): Promise<void> {
-    const normalizedName = toTitleCase(profile.name || '').trim();
-    if (!normalizedName) return;
-
-    if (previousName && toTitleCase(previousName).trim() !== normalizedName) {
-        const prevDocId = buildPayeeProfileDocId(previousName);
-        await deleteDoc(doc(payeeProfilesCollection, prevDocId)).catch(() => {});
-    }
-
-    const docRef = doc(payeeProfilesCollection, buildPayeeProfileDocId(normalizedName));
-    const payload: PayeeProfile = {
+    const docRef = doc(accountsCollection, buildAccountDocId(normalizedName));
+    const payload: Account = {
         name: normalizedName,
+        contact: account.contact?.trim() || undefined,
+        address: account.address?.trim() || undefined,
+        nature: account.nature || undefined,
+        category: account.category?.trim() || undefined,
+        subCategory: account.subCategory?.trim() || undefined,
         updatedAt: new Date().toISOString(),
     };
-
-    if (profile.contact !== undefined) payload.contact = profile.contact;
-    if (profile.address !== undefined) payload.address = profile.address;
-    if (profile.nature !== undefined) payload.nature = profile.nature;
-    if (profile.category !== undefined) payload.category = profile.category;
-    if (profile.subCategory !== undefined) payload.subCategory = profile.subCategory;
 
     await setDoc(docRef, payload, { merge: true });
 }
 
-export async function deletePayeeProfile(name: string): Promise<void> {
+export async function getAccount(name: string): Promise<Account | null> {
     const normalizedName = toTitleCase(name || '').trim();
-    if (!normalizedName) return;
-    const docId = buildPayeeProfileDocId(normalizedName);
-    await deleteDoc(doc(payeeProfilesCollection, docId)).catch(() => {});
+    if (!normalizedName) return null;
+
+    const docRef = doc(accountsCollection, buildAccountDocId(normalizedName));
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+        return { ...docSnap.data() as Account, id: docSnap.id };
+    }
+    return null;
 }
 
+export async function getAllAccounts(): Promise<Account[]> {
+    try {
+        const snapshot = await getDocs(accountsCollection);
+        return snapshot.docs.map(doc => ({
+            ...(doc.data() as Account),
+            id: doc.id,
+        }));
+    } catch (error) {
+        throw error;
+    }
+}
+
+export function getAccountsRealtime(
+    callback: (data: Account[]) => void,
+    onError: (error: Error) => void,
+) {
+    getAllAccounts()
+        .then((allAccounts) => {
+            callback(allAccounts);
+        })
+        .catch((error) => {
+            onError(error);
+        });
+
+    const q = query(accountsCollection);
+    return onSnapshot(q, (snapshot) => {
+        const accounts = snapshot.docs.map(doc => ({
+            ...(doc.data() as Account),
+            id: doc.id,
+        }));
+        callback(accounts);
+    }, (error) => {
+    });
+}
+
+export async function updateAccount(account: Account, previousName?: string): Promise<void> {
+    const normalizedName = toTitleCase(account.name || '').trim();
+    if (!normalizedName) throw new Error('Account name is required');
+
+    // If name changed, delete old document
+    if (previousName && toTitleCase(previousName).trim() !== normalizedName) {
+        const prevDocId = buildAccountDocId(previousName);
+        await deleteDoc(doc(accountsCollection, prevDocId)).catch(() => {});
+    }
+
+    const docRef = doc(accountsCollection, buildAccountDocId(normalizedName));
+    const payload: Account = {
+        name: normalizedName,
+        contact: account.contact?.trim() || undefined,
+        address: account.address?.trim() || undefined,
+        nature: account.nature || undefined,
+        category: account.category?.trim() || undefined,
+        subCategory: account.subCategory?.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+    };
+
+    await setDoc(docRef, payload, { merge: true });
+}
+
+export async function deleteAccount(name: string): Promise<void> {
+    const normalizedName = toTitleCase(name || '').trim();
+    if (!normalizedName) return;
+    const docId = buildAccountDocId(normalizedName);
+    await deleteDoc(doc(accountsCollection, docId)).catch(() => {});
+}
 
 // --- Format Settings Functions ---
 export async function getFormatSettings(): Promise<FormatSettings> {
@@ -2004,11 +2155,9 @@ export async function getAllIncomes(): Promise<Income[]> {
     try {
       const localTransactions = await db.transactions.where('type').equals('Income').toArray();
       if (localTransactions.length > 0) {
-        console.log('[getAllIncomes] Found in IndexedDB:', localTransactions.length);
         return localTransactions as Income[];
       }
     } catch (error) {
-      console.warn('[getAllIncomes] Error reading from IndexedDB:', error);
       // If local read fails, continue with Firestore
     }
   }
@@ -2019,11 +2168,8 @@ export async function getAllIncomes(): Promise<Income[]> {
     const q = query(incomesCollection);
     const snapshot = await getDocs(q);
     const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
-    console.log('[getAllIncomes] Fetched from Firestore:', incomes.length);
-    console.log('[getAllIncomes] Sample payees:', [...new Set(incomes.map(i => i.payee).filter(Boolean))].slice(0, 10));
     return incomes;
   } catch (error) {
-    console.error('[getAllIncomes] Error fetching from Firestore:', error);
     throw error;
   }
 }
@@ -2034,11 +2180,9 @@ export async function getAllExpenses(): Promise<Expense[]> {
     try {
       const localTransactions = await db.transactions.where('type').equals('Expense').toArray();
       if (localTransactions.length > 0) {
-        console.log('[getAllExpenses] Found in IndexedDB:', localTransactions.length);
         return localTransactions as Expense[];
       }
     } catch (error) {
-      console.warn('[getAllExpenses] Error reading from IndexedDB:', error);
       // If local read fails, continue with Firestore
     }
   }
@@ -2049,11 +2193,8 @@ export async function getAllExpenses(): Promise<Expense[]> {
     const q = query(expensesCollection);
     const snapshot = await getDocs(q);
     const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
-    console.log('[getAllExpenses] Fetched from Firestore:', expenses.length);
-    console.log('[getAllExpenses] Sample payees:', [...new Set(expenses.map(e => e.payee).filter(Boolean))].slice(0, 10));
     return expenses;
   } catch (error) {
-    console.error('[getAllExpenses] Error fetching from Firestore:', error);
     throw error;
   }
 }
@@ -2213,30 +2354,10 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
         let suppliersQuery;
         let snapshot;
         
-        // ✅ Only use incremental sync if we have BOTH lastSyncTime AND local data exists
-        // If IndexedDB is empty, do full sync even if lastSyncTime exists (data might have been cleared)
-        if (lastSyncTime && hasLocalSupplierData) {
-            // Use incremental sync - only get changes after last sync (when we have local data)
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            
-            try {
-                suppliersQuery = query(
-                    suppliersCollection,
-                    where('updatedAt', '>', lastSyncTimestamp),
-                    orderBy('updatedAt')
-                );
-                snapshot = await getDocs(suppliersQuery);
-            } catch (error) {
-                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
-                console.warn('Incremental sync failed for suppliers, falling back to full sync:', error);
-                suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
-                snapshot = await getDocs(suppliersQuery);
-            }
-        } else {
-            // Full sync - get all (when no local data OR no lastSyncTime)
-            suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
-            snapshot = await getDocs(suppliersQuery);
-        }
+        // ✅ Always do full sync to properly detect deletions
+        // Incremental sync doesn't detect deletions, so we need full sync
+        suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
+        snapshot = await getDocs(suppliersQuery);
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', snapshot.size);
         
@@ -2252,26 +2373,10 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
         {
             collectionName: 'suppliers',
             fetchFunction: async () => {
-                const newSuppliers = await fetchSuppliers();
-                const lastSyncTime = getLastSyncTime();
-                
-                // Always merge with existing local data if doing incremental sync
-                if (db && db.suppliers && lastSyncTime) {
-                    const existingSuppliers = await db.suppliers.toArray();
-                    const mergedMap = new Map<string, Customer>();
-                    // Start with existing data
-                    existingSuppliers.forEach(s => mergedMap.set(s.id, s));
-                    // Update/add with new data
-                    newSuppliers.forEach(s => mergedMap.set(s.id, s));
-                    const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                        const aSrNo = parseInt(a.srNo || '0') || 0;
-                        const bSrNo = parseInt(b.srNo || '0') || 0;
-                        return bSrNo - aSrNo;
-                    });
-                    return merged;
-                }
-                // Full sync - return all new suppliers
-                return newSuppliers;
+                // fetchSuppliers already does full sync, so just return it directly
+                // The metadata listener will handle deletion detection by comparing IDs
+                const allSuppliers = await fetchSuppliers();
+                return allSuppliers;
             },
             localTableName: 'suppliers'
         },
@@ -2301,89 +2406,63 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
         });
     }
 
-    // ✅ Use incremental sync - only listen to NEW changes after last sync
+    // ✅ Use metadata-based listener to properly handle deletions
+    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     const getLastSyncTime = (): number | undefined => {
         if (typeof window === 'undefined') return undefined;
         const stored = localStorage.getItem('lastSync:customers');
         return stored ? parseInt(stored, 10) : undefined;
     };
-
-    const lastSyncTime = getLastSyncTime();
-    let q;
     
-    if (lastSyncTime) {
-        // Only listen to NEW changes after last sync
-        const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-        q = query(
-            customersCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
-    } else {
-        // First sync - get all (only once)
-        q = query(customersCollection, orderBy("srNo", "desc"));
-    }
+    const fetchCustomers = async (): Promise<Customer[]> => {
+        const lastSyncTime = getLastSyncTime();
+        
+        // ✅ Check if local data exists (synchronously check count)
+        let hasLocalCustomerData = false;
+        if (db && db.customers) {
+            try {
+                const count = await db.customers.count();
+                hasLocalCustomerData = count > 0;
+            } catch {
+                hasLocalCustomerData = false;
+            }
+        }
+        
+        let customersQuery;
+        let snapshot;
+        
+        // ✅ Always do full sync to properly detect deletions
+        // Incremental sync doesn't detect deletions, so we need full sync
+        customersQuery = query(customersCollection, orderBy("srNo", "desc"));
+        snapshot = await getDocs(customersQuery);
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const newCustomers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        firestoreMonitor.logRead('customers', 'getCustomersRealtime', snapshot.size);
         
-        // ✅ Handle deletions - remove deleted documents from IndexedDB
-        const deletedIds: string[] = [];
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'removed') {
-                deletedIds.push(change.doc.id);
-            }
-        });
+        const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         
-        // Remove deleted documents from IndexedDB
-        if (db && deletedIds.length > 0) {
-            await Promise.all(deletedIds.map(id => db.customers.delete(id)));
+        // Update last sync time
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:customers', Date.now().toString());
         }
         
-        // Track Firestore read
-        firestoreMonitor.logRead('customers', 'getCustomersRealtime', newCustomers.length);
-        
-        // Merge new changes with local data
-        if (callbackCalledFromIndexedDB && localCustomers.length > 0) {
-            const mergedMap = new Map<string, Customer>();
-            localCustomers.forEach(c => mergedMap.set(c.id, c));
-            // Remove deleted customers
-            deletedIds.forEach(id => mergedMap.delete(id));
-            newCustomers.forEach(c => mergedMap.set(c.id, c));
-            const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                const aSrNo = parseInt(a.srNo || '0') || 0;
-                const bSrNo = parseInt(b.srNo || '0') || 0;
-                return bSrNo - aSrNo;
-            });
-            callback(merged);
-            
-            if (db && newCustomers.length > 0) {
-                await db.customers.bulkPut(newCustomers);
-            }
-        } else {
-            callback(newCustomers);
-            if (db && newCustomers.length > 0) {
-                await db.customers.bulkPut(newCustomers);
-            }
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:customers', String(Date.now()));
-        }
-    }, (err: any) => {
-        if (isQuotaError(err)) {
-            markFirestoreDisabled();
-            const pollUnsub = createPollingFallback(async () => {
-                return db ? await db.customers.orderBy('srNo').reverse().toArray() : [];
-            }, callback);
-            try { unsubscribe(); } catch {}
-            (pollUnsub as any).__fromQuota__ = true;
-            return;
-        }
-        onError(err);
-    });
-    return unsubscribe;
+        return customers;
+    };
+    
+    return createMetadataBasedListener<Customer>(
+        {
+            collectionName: 'customers',
+            fetchFunction: async () => {
+                // fetchCustomers already does full sync, so just return it directly
+                // The metadata listener will handle deletion detection by comparing IDs
+                const allCustomers = await fetchCustomers();
+                return allCustomers;
+            },
+            localTableName: 'customers'
+        },
+        callback,
+        onError
+    );
 }
 
 export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError: (error: Error) => void) {
@@ -2405,22 +2484,41 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         return stored ? parseInt(stored, 10) : undefined;
     };
 
+    // Track if initial IndexedDB load has completed
+    let initialLoadCompleted = false;
+
     // ✅ Load from IndexedDB first (immediate response, no Firestore read)
     if (db) {
+        // Use separate try-catch for each table to ensure we get data even if one fails
         Promise.all([
-            db.payments.orderBy('date').reverse().toArray(),
-            db.governmentFinalizedPayments.orderBy('date').reverse().toArray()
+            db.payments.orderBy('date').reverse().toArray().catch(() => []),
+            db.governmentFinalizedPayments.orderBy('date').reverse().toArray().catch(() => [])
         ]).then(([regularData, govData]) => {
-            const allPayments = [...regularData, ...govData] as Payment[];
-            if (allPayments.length > 0) {
+            // ALL payments from governmentFinalizedPayments table are gov payments
+            // Force set receiptType to 'Gov.' for ALL payments from this table
+            const govDataWithType = (govData || []).map(p => ({
+                ...p,
+                receiptType: 'Gov.' // Force set to Gov. for all payments from this table
+            })) as Payment[];
+            
+            const allPayments = [...(regularData || []), ...govDataWithType] as Payment[];
+            // Always call callback, even if empty, to ensure UI updates
                 const sorted = allPayments.sort((a, b) => {
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                const dateA = a.date ? new Date(a.date).getTime() : 0;
+                const dateB = b.date ? new Date(b.date).getTime() : 0;
+                return dateB - dateA;
                 });
+            initialLoadCompleted = true;
                 callback(sorted);
-            }
-        }).catch(() => {
-            // If local read fails, continue with Firestore
+        }).catch((error) => {
+            // If both fail, still call callback with empty array to trigger Firestore fetch
+            initialLoadCompleted = true;
+            callback([]);
         });
+    } else {
+        // If db is not available, call callback with empty array to trigger Firestore fetch
+        initialLoadCompleted = true;
+        callback([]);
     }
 
     // Fetch function that gets both regular and gov payments (incremental sync)
@@ -2469,7 +2567,7 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                 ]);
             } catch (error) {
                 // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
-                console.warn('Incremental sync failed, falling back to full sync:', error);
+
                 regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
                 govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
                 [regularSnapshot, govSnapshot] = await Promise.all([
@@ -2488,7 +2586,16 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         }
         
         const regularPayments = regularSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        const govPayments = govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        // ALL payments from governmentFinalizedPayments collection are gov payments
+        // Force set receiptType to 'Gov.' for all
+        const govPayments = govSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                receiptType: 'Gov.' // Force set to Gov. for all payments from this collection
+            } as Payment;
+        });
         
         // Track reads (incremental sync - only reads changed documents)
         firestoreMonitor.logRead('payments', 'getPaymentsRealtime', regularSnapshot.size);
@@ -2501,7 +2608,9 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         
         // Merge and sort by date (newest first)
         const allPayments = [...regularPayments, ...govPayments].sort((a, b) => {
-            return new Date(b.date).getTime() - new Date(a.date).getTime();
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
         });
         
         return allPayments;
@@ -2510,15 +2619,42 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     // Helper to save payments to IndexedDB (handles both collections)
     const savePaymentsToIndexedDB = async (data: Payment[]) => {
         if (db && data.length > 0) {
-            const regularPayments = data.filter(p => p.receiptType !== 'Gov.');
-            const govPayments = data.filter(p => p.receiptType === 'Gov.');
+            // Identify gov payments more robustly
+            const govPayments = data.filter(p => {
+                const receiptType = (p.receiptType || "").trim().toLowerCase();
+                const paymentId = (p.paymentId || "").trim().toUpperCase();
+                const rtgsSrNo = ((p as any).rtgsSrNo || "").trim().toUpperCase();
+                const hasGovFields = (p as any).govQuantity !== undefined || 
+                                    (p as any).govRate !== undefined || 
+                                    (p as any).govAmount !== undefined ||
+                                    (p as any).extraAmount !== undefined;
+                
+                return receiptType === "gov." || 
+                       receiptType === "gov" || 
+                       receiptType.startsWith("gov") ||
+                       paymentId.startsWith("GV") ||
+                       rtgsSrNo.startsWith("GV") ||
+                       hasGovFields;
+            });
+            
+            // ALL gov payments MUST have receiptType set to 'Gov.'
+            // Force set it to ensure they're always identified as gov payments
+            const govPaymentsWithType = govPayments.map(p => ({
+                ...p,
+                receiptType: 'Gov.' // Force set to Gov. for all gov payments
+            }));
+            
+            const regularPayments = data.filter(p => {
+                const id = p.id;
+                return !govPayments.some(gp => gp.id === id);
+            });
             
             // Get existing IDs to handle deletions
             const existingRegularIds = new Set((await db.payments.toArray()).map(p => p.id));
             const existingGovIds = new Set((await db.governmentFinalizedPayments.toArray()).map(p => p.id));
             
             const freshRegularIds = new Set(regularPayments.map(p => p.id));
-            const freshGovIds = new Set(govPayments.map(p => p.id));
+            const freshGovIds = new Set(govPaymentsWithType.map(p => p.id));
             
             // Delete items that are no longer in Firestore
             const regularIdsToDelete = Array.from(existingRegularIds).filter(id => !freshRegularIds.has(id));
@@ -2535,8 +2671,8 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             if (regularPayments.length > 0) {
                 await db.payments.bulkPut(regularPayments);
             }
-            if (govPayments.length > 0) {
-                await db.governmentFinalizedPayments.bulkPut(govPayments);
+            if (govPaymentsWithType.length > 0) {
+                await db.governmentFinalizedPayments.bulkPut(govPaymentsWithType);
             }
         }
     };
@@ -2560,7 +2696,13 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                         db.payments.toArray(),
                         db.governmentFinalizedPayments.toArray()
                     ]);
-                    const existingPayments = [...existingRegular, ...existingGov] as Payment[];
+                    // ALL payments from governmentFinalizedPayments table are gov payments
+                    // Force set receiptType to 'Gov.' for all
+                    const existingGovWithType = existingGov.map(p => ({
+                        ...p,
+                        receiptType: 'Gov.' // Force set to Gov. for all payments from this table
+                    })) as Payment[];
+                    const existingPayments = [...existingRegular, ...existingGovWithType] as Payment[];
                     return existingPayments.sort((a, b) => {
                         return new Date(b.date).getTime() - new Date(a.date).getTime();
                     });
@@ -2576,25 +2718,51 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             const newPayments = await fetchPayments();
             const lastSyncTime = getLastSyncTime();
             
-            // Always merge with existing local data if doing incremental sync
-            if (db && db.payments && db.governmentFinalizedPayments && lastSyncTime) {
+            // ALWAYS merge with existing local data from IndexedDB (both incremental and full sync)
+            // This ensures we don't lose any local data that might not be in Firestore yet
+            if (db && db.payments && db.governmentFinalizedPayments) {
                 const [existingRegular, existingGov] = await Promise.all([
-                    db.payments.toArray(),
-                    db.governmentFinalizedPayments.toArray()
+                    db.payments.toArray().catch(() => []),
+                    db.governmentFinalizedPayments.toArray().catch(() => [])
                 ]);
-                const existingPayments = [...existingRegular, ...existingGov] as Payment[];
+                // ALL payments from governmentFinalizedPayments table are gov payments
+                // Force set receiptType to 'Gov.' for all
+                const existingGovWithType = (existingGov || []).map(p => ({
+                    ...p,
+                    receiptType: 'Gov.' // Force set to Gov. for all payments from this table
+                })) as Payment[];
+                const existingPayments = [...(existingRegular || []), ...existingGovWithType] as Payment[];
                 const mergedMap = new Map<string, Payment>();
-                // Start with existing data
+                // Start with existing IndexedDB data (ensures we don't lose local data)
                 existingPayments.forEach(p => mergedMap.set(p.id, p));
-                // Update/add with new data
-                newPayments.forEach(p => mergedMap.set(p.id, p));
+                // Update/add with new data from Firestore (ensure gov payments have receiptType)
+                newPayments.forEach(p => {
+                    const isGov = (p.receiptType || "").trim().toLowerCase() === "gov." ||
+                                 (p.paymentId || "").trim().toUpperCase().startsWith("GV") ||
+                                 ((p as any).govQuantity !== undefined || (p as any).govRate !== undefined);
+                    if (isGov && !p.receiptType) {
+                        p.receiptType = 'Gov.';
+                    }
+                    mergedMap.set(p.id, p);
+                });
                 const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                    const dateA = a.date ? new Date(a.date).getTime() : 0;
+                    const dateB = b.date ? new Date(b.date).getTime() : 0;
+                    return dateB - dateA;
                 });
                 return merged;
             }
-            // Full sync - return all new payments
-            return newPayments;
+            // Fallback: If IndexedDB is not available, ensure all gov payments have receiptType set
+            const newPaymentsWithType = newPayments.map(p => {
+                const isGov = (p.receiptType || "").trim().toLowerCase() === "gov." ||
+                             (p.paymentId || "").trim().toUpperCase().startsWith("GV") ||
+                             ((p as any).govQuantity !== undefined || (p as any).govRate !== undefined);
+                if (isGov && !p.receiptType) {
+                    return { ...p, receiptType: 'Gov.' };
+                }
+                return p;
+            });
+            return newPaymentsWithType;
         })();
         
         const result = await lastFetchPromise;
@@ -2609,15 +2777,27 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     };
     
     // Listen to payments collection metadata (triggers fetch when payments change)
+    // Note: We skip IndexedDB initial load in createMetadataBasedListener because we handle it manually above
     const unsubscribe1 = createMetadataBasedListener<Payment>(
         {
             collectionName: 'payments',
             fetchFunction: sharedFetchFunction,
-            localTableName: 'payments' // Not used for dual-collection, but required
+            localTableName: undefined // Skip IndexedDB load - we handle it manually
         },
         async (data) => {
             await savePaymentsToIndexedDB(data);
-            callback(data);
+            // sharedFetchFunction already merges with IndexedDB, so data should be complete
+            // But ensure all gov payments have receiptType set
+            const dataWithGovType = data.map((p: Payment) => {
+                const isGov = (p.receiptType || "").trim().toLowerCase() === "gov." ||
+                             (p.paymentId || "").trim().toUpperCase().startsWith("GV") ||
+                             ((p as any).govQuantity !== undefined || (p as any).govRate !== undefined);
+                if (isGov && !p.receiptType) {
+                    return { ...p, receiptType: 'Gov.' };
+                }
+                return p;
+            });
+            callback(dataWithGovType);
         },
         onError
     );
@@ -2627,11 +2807,22 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
         {
             collectionName: 'governmentFinalizedPayments',
             fetchFunction: sharedFetchFunction,
-            localTableName: 'governmentFinalizedPayments' // Not used for dual-collection, but required
+            localTableName: undefined // Skip IndexedDB load - we handle it manually
         },
         async (data) => {
             await savePaymentsToIndexedDB(data);
-            callback(data);
+            // sharedFetchFunction already merges with IndexedDB, so data should be complete
+            // But ensure all gov payments have receiptType set
+            const dataWithGovType = data.map((p: Payment) => {
+                const isGov = (p.receiptType || "").trim().toLowerCase() === "gov." ||
+                             (p.paymentId || "").trim().toUpperCase().startsWith("GV") ||
+                             ((p as any).govQuantity !== undefined || (p as any).govRate !== undefined);
+                if (isGov && !p.receiptType) {
+                    return { ...p, receiptType: 'Gov.' };
+                }
+                return p;
+            });
+            callback(dataWithGovType);
         },
         onError
     );
@@ -2809,7 +3000,7 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
                 snapshot = await getDocs(expensesQuery);
             } catch (error) {
                 // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
-                console.warn('Incremental sync failed for expenses, falling back to full sync:', error);
+
                 expensesQuery = query(expensesCollection, orderBy("date", "desc"));
                 snapshot = await getDocs(expensesQuery);
             }
@@ -2921,20 +3112,57 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
         }
     }
 
+    // Check if we should do full sync (if lastSync is very old or missing)
+    const shouldDoFullSync = !incomesLastSync || (Date.now() - incomesLastSync > 7 * 24 * 60 * 60 * 1000); // 7 days
+    
     let incomesQuery;
-    if (incomesLastSync) {
+    if (incomesLastSync && !shouldDoFullSync) {
         const lastSyncTimestamp = Timestamp.fromMillis(incomesLastSync);
-        incomesQuery = query(
-            incomesCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
+        try {
+            incomesQuery = query(
+                incomesCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } catch (error) {
+            // If query fails (e.g., missing index), fallback to full sync
+
+            incomesQuery = query(incomesCollection, orderBy("date", "desc"));
+        }
     } else {
+        // Full sync - get all entries
         incomesQuery = query(incomesCollection, orderBy("date", "desc"));
     }
 
     const unsubIncomes = onSnapshot(incomesQuery, (snapshot) => {
         incomeData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+        
+        // ✅ Check if we might be missing entries (incremental sync with very few results)
+        // If doing incremental sync and got very few results, trigger full sync in background
+        if (incomesLastSync && !shouldDoFullSync && snapshot.size < 10) {
+
+            // Clear lastSync to force full sync on next update
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('lastSync:incomes');
+            }
+            // Fetch all incomes in background and update
+            (async () => {
+                try {
+                    const fullQuery = query(incomesCollection, orderBy("date", "desc"));
+                    const fullSnapshot = await getDocs(fullQuery);
+                    incomeData = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+
+                    incomeDone = true;
+                    mergeAndCallback();
+                } catch (error) {
+
+                    incomeDone = true;
+                    mergeAndCallback();
+                }
+            })();
+            return; // Don't call mergeAndCallback yet, wait for full sync
+        }
+        
         incomeDone = true;
         
         // ✅ Save last sync time
@@ -2950,23 +3178,73 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             mergeAndCallback();
             return;
         }
+        // If incremental sync fails, try full sync
+        if (incomesLastSync && !shouldDoFullSync) {
+
+            const fullQuery = query(incomesCollection, orderBy("date", "desc"));
+            onSnapshot(fullQuery, (fullSnapshot) => {
+                incomeData = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+                incomeDone = true;
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('lastSync:incomes', String(Date.now()));
+                }
+                mergeAndCallback();
+            }, onError);
+            return;
+        }
         onError(err);
     });
 
+    const shouldDoFullSyncExpenses = !expensesLastSync || (Date.now() - expensesLastSync > 7 * 24 * 60 * 60 * 1000); // 7 days
+    
     let expensesQuery;
-    if (expensesLastSync) {
+    if (expensesLastSync && !shouldDoFullSyncExpenses) {
         const lastSyncTimestamp = Timestamp.fromMillis(expensesLastSync);
-        expensesQuery = query(
-            expensesCollection,
-            where('updatedAt', '>', lastSyncTimestamp),
-            orderBy('updatedAt')
-        );
+        try {
+            expensesQuery = query(
+                expensesCollection,
+                where('updatedAt', '>', lastSyncTimestamp),
+                orderBy('updatedAt')
+            );
+        } catch (error) {
+            // If query fails (e.g., missing index), fallback to full sync
+
+            expensesQuery = query(expensesCollection, orderBy("date", "desc"));
+        }
     } else {
+        // Full sync - get all entries
         expensesQuery = query(expensesCollection, orderBy("date", "desc"));
     }
 
     const unsubExpenses = onSnapshot(expensesQuery, (snapshot) => {
         expenseData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+        
+        // ✅ Check if we might be missing entries (incremental sync with very few results)
+        // If doing incremental sync and got very few results, trigger full sync in background
+        if (expensesLastSync && !shouldDoFullSyncExpenses && snapshot.size < 10) {
+
+            // Clear lastSync to force full sync on next update
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('lastSync:expenses');
+            }
+            // Fetch all expenses in background and update
+            (async () => {
+                try {
+                    const fullQuery = query(expensesCollection, orderBy("date", "desc"));
+                    const fullSnapshot = await getDocs(fullQuery);
+                    expenseData = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+
+                    expenseDone = true;
+                    mergeAndCallback();
+                } catch (error) {
+
+                    expenseDone = true;
+                    mergeAndCallback();
+                }
+            })();
+            return; // Don't call mergeAndCallback yet, wait for full sync
+        }
+        
         expenseDone = true;
         
         // ✅ Save last sync time
@@ -2980,6 +3258,20 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             markFirestoreDisabled();
             expenseDone = true;
             mergeAndCallback();
+            return;
+        }
+        // If incremental sync fails, try full sync
+        if (expensesLastSync && !shouldDoFullSyncExpenses) {
+
+            const fullQuery = query(expensesCollection, orderBy("date", "desc"));
+            onSnapshot(fullQuery, (fullSnapshot) => {
+                expenseData = fullSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+                expenseDone = true;
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('lastSync:expenses', String(Date.now()));
+                }
+                mergeAndCallback();
+            }, onError);
             return;
         }
         onError(err);
@@ -3056,7 +3348,7 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
         
         if (toDelete.length > 0) {
             await db.bankAccounts.bulkDelete(toDelete);
-            console.warn(`Cleaned up ${toDelete.length} duplicate bank accounts from IndexedDB`);
+
             // Re-fetch existing accounts after deletion to get clean data
             const cleanExistingAccounts = await db.bankAccounts.toArray();
             existingAccounts.length = 0;
@@ -3115,7 +3407,7 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
         
         return Array.from(finalAccounts.values());
     } catch (error) {
-        console.warn('Error cleaning up and preparing bank accounts:', error);
+
         // Fallback: just return deduplicated incoming data
         return removeDuplicateBankAccounts(incomingAccounts);
     }
@@ -3182,7 +3474,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
             cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
                 await db.bankAccounts.bulkPut(finalAccounts);
             }).catch((err) => {
-                console.warn('Error saving bank accounts to IndexedDB:', err);
+
             });
         }
         
@@ -3191,7 +3483,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
             localStorage.setItem('lastSync:bankAccounts', String(Date.now()));
         }
     }).catch((error) => {
-        console.error('Error fetching bank accounts:', error);
+
         onError(error);
     });
 
@@ -3220,7 +3512,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
             cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
                 await db.bankAccounts.bulkPut(finalAccounts);
             }).catch((err) => {
-                console.warn('Error saving bank accounts to IndexedDB:', err);
+
             });
         }
         
@@ -3299,7 +3591,7 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
             );
         } catch (error) {
             // If updatedAt query fails (no index or missing fields), fallback to full sync
-            console.warn('Incremental sync failed for supplierBankAccounts, using full sync:', error);
+
             q = query(supplierBankAccountsCollection);
         }
     } else {
@@ -3331,7 +3623,7 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
                     cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
                         await db.bankAccounts.bulkPut(finalAccounts);
                     }).catch((err) => {
-                        console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+
                     });
                 }
             } else {
@@ -3353,7 +3645,7 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
                             cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
                                 await db.bankAccounts.bulkPut(finalAccounts);
                             }).catch((err) => {
-                                console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+
                             });
                         }
                     }).catch(onError);
@@ -3373,7 +3665,7 @@ export function getSupplierBankAccountsRealtime(callback: (data: BankAccount[]) 
                 cleanupAndPrepareBankAccounts(uniqueAccounts).then(async (finalAccounts) => {
                     await db.bankAccounts.bulkPut(finalAccounts);
                 }).catch((err) => {
-                    console.warn('Error saving supplier bank accounts to IndexedDB:', err);
+
                 });
             }
         }
@@ -3535,7 +3827,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
         // Save to IndexedDB (duplicates already removed)
         if (db && uniqueBranches.length > 0) {
             db.bankBranches.bulkPut(uniqueBranches).catch((err) => {
-                console.warn('Error saving bank branches to IndexedDB:', err);
+
             });
         }
         
@@ -3544,7 +3836,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
             localStorage.setItem('lastSync:bankBranches', String(Date.now()));
         }
     }).catch((error) => {
-        console.error('Error fetching bank branches:', error);
+
         onError(error);
     });
 
@@ -3570,7 +3862,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
         // Save to IndexedDB (duplicates already removed)
         if (db && uniqueBranches.length > 0) {
             db.bankBranches.bulkPut(uniqueBranches).catch((err) => {
-                console.warn('Error saving bank branches to IndexedDB:', err);
+
             });
         }
         
@@ -4322,7 +4614,7 @@ export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
                 return localEntries;
             }
         } catch (error) {
-            console.warn('Error reading from local IndexedDB, falling back to Firestore:', error);
+
         }
     }
 
@@ -4696,38 +4988,17 @@ export async function addMandiReport(report: MandiReport): Promise<MandiReport> 
         updatedAt: timestamp,
     });
     
-    console.log('[addMandiReport] Saving report:', {
-        id: payload.id,
-        voucherNo: payload.voucherNo,
-        sellerName: payload.sellerName,
-        collectionPath: 'mandiReports'
-    });
-    
     try {
         const docRef = doc(mandiReportsCollection, payload.id);
-        console.log('[addMandiReport] Firestore document path:', docRef.path);
         await setDoc(docRef, payload, { merge: true });
-        console.log('[addMandiReport] ✅ Successfully saved to Firestore:', {
-            id: payload.id,
-            path: docRef.path,
-            voucherNo: payload.voucherNo
-        });
     } catch (error: any) {
-        console.error('[addMandiReport] ❌ Firestore save failed:', error);
-        console.error('[addMandiReport] Error details:', {
-            code: error.code,
-            message: error.message,
-            id: payload.id
-        });
         throw error;
     }
     
     if (db) {
         try {
             await db.mandiReports.put(payload);
-            console.log('[addMandiReport] ✅ Successfully saved to IndexedDB:', payload.id);
         } catch (error) {
-            console.error('[addMandiReport] ❌ IndexedDB save failed:', error);
             // Don't throw here - Firestore save succeeded, IndexedDB is just cache
         }
     }
@@ -4746,9 +5017,9 @@ export async function updateMandiReport(id: string, updates: Partial<MandiReport
     
     try {
         await setDoc(docRef, updatePayload, { merge: true });
-        console.log('[updateMandiReport] Successfully updated in Firestore:', id);
+
     } catch (error) {
-        console.error('[updateMandiReport] Firestore update failed:', error);
+
         throw error;
     }
     
@@ -4756,9 +5027,9 @@ export async function updateMandiReport(id: string, updates: Partial<MandiReport
         try {
             const existing = await db.mandiReports.get(id);
             await db.mandiReports.put({ ...(existing || { id }), ...updates, updatedAt: updatePayload.updatedAt });
-            console.log('[updateMandiReport] Successfully updated in IndexedDB:', id);
+
         } catch (error) {
-            console.error('[updateMandiReport] IndexedDB update failed:', error);
+
             // Don't throw here - Firestore update succeeded, IndexedDB is just cache
         }
     }
@@ -4774,18 +5045,17 @@ export async function deleteMandiReport(id: string): Promise<void> {
 }
 
 export async function fetchMandiReports(): Promise<MandiReport[]> {
-    console.log('[fetchMandiReports] Starting fetch...');
     
     // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads
     if (db) {
         try {
             const localReports = await db.mandiReports.toArray();
             if (localReports.length > 0) {
-                console.log(`[fetchMandiReports] Returning ${localReports.length} reports from IndexedDB`);
+
                 return localReports;
             }
         } catch (error) {
-            console.error('[fetchMandiReports] IndexedDB read failed:', error);
+
             // If local read fails, continue with Firestore
         }
     }
@@ -4800,16 +5070,12 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
         // 2. For each parent, query the 6P subcollection
         // 3. Also try collectionGroup for '6P' subcollection (gets all 6P subcollections regardless of parent)
         
-        console.log('[fetchMandiReports] Data structure: /mandiReports/{voucherNo}/6P/{docId}');
-        console.log('[fetchMandiReports] Fetching from 6P subcollections...');
         
         // Method 1: Use collectionGroup to get ALL '6P' subcollections
         try {
-            console.log('[fetchMandiReports] Method 1: Using collectionGroup for "6P" subcollections...');
+
             const collectionGroup6P = collectionGroup(firestoreDB, '6P');
             const group6PSnapshot = await getDocs(collectionGroup6P);
-            
-            console.log(`[fetchMandiReports] collectionGroup("6P") found ${group6PSnapshot.size} total documents`);
             
             if (group6PSnapshot.size > 0) {
                 group6PSnapshot.docs.forEach((docSnap, index) => {
@@ -4825,7 +5091,7 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                     const finalId = data.id || docId;
                     
                     if (index < 5) {
-                        console.log(`[fetchMandiReports] Document ${index + 1}: path="${fullPath}", voucherNo="${voucherNo}", docId="${docId}", data.id="${data.id}", finalId="${finalId}"`);
+
                     }
                     
                     // Use finalId as key to avoid duplicates
@@ -4834,20 +5100,18 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                     }
                 });
                 
-                console.log(`[fetchMandiReports] ✅ Processed ${group6PSnapshot.size} documents from 6P subcollections, unique reports: ${reportMap.size}`);
             } else {
-                console.warn('[fetchMandiReports] collectionGroup("6P") returned 0 documents.');
+
             }
         } catch (collectionGroup6PError: any) {
-            console.error('[fetchMandiReports] collectionGroup("6P") query failed:', collectionGroup6PError);
-            console.log('[fetchMandiReports] Falling back to manual subcollection queries...');
+
+
         }
         
         // Method 2: Manually query each parent document's 6P subcollection
         try {
-            console.log('[fetchMandiReports] Method 2: Fetching parent documents and querying 6P subcollections...');
+
             const parentDocsSnapshot = await getDocs(mandiReportsCollection);
-            console.log(`[fetchMandiReports] Found ${parentDocsSnapshot.size} parent documents in mandiReports collection`);
             
             let subcollectionCount = 0;
             for (const parentDoc of parentDocsSnapshot.docs) {
@@ -4858,7 +5122,6 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                     
                     if (subcollectionSnapshot.size > 0) {
                         subcollectionCount += subcollectionSnapshot.size;
-                        console.log(`[fetchMandiReports] Parent "${parentDoc.id}" has ${subcollectionSnapshot.size} documents in 6P subcollection`);
                         
                         subcollectionSnapshot.docs.forEach((docSnap) => {
                             const data = docSnap.data() as MandiReport;
@@ -4868,26 +5131,24 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                             // Only add if not already in map
                             if (!reportMap.has(finalId)) {
                                 reportMap.set(finalId, { ...data, id: finalId });
-                                console.log(`[fetchMandiReports] Added from subcollection: parent="${parentDoc.id}", docId="${docId}", voucherNo="${data.voucherNo}"`);
+
                             }
                         });
                     }
                 } catch (subcollectionError: any) {
-                    console.warn(`[fetchMandiReports] Error querying 6P subcollection for parent "${parentDoc.id}":`, subcollectionError.message);
+
                 }
             }
             
-            console.log(`[fetchMandiReports] ✅ Method 2: Found ${subcollectionCount} total documents in 6P subcollections`);
         } catch (manualQueryError: any) {
-            console.error('[fetchMandiReports] Manual subcollection query failed:', manualQueryError);
+
         }
         
         // Method 3: Also try direct collection query (in case some data is at root level)
         try {
-            console.log('[fetchMandiReports] Method 3: Checking direct mandiReports collection...');
+
             const directQuery = query(mandiReportsCollection);
             const directSnapshot = await getDocs(directQuery);
-            console.log(`[fetchMandiReports] Direct collection query found ${directSnapshot.size} documents`);
             
             directSnapshot.docs.forEach((docSnap) => {
                 const data = docSnap.data() as MandiReport;
@@ -4899,30 +5160,24 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                     // Only add if not already in map
                     if (!reportMap.has(finalId)) {
                         reportMap.set(finalId, { ...data, id: finalId });
-                        console.log(`[fetchMandiReports] Added from direct query: docId="${docId}", voucherNo="${data.voucherNo}"`);
+
                     }
                 }
             });
         } catch (directError: any) {
-            console.error('[fetchMandiReports] Direct collection query failed:', directError);
+
         }
         
         // Convert map to array
         allReports = Array.from(reportMap.values());
-        console.log(`[fetchMandiReports] Total unique reports: ${allReports.length}`);
         
         // Log sample document IDs for debugging
         if (allReports.length > 0) {
-            console.log('[fetchMandiReports] Sample reports:', allReports.slice(0, 3).map(r => ({ 
-                id: r.id, 
-                voucherNo: r.voucherNo,
-                sellerName: r.sellerName,
-                purchaseDate: r.purchaseDate
-            })));
+
         } else {
-            console.warn('[fetchMandiReports] ⚠️ No reports found!');
-            console.warn('[fetchMandiReports] Check Firestore console: Collection should be "mandiReports"');
-            console.warn('[fetchMandiReports] Document path format: /mandiReports/{documentId}');
+
+
+
         }
         
         // Sort by purchaseDate in memory (newest first)
@@ -4932,14 +5187,12 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
             return dateB - dateA;
         });
         
-        console.log(`[fetchMandiReports] ✅ Final sorted reports: ${allReports.length}`);
-        
         if (db && allReports.length > 0) {
             try {
                 await db.mandiReports.bulkPut(allReports);
-                console.log(`[fetchMandiReports] ✅ Synced ${allReports.length} reports to IndexedDB`);
+
             } catch (error) {
-                console.error('[fetchMandiReports] ❌ IndexedDB sync failed:', error);
+
             }
         }
         
@@ -4950,22 +5203,16 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
         
         return allReports;
     } catch (error: any) {
-        console.error('[fetchMandiReports] ❌ Firestore query failed:', error);
-        console.error('[fetchMandiReports] Error details:', {
-            code: error.code,
-            message: error.message,
-            stack: error.stack
-        });
+
         
         // Try a simple direct query as last resort
         try {
-            console.log('[fetchMandiReports] Attempting simple direct query as fallback...');
+
             const snapshot = await getDocs(mandiReportsCollection);
-            console.log(`[fetchMandiReports] Direct query found ${snapshot.size} documents`);
             
             const reports = snapshot.docs.map((docSnap) => {
                 const data = docSnap.data() as MandiReport;
-                console.log(`[fetchMandiReports] Direct query doc: id="${docSnap.id}", path="${docSnap.ref.path}"`);
+
                 return { ...data, id: data.id || docSnap.id };
             });
             
@@ -4977,12 +5224,12 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
             
             if (db && reports.length > 0) {
                 await db.mandiReports.bulkPut(reports);
-                console.log(`[fetchMandiReports] ✅ Fallback: Synced ${reports.length} reports to IndexedDB`);
+
             }
             
             return reports;
         } catch (fallbackError: any) {
-            console.error('[fetchMandiReports] ❌ Fallback query also failed:', fallbackError);
+
             return [];
         }
     }
@@ -5053,7 +5300,7 @@ export function getMandiReportsRealtime(
             localStorage.setItem('lastSync:mandiReports', String(Date.now()));
         }
     }).catch((error) => {
-        console.error('Error fetching mandi reports:', error);
+
         onError(error);
     });
 
@@ -5094,7 +5341,7 @@ export function getMandiReportsRealtime(
             localStorage.setItem('lastSync:mandiReports', String(Date.now()));
         }
     }, (err: any) => {
-        console.error('Error in mandi reports realtime listener:', err);
+
         onError(err);
     });
 }

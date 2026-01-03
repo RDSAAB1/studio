@@ -119,7 +119,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
         setLoading(false);
       },
       (error) => {
-        console.error('Error loading supplier bank accounts:', error);
+
         toast({
           title: "Error",
           description: "Failed to load supplier bank accounts",
@@ -264,7 +264,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
         description: "Bank added successfully",
       });
     } catch (error: any) {
-      console.error('Error adding bank:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to add bank",
@@ -345,7 +345,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
       setSelectedBank('');
       setSelectedBranch('');
     } catch (error: any) {
-      console.error('Error saving supplier bank account:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to save supplier bank account",
@@ -362,7 +362,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
         description: "Supplier bank account deleted successfully",
       });
     } catch (error: any) {
-      console.error('Error deleting supplier bank account:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to delete supplier bank account",
@@ -470,7 +470,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
             savedCount++;
           }
         } catch (error: any) {
-          console.error('Error importing account:', accountData.accountNumber, error);
+
           errorCount++;
         }
       }
@@ -480,7 +480,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
         description: `Imported ${savedCount} supplier bank account(s). ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
       });
     } catch (error: any) {
-      console.error('Error importing from RTGS:', error);
+
       toast({
         title: "Error",
         description: error.message || "Failed to import accounts from RTGS payments",

@@ -24,14 +24,23 @@ export const useSupplierFiltering = (
         // If profile already exists, merge the data (combine transactions, payments, etc.)
         const existing = uniqueProfiles.get(profileKey)!;
         const existingData = existing.data;
+        const mergedTransactions = [...(existingData.allTransactions || []), ...(data.allTransactions || [])];
+        
+        // IMPORTANT: Recalculate totalOutstanding from merged transactions' outstanding amounts
+        // This ensures consistency: Final Outstanding = Sum of all Outstanding column values
+        const mergedTotalOutstanding = mergedTransactions.reduce((sum, t) => {
+          const outstanding = (t as any).outstandingForEntry || (t as any).netAmount || 0;
+          return sum + (typeof outstanding === 'number' ? outstanding : 0);
+        }, 0);
+        
         const mergedData = {
           ...existingData,
-          allTransactions: [...(existingData.allTransactions || []), ...(data.allTransactions || [])],
+          allTransactions: mergedTransactions,
           allPayments: [...(existingData.allPayments || []), ...(data.allPayments || [])],
           totalAmount: (existingData.totalAmount || 0) + (data.totalAmount || 0),
           totalOriginalAmount: (existingData.totalOriginalAmount || 0) + (data.totalOriginalAmount || 0),
           totalPaid: (existingData.totalPaid || 0) + (data.totalPaid || 0),
-          totalOutstanding: (existingData.totalOutstanding || 0) + (data.totalOutstanding || 0),
+          totalOutstanding: mergedTotalOutstanding,
         };
         uniqueProfiles.set(profileKey, { key: existing.key, data: mergedData });
       }

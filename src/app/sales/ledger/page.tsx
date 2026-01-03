@@ -220,9 +220,8 @@ const LedgerPage: React.FC = () => {
     return groups;
   }, [displayEntries]);
 
-  const accountDropdownOptions = useMemo(
-    () =>
-      accounts.map((account) => {
+  const accountDropdownOptions = useMemo(() => {
+    const options = accounts.map((account) => {
         const labelParts = [
           account.name ? toTitleCase(account.name) : "Unnamed Account",
           account.address ? toTitleCase(account.address) : null,
@@ -234,9 +233,10 @@ const LedgerPage: React.FC = () => {
           label: labelParts.join(" | "),
           data: account,
         };
-      }),
-    [accounts]
-  );
+    });
+    console.log('[Ledger] Dropdown options:', options.length, options);
+    return options;
+  }, [accounts]);
 
   const activeCashAccount = useMemo(
     () => cashAccounts.find((account) => account.id === activeCashAccountId) || null,
@@ -304,7 +304,6 @@ const LedgerPage: React.FC = () => {
         });
       },
       (error) => {
-        console.error("Failed to load cash accounts", error);
         toast({
           title: "Unable to load cash accounts",
           description: "We could not fetch cash accounts. Please try again.",
@@ -322,13 +321,14 @@ const LedgerPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = getLedgerAccountsRealtime(
       (data) => {
+        console.log('[Ledger] Accounts loaded:', data.length, data);
         setAccounts(data);
         if (!activeAccountId && data.length > 0) {
           setActiveAccountId(data[0].id);
         }
       },
       (error) => {
-        console.error("Failed to load ledger accounts", error);
+        console.error('[Ledger] Error loading accounts:', error);
         toast({
           title: "Unable to load accounts",
           description: "We could not fetch ledger accounts. Please try again.",
@@ -352,7 +352,6 @@ const LedgerPage: React.FC = () => {
         setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedEntries }));
       },
       (error) => {
-        console.error("Failed to load ledger entries", error);
         toast({
           title: "Unable to load entries",
           description: "We could not fetch ledger entries. Please try again.",
@@ -411,7 +410,6 @@ const LedgerPage: React.FC = () => {
       setShowAccountForm(false);
       setNewAccount({ name: "", address: "", contact: "" });
     } catch (error: any) {
-      console.error("Failed to create ledger account", error);
       toast({
         title: "Account creation failed",
         description: error?.message || "Please try again",
@@ -453,7 +451,6 @@ const LedgerPage: React.FC = () => {
       
       toast({ title: "Cash account created" });
     } catch (error: any) {
-      console.error("Failed to create cash account", error);
       toast({
         title: "Unable to create cash account",
         description: error?.message || "Please try again.",
@@ -469,7 +466,6 @@ const LedgerPage: React.FC = () => {
       name: account.name,
       noteGroups: account.noteGroups,
     }).catch((error) => {
-      console.error("Failed to update cash account", error);
       toast({
         title: "Unable to save cash account",
         description: "Recent changes could not be saved. Please retry.",
@@ -568,7 +564,13 @@ const LedgerPage: React.FC = () => {
     if (cashSaving) return;
     const target = cashAccounts.find((account) => account.id === accountId);
     if (!target) return;
-    if (typeof window === "undefined" || !window.confirm(`Delete cash account "${target.name}"?`)) return;
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm(`Delete cash account "${target.name}"?`, {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (!confirmed) return;
 
     setCashSaving(true);
     try {
@@ -592,7 +594,6 @@ const LedgerPage: React.FC = () => {
       });
       toast({ title: "Cash account deleted" });
     } catch (error: any) {
-      console.error("Failed to delete cash account", error);
       toast({
         title: "Unable to delete cash account",
         description: error?.message || "Please try again.",
@@ -748,7 +749,6 @@ const LedgerPage: React.FC = () => {
       setLinkAccountId("");
       setLinkMode("mirror");
     } catch (error: any) {
-      console.error("Failed to add ledger entry", error);
       toast({
         title: "Unable to add entry",
         description: error?.message || "Please try again",
@@ -846,7 +846,6 @@ const LedgerPage: React.FC = () => {
         }
 
         if (counterpartAccountId && counterpartEntries) {
-          console.log(`[Edit] Found linked entry in account ${counterpartAccountId}, updating...`);
           
           const counterpartUpdatedRaw = counterpartEntries.map((entry) =>
             entry.linkGroupId === editedEntry.linkGroupId
@@ -886,18 +885,11 @@ const LedgerPage: React.FC = () => {
             if (hasChanged) {
               const updatedEntry = { ...entry, updatedAt: timestamp };
               changedEntries.push(updatedEntry);
-              console.log(`[Edit] Linked entry ${entry.id} updated:`, {
-                date: entry.date,
-                particulars: entry.particulars,
-                debit: entry.debit,
-                credit: entry.credit,
-              });
               return updatedEntry;
             }
             return entry;
           });
         } else {
-          console.warn(`[Edit] Linked entry not found for linkGroupId: ${editedEntry.linkGroupId}`);
         }
       }
 
@@ -917,12 +909,10 @@ const LedgerPage: React.FC = () => {
           const lastSyncedKey = `ledgerEntriesLastSynced:${counterpartAccountId}`;
           window.localStorage.removeItem(lastSyncedKey);
         }
-        console.log(`[Edit] Persisted ${counterpartUpdated.length} entries to IndexedDB for account ${counterpartAccountId}`);
       }
 
       if (changedEntries.length) {
         await queueLedgerEntriesUpsert(changedEntries);
-        console.log(`[Edit] Queued ${changedEntries.length} entries for sync to Firestore`);
       }
 
       toast({ 
@@ -931,7 +921,6 @@ const LedgerPage: React.FC = () => {
       });
       handleCancelEdit();
     } catch (error: any) {
-      console.error("Failed to update ledger entry", error);
       toast({
         title: "Unable to update entry",
         description: error?.message || "Please try again",
@@ -944,7 +933,12 @@ const LedgerPage: React.FC = () => {
 
   const handleDeleteEntry = async (entryId: string) => {
     if (!activeAccountId || saving) return;
-    const confirmed = window.confirm("Delete this ledger entry?");
+    const { confirm } = await import("@/lib/confirm-dialog");
+    const confirmed = await confirm("Delete this ledger entry?", {
+      title: "Confirm Delete",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
     if (!confirmed) return;
 
     const entryToDelete = activeEntries.find((entry) => entry.id === entryId);
@@ -1050,7 +1044,6 @@ const LedgerPage: React.FC = () => {
         handleCancelEdit();
       }
     } catch (error: any) {
-      console.error("Failed to delete ledger entry", error);
       toast({
         title: "Unable to delete entry",
         description: error?.message || "Please try again",
@@ -1195,6 +1188,7 @@ const LedgerPage: React.FC = () => {
       (acc, row) => {
         acc.supplierCash += row.supplierCash;
         acc.supplierRtgs += row.supplierRtgs;
+        acc.govDistribution += row.govDistribution;
         acc.supplierPayments += row.supplierPayments;
         acc.expenses += row.expenses;
         acc.incomes += row.incomes;
@@ -1205,6 +1199,7 @@ const LedgerPage: React.FC = () => {
     {
       supplierCash: 0,
       supplierRtgs: 0,
+      govDistribution: 0,
       supplierPayments: 0,
       expenses: 0,
       incomes: 0,
@@ -1253,10 +1248,10 @@ const LedgerPage: React.FC = () => {
         return format(candidate, "yyyy-MM-dd");
       };
 
-      const map = new Map<string, { supplierCash: number; supplierRtgs: number; supplierPayments: number; incomes: number; expenses: number }>();
+      const map = new Map<string, { supplierCash: number; supplierRtgs: number; govDistribution: number; supplierPayments: number; incomes: number; expenses: number }>();
       const ensureRecord = (key: string) => {
         if (!map.has(key)) {
-          map.set(key, { supplierCash: 0, supplierRtgs: 0, supplierPayments: 0, incomes: 0, expenses: 0 });
+          map.set(key, { supplierCash: 0, supplierRtgs: 0, govDistribution: 0, supplierPayments: 0, incomes: 0, expenses: 0 });
         }
         return map.get(key)!;
       };
@@ -1270,6 +1265,16 @@ const LedgerPage: React.FC = () => {
         const rtgsAmount = parseAmount((payment as any).rtgsAmount);
         const receiptType = (payment.receiptType || (payment as any).type || "").toLowerCase();
         const channelHints = (payment as any).paymentMethod?.toLowerCase?.() || "";
+
+        // Check if this is a Gov payment
+        const isGovPayment = receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov');
+
+        // If it's a Gov payment, add to govDistribution instead of supplierCash
+        if (isGovPayment) {
+          record.govDistribution += totalAmount;
+          record.supplierPayments += totalAmount;
+          return; // Skip the normal cash/RTGS logic for Gov payments
+        }
 
         const addCash = (amount: number) => {
           if (amount > 0) record.supplierCash += amount;
@@ -1331,6 +1336,7 @@ const LedgerPage: React.FC = () => {
           date,
           supplierCash: Math.round(values.supplierCash * 100) / 100,
           supplierRtgs: Math.round(values.supplierRtgs * 100) / 100,
+          govDistribution: Math.round(values.govDistribution * 100) / 100,
           supplierPayments: Math.round(values.supplierPayments * 100) / 100,
           incomes: Math.round(values.incomes * 100) / 100,
           expenses: Math.round(values.expenses * 100) / 100,
@@ -1343,7 +1349,6 @@ const LedgerPage: React.FC = () => {
       setStatementData(rows);
       setStatementGeneratedAt(new Date().toISOString());
     } catch (error: any) {
-      console.error("Failed to generate statement", error);
       const message = error?.message || "Unable to generate statement right now.";
       setStatementError(message);
       toast({
@@ -1369,6 +1374,7 @@ const LedgerPage: React.FC = () => {
       "Date",
       "Supplier Cash (₹)",
       "Supplier RTGS (₹)",
+      "Gov Distribution (₹)",
       "Supplier Payments (₹)",
       "Expenses (₹)",
       "Income (₹)",
@@ -1380,6 +1386,7 @@ const LedgerPage: React.FC = () => {
       formatStatementDate(row.date),
       Number(row.supplierCash.toFixed(2)),
       Number(row.supplierRtgs.toFixed(2)),
+      Number(row.govDistribution.toFixed(2)),
       Number(row.supplierPayments.toFixed(2)),
       Number(row.expenses.toFixed(2)),
       Number(row.incomes.toFixed(2)),
@@ -1391,6 +1398,7 @@ const LedgerPage: React.FC = () => {
       "Totals",
       Number(statementTotals.supplierCash.toFixed(2)),
       Number(statementTotals.supplierRtgs.toFixed(2)),
+      Number(statementTotals.govDistribution.toFixed(2)),
       Number(statementTotals.supplierPayments.toFixed(2)),
       Number(statementTotals.expenses.toFixed(2)),
       Number(statementTotals.incomes.toFixed(2)),
@@ -1427,6 +1435,7 @@ const LedgerPage: React.FC = () => {
             <td>${formatStatementDate(row.date)}</td>
             <td class="numeric text-primary">${formatCurrency(row.supplierCash)}</td>
             <td class="numeric text-primary">${formatCurrency(row.supplierRtgs)}</td>
+            <td class="numeric text-primary">${formatCurrency(row.govDistribution)}</td>
             <td class="numeric text-primary">${formatCurrency(row.supplierPayments)}</td>
             <td class="numeric text-expense">${formatCurrency(row.expenses)}</td>
             <td class="numeric text-income">${formatCurrency(row.incomes)}</td>
@@ -1594,6 +1603,10 @@ const LedgerPage: React.FC = () => {
                 <p>₹${formatCurrency(statementTotals.supplierRtgs)}</p>
               </div>
               <div class="summary-card">
+                <h4>Gov Distribution</h4>
+                <p>₹${formatCurrency(statementTotals.govDistribution)}</p>
+              </div>
+              <div class="summary-card">
                 <h4>Total Supplier Payments</h4>
                 <p>₹${formatCurrency(statementTotals.supplierPayments)}</p>
               </div>
@@ -1624,6 +1637,7 @@ const LedgerPage: React.FC = () => {
                   <th>Date</th>
                   <th>Supplier Cash (₹)</th>
                   <th>Supplier RTGS (₹)</th>
+                  <th>Gov Distribution (₹)</th>
                   <th>Total Supplier Payments (₹)</th>
                   <th>Expenses (₹)</th>
                   <th>Income (₹)</th>
@@ -1634,7 +1648,7 @@ const LedgerPage: React.FC = () => {
               <tbody>
                 ${
                   rowsHtml ||
-                  `<tr><td colspan="8" style="text-align:center; padding: 18px;">No entries available for this period.</td></tr>`
+                  `<tr><td colspan="9" style="text-align:center; padding: 18px;">No entries available for this period.</td></tr>`
                 }
               </tbody>
             </table>
@@ -2221,7 +2235,7 @@ const LedgerPage: React.FC = () => {
                                 </Button>
                               </div>
               </div>
-              <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
                 <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Supplier Cash Payments
@@ -2236,6 +2250,14 @@ const LedgerPage: React.FC = () => {
                   </p>
                   <p className="mt-1 text-lg font-semibold text-primary">
                     ₹{formatCurrency(statementTotals.supplierRtgs)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Gov Distribution
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    ₹{formatCurrency(statementTotals.govDistribution)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
@@ -2291,6 +2313,10 @@ const LedgerPage: React.FC = () => {
                       <td className="amount-cell">₹{formatCurrency(statementTotals.supplierRtgs)}</td>
                     </tr>
                     <tr>
+                      <th scope="row">Gov Distribution</th>
+                      <td className="amount-cell">₹{formatCurrency(statementTotals.govDistribution)}</td>
+                    </tr>
+                    <tr>
                       <th scope="row">Total Supplier Payments</th>
                       <td className="amount-cell">₹{formatCurrency(statementTotals.supplierPayments)}</td>
                     </tr>
@@ -2322,6 +2348,7 @@ const LedgerPage: React.FC = () => {
                       <th className="px-4 py-2 text-left font-semibold">Date</th>
                       <th className="px-4 py-2 text-right font-semibold">Supplier Cash (₹)</th>
                       <th className="px-4 py-2 text-right font-semibold">Supplier RTGS (₹)</th>
+                      <th className="px-4 py-2 text-right font-semibold">Gov Distribution (₹)</th>
                       <th className="px-4 py-2 text-right font-semibold">Supplier Payments (₹)</th>
                       <th className="px-4 py-2 text-right font-semibold">Expenses (₹)</th>
                       <th className="px-4 py-2 text-right font-semibold">Income (₹)</th>
@@ -2332,13 +2359,13 @@ const LedgerPage: React.FC = () => {
                   <tbody>
                     {statementLoading ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
                           Generating statement…
                             </td>
                       </tr>
                     ) : statementData.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
                           No data found for the selected range.
                             </td>
                           </tr>
@@ -2348,6 +2375,7 @@ const LedgerPage: React.FC = () => {
                           <td className="px-4 py-2">{formatStatementDate(row.date)}</td>
                           <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierCash)}</td>
                           <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierRtgs)}</td>
+                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.govDistribution)}</td>
                           <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierPayments)}</td>
                           <td className="px-4 py-2 text-right text-red-500">{formatCurrency(row.expenses)}</td>
                           <td className="px-4 py-2 text-right text-emerald-600">{formatCurrency(row.incomes)}</td>

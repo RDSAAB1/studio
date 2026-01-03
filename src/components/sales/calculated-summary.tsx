@@ -73,7 +73,8 @@ export const CalculatedSummary = ({
     isDeleting = false
 }: CalculatedSummaryProps) => {
 
-    const isLoading = !customer || !customer.srNo || isDeleting;
+    // Only disable during delete operations, not during save/update (optimistic updates)
+    const isLoading = isDeleting;
     const isPrintActionForSelected = selectedIdsCount > 0;
     
     // Determine which summary to show
@@ -106,15 +107,19 @@ export const CalculatedSummary = ({
                     {showKantaParchiSummary && (
                         <>
                             <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />
-                            <SummaryItem label="Total Bag Wt" value={`${totalBagWeight.toFixed(2)} kg`} />
+                            <SummaryItem label="Total Bag Wt" value={`${(totalBagWeight / 100).toFixed(2)} Qtl`} />
                             <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
+                            <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
+                            <SummaryItem label="Bag Wt Deduction" value={formatCurrency((customer as any).bagWeightDeductionAmount || 0)} />
                             <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />
                             <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />
                             <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
+                            <SummaryItem label="Transport Amount" value={formatCurrency((customer as any).transportAmount || 0)} />
                             <SummaryItem label="Kanta" value={formatCurrency(customer.kanta || 0)} />
-                            <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
+                            <SummaryItem label="Net Receivable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
                         </>
                     )}
                     

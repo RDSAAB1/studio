@@ -52,7 +52,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             setIsComputing(false);
             setProgress(100);
         }).catch((error) => {
-            console.error('Error generating statement:', error);
+
             toast({
                 title: 'Error',
                 description: `Failed to generate statement${totalItems > 1000 ? '. This is a large dataset, please wait...' : '. Please try again.'}`,
@@ -216,7 +216,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 targetWindow.print();
             }
         } catch (error) {
-            console.error('Failed to populate print window:', error);
+
             targetWindow.close();
             toast({
                 title: 'Preview unavailable',

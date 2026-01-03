@@ -78,7 +78,7 @@ export default function TasksPage() {
         localStorage.setItem('lastSync:tasks', String(Date.now()));
       }
     }, (error) => {
-      console.error("Error fetching tasks: ", error);
+
     });
 
     return () => unsubscribe();
@@ -96,7 +96,7 @@ export default function TasksPage() {
       setNewTask({ name: "", description: "", status: "todo" });
       setIsAddModalOpen(false);
     } catch (e) {
-      console.error("Error adding document: ", e);
+
     }
   };
 
@@ -118,7 +118,7 @@ export default function TasksPage() {
       setEditingTask(null);
       setIsEditModalOpen(false);
     } catch (e) {
-      console.error("Error updating document: ", e);
+
     }
   };
 
@@ -126,7 +126,7 @@ export default function TasksPage() {
     try {
       await deleteDoc(doc(firestoreDB, "tasks", taskId));
     } catch (e) {
-      console.error("Error deleting document: ", e);
+
     }
   };
 

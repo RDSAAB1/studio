@@ -19,6 +19,7 @@ import { OptionsManagerDialog } from "./options-manager-dialog";
 import { Separator } from "../ui/separator";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { User, Phone, Home, Truck, Wheat, Banknote, Landmark, Hash, Percent, Weight, Boxes, Settings, PlusCircle } from "lucide-react";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 
 const SectionCard = ({ icon, children, className }: { icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
     <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
@@ -41,6 +42,14 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
+    const [cdInputMode, setCdInputMode] = useState<'percentage' | 'amount'>(() => {
+        // Check if there's a saved preference in localStorage
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('cd-input-mode');
+            return (saved === 'amount' ? 'amount' : 'percentage') as 'percentage' | 'amount';
+        }
+        return 'percentage';
+    });
 
     const openManagementDialog = (type: 'variety' | 'paymentType') => {
         setManagementType(type);
@@ -156,7 +165,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     // Use useWatch to efficiently watch multiple fields at once (single subscription)
     const watchedValues = useWatch({
         control: form.control,
-        name: ['grossWeight', 'teirWeight', 'bags', 'bagWeightKg', 'rate', 'netWeight', 'brokerage', 'cd', 'bagRate', 'taxRate', 'isGstIncluded']
+        name: ['grossWeight', 'teirWeight', 'bags', 'bagWeightKg', 'rate', 'kartaPercentage', 'netWeight', 'brokerage', 'cd', 'cdAmount', 'bagRate', 'transportationRate', 'taxRate', 'isGstIncluded']
     });
 
     const [
@@ -165,10 +174,13 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         bags,
         bagWeightKg,
         rate,
+        kartaPercentage,
         netWeight,
         brokerage,
         cd,
+        cdAmount,
         bagRate,
+        transportationRate,
         taxRate,
         isGstIncluded
     ] = watchedValues;
@@ -177,7 +189,38 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     const calculated = useMemo(() => {
         const formValues = form.getValues();
         return calculateCustomerEntry(formValues, []);
-    }, [grossWeight, teirWeight, bags, bagWeightKg, rate, netWeight, brokerage, cd, bagRate, form]);
+    }, [grossWeight, teirWeight, bags, bagWeightKg, rate, kartaPercentage, netWeight, brokerage, cd, cdAmount, bagRate, transportationRate, form]);
+
+    // Handle CD input mode change and auto-calculate
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cd-input-mode', cdInputMode);
+        }
+    }, [cdInputMode]);
+
+    // Auto-calculate CD% when CD Amount is entered
+    useEffect(() => {
+        if (cdInputMode === 'amount' && cdAmount && calculated.amount && calculated.amount > 0) {
+            const calculatedCdRate = (cdAmount / calculated.amount) * 100;
+            const currentCd = form.getValues('cd') || 0;
+            // Only update if the calculated value is significantly different (avoid infinite loops)
+            if (Math.abs(currentCd - calculatedCdRate) > 0.01) {
+                form.setValue('cd', calculatedCdRate, { shouldValidate: false, shouldDirty: false });
+            }
+        }
+    }, [cdAmount, cdInputMode, calculated.amount, form]);
+
+    // Auto-calculate CD Amount when CD% is entered
+    useEffect(() => {
+        if (cdInputMode === 'percentage' && cd && calculated.amount && calculated.amount > 0) {
+            const calculatedCdAmount = (calculated.amount * cd) / 100;
+            const currentCdAmount = form.getValues('cdAmount') || 0;
+            // Only update if the calculated value is significantly different (avoid infinite loops)
+            if (Math.abs(currentCdAmount - calculatedCdAmount) > 0.01) {
+                form.setValue('cdAmount', calculatedCdAmount, { shouldValidate: false, shouldDirty: false });
+            }
+        }
+    }, [cd, cdInputMode, calculated.amount, form]);
 
     // Calculate tax amounts
     const taxCalculations = useMemo(() => {
@@ -245,11 +288,11 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 {/* Weight & Rate Section - Top */}
                 <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                     <CardContent className="pt-4 space-y-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
                             <div className="space-y-0.5">
-                                <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
+                                <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="customer-gross-weight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
@@ -265,9 +308,15 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
-                                <Label htmlFor="rate" className="text-xs">Rate</Label>
+                                <Label htmlFor="customer-rate" className="text-xs">Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="customer-rate" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                </InputWithIcon>
+                            </div>
+                            <div className="space-y-0.5">
+                                <Label htmlFor="kartaPercentage" className="text-xs">KRTA %</Label>
+                                <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -339,7 +388,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                              <Controller name="variety" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
                                     <Label className="text-xs flex items-center gap-1.5">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..."/>
+                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
                             <div className="space-y-0.5">
@@ -351,7 +400,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                              <Controller name="paymentType" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
                                     <Label className="text-xs flex items-center gap-1.5">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." />
+                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
                         </div>
@@ -361,7 +410,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 {/* Weight & Financial Details Card */}
                 <Card className="bg-card/60 backdrop-blur-sm border-white/10 lg:col-span-2">
                     <CardContent className="pt-4 space-y-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
@@ -375,18 +424,72 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
-                                <Label htmlFor="cd" className="text-xs">CD (%)</Label>
-                                <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="cd" control={form.control} render={({ field }) => (
-                                        <Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                    )} />
-                                </InputWithIcon>
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="cd" className="text-xs">CD</Label>
+                                    <SegmentedSwitch
+                                        id="cd-input-mode"
+                                        checked={cdInputMode === 'amount'}
+                                        onCheckedChange={(checked) => {
+                                            setCdInputMode(checked ? 'amount' : 'percentage');
+                                        }}
+                                        leftLabel="%"
+                                        rightLabel="Amount"
+                                        className="w-32 h-6"
+                                    />
+                                </div>
+                                {cdInputMode === 'percentage' ? (
+                                    <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="cd" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="cd" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0}
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                                placeholder="0.00"
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                ) : (
+                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="cdAmount" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="cdAmount" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0}
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                                placeholder="0.00"
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                )}
                             </div>
                             <div className="space-y-0.5">
                                 <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
                                     <Controller name="brokerage" control={form.control} render={({ field }) => (
                                         <Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                    )} />
+                                </InputWithIcon>
+                            </div>
+                            <div className="space-y-0.5">
+                                <Label htmlFor="transportationRate" className="text-xs">Transportation Rate</Label>
+                                <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Controller name="transportationRate" control={form.control} render={({ field }) => (
+                                        <Input 
+                                            id="transportationRate" 
+                                            type="number" 
+                                            {...field} 
+                                            value={field.value ?? 0} 
+                                            onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                            onFocus={handleFocus} 
+                                            className="h-7 text-xs pl-9" 
+                                        />
                                     )} />
                                 </InputWithIcon>
                             </div>

@@ -38,12 +38,14 @@ export function createMetadataBasedListener<T>(
     let lastKnownTimestamp: Timestamp | null = null;
     let isInitialLoad = true;
     let callbackCalledFromIndexedDB = false;
+    let checkInterval: NodeJS.Timeout | null = null;
     
     // ✅ Step 1: Load from IndexedDB first (immediate response, no Firestore read)
+    // Then immediately check Firestore to detect deletions (even if sync registry hasn't changed)
     if (db && localTableName) {
         const localTable = (db as any)[localTableName];
         if (localTable) {
-            // Try to order by 'date' first (for payments, expenses, etc.), fallback to 'srNo' (for suppliers, customers)
+            // Try to order by 'date' first (for payments, expenses, etc.), fallback to 'srNo' (for suppliers, customers), then 'name' (for ledger accounts)
             localTable.orderBy('date').reverse().toArray().then((localData: T[]) => {
                 if (localData && localData.length > 0) {
                     callbackCalledFromIndexedDB = true;
@@ -57,7 +59,14 @@ export function createMetadataBasedListener<T>(
                         callback(localData);
                     }
                 }).catch(() => {
-                    // If both fail, just get all data without ordering
+                    // If 'srNo' doesn't exist, try 'name' (for ledger accounts)
+                    localTable.orderBy('name').toArray().then((localData: T[]) => {
+                        if (localData && localData.length > 0) {
+                            callbackCalledFromIndexedDB = true;
+                            callback(localData);
+                        }
+                    }).catch(() => {
+                        // If all ordering fails, just get all data without ordering
                     localTable.toArray().then((localData: T[]) => {
                         if (localData && localData.length > 0) {
                             callbackCalledFromIndexedDB = true;
@@ -66,9 +75,13 @@ export function createMetadataBasedListener<T>(
                     }).catch(() => {
                         // If local read fails, continue with Firestore
                         callbackCalledFromIndexedDB = false;
+                        });
                     });
                 });
             });
+            
+            // ✅ Periodic checks removed - only sync when sync registry indicates actual changes
+            // This prevents unnecessary reads and only fetches when edit/delete/update occurs
         }
     }
     
@@ -78,29 +91,32 @@ export function createMetadataBasedListener<T>(
     const registryDocRef = doc(collection(firestoreDB, "sync_registry"), registryDocId);
     
     const unsubscribe = onSnapshot(registryDocRef, async (snapshot) => {
+        console.log(`[${collectionName}] Sync registry snapshot received, exists: ${snapshot.exists()}`);
+        
         if (!snapshot.exists()) {
-            // Registry doc doesn't exist yet - do initial fetch ONLY if IndexedDB is empty
+            // Registry doc doesn't exist yet - always do initial fetch to detect deletions
             if (isInitialLoad) {
-                // Check if we have local data first
-                if (db && localTableName) {
-                    const localTable = (db as any)[localTableName];
-                    if (localTable) {
-                        try {
-                            const localCount = await localTable.count();
-                            if (localCount > 0) {
-                                // We have local data, skip Firestore fetch
-                                isInitialLoad = false;
-                                return;
-                            }
-                        } catch {
-                            // If count fails, continue with fetch
-                        }
-                    }
-                }
-                
-                // No local data - do initial fetch
+                // Always fetch on initial load, even if we have local data
+                // This ensures deletions are detected after refresh
                 try {
                     const freshData = await fetchFunction();
+                    
+                    // Update IndexedDB and detect deletions
+                    if (db && localTableName) {
+                        const localTable = (db as any)[localTableName];
+                        if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
+                            const existingIds = new Set((await localTable.toArray()).map((item: any) => item.id));
+                            const freshIds = new Set(freshData.map((item: any) => item.id));
+                            const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
+                            if (idsToDelete.length > 0) {
+                                await localTable.bulkDelete(idsToDelete);
+                            }
+                            if (freshData.length > 0) {
+                                await localTable.bulkPut(freshData);
+                            }
+                        }
+                    }
+                    
                     callback(freshData);
                     isInitialLoad = false;
                 } catch (error) {
@@ -112,126 +128,163 @@ export function createMetadataBasedListener<T>(
         
         const data = snapshot.data();
         const currentTimestamp = data.last_updated || data.updated_at;
+        const currentTrigger = (data as any)._trigger;
         
-        // ✅ Step 3: Check if timestamp has changed
-        // Always fetch on initial load (when lastKnownTimestamp is null)
-        // For subsequent loads, only fetch if timestamp actually changed
+        // Track last known values
+        const lastTriggerKey = `lastTrigger_${collectionName}`;
+        const lastTimestampKey = `lastTimestamp_${collectionName}`;
+        const lastKnownTrigger = typeof window !== 'undefined' ? (window as any)[lastTriggerKey] : null;
+        const lastKnownTimestampStr = typeof window !== 'undefined' ? (window as any)[lastTimestampKey] : null;
+        
+        console.log(`[${collectionName}] Sync registry change detected:`, {
+            hasTimestamp: !!currentTimestamp,
+            hasTrigger: currentTrigger !== undefined,
+            currentTrigger,
+            lastKnownTrigger,
+            lastKnownTimestampStr,
+            isInitialLoad
+        });
+        
+        // ✅ Step 3: Only fetch if there's an ACTUAL change (timestamp or trigger changed)
         if (isInitialLoad) {
-            // Initial load - check if we have local data first
-            if (db && localTableName) {
-                const localTable = (db as any)[localTableName];
-                if (localTable) {
-                    try {
-                        const localCount = await localTable.count();
-                        if (localCount > 0) {
-                            // We have local data, skip Firestore fetch on initial load
-                            // Just update the timestamp and return
-                            if (currentTimestamp) {
-                                lastKnownTimestamp = currentTimestamp instanceof Timestamp 
-                                    ? currentTimestamp 
-                                    : Timestamp.fromMillis(currentTimestamp);
-                            }
-                            isInitialLoad = false;
-                            return;
-                        }
-                    } catch {
-                        // If count fails, continue with fetch
+            // Initial load - always fetch
+            console.log(`[${collectionName}] Initial load - fetching`);
+            isInitialLoad = false;
+            // Continue to fetch below
+        } else {
+            // If we don't have last known values yet, always fetch (first update after initial load)
+            if (lastKnownTimestampStr === null && lastKnownTrigger === null) {
+                console.log(`[${collectionName}] No last known values - fetching (first update)`);
+                // Continue to fetch below
+            } else {
+                // Check if timestamp changed
+                let timestampChanged = false;
+                if (currentTimestamp) {
+                    const currentTimestampStr = currentTimestamp instanceof Timestamp 
+                        ? currentTimestamp.toMillis().toString() 
+                        : String(currentTimestamp);
+                    
+                    if (lastKnownTimestampStr !== currentTimestampStr) {
+                        timestampChanged = true;
+                        console.log(`[${collectionName}] Timestamp changed: ${lastKnownTimestampStr} -> ${currentTimestampStr}`);
                     }
                 }
+                
+                // Check if trigger changed
+                // Trigger is always a number when set, so compare directly
+                // Handle case where trigger might be 0 (falsy but valid)
+                const hasCurrentTrigger = currentTrigger !== undefined && currentTrigger !== null;
+                const hasLastTrigger = lastKnownTrigger !== undefined && lastKnownTrigger !== null;
+                const triggerChanged = hasCurrentTrigger && 
+                                      (hasLastTrigger ? currentTrigger !== lastKnownTrigger : true);
+                
+                console.log(`[${collectionName}] Change check:`, {
+                    timestampChanged,
+                    triggerChanged,
+                    currentTrigger,
+                    lastKnownTrigger,
+                    hasCurrentTrigger,
+                    hasLastTrigger,
+                    willFetch: timestampChanged || triggerChanged
+                });
+                
+                // Only fetch if timestamp OR trigger changed (actual change detected)
+                if (timestampChanged || triggerChanged) {
+                    console.log(`[${collectionName}] ✅ Change detected - fetching (timestamp: ${timestampChanged}, trigger: ${triggerChanged})`);
+                    // Continue to fetch below (don't return)
+                } else {
+                    // No change detected - skip fetch to avoid unnecessary reads
+                    console.log(`[${collectionName}] ⏭️ No change detected, skipping fetch`);
+                    return; // Skip fetch
+                }
             }
-            // No local data - proceed with fetch
-            isInitialLoad = false;
-        } else if (lastKnownTimestamp && currentTimestamp) {
-            // Compare timestamps - skip if unchanged
-            let timestampsEqual = false;
-            if (currentTimestamp instanceof Timestamp && lastKnownTimestamp instanceof Timestamp) {
-                timestampsEqual = currentTimestamp.isEqual(lastKnownTimestamp);
-            } else if (currentTimestamp === lastKnownTimestamp) {
-                timestampsEqual = true;
-            }
-            
-            if (timestampsEqual) {
-                return; // No change - skip fetch
-            }
-        } else if (!currentTimestamp) {
-            // No timestamp in registry - skip
-            return;
         }
         
-        // ✅ Step 4: Timestamp changed or initial load - fetch fresh data (one-time getDocs)
+        // ✅ Step 4: Timestamp changed or initial load - fetch fresh data immediately (one-time getDocs)
+        // Always fetch when timestamp changes - no cooldown to ensure deletions are detected immediately
         try {
-            // Check if we already have data in IndexedDB and timestamp hasn't changed significantly
-            // Skip fetch if we have local data and this is just a minor timestamp update
-            if (db && localTableName && !isInitialLoad && lastKnownTimestamp && currentTimestamp) {
-                const localTable = (db as any)[localTableName];
-                if (localTable) {
-                    try {
-                        const localCount = await localTable.count();
-                        // If we have local data and timestamp difference is less than 30 seconds, skip fetch
-                        // This prevents unnecessary reads from rapid timestamp updates
-                        if (localCount > 0) {
-                            const currentTime = currentTimestamp instanceof Timestamp 
-                                ? currentTimestamp.toMillis() 
-                                : (typeof currentTimestamp === 'number' ? currentTimestamp : Date.now());
-                            const lastTime = lastKnownTimestamp instanceof Timestamp 
-                                ? lastKnownTimestamp.toMillis() 
-                                : (typeof lastKnownTimestamp === 'number' ? lastKnownTimestamp : 0);
-                            
-                            // If timestamp changed by less than 30 seconds, it's likely just a metadata update
-                            // Skip the fetch to reduce reads (increased from 5 to 30 seconds)
-                            if (currentTime - lastTime < 30000) {
-                                // Update timestamp but don't fetch
-                                lastKnownTimestamp = currentTimestamp instanceof Timestamp 
-                                    ? currentTimestamp 
-                                    : Timestamp.fromMillis(currentTime);
-                                return;
-                            }
-                        }
-                    } catch {
-                        // If check fails, continue with fetch
-                    }
-                }
-            }
             
             // Track Firestore read (only one read per change, not streaming)
             firestoreMonitor.logRead(collectionName, 'metadataBasedListener', 1);
             
             const freshData = await fetchFunction();
             
-            // ✅ Step 5: Update local IndexedDB
+            // ✅ Step 5: Update local IndexedDB and prepare final data for callback
+            let finalData = freshData;
+            
             if (db && localTableName) {
                 const localTable = (db as any)[localTableName];
                 if (localTable) {
                     // For dual-collection payments, skip default IndexedDB update (handled separately)
                     if (localTableName === 'payments' || localTableName === 'governmentFinalizedPayments') {
                         // Skip - payments are handled by savePaymentsToIndexedDB
+                        finalData = freshData;
                     } else {
-                        // Get all existing IDs from IndexedDB
-                        const existingIds = new Set((await localTable.toArray()).map((item: any) => item.id));
+                        // Get all existing IDs from IndexedDB BEFORE updating
+                        const existingItems = await localTable.toArray();
+                        const existingIds = new Set(existingItems.map((item: any) => item.id));
                         const freshIds = new Set(freshData.map((item: any) => item.id));
                         
                         // Delete items that are no longer in Firestore
                         const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
                         if (idsToDelete.length > 0) {
+                            console.log(`[${collectionName}] 🗑️ Detected ${idsToDelete.length} deletions:`, idsToDelete);
                             await localTable.bulkDelete(idsToDelete);
                         }
                         
                         // Update/add fresh data
                         if (freshData.length > 0) {
                             await localTable.bulkPut(freshData);
+                        } else if (idsToDelete.length > 0) {
+                            // If all items were deleted, ensure IndexedDB is empty
+                            await localTable.clear();
+                        }
+                        
+                        // After updating IndexedDB, get the final data (which excludes deleted items)
+                        // This ensures the callback gets the correct data that matches IndexedDB
+                        finalData = freshData; // freshData already excludes deleted items from Firestore
+                        
+                        // Log deletion detection for debugging
+                        if (idsToDelete.length > 0) {
+                            console.log(`[${collectionName}] ✅ Deleted ${idsToDelete.length} items from IndexedDB:`, idsToDelete);
                         }
                     }
                 }
             }
             
-            // ✅ Step 6: Call callback with fresh data (always call, even if empty, to trigger UI update)
-            callback(freshData);
+            // ✅ Step 6: Call callback with final data (always call, even if empty, to trigger UI update)
+            // finalData already excludes deleted items (from Firestore fetch)
+            // and IndexedDB has been updated to match, so callback will update UI correctly
+            // This ensures other devices' IndexedDB and UI update immediately
+            // Always create a new array reference to ensure React detects the change
+            const dataToCallback = [...finalData];
+            console.log(`[${collectionName}] Sync registry change detected, updating with ${dataToCallback.length} items`);
+            callback(dataToCallback);
             
-            // Update last known timestamp
+            // Update last known timestamp and trigger (save BEFORE callback to ensure it's saved)
             if (currentTimestamp) {
                 lastKnownTimestamp = currentTimestamp instanceof Timestamp 
                     ? currentTimestamp 
                     : Timestamp.fromMillis(currentTimestamp);
+                
+                // Save timestamp string for comparison
+                if (typeof window !== 'undefined') {
+                    const timestampStr = currentTimestamp instanceof Timestamp 
+                        ? currentTimestamp.toMillis().toString() 
+                        : String(currentTimestamp);
+                    (window as any)[`lastTimestamp_${collectionName}`] = timestampStr;
+                }
+            }
+            // Always save trigger if it exists (even if 0, to track state)
+            // Use explicit check for undefined/null, not falsy check (0 is valid)
+            if (typeof window !== 'undefined') {
+                if (currentTrigger !== undefined && currentTrigger !== null) {
+                    (window as any)[`lastTrigger_${collectionName}`] = currentTrigger;
+                    console.log(`[${collectionName}] Saved trigger: ${currentTrigger}`);
+                } else {
+                    // Clear trigger if it's undefined/null (document might not have trigger field yet)
+                    (window as any)[`lastTrigger_${collectionName}`] = null;
+                }
             }
             isInitialLoad = false;
             
@@ -249,7 +302,14 @@ export function createMetadataBasedListener<T>(
         onError(error);
     });
     
-    return unsubscribe;
+    // Return unsubscribe function that also cleans up interval
+    return () => {
+        if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+        }
+        unsubscribe();
+    };
 }
 
 /**

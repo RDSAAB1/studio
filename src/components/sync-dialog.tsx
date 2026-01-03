@@ -42,7 +42,7 @@ export function SyncDialog({ open, onOpenChange, onSync }: SyncDialogProps) {
           const results = await onSync(undefined); // Get all collections info
           setCollections(results);
         } catch (error) {
-          console.error('Error loading collections:', error);
+
         } finally {
           setIsSyncing(false);
         }
@@ -145,7 +145,7 @@ export function SyncDialog({ open, onOpenChange, onSync }: SyncDialogProps) {
       setCollections(results);
       setSyncComplete(true);
     } catch (error) {
-      console.error('Sync error:', error);
+
     } finally {
       setIsSyncing(false);
     }

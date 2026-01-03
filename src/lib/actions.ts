@@ -59,7 +59,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         
         return { success: true };
     } catch (error: any) {
-        console.error('Error sending email:', error);
+
         let errorMessage = "Failed to send email. Please check your App Password and try again.";
          if (error.code === 'EAUTH') {
             errorMessage = 'Authentication failed. Please verify your email and App Password in Settings.';

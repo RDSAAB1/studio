@@ -27,6 +27,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [parchiNo, setParchiNo] = useState('');
     const [utrNo, setUtrNo] = useState('');
     const [checkNo, setCheckNo] = useState('');
+    const [centerName, setCenterName] = useState<string>('');
 
     const [rtgsQuantity, setRtgsQuantity] = useState(0);
     const [rtgsRate, setRtgsRate] = useState(0);
@@ -243,6 +244,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setIsBeingEdited(false); // Reset edit state
         setIsPayeeEditing(false); // Reset payee editing state
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
+        setCenterName('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
         setGovQuantity(0); setGovRate(0); setGovAmount(0);
         setGovRequiredAmount(0);
@@ -275,6 +277,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         parchiNo, setParchiNo,
         utrNo, setUtrNo,
         checkNo, setCheckNo,
+        centerName, setCenterName,
         rtgsQuantity, setRtgsQuantity,
         rtgsRate, setRtgsRate,
         rtgsAmount, setRtgsAmount,

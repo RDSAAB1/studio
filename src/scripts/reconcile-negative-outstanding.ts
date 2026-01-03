@@ -137,7 +137,7 @@ export async function runReconciliation(entries: ReportEntry[], options: Reconci
   const plans = await planReconciliation(entries, options);
   if (!options.apply) {
     // eslint-disable-next-line no-console
-    console.log(JSON.stringify(plans, null, 2));
+
     return { applied: false, count: plans.length };
   }
   await applyReconciliation(plans);
@@ -184,6 +184,6 @@ function proportionallyScaleDown(items: PaidForItem[], targetTotal: number): Pai
 
 // Optional: paste your data here and invoke runReconciliation(DATA, { apply: false }) in a custom runner
 // const DATA: ReportEntry[] = [];
-// runReconciliation(DATA, { apply: false, capAllocationsToPaymentTotal: true }).then(console.log);
+// runReconciliation(DATA, { apply: false, capAllocationsToPaymentTotal: true }).then();
 
 

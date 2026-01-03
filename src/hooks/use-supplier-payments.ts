@@ -10,8 +10,8 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
-import { addBank } from '@/lib/firestore';
-import type { Customer } from "@/lib/definitions";
+import { addBank, getOptionsRealtime } from '@/lib/firestore';
+import type { Customer, OptionItem } from "@/lib/definitions";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "@/app/sales/supplier-profile/utils/fuzzy-matching";
 
 const normalizeProfileField = (value: unknown): string => {
@@ -53,6 +53,7 @@ export const useSupplierPayments = () => {
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('process');
     const [selectedPaymentOption, setSelectedPaymentOption] = useState<{ quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; bags?: number | null } | null>(null);
+    const [centerNameOptions, setCenterNameOptions] = useState<OptionItem[]>([]);
     
     const selectedEntries = useMemo(() => {
         if (!Array.isArray(data.suppliers)) return [];
@@ -339,6 +340,16 @@ export const useSupplierPayments = () => {
         };
     }, []);
 
+    // Load centerNameOptions for Gov payments
+    useEffect(() => {
+        const unsubCenterNames = getOptionsRealtime('centerNames', setCenterNameOptions, (err) => {
+            console.error("Error fetching center names:", err);
+        });
+        return () => {
+            unsubCenterNames();
+        };
+    }, []);
+
     // Auto-calculate settle amount for Partial payment type
     // IMPORTANT: Only add CD to settlement if CD is enabled
     // Use debounced value to prevent lag
@@ -475,6 +486,7 @@ export const useSupplierPayments = () => {
                 form.setGovAmount((paymentData as any).govAmount || 0);
                 form.setGovRequiredAmount((paymentData as any).govRequiredAmount || (paymentData as any).govAmount || 0);
                 form.setExtraAmount((paymentData as any).extraAmount || 0);
+                form.setCenterName((paymentData as any).centerName || '');
             }
             
             // Preserve contact number from payment data or find from supplier entry
@@ -557,7 +569,7 @@ export const useSupplierPayments = () => {
     
             toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
         } catch (error: any) {
-            console.error("Edit setup failed:", error);
+
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
             form.setEditingPayment(null);
             form.resetPaymentForm();
@@ -588,13 +600,49 @@ export const useSupplierPayments = () => {
             form.setGovQuantity(option.quantity);
             form.setGovRate(option.rate);
             form.setGovAmount(roundedAmount);
-            // Set Gov Required Amount = Selected Amount + Pending Amount
+            
+            // CRITICAL: Calculate extra amount and gov required based on extraAmountBaseType
+            let extraAmt = 0;
+            let govRequiredAmt = 0;
+            
+            if (form.extraAmountBaseType === 'target') {
+                // Target-based calculation:
+                // Extra = (Target Amount / Gov Rate) * Extra Rate per Quintal
+                // Gov Required = Target Amount + Extra
+                const targetAmt = form.calcTargetAmount || 0;
+                const currentGovRate = option.rate || form.govRate || 0;
+                
+                // Get extra rate per quintal from existing extraAmount and govQuantity if available
+                // Otherwise calculate from option if it has the information
+                let extraRatePerQtl = 0;
+                if (form.extraAmount > 0 && form.govQuantity > 0) {
+                    // Use existing extra rate from form
+                    extraRatePerQtl = form.extraAmount / form.govQuantity;
+                } else if (option.quantity > 0 && option.calculatedAmount > targetAmt) {
+                    // Calculate from option
+                    extraRatePerQtl = (option.calculatedAmount - targetAmt) / option.quantity;
+                } else if (form.govQuantity > 0 && form.extraAmount > 0) {
+                    // Fallback: use form values
+                    extraRatePerQtl = form.extraAmount / form.govQuantity;
+                }
+                
+                if (currentGovRate > 0 && targetAmt > 0 && extraRatePerQtl > 0) {
+                    const quantity = targetAmt / currentGovRate;
+                    extraAmt = quantity * extraRatePerQtl;
+                }
+                govRequiredAmt = targetAmt + extraAmt;
+            } else {
+                // Receipt-based calculation:
+                // Gov Required = Selected Amount + Pending Amount
+                // Extra = Gov Required - Receipt Outstanding
             const roundedAmountRemaining = Math.round(option.amountRemaining);
-            const govRequiredAmt = roundedAmount + roundedAmountRemaining;
+                govRequiredAmt = roundedAmount + roundedAmountRemaining;
+                const baseForExtraAmount = totalOutstandingForSelected;
+                extraAmt = Math.max(0, govRequiredAmt - baseForExtraAmount);
+            }
+            
             form.setGovRequiredAmount(govRequiredAmt);
-            // Set Extra Amount = Gov Amount + Pending Amount - Target Amount (only when entry selected)
-            const extraAmt = roundedAmount + roundedAmountRemaining - form.calcTargetAmount;
-            form.setExtraAmount(Math.max(0, extraAmt));
+            form.setExtraAmount(extraAmt);
         }
         form.setPaymentType('Partial'); // Set to Partial first
         
@@ -613,7 +661,7 @@ export const useSupplierPayments = () => {
             // Use extra amount from form (manual or from entry selection)
             const extraAmount = form.extraAmount || 0;
             
-            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected, extraAmount, govRequiredAmount: form.govRequiredAmount });
+            const result = await processPaymentLogic({ ...data, ...form, ...cdProps, calculatedCdAmount: effectiveCdAmount, selectedEntries, paymentAmount: toBePaidAmount, settleAmount, totalOutstandingForSelected, extraAmount, govRequiredAmount: form.govRequiredAmount, centerName: form.centerName, extraAmountBaseType: form.extraAmountBaseType, calcTargetAmount: form.calcTargetAmount });
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
@@ -630,7 +678,7 @@ export const useSupplierPayments = () => {
             handleSettleAmountChange(0); 
             handleToBePaidChange(0);
         } catch (error: any) {
-            console.error("Error processing payment:", error);
+
             toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
         } finally {
             setIsProcessing(false);
@@ -655,7 +703,7 @@ export const useSupplierPayments = () => {
               handleToBePaidChange(0);
             }
         } catch (error: any) {
-            console.error("Error deleting payment:", error);
+
             toast({ title: "Failed to delete payment.", description: error.message, variant: "destructive" });
         } finally {
             setIsProcessing(false);
@@ -758,5 +806,8 @@ export const useSupplierPayments = () => {
         bankAccounts: data.bankAccounts,
         bankBranches: data.bankBranches,
         selectedPaymentOption,
+        centerNameOptions,
+        centerName: form.centerName,
+        setCenterName: form.setCenterName,
     };
 };

@@ -1,0 +1,72 @@
+appId: com.jrmdsoftware.studio
+productName: JRMD Studio
+copyright: Copyright © 2024 JRMD Software
+
+directories:
+  buildResources: build
+  output: dist
+
+files:
+  - 'out/**/*'
+  - 'node_modules/**/*'
+  - 'electron/**/*'
+  - 'package.json'
+  - '!node_modules/.cache/**/*'
+  - '!**/*.{md,ts,tsx,jsx}'
+  - '!**/*.test.{ts,tsx,js,jsx}'
+  - '!src/**/*'
+  - '!.next/**/*'
+  - '!scripts/**/*'
+  - '!docs/**/*'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+  icon: PUBLIC/icon-512.png
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: JRMD Studio
+  installerIcon: PUBLIC/icon-512.png
+  uninstallerIcon: PUBLIC/icon-512.png
+  installerHeaderIcon: PUBLIC/icon-512.png
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: default
+      arch:
+        - x64
+        - arm64
+  icon: PUBLIC/icon-512.png
+  category: public.app-category.business
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: PUBLIC/icon-512.png
+  category: Office
+
+publish: null
+
+
+
+
+
+
+
+
+
+
+
+
+

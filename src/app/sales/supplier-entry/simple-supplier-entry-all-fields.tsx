@@ -72,6 +72,7 @@ export default function SimpleSupplierEntryAllFields() {
     const allSuppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray());
     const totalSuppliersCount = useLiveQuery(() => db.suppliers.count());
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
     const [isClient, setIsClient] = useState(false);
     const [currentView, setCurrentView] = useState<'entry' | 'data'>('entry');
     const [isEditing, setIsEditing] = useState(false);
@@ -251,7 +252,7 @@ export default function SimpleSupplierEntryAllFields() {
                 }
             }
         } catch (error) {
-            console.warn('Error restoring form state:', error);
+            // Error restoring form state
         }
     }, [isClient, form]);
 
@@ -272,15 +273,13 @@ export default function SimpleSupplierEntryAllFields() {
         }
 
         try {
-            // Resolve a valid Firestore ID before delete
+            // Resolve a valid Firestore ID before delete - use existing state (no DB read)
             let targetId = currentSupplier.id;
             if (!targetId || targetId.length < 4) {
-                const bySr = await getSupplierIdBySrNo(currentSupplier.srNo);
-                if (bySr) targetId = bySr;
-                // As a final fallback, try Dexie lookup by srNo
-                if ((!targetId || targetId.length < 4) && db) {
-                    const local = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
-                    if (local?.id) targetId = local.id;
+                // Use existing state instead of DB query
+                const existingSupplier = allSuppliers?.find(s => s.srNo === currentSupplier.srNo);
+                if (existingSupplier?.id) {
+                    targetId = existingSupplier.id;
                 }
             }
 
@@ -383,7 +382,7 @@ export default function SimpleSupplierEntryAllFields() {
                 const data = await db.suppliers.orderBy('srNo').reverse().toArray();
                 setDataLoaded(true);
             } catch (error) {
-                console.error('Error loading data:', error);
+                // Error loading data
             }
         };
         
@@ -424,8 +423,8 @@ export default function SimpleSupplierEntryAllFields() {
         // ✅ Global context handles suppliers realtime listener - no duplicate listener needed
         // useLiveQuery will automatically react to IndexedDB changes updated by global context
         
-        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => {});
+        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => {});
 
         const savedVariety = localStorage.getItem('lastSelectedVariety');
         if (savedVariety) {
@@ -542,7 +541,7 @@ export default function SimpleSupplierEntryAllFields() {
                             localStorage.setItem('supplier-entry-form-state', JSON.stringify(values));
                         }
                     } catch (error) {
-                        console.warn('Error saving form state:', error);
+                        // Error saving form state
                     }
                 }, 500);
             }
@@ -631,7 +630,7 @@ export default function SimpleSupplierEntryAllFields() {
                     });
                 }
             } catch (error) {
-                console.error('Error checking existing supplier:', error);
+                // Error checking existing supplier
             }
         }
     };
@@ -676,7 +675,7 @@ export default function SimpleSupplierEntryAllFields() {
                     });
                 }
             } catch (error) {
-                console.error('Error checking existing contact:', error);
+                // Error checking existing contact
             }
         }
     };
@@ -692,7 +691,6 @@ export default function SimpleSupplierEntryAllFields() {
             await addOption(collectionName, { name: toTitleCase(name.trim()) });
             toast({ title: "Option added successfully!" });
         } catch (error: any) {
-            console.error('Error adding option:', error);
             toast({ title: "Error adding option", description: error?.message || "Please try again", variant: "destructive" });
         }
     }, [toast]);
@@ -708,7 +706,6 @@ export default function SimpleSupplierEntryAllFields() {
                 return;
             }
             const name = toTitleCase(optionData.name.trim());
-            console.log('Updating option:', { collectionName, id, name });
             await updateOption(collectionName, id, { name });
             toast({ 
                 title: "Option updated successfully!", 
@@ -716,7 +713,6 @@ export default function SimpleSupplierEntryAllFields() {
                 variant: "success"
             });
         } catch (error: any) {
-            console.error('Error updating option:', error);
             toast({ 
                 title: "Error updating option", 
                 description: error?.message || "Please try again", 
@@ -736,14 +732,15 @@ export default function SimpleSupplierEntryAllFields() {
 
     const handleDelete = useCallback(async (supplierId: string) => {
         try {
-            await db.suppliers.delete(supplierId);
+            // Use deleteSupplier which handles local-first sync
+            const { deleteSupplier } = await import('@/lib/firestore');
+            await deleteSupplier(supplierId);
             toast({ 
                 title: "Entry deleted successfully!", 
                 description: "Supplier entry has been removed.",
                 variant: "success"
             });
         } catch (error) {
-            console.error('Error deleting supplier:', error);
             toast({ 
                 title: "Error deleting entry", 
                 description: "Failed to delete supplier entry.",
@@ -752,13 +749,8 @@ export default function SimpleSupplierEntryAllFields() {
         }
     }, [toast]);
 
-    const onSubmit = async (values: CompleteSupplierFormValues) => {
-        console.log('onSubmit called with values:', values);
-        console.log('isEditing:', isEditing);
-        console.log('currentSupplier:', currentSupplier);
-        
-        setIsSubmitting(true);
-        
+    const onSubmit = (values: CompleteSupplierFormValues) => {
+        // Optimistic update - UI updates immediately, DB operations in background
         try {
             // Align DB save with summary calculations
             const finalWeight = Number(values.grossWeight) - Number(values.teirWeight);
@@ -796,7 +788,7 @@ export default function SimpleSupplierEntryAllFields() {
                 address: toTitleCase(values.address),
                 contact: values.contact,
                 vehicleNo: (values.vehicleNo || '').toUpperCase(),
-                variety: toTitleCase(values.variety),
+                variety: values.variety ? String(values.variety).toUpperCase() : values.variety,
                 grossWeight: Number(values.grossWeight),
                 teirWeight: Number(values.teirWeight),
                 weight: Number(finalWeight.toFixed(2)),
@@ -822,117 +814,69 @@ export default function SimpleSupplierEntryAllFields() {
                 forceUnique: values.forceUnique,
             };
 
+            let savedId: string | null = null;
+
             if (isEditing && currentSupplier.id) {
-                // Update existing supplier - use currentSupplier.id directly
-                console.log('UPDATE MODE: Updating supplier:', currentSupplier.id);
-                console.log('Supplier base data:', supplierBase);
-                
+                // Update existing supplier - optimistic UI update
                 let targetId = currentSupplier.id;
                 
-                // If ID seems invalid, try to find proper ID
-                if (!targetId || targetId.length < 4) {
-                    const foundId = await getSupplierIdBySrNo(values.srNo);
-                    if (foundId) {
-                        targetId = foundId;
-                    } else {
-                        // Try local DB lookup
-                        const localSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
-                        if (localSupplier?.id) {
-                            targetId = localSupplier.id;
-                        }
-                    }
-                }
-                
-                if (targetId && targetId.length > 3) {
-                    const success = await updateSupplier(targetId, supplierBase);
-                    
-                    if (success) {
-                        // Update local IndexedDB as well
-                        try {
-                            const existingLocal = await db.suppliers.get(targetId);
-                            if (existingLocal) {
-                                await db.suppliers.put({ ...existingLocal, ...supplierBase });
-                            }
-                        } catch (localError) {
-                            console.warn('Failed to update local DB:', localError);
-                        }
-                        
-                        setCurrentSupplier({ ...supplierBase, id: targetId } as Customer);
-                        toast({ 
-                            title: "Entry updated successfully!", 
-                            description: `Supplier ${values.name} has been updated.`,
-                            variant: "success"
-                        });
-                        setIsEditing(false);
-                    } else {
-                        throw new Error('Failed to update supplier - updateSupplier returned false');
-                    }
-                } else {
-                    throw new Error(`Invalid supplier ID: ${targetId}. Cannot update.`);
-                }
-            } else {
-                // Determine if supplier already exists by SR No
-                let existingId = await getSupplierIdBySrNo(values.srNo);
-                if (!existingId) {
-                    const existingLocal = await db.suppliers.where('srNo').equals(values.srNo).first();
-                    existingId = existingLocal?.id;
-                }
+                // Optimistically update UI immediately
+                const updatedSupplier = { ...supplierBase, id: targetId } as Customer;
+                setCurrentSupplier(updatedSupplier);
+                setIsEditing(false);
+                savedId = targetId;
 
-                if (existingId) {
-                    console.log('ADD MODE detected existing supplier. Updating instead:', existingId);
-                    const success = await updateSupplier(existingId, supplierBase);
-                    if (!success) {
-                        throw new Error('Failed to update existing supplier with matching SR number.');
-                    }
-                    try {
-                        const existingLocal = await db.suppliers.get(existingId);
-                        if (existingLocal) {
-                            await db.suppliers.put({ ...existingLocal, ...supplierBase });
-                        }
-                    } catch (localError) {
-                        console.warn('Failed to update local DB:', localError);
-                    }
-                    setCurrentSupplier({ ...supplierBase, id: existingId } as Customer);
-                    toast({
-                        title: "Entry updated successfully!",
-                        description: `Supplier ${values.name} has been updated.`,
-                        variant: "success"
-                    });
-                    setIsEditing(false);
+                // Write using sync system (triggers Firestore sync)
+                updateSupplier(targetId, supplierBase).catch(() => {});
+            } else {
+                // ✅ Use srNo as document ID (not random UUID) to ensure consistent saving
+                // Check if supplier with this srNo already exists
+                const existingSupplier = allSuppliers?.find(s => s.srNo === values.srNo);
+                if (existingSupplier?.id) {
+                    // Update existing supplier
+                    updateSupplier(existingSupplier.id, supplierBase).catch(() => {});
+                    savedId = existingSupplier.id;
+                    setCurrentSupplier({ ...supplierBase, id: existingSupplier.id } as Customer);
                 } else {
-                    // Add new supplier
-                    console.log('ADD MODE: Creating new supplier');
-                    const savedSupplier = await addSupplier({ id: crypto.randomUUID(), ...(supplierBase as any) } as Customer);
-                    setCurrentSupplier({ ...supplierBase, id: savedSupplier.id } as Customer);
-                    toast({ 
-                        title: "Entry saved successfully!", 
-                        description: `Supplier ${values.name} has been added.`,
-                        variant: "success"
-                    });
+                    // Create new supplier - use srNo as id if valid, otherwise use a temp id
+                    const supplierId = values.srNo && values.srNo.trim() !== '' && values.srNo !== 'S----'
+                        ? values.srNo
+                        : crypto.randomUUID();
+                    const newSupplier = { ...supplierBase, id: supplierId } as Customer;
+                    setCurrentSupplier(newSupplier);
+                    savedId = supplierId;
                     setIsEditing(false);
+                    
+                    // Write using sync system (triggers Firestore sync)
+                    addSupplier(newSupplier).catch(() => {});
                 }
             }
 
-            // Reset form for new entry with next serial number (only if not editing)
+            // Highlight entry immediately (lightweight)
+            if (savedId) {
+                setHighlightEntryId(savedId);
+                setTimeout(() => setHighlightEntryId(null), 3000);
+            }
+            
+            // Reset form for new entry (deferred to avoid blocking update)
             if (!isEditing) {
-                const newState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]);
-                form.reset(newState);
-                // Clear saved form state after successful save
-                if (typeof window !== 'undefined') {
-                    localStorage.removeItem('supplier-entry-form-state');
-                }
+                // Defer form reset to avoid blocking
+                setTimeout(() => {
+                    const newState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]);
+                    form.reset(newState);
+                    // Clear saved form state after successful save
+                    if (typeof window !== 'undefined') {
+                        localStorage.removeItem('supplier-entry-form-state');
+                    }
+                }, 0);
             }
             
         } catch (error: any) {
-            console.error("Error saving supplier:", error);
-            console.error("Error stack:", error?.stack);
             toast({ 
                 title: "Failed to save entry", 
                 description: error?.message || "Please try again.",
                 variant: "destructive" 
             });
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -1169,7 +1113,6 @@ export default function SimpleSupplierEntryAllFields() {
                 });
             }
         } catch (error) {
-            console.error('Error processing print data:', error);
             toast({
                 title: "Error",
                 description: "Failed to process print data. Please try again.",
@@ -1189,7 +1132,6 @@ export default function SimpleSupplierEntryAllFields() {
                 description: `${supplierIds.length} suppliers and their associated payments deleted successfully` 
             });
         } catch (error) {
-            console.error('Error deleting suppliers:', error);
             toast({ 
                 title: "Error", 
                 description: "Failed to delete some suppliers", 
@@ -1280,7 +1222,6 @@ export default function SimpleSupplierEntryAllFields() {
                         description: `Loaded ${supplierData.name} (SR# ${supplierData.srNo}) for editing.`,
                     });
                 } catch (error) {
-                    console.error('Error loading edit data:', error);
                     localStorage.removeItem('editSupplierData');
                 }
             }
@@ -1293,7 +1234,40 @@ export default function SimpleSupplierEntryAllFields() {
             <Card>
                 <CardContent className="p-4">
                     <FormProvider {...form}>
-                        <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <form 
+                            ref={formRef} 
+                            onSubmit={form.handleSubmit(onSubmit)} 
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const activeElement = document.activeElement as HTMLElement;
+                                    // Don't interfere if focus is on button, dialog, menu, or command palette
+                                    if (activeElement.tagName === 'BUTTON' || 
+                                        activeElement.closest('[role="dialog"]') || 
+                                        activeElement.closest('[role="menu"]') || 
+                                        activeElement.closest('[cmdk-root]')) {
+                                        return;
+                                    }
+                                    // If event was already prevented by CustomDropdown, don't handle it
+                                    if (e.defaultPrevented) {
+                                        return;
+                                    }
+                                    e.preventDefault(); // Prevent form submission
+                                    const formEl = e.currentTarget;
+                                    const formElements = Array.from(formEl.elements).filter(el => 
+                                        (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) && 
+                                        !el.hasAttribute('disabled') && 
+                                        (el as HTMLElement).offsetParent !== null
+                                    ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement | HTMLSelectElement)[];
+
+                                    const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+                                    
+                                    if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                                        formElements[currentElementIndex + 1].focus();
+                                    }
+                                }
+                            }}
+                            className="space-y-4"
+                        >
                                 <div onFocus={handleFieldFocus}>
                                     <SimpleSupplierFormAllFields 
                                         form={form}
@@ -1350,7 +1324,7 @@ export default function SimpleSupplierEntryAllFields() {
                             }}
                             onClearForm={undefined}
                             isEditing={isEditing}
-                            isSubmitting={isSubmitting}
+                            isSubmitting={false}
                         />
                     </CardContent>
                 </Card>
@@ -1404,88 +1378,40 @@ export default function SimpleSupplierEntryAllFields() {
                                     onClick={handleNewEntry} 
                                     size="sm" 
                                     className="h-8 rounded-md"
-                                    disabled={isSubmitting}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Clear Form
                                 </Button>
 
                                 <Button 
-                                    onClick={async () => {
-                                        try {
-                                            // Validate form first
-                                            const isValid = await form.trigger();
-                                            if (!isValid) {
-                                                // Get form errors to show specific validation issues
-                                                const formErrors = form.formState.errors;
-                                                console.log('Form validation errors:', formErrors);
-                                                
-                                                // Helper function to extract all error messages
-                                                const extractErrors = (errors: any, prefix = ''): string[] => {
-                                                    const errorMessages: string[] = [];
-                                                    for (const key in errors) {
-                                                        const error = errors[key];
-                                                        const fieldName = prefix ? `${prefix}.${key}` : key;
-                                                        if (error?.message) {
-                                                            errorMessages.push(`${fieldName}: ${error.message}`);
-                                                        } else if (error && typeof error === 'object') {
-                                                            errorMessages.push(...extractErrors(error, fieldName));
-                                                        }
-                                                    }
-                                                    return errorMessages;
-                                                };
-                                                
-                                                const errorMessages = extractErrors(formErrors);
-                                                
-                                                toast({ 
-                                                    title: "Validation Error", 
-                                                    description: errorMessages.length > 0 
-                                                        ? errorMessages.slice(0, 3).join(', ') + (errorMessages.length > 3 ? ` and ${errorMessages.length - 3} more...` : '')
-                                                        : "Please check the form for errors.", 
-                                                    variant: "destructive",
-                                                    duration: 5000
-                                                });
-                                                return;
-                                            }
-                                            
-                                            calculateSummary();
-                                            
-                                            // Use form.handleSubmit to ensure proper validation and value extraction
-                                            form.handleSubmit(async (values) => {
-                                                console.log('Form values from handleSubmit:', values);
-                                                console.log('Is editing:', isEditing);
-                                                console.log('Current supplier ID:', currentSupplier.id);
-                                                
-                                                // Validate that required fields are not empty
-                                                if (!values.srNo || !values.name || !values.variety || !values.rate || !values.grossWeight) {
-                                                    toast({ 
-                                                        title: "Missing Required Fields", 
-                                                        description: "Please fill in all required fields (Sr No, Name, Variety, Rate, Gross Weight).", 
-                                                        variant: "destructive" 
-                                                    });
-                                                    return;
-                                                }
-                                                
-                                                await onSubmit(values);
-                                            })();
-                                        } catch (error: any) {
-                                            console.error('Error in button onClick:', error);
+                                    onClick={() => {
+                                        // Validate in background, submit immediately (optimistic)
+                                        const values = form.getValues();
+                                        
+                                        // Basic validation check
+                                        if (!values.srNo || !values.name || !values.variety || !values.rate || !values.grossWeight) {
                                             toast({ 
-                                                title: "Error", 
-                                                description: error?.message || "Failed to save entry.", 
+                                                title: "Missing Required Fields", 
+                                                description: "Please fill in all required fields (Sr No, Name, Variety, Rate, Gross Weight).", 
                                                 variant: "destructive" 
                                             });
+                                            // Validate in background to show field errors
+                                            form.trigger().catch(() => {});
+                                            return;
                                         }
+                                        
+                                        calculateSummary();
+                                        
+                                        // Submit immediately (optimistic)
+                                        onSubmit(values);
+                                        
+                                        // Validate in background to show any errors
+                                        form.trigger().catch(() => {});
                                     }} 
                                     size="sm" 
-                                    className="h-8 rounded-md" 
-                                    disabled={isSubmitting}
+                                    className="h-8 rounded-md"
                                 >
-                                    {isSubmitting ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Save className="mr-2 h-4 w-4" />
-                                    )}
+                                    <Save className="mr-2 h-4 w-4" />
                                     {isEditing ? 'Update' : 'Save'}
                                 </Button>
                             </div>
@@ -1548,6 +1474,7 @@ export default function SimpleSupplierEntryAllFields() {
                 totalCount={filteredSuppliers.length}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
+                highlightEntryId={highlightEntryId}
                 />
             </div>
         </div>
@@ -1567,6 +1494,7 @@ export default function SimpleSupplierEntryAllFields() {
                 totalCount={filteredSuppliers.length}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
+                highlightEntryId={highlightEntryId}
             />
         </div>
     ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);

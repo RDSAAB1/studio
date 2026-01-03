@@ -39,8 +39,8 @@ export default function BankManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const unsubBanks = getBanksRealtime(setBanks, console.error);
-        const unsubBranches = getBankBranchesRealtime(setBranches, console.error);
+        const unsubBanks = getBanksRealtime(setBanks, );
+        const unsubBranches = getBankBranchesRealtime(setBranches, );
 
         return () => {
             unsubBanks();
@@ -108,7 +108,7 @@ export default function BankManagementPage() {
             setCurrentBranch({});
             setIsBranchDialogOpen(false);
         } catch (error: any) {
-            console.error("Error saving branch:", error);
+
             toast({ title: "Save Failed", description: error.message, variant: "destructive" });
         }
     };

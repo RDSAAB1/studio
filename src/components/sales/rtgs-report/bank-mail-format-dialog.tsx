@@ -143,7 +143,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 throw new Error(result.error || "An unknown error occurred.");
             }
         } catch (error: any) {
-            console.error("Error sending email:", error);
+
             toast({ title: "Failed to Send Email", description: error.message, variant: "destructive" });
         } finally {
             setIsSending(false);

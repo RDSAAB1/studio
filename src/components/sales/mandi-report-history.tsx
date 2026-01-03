@@ -24,15 +24,15 @@ export function MandiReportHistory() {
   // Use toArray() and sort manually if purchaseDate index doesn't exist yet
   const allEntriesRaw = useLiveQuery(async () => {
     if (typeof window === 'undefined' || !db) {
-      console.log('DB not available (server-side or not initialized)');
+
       return [];
     }
     try {
       const entries = await db.mandiReports.toArray();
-      console.log(`Fetched ${entries.length} mandi report entries from IndexedDB`);
+
       return entries;
     } catch (error) {
-      console.error('Error fetching mandi reports from IndexedDB:', error);
+
       return [];
     }
   }, []);
@@ -43,11 +43,11 @@ export function MandiReportHistory() {
     
     const unsubscribe = getMandiReportsRealtime(
       (data) => {
-        console.log(`[MandiReportHistory] ✅ Real-time update: ${data.length} reports`);
+
         // Data is automatically synced to IndexedDB by the real-time function
       },
       (error) => {
-        console.error('[MandiReportHistory] ❌ Error in real-time listener:', error);
+
       }
     );
     
@@ -162,23 +162,23 @@ export function MandiReportHistory() {
                 if (db) {
                   try {
                     await db.mandiReports.clear();
-                    console.log('[MandiReportHistory] Cleared IndexedDB cache');
+
                   } catch (error) {
-                    console.error('Error clearing IndexedDB:', error);
+
                   }
                 }
                 try {
-                  console.log('[MandiReportHistory] Force refreshing from Firestore...');
+
                   const reports = await fetchMandiReports();
-                  console.log(`[MandiReportHistory] Fetched ${reports.length} reports`);
+
                   if (db && reports.length > 0) {
                     await db.mandiReports.bulkPut(reports);
-                    console.log('[MandiReportHistory] Synced to IndexedDB');
+
                   } else if (reports.length === 0) {
-                    console.warn('[MandiReportHistory] No reports found in Firestore. Check Firestore console.');
+
                   }
                 } catch (error) {
-                  console.error('[MandiReportHistory] Error refreshing data:', error);
+
                 }
               }} 
               variant="outline" 

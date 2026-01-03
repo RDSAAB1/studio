@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { SmartDatePicker } from '@/components/ui/smart-date-picker';
 import { Input } from '@/components/ui/input';
-import { Users, X, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, X, Search, Filter, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { formatSerialNumber, parseSerialNumber } from '../utils/fuzzy-matching';
@@ -35,6 +36,7 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
 }) => {
   const { toast } = useToast();
   const [serialSearch, setSerialSearch] = React.useState('');
+  const [searchType, setSearchType] = React.useState<'name' | 'fatherName' | 'address' | 'contact'>('name');
 
   // Handle serial number search
   const handleSerialSearch = (srNo: string) => {
@@ -124,11 +126,27 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
       });
     }
   };
+  const handleClear = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setSelectedSupplierKey(null);
+    setSerialSearch('');
+  };
+
+  const handleFinalize = () => {
+    // Finalize action - can be customized based on requirements
+    toast({
+      title: "Filters Applied",
+      description: "Supplier profile filters have been finalized.",
+    });
+  };
+
   return (
     <Card>
       <CardContent className="p-3">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3">
+          {/* Header Row */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-primary" />
               <h3 className="text-base font-semibold">Select Profile</h3>
@@ -160,25 +178,97 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
               >
                 Last 365 Days
               </Button>
-              {(startDate || endDate) && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    setStartDate(undefined);
-                    setEndDate(undefined);
-                  }}
-                  className="h-8 text-xs"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
-   
-          {/* Date and Serial Number Row */}
-          <div className="flex flex-col sm:flex-row items-center gap-2">
+
+          {/* Organized Layout: Row 1 (Name + Serial + Buttons), Row 2 (Search supplier) */}
+          <div className="flex flex-col gap-2">
+            {/* Row 1: Name Dropdown, Serial No, and Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+              {/* Name Dropdown (Search Type) */}
+              <div className="w-full sm:w-[140px] flex-shrink-0">
+                <Select value={searchType} onValueChange={(value) => setSearchType(value as typeof searchType)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="fatherName">Father Name</SelectItem>
+                    <SelectItem value="address">Address</SelectItem>
+                    <SelectItem value="contact">Contact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Serial Number Search */}
+              <div className="flex-1 sm:flex-initial sm:w-[220px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="text"
+                    placeholder="Serial No..."
+                    value={serialSearch}
+                    onChange={(e) => handleSerialSearch(e.target.value)}
+                    onBlur={handleSerialSearchBlur}
+                    onKeyPress={handleSerialSearchKeyPress}
+                    className="pl-10 h-9 w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Filter action - can be customized
+                    toast({
+                      title: "Filter",
+                      description: "Filter options",
+                    });
+                  }}
+                  className="h-9 w-9 p-0"
+                  title="Filter"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClear}
+                  className="h-9 px-3"
+                >
+                  Clear
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleFinalize}
+                  className="h-9 px-3"
+                >
+                  <Check className="h-4 w-4 mr-1.5" />
+                  Finalize
+                </Button>
+              </div>
+            </div>
+            
+            {/* Row 2: Search Supplier Input (below Name dropdown) */}
+            <div className="w-full sm:w-[280px]">
+              <CustomDropdown
+                options={filteredSupplierOptions.map(({ value, label, data }) => ({ value, label, data }))}
+                value={selectedSupplierKey}
+                onChange={(value: string | null) => setSelectedSupplierKey(value)}
+                placeholder="Search supplier..."
+                searchType={searchType}
+                onSearchTypeChange={undefined}
+                inputClassName="h-9"
+              />
+            </div>
+          </div>
+
+          {/* Date Pickers Row */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <SmartDatePicker
               value={startDate}
               onChange={(val) => setStartDate(val instanceof Date ? val : (val ? new Date(val) : undefined))}
@@ -192,32 +282,6 @@ export const SupplierProfileHeader: React.FC<SupplierProfileHeaderProps> = ({
               placeholder="End Date"
               inputClassName="h-9 w-full sm:w-[200px]"
               returnDate={true}
-            />
-
-            {/* Serial Number Search - In same row as dates */}
-            <div className="w-full sm:w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="SR# (e.g., 555)"
-                  value={serialSearch}
-                  onChange={(e) => handleSerialSearch(e.target.value)}
-                  onBlur={handleSerialSearchBlur}
-                  onKeyPress={handleSerialSearchKeyPress}
-                  className="pl-10 h-9 w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Full Width Name/Supplier Selection */}
-          <div className="w-full">
-            <CustomDropdown
-              options={filteredSupplierOptions.map(({ value, label, data }) => ({ value, label, data }))}
-              value={selectedSupplierKey}
-              onChange={(value: string | null) => setSelectedSupplierKey(value)}
-              placeholder="Search by name, father name, address, or contact..."
             />
           </div>
 

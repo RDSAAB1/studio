@@ -56,7 +56,7 @@ export const useOutsiderData = () => {
                     checkAllLoaded();
                 }
             }, error => {
-                console.error("Payments fetch error:", error);
+
                 checkAllLoaded();
             }),
             getBanksRealtime(data => { 
@@ -65,7 +65,7 @@ export const useOutsiderData = () => {
                     checkAllLoaded();
                 }
             }, error => {
-                console.error("Banks fetch error:", error);
+
                 checkAllLoaded();
             }),
             getBankBranchesRealtime(data => { 
@@ -74,7 +74,7 @@ export const useOutsiderData = () => {
                     checkAllLoaded();
                 }
             }, error => {
-                console.error("Bank Branches fetch error:", error);
+
                 checkAllLoaded();
             }),
             getSupplierBankAccountsRealtime(data => { 
@@ -83,7 +83,7 @@ export const useOutsiderData = () => {
                     checkAllLoaded();
                 }
             }, error => {
-                console.error("Supplier Bank Accounts fetch error:", error);
+
                 checkAllLoaded();
             }),
         ];
@@ -94,7 +94,7 @@ export const useOutsiderData = () => {
                 checkAllLoaded();
             }
         }).catch(error => {
-            console.error("Receipt settings fetch error:", error);
+
             checkAllLoaded();
         });
 

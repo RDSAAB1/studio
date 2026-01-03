@@ -37,7 +37,7 @@ export default function AttendanceTrackingPage() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribeEmployees = getEmployeesRealtime(setEmployees, console.error);
+        const unsubscribeEmployees = getEmployeesRealtime(setEmployees, );
         return () => unsubscribeEmployees();
     }, []);
 
@@ -52,7 +52,9 @@ export default function AttendanceTrackingPage() {
                 const filtered = data.filter(entry => entry.date === dateStr);
                 setAttendanceRecordsToday(filtered);
             },
-            console.error,
+            (error) => {
+                console.error('Error fetching attendance:', error);
+            },
             dateStr // Filter by specific date
         );
         
@@ -74,7 +76,7 @@ export default function AttendanceTrackingPage() {
             };
             await setAttendance(entry);
         } catch (error) {
-            console.error("Failed to update attendance:", error);
+
             toast({ title: "Update failed", variant: "destructive" });
         }
     };

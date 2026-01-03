@@ -17,21 +17,80 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport, onDelete, onEdit, title, suppliers, onParchiSelect }: any) => {
     // Helper: normalize payment id for sorting
     const getIdForSort = React.useCallback((payment: any): string => {
-        const rawId = payment?.id || payment?.paymentId || '';
-        return rawId.toString();
+        const rawId = payment?.id || payment?.paymentId || payment?.rtgsSrNo || '';
+        return String(rawId).trim().replace(/\s+/g, '');
     }, []);
 
-    // Sort payments by ID (descending - high to low)
+    // Helper: parse ID into prefix and numeric part for proper sorting
+    // Handles IDs like E832, EX00118, EX0000174, EX00839.1, P00081, RT00393
+    const parseIdForSort = React.useCallback((id: string): { prefix: string; numericValue: number; decimalValue: number } => {
+        if (!id || typeof id !== 'string') return { prefix: '', numericValue: 0, decimalValue: 0 };
+        
+        // Clean the ID - remove any non-alphanumeric characters except dots
+        const cleanId = id.trim().replace(/[^A-Za-z0-9.]/g, '');
+        if (!cleanId) return { prefix: '', numericValue: 0, decimalValue: 0 };
+        
+        // Extract prefix (letters), number, and optional decimal part
+        // Pattern: letters + digits + optional decimal point + optional decimal digits
+        const match = cleanId.match(/^([A-Za-z]*)(\d+)(?:\.(\d+))?$/);
+        if (match && match[2]) {
+            const prefix = match[1] || '';
+            const numberStr = match[2] || '0';
+            const decimalStr = match[3] || '0';
+            
+            // Convert to numbers for proper numeric comparison
+            const numericValue = parseInt(numberStr, 10);
+            const decimalValue = decimalStr ? parseInt(decimalStr, 10) : 0;
+            
+            // Validate that parsing was successful
+            if (!isNaN(numericValue)) {
+                return { prefix, numericValue, decimalValue };
+            }
+        }
+        
+        // Fallback: if no match or parsing failed, treat entire ID as string for prefix comparison
+        return { prefix: cleanId || id, numericValue: 0, decimalValue: 0 };
+    }, []);
+
+    // Sort payments by ID in descending order - prefix first, then number (highest first)
+    // This ensures proper sorting even if parent doesn't sort correctly
     const sortedPayments = React.useMemo(() => {
-        return [...payments].sort((a: any, b: any) => {
-            const idB = getIdForSort(b);
-            const idA = getIdForSort(a);
-            if (!idA && !idB) return 0;
-            if (!idA) return 1;
-            if (!idB) return -1;
-            return idB.localeCompare(idA, undefined, { numeric: true, sensitivity: "base" });
+        if (!payments || payments.length === 0) return [];
+        
+        // Create a copy and sort it
+        const sorted = [...payments].sort((a, b) => {
+            try {
+                const idA = getIdForSort(a);
+                const idB = getIdForSort(b);
+                
+                if (!idA && !idB) return 0;
+                if (!idA) return 1;
+                if (!idB) return -1;
+                
+                const parsedA = parseIdForSort(idA);
+                const parsedB = parseIdForSort(idB);
+                
+                // First compare prefixes alphabetically (case-insensitive)
+                const prefixA = parsedA.prefix.toUpperCase();
+                const prefixB = parsedB.prefix.toUpperCase();
+                const prefixCompare = prefixA.localeCompare(prefixB);
+                if (prefixCompare !== 0) return prefixCompare;
+                
+                // If prefixes are same, compare numbers numerically (descending - highest first)
+                if (parsedA.numericValue !== parsedB.numericValue) {
+                    return parsedB.numericValue - parsedA.numericValue;
+                }
+                
+                // If numbers are same, compare decimal parts (descending)
+                return parsedB.decimalValue - parsedA.decimalValue;
+            } catch (error) {
+                console.error('Error sorting payment:', error, a, b);
+                return 0;
+            }
         });
-    }, [payments, getIdForSort]);
+        
+        return sorted;
+    }, [payments, getIdForSort, parseIdForSort]);
 
     // Infinite scroll pagination
     const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedPayments, {
@@ -103,8 +162,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                             <Table className="w-full">
                                 <TableHeader>
                                     <TableRow className="bg-muted/50">
-                                        <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID & 6R</TableHead>
-                                        <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Date</TableHead>
+                                        <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID</TableHead>
                                         <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
                                         <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
                                         <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank / Gov. Required</TableHead>
@@ -116,9 +174,9 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {visiblePayments.map((p: any) => (
+                                    {visiblePayments.map((p: any, index: number) => (
                                     <TableRow 
-                                        key={p.id} 
+                                        key={`${p.id || p.paymentId || p.rtgsSrNo || index}-${p.date || ''}`} 
                                         className="hover:bg-muted/50"
                                         onClick={(e) => {
                                             // Prevent row click from interfering with button click
@@ -128,16 +186,10 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             }
                                         }}
                                     >
-                                        <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo} | 6R: ${p.sixRNo || ''}`}>
+                                        <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo}`}>
                                             <div className="text-foreground font-semibold text-[11px] break-words">
                                                 {p.paymentId || p.rtgsSrNo}
                                             </div>
-                                            <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
-                                                {p.sixRNo || ''}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-20">
-                                            <div className="text-foreground font-semibold break-words">{format(new Date(p.date), "dd-MMM-yy")}</div>
                                         </TableCell>
                                         <TableCell className="p-1 text-[11px] w-20">
                                             <Badge variant={p.receiptType === 'RTGS' ? 'default' : p.receiptType === 'Gov.' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
@@ -150,23 +202,16 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                 const target = e.target as HTMLElement;
                                                 // Only trigger if clicking on the receipt number area (not on other elements)
                                                 if (target.closest('.receipt-number-area') || target.classList.contains('receipt-number-area')) {
-                                                    console.log('[PaymentHistory] CELL CLICKED!', p.id);
+
                                                     e.preventDefault();
                                                     e.stopPropagation();
                                                     
                                                     if (onParchiSelect) {
                                                         const receiptNumbers = getReceiptNumbers(p);
                                                         const parchiValue = p.parchiNo || receiptNumbers;
-                                                        
-                                                        console.log('[PaymentHistory] Cell click - Values:', {
-                                                            paymentId: p.id,
-                                                            paymentParchiNo: p.parchiNo,
-                                                            receiptNumbers: receiptNumbers,
-                                                            finalValue: parchiValue
-                                                        });
-                                                        
+
                                                         if (parchiValue) {
-                                                            console.log('[PaymentHistory] Calling onParchiSelect from cell click');
+
                                                             onParchiSelect(parchiValue);
                                                         }
                                                     }
@@ -182,29 +227,22 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             <div 
                                                 className="text-muted-foreground text-[11px] mt-0.5 receipt-number-area hover:text-primary hover:underline cursor-pointer"
                                                 onClick={(e) => {
-                                                    console.log('[PaymentHistory] RECEIPT NUMBER CLICKED!', p.id);
+
                                                     e.preventDefault();
                                                     e.stopPropagation();
                                                     
                                                     if (onParchiSelect) {
                                                         const receiptNumbers = getReceiptNumbers(p);
                                                         const parchiValue = p.parchiNo || receiptNumbers;
-                                                        
-                                                        console.log('[PaymentHistory] Receipt number click - Values:', {
-                                                            paymentId: p.id,
-                                                            paymentParchiNo: p.parchiNo,
-                                                            receiptNumbers: receiptNumbers,
-                                                            finalValue: parchiValue
-                                                        });
-                                                        
+
                                                         if (parchiValue) {
-                                                            console.log('[PaymentHistory] Calling onParchiSelect from receipt number click');
+
                                                             onParchiSelect(parchiValue);
                                                         } else {
-                                                            console.warn('[PaymentHistory] No parchi value found');
+
                                                         }
                                                     } else {
-                                                        console.error('[PaymentHistory] onParchiSelect not provided!');
+
                                                     }
                                                 }}
                                                 title="Click to use as reference"
@@ -311,7 +349,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                     ))}
                                     {isLoading && (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="text-center py-4">
+                                            <TableCell colSpan={9} className="text-center py-4">
                                                 <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                                                 <span className="ml-2 text-sm text-muted-foreground">Loading more payments...</span>
                                             </TableCell>
@@ -319,14 +357,14 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                     )}
                                     {!hasMore && sortedPayments.length > 30 && (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="text-center py-2 text-xs text-muted-foreground">
+                                            <TableCell colSpan={9} className="text-center py-2 text-xs text-muted-foreground">
                                                 Showing all {sortedPayments.length} payments
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {sortedPayments.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                            <TableCell colSpan={9} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>

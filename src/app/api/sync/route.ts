@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: 'Sync successful' }, { status: 200 });
   } catch (error: any) {
-    console.error('Sync API Error:', error);
+
     return NextResponse.json({ message: 'Sync failed', error: error.message }, { status: 500 });
   }
 }

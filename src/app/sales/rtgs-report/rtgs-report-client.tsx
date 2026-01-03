@@ -85,7 +85,7 @@ export default function RtgsReportClient() {
                 const savedSettings = await getRtgsSettings();
                 setSettings(savedSettings);
             } catch (error) {
-                console.error("Error fetching initial settings: ", error);
+
             }
         };
         fetchSettings();
@@ -521,12 +521,12 @@ export default function RtgsReportClient() {
                                     await db.payments.put(localUpdateData);
                                 }
                             } catch (localError) {
-                                console.warn(`Failed to update local IndexedDB for ${paymentId}:`, localError);
+
                             }
                         }
                     }
                 } catch (dbError) {
-                    console.warn('Failed to update local IndexedDB:', dbError);
+
                 }
             }
 
@@ -541,7 +541,7 @@ export default function RtgsReportClient() {
             setUpdateDate(undefined);
             setUpdateCheckNo('');
         } catch (error: any) {
-            console.error('Error updating payments:', error);
+
             toast({ 
                 title: "Error", 
                 description: `Failed to update payments: ${error.message}`, 

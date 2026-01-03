@@ -480,7 +480,7 @@ export function ManufacturingCosting() {
                 setIsLoading(false);
             },
             (error) => {
-                console.error('Error loading manufacturing costing:', error);
+
                 setIsLoading(false);
             }
         );
@@ -514,7 +514,7 @@ export function ManufacturingCosting() {
                 overallTargetProfit
             });
         } catch (error: any) {
-            console.error('Error saving manufacturing costing:', error);
+
         }
     }, [buyingRate, expense, quantity, extraCost, products, costAllocationMethod, overallTargetProfit]);
 

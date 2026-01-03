@@ -112,7 +112,7 @@ export const useSupplierEntry = () => {
             // Check if varieties document exists, if not create it
             const varietiesDoc = await getDoc(doc(firestoreDB, 'options', 'varieties'));
             if (!varietiesDoc.exists()) {
-                console.log('Creating varieties document...');
+
                 await setDoc(doc(firestoreDB, 'options', 'varieties'), {
                     items: ['Wheat', 'Rice', 'Corn', 'Barley']
                 });
@@ -121,19 +121,19 @@ export const useSupplierEntry = () => {
             // Check if paymentTypes document exists, if not create it
             const paymentTypesDoc = await getDoc(doc(firestoreDB, 'options', 'paymentTypes'));
             if (!paymentTypesDoc.exists()) {
-                console.log('Creating paymentTypes document...');
+
                 await setDoc(doc(firestoreDB, 'options', 'paymentTypes'), {
                     items: ['Full', 'Partial']
                 });
             }
         } catch (error) {
-            console.error('Error initializing options:', error);
+
         }
     };
     initializeOptions();
 
     const unsubVarieties = getOptionsRealtime('varieties', (options) => {
-        console.log('Variety options loaded:', options);
+
         // Use default options if none are loaded
         const finalOptions = options.length > 0 ? options : [
             { id: 'wheat', name: 'Wheat' },
@@ -143,7 +143,7 @@ export const useSupplierEntry = () => {
         ];
         setVarietyOptions(finalOptions);
     }, (err) => {
-        console.error("Error fetching varieties:", err);
+
         // Set default options on error
         setVarietyOptions([
             { id: 'wheat', name: 'Wheat' },
@@ -154,7 +154,7 @@ export const useSupplierEntry = () => {
     });
     
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', (options) => {
-        console.log('Payment type options loaded:', options);
+
         // Use default options if none are loaded
         const finalOptions = options.length > 0 ? options : [
             { id: 'full', name: 'Full' },
@@ -162,7 +162,7 @@ export const useSupplierEntry = () => {
         ];
         setPaymentTypeOptions(finalOptions);
     }, (err) => {
-        console.error("Error fetching payment types:", err);
+
         // Set default options on error
         setPaymentTypeOptions([
             { id: 'full', name: 'Full' },
@@ -266,10 +266,7 @@ export const useSupplierEntry = () => {
             performHeavyCalculations(foundCustomer, true);
         }, 10);
         
-        toast({ 
-            title: "Supplier found!", 
-            description: `Auto-filled all fields for ${foundCustomer.name}` 
-        });
+        // Removed unnecessary toast message
     } else if (isEditing) {
         // Keep the form data but switch to "new entry" mode for that SR No.
         setIsEditing(false);
@@ -299,10 +296,15 @@ export const useSupplierEntry = () => {
   // Handle form submission
   const handleSubmit = useCallback(async (values: FormValues) => {
     try {
+      // ✅ Use srNo as document ID if available (for consistent saving)
+      const supplierId = values.srNo && values.srNo.trim() !== '' && values.srNo !== 'S----'
+          ? values.srNo
+          : (currentSupplier.id || `supplier_${Date.now()}`);
+      
       const completeEntry: Customer = {
           ...currentSupplier,
           ...values,
-          id: currentSupplier.id || `supplier_${Date.now()}`,
+          id: supplierId,
           customerId: currentSupplier.customerId || `customer_${Date.now()}`,
       };
 
@@ -326,7 +328,7 @@ export const useSupplierEntry = () => {
 
       setIsEditing(false);
     } catch (error) {
-      console.error('Error saving supplier:', error);
+
       toast({ title: "Error saving supplier", description: "Please try again", variant: "destructive" });
     }
   }, [currentSupplier, isEditing, toast]);

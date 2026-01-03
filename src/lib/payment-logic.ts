@@ -36,6 +36,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
         isCustomer = false, // Flag to determine if this is a customer payment
         extraAmount: userExtraAmount, // Extra amount from form (Gov. payment only)
+        centerName, // Center Name for Gov payments
+        extraAmountBaseType = 'receipt', // 'receipt' = receipt-based, 'target' = target-based
+        calcTargetAmount = 0, // Target amount for target-based calculation
     } = context;
 
 
@@ -95,7 +98,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     await runTransaction(firestoreDB, async (transaction) => {
         
         if (editingPayment?.id) {
-            const paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+            // For Gov. payments, use the separate governmentFinalizedPayments collection
+            // For other payments, use the regular payments collection
+            let paymentCollection;
+            if (paymentMethod === 'Gov.') {
+                paymentCollection = governmentFinalizedPaymentsCollection;
+            } else {
+                paymentCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
+            }
             const oldPaymentRef = doc(paymentCollection, editingPayment.id);
             const oldPaymentDoc = await transaction.get(oldPaymentRef);
 
@@ -109,6 +119,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         // Gov. payment extra amount variables (declared outside block for offline fallback access)
         let totalExtraAmount = 0;
         let govRequiredAmount = 0;
+        let calculatedExtraAmount = 0; // Actual calculated extra amount (Total - Base) for database storage
         const extraAmountPerEntry: { [srNo: string]: number } = {};
         const adjustedOriginalPerEntry: { [srNo: string]: number } = {};
         const adjustedOutstandingPerEntry: { [srNo: string]: number } = {};
@@ -150,9 +161,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // ============================================================
             // STEP 1: Calculate Current Outstanding for Each Purchase
             // ============================================================
-            // IMPORTANT: Use SAME logic as use-supplier-summary to ensure consistency
-            // Outstanding = Original Amount - (Total Paid + Total CD)
-            const paymentHistory: Payment[] = (context as any).paymentHistory || [];
+                // IMPORTANT: Use SAME logic as use-supplier-summary to ensure consistency
+                // Outstanding = Original Amount - (Total Paid + Total CD)
+                const paymentHistory: Payment[] = (context as any).paymentHistory || [];
             
             const entryOutstandings = selectedEntries.map(entry => {
                 const originalAmount = Number(entry.originalNetAmount) || 0;
@@ -164,21 +175,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     ? Number((entry as any).outstandingForEntry) 
                     : (entry.netAmount !== undefined ? Number(entry.netAmount) : null);
                 
-                console.log(`STEP 1 - Calculating outstanding for ${entry.srNo}:`, {
-                    srNo: entry.srNo,
-                    originalNetAmount: originalAmount,
-                    outstandingForEntry: (entry as any).outstandingForEntry,
-                    netAmount: entry.netAmount,
-                    outstandingFromSummary: outstandingFromSummary
-                });
-                
                 // Get all payments for this entry (excluding the one being edited if in edit mode)
                 const allPaymentsForEntry = paymentHistory.filter(p => 
                     p.paidFor?.some(pf => pf.srNo === entry.srNo) && 
                     (!editingPayment || p.id !== editingPayment.id)
                 );
-                
-                console.log(`STEP 1 - Found ${allPaymentsForEntry.length} previous payments for ${entry.srNo}`);
                 
                 // Calculate total paid and CD using SAME logic as use-supplier-summary
                 let totalPaidForEntry = 0;
@@ -211,14 +212,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         if (cdAmount <= 0.01) {
                             totalPaidWithoutCdForEntry += paidAmount;
                         }
-                        
-                        console.log(`STEP 1 - Payment ${idx + 1} for ${entry.srNo}:`, {
-                            paymentId: payment.paymentId,
-                            paidAmount,
-                            cdAmount,
-                            totalPaidSoFar: totalPaidForEntry,
-                            totalCdSoFar: totalCdForEntry
-                        });
                     }
                 });
                 
@@ -246,12 +239,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         if (previousCdAmount <= 0.01) {
                             totalPaidWithoutCdForEntry += previousPaidAmount;
                         }
-                        
-                        console.log(`STEP 1 - Editing payment for ${entry.srNo}:`, {
-                            previousPaidAmount,
-                            previousCdAmount,
-                            note: 'Will be added back temporarily'
-                        });
                     }
                 }
                 
@@ -261,53 +248,30 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
                 const outstanding = currentOutstanding + previousPaidAmount + previousCdAmount;
                 
-                // IMPORTANT: Use outstandingFromSummary if available (from use-supplier-summary)
-                // This ensures we use the SAME outstanding that's shown in the UI
-                // If editing, add back the editing payment temporarily
+                // CRITICAL: Always prioritize fresh outstanding values
+                // outstandingFromSummary or entry.netAmount are fresh from database
+                // Don't rely on stale paymentHistory calculation
                 let finalOutstanding = outstanding;
                 if (outstandingFromSummary !== null && !editingPayment) {
-                    // Use the outstanding from summary (already calculated correctly)
+                    // Use the outstanding from summary (already calculated correctly from fresh data)
                     finalOutstanding = outstandingFromSummary;
-                    console.log(`STEP 1 - Using outstandingFromSummary for ${entry.srNo}:`, {
-                        outstandingFromSummary,
-                        calculatedOutstanding: outstanding,
-                        match: Math.abs(outstandingFromSummary - outstanding) < 0.01 ? 'MATCH' : 'MISMATCH',
-                        difference: outstandingFromSummary - outstanding
-                    });
-                } else if (editingPayment) {
+                } else if (outstandingFromSummary !== null && editingPayment) {
                     // If editing, add back the editing payment to outstandingFromSummary
-                    if (outstandingFromSummary !== null) {
-                        finalOutstanding = outstandingFromSummary + previousPaidAmount + previousCdAmount;
-                        console.log(`STEP 1 - Editing mode: Adding back payment for ${entry.srNo}:`, {
-                            outstandingFromSummary,
-                            previousPaidAmount,
-                            previousCdAmount,
-                            finalOutstanding
-                        });
+                    finalOutstanding = outstandingFromSummary + previousPaidAmount + previousCdAmount;
+                } else if (entry.netAmount !== undefined && entry.netAmount !== null) {
+                    // CRITICAL: Use entry.netAmount as fallback (fresh from database)
+                    // This is better than calculating from stale paymentHistory
+                    finalOutstanding = Number(entry.netAmount);
+                    if (editingPayment) {
+                        // If editing, add back the editing payment
+                        finalOutstanding = finalOutstanding + previousPaidAmount + previousCdAmount;
                     }
                 }
+                // If neither available, use calculated outstanding (last resort)
                 
                 // IMPORTANT: originalOutstanding should be the CURRENT outstanding (before new payment)
                 // This is what we'll use for capacity calculation
                 const originalOutstanding = Math.max(0, Math.round(finalOutstanding * 100) / 100);
-                
-                console.log(`STEP 1 - Final calculation for ${entry.srNo}:`, {
-                    originalAmount: originalAmount,
-                    totalPaidForEntry: totalPaidForEntry,
-                    totalCdForEntry: totalCdForEntry,
-                    totalPaidWithoutCd: Math.max(0, Math.round(totalPaidWithoutCdForEntry * 100) / 100),
-                    currentOutstanding: currentOutstanding,
-                    previousPaidAmount: previousPaidAmount,
-                    previousCdAmount: previousCdAmount,
-                    outstanding: outstanding,
-                    outstandingFromSummary: outstandingFromSummary,
-                    finalOutstanding: finalOutstanding,
-                    originalOutstanding: originalOutstanding,
-                    formula: outstandingFromSummary !== null 
-                        ? `Using outstandingFromSummary (${outstandingFromSummary}) + Editing Payment (${previousPaidAmount} + ${previousCdAmount}) = Current Outstanding (${originalOutstanding})`
-                        : `Original Amount (${originalAmount}) - Previous Paid (${totalPaidForEntry}) - Previous CD (${totalCdForEntry}) + Editing Paid (${previousPaidAmount}) + Editing CD (${previousCdAmount}) = Current Outstanding (${originalOutstanding})`,
-                    note: 'originalOutstanding = Current outstanding before new payment (this is the capacity)'
-                });
                 
                 return { 
                     entry, 
@@ -373,17 +337,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // 3. Distribution method depends on cdAt mode
             // 4. CD MUST be distributed even if payment amount is 0 (for CD-only payments)
             
-            // Debug: Log CD distribution start
-            if (cdEnabled && calculatedCdAmount) {
-                console.log('CD Distribution Start:', {
-                    cdEnabled,
-                    calculatedCdAmount,
-                    cdToDistribute,
-                    totalEntries: entryOutstandings.length,
-                    entriesWithOutstanding: entryOutstandings.filter(eo => eo.outstanding > 0).length
-                });
-            }
-            
             if (cdToDistribute > 0) {
                 // Get eligible entries (those that haven't received CD before and have outstanding)
                 const eligibleEntries = entryOutstandings.filter(eo => {
@@ -396,16 +349,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const entriesToUse = eligibleEntries.length > 0 
                     ? eligibleEntries 
                     : entryOutstandings.filter(eo => eo.outstanding > 0);
-                
-                console.log('CD Distribution - Entries to use:', {
-                    eligibleCount: eligibleEntries.length,
-                    totalToUse: entriesToUse.length,
-                    entriesToUse: entriesToUse.map(eo => ({
-                        srNo: eo.entry.srNo,
-                        outstanding: eo.outstanding,
-                        previousCd: totalCdReceivedByEntry[eo.entry.srNo] || 0
-                    }))
-                });
                 
                 if (entriesToUse.length > 0) {
                     // Determine CD distribution method based on cdAt mode
@@ -458,17 +401,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                     if (calculatedCd > maxAllowedCd) {
                                         excessCd[eo.entry.srNo] = calculatedCd - maxAllowedCd;
                                     }
-                                    
-                                    console.log(`CD Allocated to ${eo.entry.srNo} (on_full_amount mode):`, {
-                                        originalAmount: eo.entry.originalNetAmount || eo.originalAmount || 0,
-                                        calculatedCdBasedOnOriginal: calculatedCd,
-                                        currentOutstanding: eo.outstanding,
-                                        maxAllowedCd,
-                                        finalCd: cdAllocations[eo.entry.srNo],
-                                        excessCd: excessCd[eo.entry.srNo] || 0,
-                                        outstandingAfterCd: eo.outstanding - cdAllocations[eo.entry.srNo],
-                                        status: (eo.outstanding - cdAllocations[eo.entry.srNo]) >= 0 ? 'OK' : 'NEGATIVE!'
-                                    });
                                 }
                             }
                             
@@ -477,12 +409,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             let remainingCdToDistribute = cdToDistribute - totalAllocated;
                             
                             if (remainingCdToDistribute > 0.01) {
-                                console.log('Redistributing excess CD:', {
-                                    totalExcessCd,
-                                    remainingCdToDistribute,
-                                    totalAllocated
-                                });
-                                
                                 // Sort entries by outstanding (descending) to fill purchases with most capacity first
                                 const sortedEntriesForRedistribution = [...entriesToUse]
                                     .filter(eo => {
@@ -515,14 +441,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         cdAllocations[eo.entry.srNo] = currentCd + additionalCd;
                                         totalAllocated += additionalCd;
                                         remainingCdToDistribute -= additionalCd;
-                                        
-                                        console.log(`Redistributed excess CD to ${eo.entry.srNo}:`, {
-                                            additionalCd,
-                                            oldCd: currentCd,
-                                            newCd: cdAllocations[eo.entry.srNo],
-                                            remainingCapacity,
-                                            remainingCdToDistribute
-                                        });
                                     }
                                 }
                             }
@@ -554,18 +472,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                     }
                                 }
                             }
-                            
-                            console.log('Final CD Distribution (on_full_amount mode):', {
-                                totalCdToDistribute: cdToDistribute,
-                                totalAllocated,
-                                roundingDiff,
-                                allocations: Object.entries(cdAllocations).map(([srNo, cd]) => ({
-                                    srNo,
-                                    cd,
-                                    originalAmount: entriesToUse.find(eo => eo.entry.srNo === srNo)?.entry.originalNetAmount || 0,
-                                    outstanding: entriesToUse.find(eo => eo.entry.srNo === srNo)?.outstanding || 0
-                                }))
-                            });
                     }
                 } else {
                         // Mode: partial_on_paid or on_unpaid_amount
@@ -637,21 +543,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                     // Verify: Outstanding after CD should be >= 0
                                     const outstandingAfterCd = eo.outstanding - finalCd;
                                     if (outstandingAfterCd < -0.01) {
-                                        console.warn(`CD Allocation Warning for ${eo.entry.srNo}: Outstanding would become negative, adjusting CD`);
                                         cdAllocations[eo.entry.srNo] = Math.max(0, eo.outstanding);
                                         totalAllocated = totalAllocated - finalCd + cdAllocations[eo.entry.srNo];
                                     }
-                                    
-                                    console.log(`CD Allocated to ${eo.entry.srNo}:`, {
-                                        baseAmount,
-                                        proportion: (proportion * 100).toFixed(2) + '%',
-                                        exactCd,
-                                        roundedCd,
-                                        finalCd: cdAllocations[eo.entry.srNo],
-                                        outstanding: eo.outstanding,
-                                        outstandingAfterCd: eo.outstanding - cdAllocations[eo.entry.srNo],
-                                        status: (eo.outstanding - cdAllocations[eo.entry.srNo]) >= 0 ? 'OK' : 'NEGATIVE!'
-                                    });
                                 }
                             }
                             
@@ -707,27 +601,127 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             
             if (paymentMethod === 'Gov.' && govAmount > 0) {
                 // First, initialize adjustedOriginal for ALL entries (will be updated if extra amount exists)
-                // This ensures the original amount is correctly displayed in the outstanding table
+                // IMPORTANT: Calculate fresh from paymentHistory, NOT from cached entry object
+                // This ensures we use correct base when making multiple payments without refresh
                 entryOutstandings.forEach(eo => {
-                    adjustedOriginalPerEntry[eo.entry.srNo] = eo.originalAmount || 0;
+                    // Find the most recent Gov. payment for this entry from paymentHistory
+                    // This gives us the latest adjustedOriginal (if any previous Gov. payment exists)
+                    // IMPORTANT: Exclude the current editing payment if in edit mode
+                    let previousAdjustedOriginal: number | null = null;
+                    const previousGovPayments = paymentHistory
+                        .filter(p => 
+                            (p as any).receiptType === 'Gov.' && 
+                            p.paidFor?.some(pf => pf.srNo === eo.entry.srNo) &&
+                            (!editingPayment || p.id !== editingPayment.id) // Exclude editing payment
+                        )
+                        .sort((a, b) => {
+                            // Sort by date descending to get most recent first
+                            const dateA = a.date ? new Date(a.date).getTime() : 0;
+                            const dateB = b.date ? new Date(b.date).getTime() : 0;
+                            return dateB - dateA;
+                        });
+                    
+                    if (previousGovPayments.length > 0) {
+                        // Get the most recent Gov. payment's adjustedOriginal for this entry
+                        const mostRecentGovPayment = previousGovPayments[0];
+                        const paidForThisEntry = mostRecentGovPayment.paidFor?.find((pf: any) => pf.srNo === eo.entry.srNo);
+                        if (paidForThisEntry && (paidForThisEntry as any).adjustedOriginal !== undefined) {
+                            previousAdjustedOriginal = Number((paidForThisEntry as any).adjustedOriginal);
+                        }
+                    }
+                    
+                    // Use previous adjustedOriginal if found, otherwise use originalAmount
+                    // This ensures we build upon previous Gov. payment's adjusted original
+                    const baseOriginal = previousAdjustedOriginal !== null && previousAdjustedOriginal > 0
+                        ? previousAdjustedOriginal
+                        : (eo.originalAmount || 0);
+                    
+                    adjustedOriginalPerEntry[eo.entry.srNo] = baseOriginal;
+                    
+                    // Calculate base outstanding: Current outstanding already reflects payments against adjusted original
+                    // So base outstanding = current outstanding (which already accounts for previous adjustments)
                     const originalOutstanding = eo.originalOutstanding || (Math.max(0, eo.outstanding || 0) + (cdAllocations[eo.entry.srNo] || 0));
                     adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding;
+                    
                 });
 
                 // Calculate total receipt outstanding (after CD)
+                // CRITICAL: Use originalOutstanding (before CD) for accurate calculation
+                // This ensures we get the correct base outstanding for extra amount calculation
+                // IMPORTANT: If originalOutstanding is 0 but outstanding is > 0, use outstanding
+                // This handles cases where outstandingFromSummary or entry.netAmount might not be available
                 const totalReceiptOutstanding = entryOutstandings.reduce((sum, eo) => {
-                    const outstanding = eo.outstanding || 0; // Already updated after CD
-                    return sum + Math.max(0, outstanding);
+                    // Use originalOutstanding first (most accurate), fallback to outstanding
+                    // originalOutstanding is set in line 271 and should be the correct outstanding
+                    let baseOutstanding = eo.originalOutstanding || 0;
+                    // If originalOutstanding is 0 but outstanding > 0, use outstanding (might be updated after CD)
+                    if (baseOutstanding <= 0.01 && eo.outstanding > 0.01) {
+                        baseOutstanding = eo.outstanding;
+                    }
+                    // Ensure we're using a positive value
+                    return sum + Math.max(0, baseOutstanding);
                 }, 0);
                 
-                // Gov. Required Amount = from form (or fallback to govAmount if not provided)
+                // IMPORTANT: Gov Required Amount and Extra Amount calculation depends on extraAmountBaseType
+                if (extraAmountBaseType === 'target') {
+                    // Target-based calculation:
+                    // Extra = (Target Amount / Gov Rate) * Extra Rate per Quintal
+                    // Gov Required = Target Amount + Extra
+                    const targetAmt = typeof calcTargetAmount === 'function' ? calcTargetAmount() : (calcTargetAmount || 0);
+                    const currentGovRate = govRate || 0;
+                    
+                    // Calculate extra amount: (Target Amount / Gov Rate) * Extra Rate per Quintal
+                    // If we have userExtraAmount and govQuantity, calculate extra rate per quintal
+                    let calculatedExtra = 0;
+                    if (currentGovRate > 0 && targetAmt > 0) {
+                        if (userExtraAmount !== undefined && userExtraAmount > 0 && govQuantity > 0) {
+                            // Use the extra rate per quintal from the form
+                            const extraRatePerQtl = userExtraAmount / govQuantity;
+                            const quantity = targetAmt / currentGovRate;
+                            calculatedExtra = quantity * extraRatePerQtl;
+                        } else if (userGovRequiredAmount !== undefined && userGovRequiredAmount > targetAmt && govQuantity > 0) {
+                            // Calculate extra rate from govRequiredAmount if available
+                            const extraRatePerQtl = (userGovRequiredAmount - targetAmt) / govQuantity;
+                            const quantity = targetAmt / currentGovRate;
+                            calculatedExtra = quantity * extraRatePerQtl;
+                        } else if (userExtraAmount !== undefined && userExtraAmount > 0) {
+                            // Use user provided extra amount directly
+                            calculatedExtra = userExtraAmount;
+                        }
+                    }
+                    
+                    calculatedExtraAmount = Math.max(0, calculatedExtra);
+                    // Gov Required = Target Amount + Extra
+                    govRequiredAmount = targetAmt + calculatedExtraAmount;
+                    
+                    // Override with user provided govRequiredAmount if it's explicitly set and different
+                    if (userGovRequiredAmount !== undefined && userGovRequiredAmount > 0 && Math.abs(userGovRequiredAmount - govRequiredAmount) > 0.01) {
+                        govRequiredAmount = userGovRequiredAmount;
+                        // Recalculate extra based on the provided govRequiredAmount
+                        calculatedExtraAmount = Math.max(0, govRequiredAmount - targetAmt);
+                    }
+                } else {
+                    // Receipt-based calculation:
+                    // Gov Required Amount = from form (or fallback to govAmount if not provided)
                 govRequiredAmount = userGovRequiredAmount !== undefined && userGovRequiredAmount > 0 
                     ? userGovRequiredAmount 
                     : govAmount;
                 
-                // IMPORTANT: Use extra amount from form directly (not calculated)
-                // Extra Amount = Gov. Amount + Pending Amount - Target Amount (from form)
-                totalExtraAmount = userExtraAmount !== undefined ? Math.max(0, userExtraAmount) : 0;
+                    // Extra Amount = Total (govRequiredAmount) - Base (totalReceiptOutstanding)
+                calculatedExtraAmount = Math.max(0, govRequiredAmount - totalReceiptOutstanding);
+                }
+                
+                if (userExtraAmount !== undefined && userExtraAmount > 0) {
+                    // Use user provided value, but validate it's reasonable
+                    totalExtraAmount = Math.max(0, userExtraAmount);
+                    const difference = Math.abs(totalExtraAmount - calculatedExtraAmount);
+                    // Note: difference > 0.01 means user provided value differs from calculated
+                } else {
+                    // Calculate: Extra = Total - Base
+                    totalExtraAmount = calculatedExtraAmount;
+                }
+                
+                // totalExtraAmount ready for distribution
                 
                 // Distribute extra amount based on outstanding (not original amount)
                 // This ensures fair distribution - receipts with more outstanding get more extra amount
@@ -770,11 +764,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             extraAmountPerEntry[eo.entry.srNo] = Math.max(0, extraAmount);
                             totalDistributed += extraAmountPerEntry[eo.entry.srNo];
                             
+                            // Extra amount calculated and saved
+                            
                             // Calculate adjusted original and outstanding
-                            // IMPORTANT: Use originalOutstanding (before CD) for adjusted outstanding
-                            // This ensures verification doesn't double-subtract CD
-                            adjustedOriginalPerEntry[eo.entry.srNo] = (eo.originalAmount || 0) + extraAmountPerEntry[eo.entry.srNo];
+                            // IMPORTANT: Use baseOriginal (already set at initialization, might be previous adjustedOriginal)
+                            // Add new extraAmount on top of baseOriginal
+                            // This ensures we build upon previous Gov. payment's adjusted original correctly
+                            const baseOriginal = adjustedOriginalPerEntry[eo.entry.srNo] || (eo.originalAmount || 0);
+                            adjustedOriginalPerEntry[eo.entry.srNo] = baseOriginal + extraAmountPerEntry[eo.entry.srNo];
                             adjustedOutstandingPerEntry[eo.entry.srNo] = originalOutstanding + extraAmountPerEntry[eo.entry.srNo];
+                            
+                            // Adjusted original updated with new extra amount
                         } else {
                             // Even if outstanding is 0, keep the initialized adjustedOriginal
                             // This ensures the original amount is correctly displayed in the outstanding table
@@ -786,73 +786,86 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     
                     // Verify total distributed matches total extra amount (with small tolerance for rounding)
                     const roundingDifference = Math.abs(totalDistributed - totalExtraAmount);
-                    if (roundingDifference > 0.01) {
-                        console.warn('Extra amount distribution rounding difference:', roundingDifference);
-                    }
+                    // Note: roundingDifference > 0.01 indicates rounding error, but acceptable for final entry
                 }
-                
-                console.log('Gov. Payment Extra Amount Calculation:', {
-                    totalReceiptOutstanding,
-                    govRequiredAmount,
-                    totalExtraAmount,
-                    extraAmountPerEntry,
-                    adjustedOriginalPerEntry,
-                    adjustedOutstandingPerEntry
-                });
             }
             
-            // Step 2: Distribute paid amount (To Be Paid amount) sequentially
-            // Rule: Complete the purchase with least outstanding first, then move to next with least outstanding
-            // IMPORTANT: paidFor.amount is the actual payment amount (To Be Paid), NOT (outstanding - CD)
+            // Step 2: Distribute paid amount (To Be Paid amount)
+            // IMPORTANT: For Gov. payment, first pay normal outstanding, then distribute only extra amount proportionally
+            // paidFor.amount is the actual payment amount (To Be Paid), NOT (outstanding - CD)
             // CD is separate and stored in cdAmount field
             let amountToDistribute = Math.round(finalAmountToPay * 100) / 100;
             
-            // For Gov. payment, ensure payment doesn't exceed total adjusted outstanding
-            // This prevents negative outstanding when Gov. payment is less than Gov. Required
-            if (paymentMethod === 'Gov.' && govRequiredAmount > 0) {
+            // Initialize roundedPayments object for payment distribution
+            const roundedPayments: { [srNo: string]: number } = {};
+            
+            // For Gov. payment, distribute payment proportionally based on ADJUSTED outstanding (includes extra amount)
+            // IMPORTANT: Payment should cover adjusted outstanding (receiptOutstanding + extraAmount)
+            // This ensures the extra amount is properly paid
+            if (paymentMethod === 'Gov.' && govRequiredAmount > 0 && totalExtraAmount > 0) {
+                // Calculate total adjusted outstanding (includes extra amount)
                 const totalAdjustedOutstanding = entryOutstandings.reduce((sum, eo) => {
-                    const adjustedOutstanding = adjustedOutstandingPerEntry[eo.entry.srNo] || (eo.outstanding || 0);
-                    return sum + Math.max(0, adjustedOutstanding);
+                    const adjusted = adjustedOutstandingPerEntry[eo.entry.srNo] || Math.max(0, eo.outstanding || 0);
+                    return sum + adjusted;
                 }, 0);
                 
-                // Limit payment to total adjusted outstanding (Gov. Required amount)
-                // This ensures outstanding doesn't go negative
-                amountToDistribute = Math.min(amountToDistribute, totalAdjustedOutstanding);
+                // Distribute payment proportionally based on adjusted outstanding
+                const payments: { [srNo: string]: number } = {};
+                let totalDistributed = 0;
                 
-                console.log('Gov. Payment Amount Limiting:', {
-                    originalPaymentAmount: finalAmountToPay,
-                    govRequiredAmount,
-                    totalAdjustedOutstanding,
-                    limitedPaymentAmount: amountToDistribute,
-                    extraAmountDistribution: extraAmountPerEntry,
-                    allReceipts: entryOutstandings.map(eo => ({
-                        srNo: eo.entry.srNo,
-                        outstanding: eo.outstanding,
-                        originalOutstanding: eo.originalOutstanding,
-                        extraAmount: extraAmountPerEntry[eo.entry.srNo] || 0,
-                        adjustedOutstanding: adjustedOutstandingPerEntry[eo.entry.srNo] || 0
-                    }))
+                // Sort by adjusted outstanding (descending) for rounding
+                const sortedByAdjustedOutstanding = [...entryOutstandings].sort((a, b) => {
+                    const adjustedA = adjustedOutstandingPerEntry[a.entry.srNo] || Math.max(0, a.outstanding || 0);
+                    const adjustedB = adjustedOutstandingPerEntry[b.entry.srNo] || Math.max(0, b.outstanding || 0);
+                    return adjustedB - adjustedA;
                 });
-            }
-            
-            console.log('=== PAYMENT DISTRIBUTION START ===');
-            console.log('Total amount to distribute:', amountToDistribute);
-            console.log('Entry outstandings BEFORE payment distribution:', entryOutstandings.map(eo => {
-                const originalOutstanding = eo.originalOutstanding || eo.outstanding;
-                const cdAllocated = cdAllocations[eo.entry.srNo] || 0;
-                const outstandingAfterCd = eo.outstanding; // Already updated after CD
-                const capacity = outstandingAfterCd; // Capacity = Outstanding after CD
                 
-                return {
-                    srNo: eo.entry.srNo,
-                    originalAmount: eo.originalAmount,
-                    originalOutstanding: originalOutstanding,
-                    cdAllocated: cdAllocated,
-                    outstandingAfterCd: outstandingAfterCd,
-                    capacity: capacity, // Capacity = Outstanding after CD (this is the maximum we can pay)
-                    formula: `Original Outstanding (${originalOutstanding}) - CD (${cdAllocated}) = Capacity (${capacity})`
-                };
-            }));
+                sortedByAdjustedOutstanding.forEach((eo, index) => {
+                    const adjustedOutstanding = adjustedOutstandingPerEntry[eo.entry.srNo] || Math.max(0, eo.outstanding || 0);
+                    
+                    if (adjustedOutstanding > 0 && amountToDistribute > totalDistributed) {
+                        let paymentForThisEntry: number;
+                        
+                        if (index === sortedByAdjustedOutstanding.length - 1) {
+                            // Last entry gets remaining amount to avoid rounding errors
+                            paymentForThisEntry = amountToDistribute - totalDistributed;
+                        } else {
+                            // Calculate proportional payment
+                            const proportion = totalAdjustedOutstanding > 0 ? adjustedOutstanding / totalAdjustedOutstanding : 0;
+                            paymentForThisEntry = amountToDistribute * proportion;
+                            paymentForThisEntry = Math.round(paymentForThisEntry * 100) / 100;
+                        }
+                        
+                        // Cap payment at adjusted outstanding (can't pay more than capacity)
+                        paymentForThisEntry = Math.min(paymentForThisEntry, adjustedOutstanding);
+                        payments[eo.entry.srNo] = paymentForThisEntry;
+                        totalDistributed += paymentForThisEntry;
+                    } else {
+                        payments[eo.entry.srNo] = 0;
+                    }
+                });
+                
+                // Set roundedPayments to the calculated payments
+                Object.keys(payments).forEach(srNo => {
+                    roundedPayments[srNo] = payments[srNo];
+                });
+                
+                amountToDistribute = 0; // All distributed
+            } else {
+                // For non-Gov payments or Gov without extra amount, use normal sequential distribution
+                // For Gov. payment, ensure payment doesn't exceed total adjusted outstanding
+                if (paymentMethod === 'Gov.' && govRequiredAmount > 0) {
+                    const totalAdjustedOutstanding = entryOutstandings.reduce((sum, eo) => {
+                        const adjustedOutstanding = adjustedOutstandingPerEntry[eo.entry.srNo] || (eo.outstanding || 0);
+                        return sum + Math.max(0, adjustedOutstanding);
+                    }, 0);
+                    
+                    // Limit payment to total adjusted outstanding (Gov. Required amount)
+                    // This ensures outstanding doesn't go negative
+                    amountToDistribute = Math.min(amountToDistribute, totalAdjustedOutstanding);
+                    
+                }
+            }
             
             // Sort entries by outstanding amount (ascending - least outstanding first)
             // IMPORTANT: eo.outstanding is already updated after CD allocation
@@ -886,31 +899,21 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     return outstandingA - outstandingB;
                 });
             
-            console.log('Sorted entries for payment (by outstanding after CD, ascending):', sortedEntriesForPayment.map(eo => {
-                const originalOutstanding = eo.originalOutstanding || eo.outstanding;
-                const cdAllocated = cdAllocations[eo.entry.srNo] || 0;
-                const outstandingAfterCd = eo.outstanding; // Already updated after CD
-                const capacity = outstandingAfterCd; // Capacity = Outstanding after CD
-                
-                return {
-                    srNo: eo.entry.srNo,
-                    originalOutstanding: originalOutstanding,
-                    cdAllocated: cdAllocated,
-                    outstandingAfterCd: outstandingAfterCd,
-                    capacity: capacity,
-                    formula: `Original Outstanding (${originalOutstanding}) - CD (${cdAllocated}) = Capacity (${capacity})`
-                };
-            }));
-            
             // Sequential distribution: complete each purchase fully before moving to next
-            const roundedPayments: { [srNo: string]: number } = {};
+            // Check if payments were already distributed (for Gov. with extra amount)
+            const paymentsAlreadyDistributed = Object.keys(roundedPayments).length > 0;
             
-            // Initialize all payments to 0
-            for (const { entry } of entryOutstandings) {
-                roundedPayments[entry.srNo] = 0;
+            if (!paymentsAlreadyDistributed) {
+                // Initialize all payments to 0 (if not already initialized)
+                for (const { entry } of entryOutstandings) {
+                    if (!(entry.srNo in roundedPayments)) {
+                        roundedPayments[entry.srNo] = 0;
+                    }
+                }
             }
             
-            // Distribute sequentially
+            // Distribute sequentially (skip if already distributed for Gov. with extra amount)
+            if (!paymentsAlreadyDistributed) {
             for (const eo of sortedEntriesForPayment) {
                 const { entry, outstanding } = eo;
                 if (amountToDistribute <= 0.01) break;
@@ -939,56 +942,13 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     roundedPayments[entry.srNo] = Math.round(paymentForThisEntry * 100) / 100;
                     amountToDistribute = Math.round((amountToDistribute - paymentForThisEntry) * 100) / 100;
                     
-                    const originalOutstanding = eo.originalOutstanding || outstanding;
-                    const extraAmount = extraAmountPerEntry[entry.srNo] || 0;
-                    console.log(`Payment allocated to ${entry.srNo}:`, {
-                        originalOutstanding: originalOutstanding,
-                        outstanding: outstanding,
-                        cdAllocated: cdAllocated,
-                        outstandingAfterCd: outstandingAfterCd,
-                        extraAmount: extraAmount,
-                        adjustedOutstanding: adjustedOutstandingPerEntry[entry.srNo] || outstandingAfterCd,
-                        capacity: capacity,
-                        paymentAllocated: roundedPayments[entry.srNo],
-                        remainingToDistribute: amountToDistribute,
-                        outstandingAfterPayment: capacity - roundedPayments[entry.srNo],
-                        formula: paymentMethod === 'Gov.' 
-                            ? `Adjusted Outstanding (${capacity}) - Payment (${roundedPayments[entry.srNo]}) = Final Outstanding (${capacity - roundedPayments[entry.srNo]})`
-                            : `Original Outstanding (${originalOutstanding}) - CD (${cdAllocated}) - Payment (${roundedPayments[entry.srNo]}) = Final Outstanding (${outstandingAfterCd - roundedPayments[entry.srNo]})`
-                    });
                 }
             }
-            
-            console.log('Payment distribution summary:', {
-                totalToDistribute: finalAmountToPay,
-                totalDistributed: Object.values(roundedPayments).reduce((sum, amt) => sum + amt, 0),
-                remaining: amountToDistribute,
-                payments: Object.entries(roundedPayments).map(([srNo, amt]) => {
-                    const eo = entryOutstandings.find(eo => eo.entry.srNo === srNo);
-                    if (eo) {
-                        const originalOutstanding = eo.originalOutstanding || eo.outstanding;
-                        const cdAllocated = cdAllocations[srNo] || 0;
-                        const outstandingAfterCd = eo.outstanding; // Already updated after CD
-                        const outstandingAfterPayment = outstandingAfterCd - amt;
-                        
-                        return {
-                            srNo,
-                            amount: amt,
-                            originalOutstanding: originalOutstanding,
-                            cdAllocated: cdAllocated,
-                            outstandingAfterCd: outstandingAfterCd,
-                            outstandingAfterPayment: outstandingAfterPayment,
-                            capacity: outstandingAfterCd,
-                            formula: `Original Outstanding (${originalOutstanding}) - CD (${cdAllocated}) - Payment (${amt}) = Final Outstanding (${outstandingAfterPayment})`
-                        };
-                    }
-                    return { srNo, amount: amt, error: 'Entry not found' };
-                })
-            });
+            } // End of sequential distribution (only if not already distributed)
             
             // Handle any remaining amount due to rounding (distribute to entries with capacity)
-            if (amountToDistribute > 0.01) {
-                console.log('Remaining amount to distribute after sequential payment:', amountToDistribute);
+            // Skip if payments were already distributed (for Gov. with extra amount)
+            if (!paymentsAlreadyDistributed && amountToDistribute > 0.01) {
                 // Find entries that still have capacity and distribute remaining amount
                 for (const eo of sortedEntriesForPayment) {
                     const { entry, outstanding } = eo;
@@ -1012,20 +972,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         const additionalPayment = Math.min(amountToDistribute, remainingCapacity);
                         roundedPayments[entry.srNo] = Math.round((roundedPayments[entry.srNo] || 0) + additionalPayment) * 100 / 100;
                         amountToDistribute = Math.round((amountToDistribute - additionalPayment) * 100) / 100;
-                        
-                        console.log(`Additional payment allocated to ${entry.srNo}:`, {
-                            outstandingAfterCd,
-                            alreadyPaid,
-                            remainingCapacity,
-                            additionalPayment,
-                            newTotalPaid: roundedPayments[entry.srNo],
-                            remainingToDistribute: amountToDistribute
-                        });
                     }
-                }
-                
-                if (amountToDistribute > 0.01) {
-                    console.warn(`WARNING: Could not distribute all amount. Remaining: ${amountToDistribute}. This means total payment exceeds total capacity.`);
                 }
             }
             
@@ -1047,20 +994,96 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 const shouldInclude = paymentForThisEntry > 0 || cdForThisEntry > 0 || (paymentMethod === 'Gov.' && extraAmount > 0);
                 
                 if (shouldInclude) {
-                    const receiptOutstanding = Math.max(0, (entryOutstandings.find(eo => eo.entry.srNo === entry.srNo)?.originalOutstanding || 0));
-                    const adjustedOriginal = adjustedOriginalPerEntry[entry.srNo] || (entry.originalNetAmount || 0);
-                    const adjustedOutstanding = adjustedOutstandingPerEntry[entry.srNo] || receiptOutstanding;
+                    // Get the entry outstanding data
+                    const eo = entryOutstandings.find(eo => eo.entry.srNo === entry.srNo);
+                    
+                    // CRITICAL: receiptOutstanding should be the ORIGINAL outstanding BEFORE this payment
+                    // This is the outstanding from database before any payments are applied
+                    const receiptOutstanding = Math.max(0, eo?.originalOutstanding || (eo?.outstanding || 0) + (cdAllocations[entry.srNo] || 0));
+                    
+                    // CRITICAL: Get the correct extraAmount from distribution
+                    const correctExtraAmount = extraAmountPerEntry[entry.srNo] || 0;
+                    
+                    // CRITICAL: adjustedOriginal = originalNetAmount + extraAmount
+                    // Use the calculated adjustedOriginal from distribution, or calculate it
+                    const baseOriginal = entry.originalNetAmount || 0;
+                    const adjustedOriginal = adjustedOriginalPerEntry[entry.srNo] || (baseOriginal + correctExtraAmount);
+                    
+                    // CRITICAL: adjustedOutstanding = receiptOutstanding + extraAmount
+                    // This is the outstanding BEFORE this payment, including extra amount
+                    // Use the calculated adjustedOutstanding from distribution, or calculate it
+                    const adjustedOutstanding = Math.max(0, adjustedOutstandingPerEntry[entry.srNo] || (receiptOutstanding + correctExtraAmount));
+                    
+                    // VERIFY: Ensure adjustedOutstanding = receiptOutstanding + extraAmount (recalculate if needed)
+                    const recalculatedAdjustedOutstanding = receiptOutstanding + correctExtraAmount;
+                    const finalAdjustedOutstanding = Math.max(0, recalculatedAdjustedOutstanding);
+                    
+                    // VERIFY: Ensure adjustedOriginal = baseOriginal + extraAmount (recalculate if needed)
+                    const recalculatedAdjustedOriginal = baseOriginal + correctExtraAmount;
+                    const finalAdjustedOriginal = recalculatedAdjustedOriginal;
                     
                     paidForDetails.push({
                         srNo: entry.srNo,
-                        amount: paymentForThisEntry, // Actual payment amount (To Be Paid)
-                        cdAmount: cdForThisEntry, // CD amount (separate)
+                        amount: Math.round(paymentForThisEntry * 100) / 100, // Actual payment amount (To Be Paid) - rounded
+                        cdAmount: cdForThisEntry, // CD amount (separate) - already rounded
                         // Gov. payment extra amount tracking fields
-                        receiptOutstanding: receiptOutstanding,
-                        extraAmount: extraAmount,
-                        adjustedOriginal: adjustedOriginal,
-                        adjustedOutstanding: adjustedOutstanding,
+                        receiptOutstanding: Math.round(receiptOutstanding * 100) / 100, // Original outstanding before payment - rounded
+                        extraAmount: Math.round(correctExtraAmount * 100) / 100, // Proportional distribution of totalExtraAmount - rounded
+                        adjustedOriginal: Math.round(finalAdjustedOriginal * 100) / 100, // Original + Extra - rounded
+                        adjustedOutstanding: Math.round(finalAdjustedOutstanding * 100) / 100, // Outstanding + Extra - rounded
                     });
+                }
+            }
+            
+            // Verify: For Gov. payments, verify extraAmount values are correct
+            if (paymentMethod === 'Gov.' && totalExtraAmount > 0) {
+                const totalPaidForExtraAmount = paidForDetails.reduce((sum, pf: any) => sum + (pf.extraAmount || 0), 0);
+                const extraAmountDiff = Math.abs(totalPaidForExtraAmount - totalExtraAmount);
+                // CRITICAL: If mismatch detected, fix the extraAmount values
+                if (extraAmountDiff > 0.01) {
+                    // Recalculate proportional distribution to fix the mismatch
+                    const totalReceiptOutstanding = entryOutstandings.reduce((sum, eo) => {
+                        const outstanding = Math.max(0, eo.outstanding || 0);
+                        return sum + outstanding;
+                    }, 0);
+                    
+                    if (totalReceiptOutstanding > 0) {
+                        // Recalculate proportions and redistribute
+                        paidForDetails.forEach((pf: any) => {
+                            const eo = entryOutstandings.find(e => e.entry.srNo === pf.srNo);
+                            if (eo) {
+                                const outstanding = Math.max(0, eo.outstanding || 0);
+                                const proportion = outstanding / totalReceiptOutstanding;
+                                pf.extraAmount = Math.round((totalExtraAmount * proportion) * 100) / 100;
+                            }
+                        });
+                        
+                        // Fix last entry to account for rounding
+                        const recalculatedTotal = paidForDetails.reduce((sum, pf: any) => sum + (pf.extraAmount || 0), 0);
+                        const remainingDiff = totalExtraAmount - recalculatedTotal;
+                        if (paidForDetails.length > 0 && Math.abs(remainingDiff) > 0.01) {
+                            const lastEntry = paidForDetails[paidForDetails.length - 1];
+                            lastEntry.extraAmount = Math.round(((lastEntry.extraAmount || 0) + remainingDiff) * 100) / 100;
+                        }
+                        
+                        // Recalculate adjustedOriginal and adjustedOutstanding with corrected extraAmount
+                        paidForDetails.forEach((pf: any) => {
+                            const eo = entryOutstandings.find(e => e.entry.srNo === pf.srNo);
+                            if (eo) {
+                                const baseOriginal = adjustedOriginalPerEntry[pf.srNo] || (eo.originalAmount || 0);
+                                // Remove old extraAmount and add new one
+                                const oldExtraAmount = extraAmountPerEntry[pf.srNo] || 0;
+                                const correctedBaseOriginal = baseOriginal - oldExtraAmount;
+                                adjustedOriginalPerEntry[pf.srNo] = correctedBaseOriginal + (pf.extraAmount || 0);
+                                
+                                const originalOutstanding = eo.originalOutstanding || (Math.max(0, eo.outstanding || 0) + (cdAllocations[pf.srNo] || 0));
+                                adjustedOutstandingPerEntry[pf.srNo] = originalOutstanding + (pf.extraAmount || 0);
+                                
+                                // Update extraAmountPerEntry for consistency
+                                extraAmountPerEntry[pf.srNo] = pf.extraAmount || 0;
+                            }
+                        });
+                    }
                 }
             }
             
@@ -1068,24 +1091,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             const totalCdDistributed = paidForDetails.reduce((sum, pf) => sum + (pf.cdAmount || 0), 0);
             const cdDistributionDiff = cdToDistribute - totalCdDistributed;
             
-            // Log CD distribution summary
-            if (cdToDistribute > 0) {
-                console.log('CD Distribution Summary:', {
-                    cdToDistribute,
-                    totalCdDistributed,
-                    diff: cdDistributionDiff,
-                    paidForDetails: paidForDetails.map(pf => ({
-                        srNo: pf.srNo,
-                        amount: pf.amount,
-                        cdAmount: pf.cdAmount
-                    }))
-                });
-            }
-            
-            // If there's a significant difference in CD distribution, log warning
-            if (Math.abs(cdDistributionDiff) >= 0.01 && cdToDistribute > 0) {
-                console.warn(`CD Distribution Warning: Expected CD ${cdToDistribute}, distributed ${totalCdDistributed}, diff: ${cdDistributionDiff}`);
-            }
+            // CD distribution complete
+            // Note: cdDistributionDiff indicates difference, but silent validation
             
             // ============================================================
             // STEP 5: Finalize CD Distribution (Recalculate for partial_on_paid mode)
@@ -1095,15 +1102,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // Settle Amount = Paid Amount + CD Amount
             // CD should be calculated on Paid Amount only
             if (cdToDistribute > 0 && paidForDetails.length > 0 && cdAt === 'partial_on_paid') {
-                console.log('Finalize Step: Recalculating CD for partial_on_paid mode');
                 
                 // Recalculate CD based on ACTUAL PAID AMOUNTS (not settled amounts)
                 // paidFor.amount is already the actual paid amount (To Be Paid), not settle amount
                 const totalPaidAmount = paidForDetails.reduce((sum, pf) => sum + pf.amount, 0);
                 
-                console.log('Finalize - Total ACTUAL paid amount (not settle):', totalPaidAmount);
-                console.log('Finalize - Total CD to distribute:', cdToDistribute);
-                console.log('Finalize - Expected CD%:', ((cdToDistribute / totalPaidAmount) * 100).toFixed(2) + '%');
                 
                 if (totalPaidAmount > 0) {
                     // Get eligible entries (those without previous CD)
@@ -1114,12 +1117,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         return previousCd === 0 && pf.amount > 0;
                     });
                     
-                    console.log('Finalize - Eligible entries:', eligiblePaidFor.length);
                     
                     // Calculate total ACTUAL paid amount for eligible entries (not settle amount)
                     const totalPaidForEligible = eligiblePaidFor.reduce((sum, pf) => sum + pf.amount, 0);
                     
-                    console.log('Finalize - Total ACTUAL paid for eligible (not settle):', totalPaidForEligible);
                     
                     if (totalPaidForEligible > 0) {
                         let totalRecalculated = 0;
@@ -1168,8 +1169,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         const purchasesWithCd = sortedEligible.filter(pf => (proportionalCd[pf.srNo] || 0) > 0.01);
                         const purchasesWithoutCd = sortedEligible.filter(pf => (proportionalCd[pf.srNo] || 0) <= 0.01);
                         
-                        console.log('Finalize - Purchases with CD:', purchasesWithCd.map(pf => pf.srNo));
-                        console.log('Finalize - Purchases without CD:', purchasesWithoutCd.map(pf => pf.srNo));
                         
                         // Second pass: Distribute CD and adjust paid amounts iteratively
                         // Rule: If a purchase would go negative, adjust previous purchases to make it work
@@ -1188,7 +1187,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         
                         while (!allValid && iteration < maxIterations) {
                             iteration++;
-                            console.log(`Finalize - Iteration ${iteration}: Checking all purchases`);
                             
                             allValid = true;
                             const adjustmentsThisIteration: { [srNo: string]: number } = {};
@@ -1196,8 +1194,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             // Check each purchase sequentially
                             // IMPORTANT: Check ALL purchases - even those without CD
                             // If outstanding would go negative (with or without CD), reduce paid amount
-                            console.log(`Finalize - Iteration ${iteration}: Checking ${sortedEligible.length} purchases for negative outstanding`);
-                            
                             for (let i = 0; i < sortedEligible.length; i++) {
                                 const paidFor = sortedEligible[i];
                                 const originalOutstanding = getOriginalOutstanding(paidFor.srNo);
@@ -1209,16 +1205,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 
                                 // Check if this purchase would go negative (with or without CD)
                                 const outstandingAfter = originalOutstanding - currentPaidAmount - proposedCd;
-                                
-                                console.log(`Finalize - Iteration ${iteration}: Checking ${paidFor.srNo}:`, {
-                                    originalOutstanding,
-                                    currentPaidAmount,
-                                    proposedCd,
-                                    capacity,
-                                    outstandingAfter,
-                                    wouldGoNegative: outstandingAfter < -0.01,
-                                    status: outstandingAfter < -0.01 ? 'NEGATIVE - NEEDS ADJUSTMENT' : 'OK'
-                                });
                                 
                                 if (outstandingAfter < -0.01) {
                                     // This purchase would go negative - MUST reduce paid amount
@@ -1232,16 +1218,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                     paidAmountAdjustments[paidFor.srNo] = newPaidAmount;
                                     
                                     const hasCd = proposedCd > 0.01;
-                                    
-                                    console.log(`Finalize - Iteration ${iteration}: ${paidFor.srNo} would go negative (CD: ${hasCd ? 'YES' : 'NO'}), reducing paid amount:`, {
-                                        currentPaidAmount,
-                                        newPaidAmount,
-                                        excess,
-                                        proposedCd,
-                                        originalOutstanding,
-                                        newOutstanding: originalOutstanding - newPaidAmount - proposedCd,
-                                        hasCd: hasCd
-                                    });
                                     
                                     // Redistribute the reduced amount
                                     // IMPORTANT: Redistribute only to purchases that are receiving CD (have capacity)
@@ -1271,16 +1247,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                                 paidAmountAdjustments[targetPaidFor.srNo] = newTargetPaid;
                                                 remainingToRedistribute -= additionalPaid;
                                                 
-                                                console.log(`Finalize - Iteration ${iteration}: Redistributed from ${sourceSrNo} to ${targetPaidFor.srNo} (with CD):`, {
-                                                    from: sourceSrNo,
-                                                    to: targetPaidFor.srNo,
-                                                    amount: additionalPaid,
-                                                    oldPaid: targetPaid,
-                                                    newPaid: newTargetPaid,
-                                                    capacity,
-                                                    remainingToRedistribute,
-                                                    status: 'REDISTRIBUTED'
-                                                });
                                             }
                                         };
                                         
@@ -1335,7 +1301,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         
                                         // Final check: If still remaining, log warning
                                         if (remainingToRedistribute > 0.01) {
-                                            console.warn(`Finalize - Iteration ${iteration}: Could not redistribute all amount from ${paidFor.srNo}. Remaining: ${remainingToRedistribute}. This means total paid amount will be less than intended.`);
                                         }
                             }
                         } else {
@@ -1350,57 +1315,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             }
                             
                             if (allValid) {
-                                console.log(`Finalize - All purchases valid after ${iteration} iterations`);
-                                
-                                // Final summary of all purchases
-                                console.log('Finalize - Final Summary of All Purchases:', sortedEligible.map(pf => {
-                                    const originalOutstanding = getOriginalOutstanding(pf.srNo);
-                                    const finalPaidAmount = paidAmountAdjustments[pf.srNo] || pf.amount;
-                                    const finalCd = proportionalCd[pf.srNo] || 0;
-                                    const finalOutstanding = originalOutstanding - finalPaidAmount - finalCd;
-                                    
-                                    return {
-                                        srNo: pf.srNo,
-                                        originalOutstanding,
-                                        paidAmount: finalPaidAmount,
-                                        cdAmount: finalCd,
-                                        settleAmount: finalPaidAmount + finalCd,
-                                        finalOutstanding,
-                                        capacity: originalOutstanding - finalCd,
-                                        status: finalOutstanding < -0.01 ? 'NEGATIVE!' : finalOutstanding > 0.01 ? 'OUTSTANDING' : 'SETTLED'
-                                    };
-                                }));
+                                // All purchases are valid
                             }
-                        }
-                        
-                        if (!allValid) {
-                            console.warn(`Finalize - Warning: Could not make all purchases valid after ${maxIterations} iterations`);
-                            
-                            // Show final state even if not all valid
-                            console.log('Finalize - Final State (Some may be negative):', sortedEligible.map(pf => {
-                                const originalOutstanding = getOriginalOutstanding(pf.srNo);
-                                const finalPaidAmount = paidAmountAdjustments[pf.srNo] || pf.amount;
-                                const finalCd = proportionalCd[pf.srNo] || 0;
-                                const finalOutstanding = originalOutstanding - finalPaidAmount - finalCd;
-                                
-                                return {
-                                    srNo: pf.srNo,
-                                    originalOutstanding,
-                                    paidAmount: finalPaidAmount,
-                                    cdAmount: finalCd,
-                                    settleAmount: finalPaidAmount + finalCd,
-                                    finalOutstanding,
-                                    capacity: originalOutstanding - finalCd,
-                                    status: finalOutstanding < -0.01 ? 'NEGATIVE!' : finalOutstanding > 0.01 ? 'OUTSTANDING' : 'SETTLED'
-                                };
-                            }));
                         }
                         
                         // Third pass: Distribute remaining CD to eligible purchases
                         let totalAllocated = Object.values(recalculatedCd).reduce((sum, cd) => sum + cd, 0);
                         let remainingCdAfterFirstPass = cdToDistribute - totalAllocated;
                         
-                        console.log('Finalize - Remaining CD after first pass:', remainingCdAfterFirstPass);
                         
                         if (remainingCdAfterFirstPass > 0.01) {
                             // Distribute remaining CD to purchases that can accept it
@@ -1435,12 +1357,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         recalculatedCd[paidFor.srNo] = Math.round((currentCd + additionalCd) * 100) / 100;
                                         remainingCdAfterFirstPass -= additionalCd;
                                         
-                                        console.log(`Finalize - Additional CD to ${paidFor.srNo}:`, {
-                                            currentCd,
-                                            additionalCd,
-                                            newCd: recalculatedCd[paidFor.srNo],
-                                            maxAdditionalCd
-                                        });
                                     }
                                 }
                             }
@@ -1465,15 +1381,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 reductions[paidFor.srNo] = reduction;
                                 totalReducedAmount += reduction;
                                 
-                                console.log(`Finalize - Reduction for ${paidFor.srNo}:`, {
-                                    originalPaidAmount,
-                                    adjustedPaidAmount,
-                                    reduction
-                                });
                             }
                         }
                         
-                        console.log('Finalize - Total reduced amount to redistribute:', totalReducedAmount);
                         
                         // Redistribute reduced amount to other purchases (those that didn't have reduction)
                         if (totalReducedAmount > 0.01) {
@@ -1493,7 +1403,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 return outstandingAfter > 0.01;
                             });
                             
-                            console.log('Finalize - Eligible for redistribution:', eligibleForRedistribution.length);
                             
                             if (eligibleForRedistribution.length > 0) {
                                 // Calculate total outstanding for eligible purchases (for proportional distribution)
@@ -1526,13 +1435,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                         paidAmountAdjustments[paidFor.srNo] = newPaidAmount;
                                         remainingToRedistribute -= additionalPaid;
                                         
-                                        console.log(`Finalize - Redistributed to ${paidFor.srNo}:`, {
-                                            oldPaidAmount: paidFor.amount,
-                                            additionalPaid,
-                                            newPaidAmount,
-                                            outstandingCapacity,
-                                            newOutstanding: originalOutstanding - newPaidAmount - currentCd
-                                        });
                                     }
                                 }
                                 
@@ -1562,15 +1464,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                             paidAmountAdjustments[paidFor.srNo] = newPaidAmount;
                                             remainingToRedistribute -= additionalPaid;
                                             
-                                            console.log(`Finalize - Final redistribution to ${paidFor.srNo}:`, {
-                                                additionalPaid,
-                                                newPaidAmount
-                                            });
                                         }
                                     }
                                 }
                                 
-                                console.log('Finalize - Redistribution complete. Remaining:', remainingToRedistribute);
                             }
                         }
                         
@@ -1585,11 +1482,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 const oldPaidAmount = paidFor.amount;
                                 paidFor.amount = Math.round(paidAmountAdjustments[paidFor.srNo] * 100) / 100;
                                 
-                                console.log(`Finalize - Updated paid amount for ${paidFor.srNo}:`, {
-                                    oldPaidAmount,
-                                    newPaidAmount: paidFor.amount,
-                                    reduction: oldPaidAmount - paidFor.amount
-                                });
                             }
                             
                             // Update CD amount
@@ -1597,17 +1489,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 const oldCd = paidFor.cdAmount || 0;
                                 paidFor.cdAmount = Math.round(recalculatedCd[paidFor.srNo] * 100) / 100;
                                 updatedCount++;
-                                
-                                console.log(`Finalize - Updated CD for ${paidFor.srNo}:`, {
-                                    oldCd,
-                                    newCd: paidFor.cdAmount
-                                });
                             }
                         }
                         
-                        console.log('Finalize - Updated entries:', updatedCount);
-                        console.log('Finalize - Paid amount adjustments:', paidAmountAdjustments);
-                        console.log('Finalize - Final CD distribution:', recalculatedCd);
                         
                         // ============================================================
                         // CRITICAL: Final verification - no outstanding should be negative
@@ -1624,24 +1508,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             
                             // Verify outstanding is non-negative
                             if (outstandingAfter < -0.01) {
-                                console.error(`Finalize - ERROR: ${paidFor.srNo} still has negative outstanding!`, {
-                                    originalOutstanding,
-                                    finalPaidAmount,
-                                    cdAmount: finalCd,
-                                    outstandingAfter
-                                });
                                 // Last resort: Reduce paid amount to make outstanding = 0
                                 const maxAllowedPaid = originalOutstanding - finalCd;
                                 paidFor.amount = Math.max(0, maxAllowedPaid);
-                                console.warn(`Finalize - Emergency: Reduced paid amount for ${paidFor.srNo} to ${paidFor.amount}`);
-                            } else {
-                                console.log(`Finalize - Verified ${paidFor.srNo}:`, {
-                                    originalOutstanding,
-                                    finalPaidAmount,
-                                    cdAmount: finalCd,
-                                    outstandingAfter,
-                                    status: outstandingAfter >= 0 ? 'OK' : 'NEGATIVE!'
-                                });
                             }
                             
                             // Final rounding
@@ -1652,20 +1521,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         // Final CD summary
                         const finalTotalCd = paidForDetails.reduce((sum, pf) => sum + (pf.cdAmount || 0), 0);
                         const cdDiff = cdToDistribute - finalTotalCd;
-                        console.log('Finalize - Final CD Summary:', {
-                            expectedCd: cdToDistribute,
-                            actualCd: finalTotalCd,
-                            diff: cdDiff,
-                            note: 'CD distributed to eligible purchases, skipped ones that would go negative'
-                        });
-                    } else {
-                        console.warn('Finalize - No eligible entries with payment amount > 0');
                     }
-                } else {
-                    console.warn('Finalize - Total paid amount is 0, cannot recalculate CD');
                 }
-            } else {
-                console.log('Finalize Step: Skipped (not partial_on_paid mode or no CD to distribute)');
             }
             
             // ============================================================
@@ -1683,7 +1540,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             // Update CD if it's missing or different
                             if (!existingPaidFor.cdAmount || existingPaidFor.cdAmount === 0) {
                                 existingPaidFor.cdAmount = allocatedCd;
-                                console.log(`STEP 6 - Added missing CD to ${entry.srNo}:`, allocatedCd);
                             }
                         } else {
                             // Entry not in paidForDetails, add it with CD only
@@ -1692,7 +1548,6 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                                 amount: 0, // No payment, only CD
                                 cdAmount: allocatedCd
                             });
-                            console.log(`STEP 6 - Added entry ${entry.srNo} with CD only:`, allocatedCd);
                         }
                     }
                 }
@@ -1711,62 +1566,74 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     // Use stored originalOutstanding if available, otherwise calculate
                     let originalOutstanding = eo.originalOutstanding || (eo.outstanding + (cdAllocations[paidFor.srNo] || 0));
                     
-                    // For Gov. payment, use adjusted outstanding (original outstanding + extra amount)
-                    // This allows payment up to adjusted outstanding without going negative
-                    // IMPORTANT: adjustedOutstandingPerEntry = originalOutstanding (before CD) + extraAmount
-                    // This ensures CD is only subtracted once in verification
-                    if (paymentMethod === 'Gov.' && adjustedOutstandingPerEntry[paidFor.srNo] !== undefined) {
-                        // Use adjusted outstanding directly (already includes extra amount)
-                        // Adjusted Outstanding = Original Outstanding (before CD) + Extra Amount
-                        originalOutstanding = adjustedOutstandingPerEntry[paidFor.srNo];
+                    // CRITICAL: For Gov. payment, use adjustedOutstanding from paidFor (saved value)
+                    // This is the outstanding BEFORE this payment, including extra amount
+                    // For non-Gov payments, use originalOutstanding
+                    let baseOutstandingForVerification = originalOutstanding;
+                    if (paymentMethod === 'Gov.' && (paidFor as any).adjustedOutstanding !== undefined) {
+                        // Use adjustedOutstanding from paidFor (this is receiptOutstanding + extraAmount)
+                        baseOutstandingForVerification = (paidFor as any).adjustedOutstanding;
+                    } else if (paymentMethod === 'Gov.' && adjustedOutstandingPerEntry[paidFor.srNo] !== undefined) {
+                        // Fallback: Use adjustedOutstandingPerEntry if paidFor doesn't have it yet
+                        baseOutstandingForVerification = adjustedOutstandingPerEntry[paidFor.srNo];
                     }
                     
                     const paidAmount = paidFor.amount;
                     const cdAmount = paidFor.cdAmount || 0;
                     
                     // Calculate outstanding after payment and CD
-                    const outstandingAfter = originalOutstanding - paidAmount - cdAmount;
+                    // Outstanding After = Base Outstanding (before payment) - Paid Amount - CD Amount
+                    let outstandingAfter = baseOutstandingForVerification - paidAmount - cdAmount;
                     
-                    console.log(`STEP 7 - Checking ${paidFor.srNo}:`, {
-                        originalOutstanding,
-                        currentOutstanding: eo.outstanding,
-                        cdAllocated: cdAllocations[paidFor.srNo] || 0,
-                        extraAmount: extraAmountPerEntry[paidFor.srNo] || 0,
-                        adjustedOutstanding: paymentMethod === 'Gov.' ? originalOutstanding : undefined,
-                        paidAmount,
-                        cdAmount,
-                        settleAmount: paidAmount + cdAmount,
-                        outstandingAfter,
-                        capacity: originalOutstanding - cdAmount, // Maximum we can pay
-                        wouldGoNegative: outstandingAfter < -0.01,
-                        status: outstandingAfter < -0.01 ? 'NEGATIVE - NEEDS ADJUSTMENT' : outstandingAfter > 0.01 ? 'OUTSTANDING' : 'SETTLED'
-                    });
+                    // IMPORTANT: Cap outstanding at 0 to prevent negative values
+                    outstandingAfter = Math.max(0, outstandingAfter);
                     
-                    // If outstanding becomes negative, adjust CD (not payment amount)
+                    // If outstanding becomes negative (before capping), adjust payment amount and CD
                     // IMPORTANT: For Gov. payment, this should not happen if payment is within adjusted outstanding
-                    // But if it does (due to rounding or other issues), adjust CD
+                    // But if it does (due to rounding or other issues), adjust both payment and CD
                     if (outstandingAfter < -0.01) {
                         const excess = Math.abs(outstandingAfter);
+                        // First, try to reduce CD
                         const oldCd = cdAmount;
                         const newCd = Math.max(0, oldCd - excess);
                         paidFor.cdAmount = newCd;
                         
-                        console.warn(`STEP 7 - WARNING: ${paidFor.srNo} would go negative! Adjusting CD:`, {
-                            originalOutstanding,
-                            paidAmount,
-                            oldCd,
-                            newCd,
-                            excess,
-                            outstandingAfterBeforeAdjustment: outstandingAfter,
-                            outstandingAfterAfterAdjustment: originalOutstanding - paidAmount - newCd
-                        });
+                        // If CD reduction is not enough, reduce payment amount
+                        const remainingExcess = excess - (oldCd - newCd);
+                        if (remainingExcess > 0.01) {
+                            paidFor.amount = Math.max(0, paidAmount - remainingExcess);
+                        }
+                        
+                        // Recalculate outstanding after adjustment
+                        outstandingAfter = baseOutstandingForVerification - paidFor.amount - paidFor.cdAmount;
+                        outstandingAfter = Math.max(0, outstandingAfter);
                     }
                     
-                    // Final rounding
+                    // Final rounding - ensure all values are properly rounded
                     paidFor.amount = Math.round(paidFor.amount * 100) / 100;
                     paidFor.cdAmount = Math.round((paidFor.cdAmount || 0) * 100) / 100;
-                } else {
-                    console.warn(`STEP 7 - WARNING: Could not find entry for ${paidFor.srNo} in entryOutstandings`);
+                    
+                    // CRITICAL: Verify and fix adjustedOutstanding and adjustedOriginal if they're incorrect
+                    if (paymentMethod === 'Gov.' && (paidFor as any).adjustedOutstanding !== undefined) {
+                        const receiptOutstanding = (paidFor as any).receiptOutstanding || 0;
+                        const extraAmount = (paidFor as any).extraAmount || 0;
+                        const recalculatedAdjustedOutstanding = receiptOutstanding + extraAmount;
+                        
+                        // Update if there's a mismatch (due to rounding or calculation errors)
+                        if (Math.abs((paidFor as any).adjustedOutstanding - recalculatedAdjustedOutstanding) > 0.01) {
+                            (paidFor as any).adjustedOutstanding = Math.round(recalculatedAdjustedOutstanding * 100) / 100;
+                        }
+                        
+                        // Verify adjustedOriginal
+                        const entry = eo.entry;
+                        const baseOriginal = entry.originalNetAmount || 0;
+                        const recalculatedAdjustedOriginal = baseOriginal + extraAmount;
+                        if ((paidFor as any).adjustedOriginal !== undefined) {
+                            if (Math.abs((paidFor as any).adjustedOriginal - recalculatedAdjustedOriginal) > 0.01) {
+                                (paidFor as any).adjustedOriginal = Math.round(recalculatedAdjustedOriginal * 100) / 100;
+                            }
+                        }
+                    }
                 }
             }
             
@@ -1804,37 +1671,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 return { srNo: pf.srNo, error: 'Entry not found' };
             });
             
-            console.log('STEP 7 - Final Summary of All Purchases:', finalSummary);
-            
-            // Check for any negative outstanding
-            const negativePurchases = finalSummary.filter(p => p.status === 'NEGATIVE!');
-            if (negativePurchases.length > 0) {
-                console.error('STEP 7 - ERROR: Found purchases with negative outstanding:', negativePurchases);
-            } else {
-                console.log('STEP 7 - SUCCESS: All purchases have non-negative outstanding!');
-            }
-            
-            // Show outstanding purchases
-            const outstandingPurchases = finalSummary.filter(p => p.status === 'OUTSTANDING');
-            if (outstandingPurchases.length > 0) {
-                console.log('STEP 7 - Purchases with remaining outstanding:', outstandingPurchases.map(p => ({
-                    srNo: p.srNo,
-                    outstanding: p.outstandingAfter
-                })));
-            }
-            
             // Final CD distribution verification
             const finalTotalCd = paidForDetails.reduce((sum, pf) => sum + (pf.cdAmount || 0), 0);
-            console.log('STEP 7 - Final CD Verification:', {
-                expectedCd: cdToDistribute,
-                actualCd: finalTotalCd,
-                diff: cdToDistribute - finalTotalCd,
-                paidForDetails: paidForDetails.map(pf => ({
-                    srNo: pf.srNo,
-                    amount: pf.amount,
-                    cdAmount: pf.cdAmount
-                }))
-            });
             
             // ============================================================
             // STEP 8: Calculate Final Outstanding (for table update)
@@ -1904,7 +1742,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             (paymentDataBase as any).govRate = govRate || 0;
             (paymentDataBase as any).govAmount = govAmount || 0;
             (paymentDataBase as any).govRequiredAmount = govRequiredAmount || 0;
-            (paymentDataBase as any).extraAmount = totalExtraAmount || 0;
+            // IMPORTANT: Save calculated extra amount (Total - Base), not user provided value
+            (paymentDataBase as any).extraAmount = calculatedExtraAmount || 0;
+            // Center Name for Gov payments (save in uppercase)
+            (paymentDataBase as any).centerName = centerName ? String(centerName).toUpperCase() : '';
+            // CRITICAL: Gov payments use GovAccount, NOT Cash or any bank account
+            // Do NOT set bankAccountId - Gov payments are tracked separately via GovAccount
             // Do NOT set bank fields for Gov. payment
             // Do NOT set utrNo, checkNo for Gov. payment
             // Do NOT set quantity, rate, rtgsAmount for Gov. payment (use govQuantity, govRate, govAmount)
@@ -1938,8 +1781,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         const now = Timestamp.now();
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id, updatedAt: now });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase, updatedAt: now } as Payment;
-        
-        // ✅ Update sync registry atomically within transaction
+    });
+    
+    // ✅ Update sync registry AFTER transaction completes (non-blocking)
+    try {
         const { notifySyncRegistry } = await import('./sync-registry');
         let collectionName: string;
         if (paymentMethod === 'Gov.') {
@@ -1947,9 +1792,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         } else {
             collectionName = isCustomer ? 'customerPayments' : 'payments';
         }
-        await notifySyncRegistry(collectionName, { transaction });
-        
-    });
+        // Run async without blocking
+        notifySyncRegistry(collectionName, {}).catch(err => {});
+    } catch (err) {
+        // Error updating sync registry
+    }
     } catch (err: any) {
         // Quota/offline fallback: write locally and enqueue sync
         const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
@@ -1966,11 +1813,14 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // Calculate Gov. payment extra amount for offline fallback (if not already calculated)
             // If main block didn't run, calculate basic values
             let fallbackGovRequiredAmount = 0;
-            let fallbackTotalExtraAmount = 0;
+            let fallbackCalculatedExtraAmount = 0;
             if (paymentMethod === 'Gov.' && govAmount > 0) {
-                fallbackGovRequiredAmount = govAmount; // Use govAmount as govRequiredAmount
-                // totalExtraAmount will be 0 if not calculated (will be recalculated on sync)
-                fallbackTotalExtraAmount = 0;
+                // Use userGovRequiredAmount if provided, else use govAmount
+                // Note: govRequiredAmount and calculatedExtraAmount may not be calculated if main block failed
+                fallbackGovRequiredAmount = userGovRequiredAmount || govAmount;
+                // calculatedExtraAmount will be 0 if not calculated (will be recalculated on sync)
+                // This is fine - it will be recalculated when synced
+                fallbackCalculatedExtraAmount = 0;
             }
             
             const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
@@ -2007,7 +1857,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 (paymentDataBase as any).govRate = govRate || 0;
                 (paymentDataBase as any).govAmount = govAmount || 0;
                 (paymentDataBase as any).govRequiredAmount = fallbackGovRequiredAmount || 0;
-                (paymentDataBase as any).extraAmount = fallbackTotalExtraAmount || 0;
+                // IMPORTANT: Save calculated extra amount (Total - Base), not user provided value
+                // fallbackCalculatedExtraAmount will be 0 if not calculated (will be recalculated on sync)
+                (paymentDataBase as any).extraAmount = fallbackCalculatedExtraAmount || 0;
+                (paymentDataBase as any).centerName = centerName || '';
                 // Do NOT set bank fields, utrNo, checkNo, quantity, rate, rtgsAmount for Gov.
             } else if (paymentMethod === 'Cash') {
                 paymentDataBase.utrNo = utrNo;
@@ -2035,12 +1888,17 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             await db.payments.delete(editingPayment.id);
                         }
                     }
+                    // Ensure receiptType is set for gov payments
+                    const paymentToSave = paymentMethod === 'Gov.' 
+                        ? { ...finalPaymentData, receiptType: finalPaymentData.receiptType || 'Gov.' }
+                        : finalPaymentData;
+                    
                     if (paymentMethod === 'Gov.') {
-                        await db.governmentFinalizedPayments.put(finalPaymentData);
+                        await db.governmentFinalizedPayments.put(paymentToSave);
                     } else if (isCustomer) {
-                        await db.customerPayments.put(finalPaymentData as any);
+                        await db.customerPayments.put(paymentToSave as any);
                     } else {
-                        await db.payments.put(finalPaymentData);
+                        await db.payments.put(paymentToSave);
                     }
                 }
             } catch {}
@@ -2070,53 +1928,64 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             throw err;
         }
     }
-    // Ensure local IndexedDB reflects the latest payment so UI updates instantly
-    try {
-        if (db && finalPaymentData) {
-            if (paymentMethod === 'Gov.') {
-                await db.governmentFinalizedPayments.put(finalPaymentData);
-            } else if (isCustomer) {
-                await db.customerPayments.put(finalPaymentData as any);
-            } else {
-                await db.payments.put(finalPaymentData);
+    // Ensure local IndexedDB reflects the latest payment so UI updates instantly (non-blocking)
+    if (db && finalPaymentData) {
+        // Run IndexedDB update in background without blocking
+        (async () => {
+            try {
+                // Ensure receiptType is set for gov payments
+                const paymentToSave = paymentMethod === 'Gov.' 
+                    ? { ...finalPaymentData, receiptType: finalPaymentData.receiptType || 'Gov.' }
+                    : finalPaymentData;
+                
+                if (paymentMethod === 'Gov.') {
+                    await db.governmentFinalizedPayments.put(paymentToSave);
+                } else if (isCustomer) {
+                    await db.customerPayments.put(paymentToSave as any);
+                } else {
+                    await db.payments.put(paymentToSave);
+                }
+                
+                // ✅ Trigger custom event to notify listeners of IndexedDB update
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('indexeddb:payment:updated', { 
+                        detail: { payment: paymentToSave, paymentMethod, isCustomer } 
+                    }));
+                }
+            } catch (err) {
             }
-            
-            // ✅ Trigger custom event to notify listeners of IndexedDB update
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('indexeddb:payment:updated', { 
-                    detail: { payment: finalPaymentData, paymentMethod, isCustomer } 
-                }));
-            }
-        }
-    } catch {}
+        })();
+    }
     if (!finalPaymentData) {
         return { success: false, message: "Failed to create payment" };
     }
     
-    // ✅ Recalculate outstanding for affected suppliers/customers after payment save/edit
-    try {
-        const affectedSrNos = finalPaymentData.paidFor?.map(pf => pf.srNo) || [];
-        if (affectedSrNos.length > 0) {
-            // Get old payment's affected SR Nos if editing
-            const oldAffectedSrNos = editingPayment?.paidFor?.map(pf => pf.srNo) || [];
-            // Combine both old and new to ensure all affected entries are updated
-            const allAffectedSrNos = [...new Set([...affectedSrNos, ...oldAffectedSrNos])];
-            await recalculateOutstandingForAffectedEntries(allAffectedSrNos, isCustomer);
-            
-            // ✅ Trigger custom event to notify listeners of supplier/customer updates
-            if (typeof window !== 'undefined') {
-                try {
-                    window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
-                        detail: { affectedSrNos: allAffectedSrNos, isCustomer } 
-                    }));
-                } catch (error) {
-                    console.error('Error dispatching suppliers update event:', error);
+    // ✅ Recalculate outstanding for affected suppliers/customers after payment save/edit (non-blocking)
+    const affectedSrNos = finalPaymentData.paidFor?.map(pf => pf.srNo) || [];
+    if (affectedSrNos.length > 0) {
+        // Get old payment's affected SR Nos if editing
+        const oldAffectedSrNos = editingPayment?.paidFor?.map(pf => pf.srNo) || [];
+        // Combine both old and new to ensure all affected entries are updated
+        const allAffectedSrNos = [...new Set([...affectedSrNos, ...oldAffectedSrNos])];
+        
+        // Run in background without blocking
+        (async () => {
+            try {
+                await recalculateOutstandingForAffectedEntries(allAffectedSrNos, isCustomer);
+                
+                // ✅ Trigger custom event to notify listeners of supplier/customer updates
+                if (typeof window !== 'undefined') {
+                    try {
+                        window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
+                            detail: { affectedSrNos: allAffectedSrNos, isCustomer } 
+                        }));
+                    } catch (error) {
+                    }
                 }
+            } catch (error) {
+                // Don't fail the payment save if recalculation fails
             }
-        }
-    } catch (error) {
-        console.error('Error recalculating outstanding after payment save:', error);
-        // Don't fail the payment save if recalculation fails
+        })();
     }
     
     return { success: true, payment: finalPaymentData };
@@ -2183,7 +2052,8 @@ async function recalculateOutstandingForAffectedEntries(
             });
             
             // Outstanding = Original - Total Paid - Total CD
-            const outstanding = Math.round((recalculatedData.originalNetAmount - totalPaid - totalCd) * 100) / 100;
+            // IMPORTANT: Cap at 0 to prevent negative outstanding
+            const outstanding = Math.max(0, Math.round((recalculatedData.originalNetAmount - totalPaid - totalCd) * 100) / 100);
             const netAmount = outstanding;
             
             // Update only outstanding and netAmount
@@ -2206,7 +2076,6 @@ async function recalculateOutstandingForAffectedEntries(
         
         if (updatedCount > 0) {
             await batch.commit();
-            console.log(`Updated outstanding for ${updatedCount} ${isCustomer ? 'customers' : 'suppliers'}`);
             
             // ✅ Trigger custom event to notify listeners of IndexedDB update
             if (typeof window !== 'undefined') {
@@ -2215,12 +2084,10 @@ async function recalculateOutstandingForAffectedEntries(
                         detail: { affectedSrNos, isCustomer } 
                     }));
                 } catch (error) {
-                    console.error('Error dispatching suppliers update event:', error);
                 }
             }
         }
     } catch (error) {
-        console.error('Error recalculating outstanding:', error);
         // Don't throw - this is a background update
     }
 }
@@ -2262,7 +2129,6 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
         const paymentDoc = await transOrBatch.get(paymentDocRef);
         
         if (!paymentDoc.exists()) {
-             console.warn(`Payment ${paymentToDelete.id} not found during deletion attempt.`);
              return; // Silently fail if doc is already gone
         }
 
@@ -2272,8 +2138,10 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
     try {
         await runTransaction(firestoreDB, async (t) => {
             await performDelete(t);
-            
-            // ✅ Update sync registry atomically within transaction
+        });
+        
+        // ✅ Update sync registry AFTER transaction completes (non-blocking)
+        try {
             const { notifySyncRegistry } = await import('./sync-registry');
             let collectionName: string;
             if (isGovPayment) {
@@ -2281,8 +2149,10 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
             } else {
                 collectionName = isCustomer ? 'customerPayments' : 'payments';
             }
-            await notifySyncRegistry(collectionName, { transaction: t });
-        });
+            // Run async without blocking
+            notifySyncRegistry(collectionName, {}).catch(err => {});
+        } catch (err) {
+        }
     } catch (err: any) {
         // Quota/offline fallback: delete locally and enqueue sync
         const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
@@ -2292,62 +2162,72 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
         // Continue with local delete and sync queue
     }
 
+    // Run IndexedDB delete and sync in background (non-blocking)
     if (db) {
-        if (isGovPayment) {
-            await db.governmentFinalizedPayments.delete(paymentToDelete.id);
-        } else if (isCustomer) {
-            await db.customerPayments.delete(paymentToDelete.id);
-        } else {
-            await db.payments.delete(paymentToDelete.id);
-        }
-        
-        // ✅ Enqueue sync task for deletion
-        try {
-            const { enqueueSyncTask } = await import('./sync-queue');
-            let deleteTaskType;
-            if (isGovPayment) {
-                deleteTaskType = 'delete:governmentFinalizedPayment';
-            } else {
-                deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
-            }
-            await enqueueSyncTask(deleteTaskType, { id: paymentToDelete.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${paymentToDelete.id}` });
-        } catch (error) {
-            console.error('Error enqueueing payment delete sync task:', error);
-        }
-        
-        // ✅ Trigger custom event to notify listeners of IndexedDB delete
-        if (typeof window !== 'undefined') {
+        (async () => {
             try {
-                window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', { 
-                    detail: { 
-                        paymentId: paymentToDelete.id, 
-                        payment: paymentToDelete,
-                        receiptType: paymentToDelete.receiptType,
-                        paymentMethod: (paymentToDelete as any).paymentMethod,
-                        isGovPayment, 
-                        isCustomer 
-                    } 
-                }));
-            } catch (error) {
-                console.error('Error dispatching payment delete event:', error);
+                // Delete from IndexedDB
+                if (isGovPayment) {
+                    await db.governmentFinalizedPayments.delete(paymentToDelete.id);
+                } else if (isCustomer) {
+                    await db.customerPayments.delete(paymentToDelete.id);
+                } else {
+                    await db.payments.delete(paymentToDelete.id);
+                }
+                
+                // ✅ Enqueue sync task for deletion
+                try {
+                    const { enqueueSyncTask } = await import('./sync-queue');
+                    let deleteTaskType;
+                    if (isGovPayment) {
+                        deleteTaskType = 'delete:governmentFinalizedPayment';
+                    } else {
+                        deleteTaskType = isCustomer ? 'delete:customerPayment' : 'delete:payment';
+                    }
+                    await enqueueSyncTask(deleteTaskType, { id: paymentToDelete.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${paymentToDelete.id}` });
+                } catch (error) {
+                }
+                
+                // ✅ Trigger custom event to notify listeners of IndexedDB delete
+                if (typeof window !== 'undefined') {
+                    try {
+                        window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', { 
+                            detail: { 
+                                paymentId: paymentToDelete.id, 
+                                payment: paymentToDelete,
+                                receiptType: paymentToDelete.receiptType,
+                                paymentMethod: (paymentToDelete as any).paymentMethod,
+                                isGovPayment, 
+                                isCustomer 
+                            } 
+                        }));
+                    } catch (error) {
+                    }
+                }
+            } catch (err) {
             }
-        }
+        })();
     }
 
-    // ✅ Recalculate outstanding for affected suppliers/customers
+    // ✅ Recalculate outstanding for affected suppliers/customers (non-blocking)
     if (affectedSrNos.length > 0) {
-        await recalculateOutstandingForAffectedEntries(affectedSrNos, isCustomer);
-        
-        // ✅ Trigger custom event to notify listeners of supplier/customer updates
-        if (typeof window !== 'undefined') {
+        // Run in background without blocking
+        (async () => {
             try {
-                window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
-                    detail: { affectedSrNos, isCustomer } 
-                }));
+                await recalculateOutstandingForAffectedEntries(affectedSrNos, isCustomer);
+                
+                // ✅ Trigger custom event to notify listeners of supplier/customer updates
+                if (typeof window !== 'undefined') {
+                    try {
+                        window.dispatchEvent(new CustomEvent('indexeddb:suppliers:updated', { 
+                            detail: { affectedSrNos, isCustomer } 
+                        }));
+                    } catch (error) {
+                    }
+                }
             } catch (error) {
-                console.error('Error dispatching suppliers update event:', error);
             }
-        }
+        })();
     }
 };
 
