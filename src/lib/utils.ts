@@ -260,7 +260,32 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     
     // ✅ Calculate KRTA (same logic as supplier)
     const kartaPercentage = values.kartaPercentage || 0;
-    const rate = values.rate || 0;
+    let rate = values.rate || 0;
+    
+    // ✅ RICE BRAN special rate calculation
+    const variety = (values.variety || '').toUpperCase().trim();
+    const isRiceBran = variety === 'RICE BRAN';
+    let calculatedRate = rate;
+    
+    if (isRiceBran) {
+        const baseReport = Number((values as any).baseReport || 0);
+        const collectedReport = Number((values as any).collectedReport || 0);
+        const riceBranGst = Number((values as any).riceBranGst || 0);
+        
+        if (baseReport > 0 && collectedReport > 0) {
+            // Step 1: Calculate intermediate rate: (rate / baseReport) * collectedReport
+            const intermediateRate = (rate / baseReport) * collectedReport;
+            // Step 2: Apply GST percentage: intermediateRate * (1 + GST/100)
+            // Keep full precision with 2 decimal places (paise)
+            const fullRate = intermediateRate * (1 + riceBranGst / 100);
+            // Round to 2 decimal places properly
+            calculatedRate = Number(fullRate.toFixed(2)); // Keep 2 decimal places (paise)
+        }
+        // If baseReport or collectedReport is 0, use original rate
+    }
+    
+    // Use calculated rate for all calculations
+    const effectiveRate = isRiceBran ? calculatedRate : rate;
     
     const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
     const rawKartaWeight = weight * kartaPercentage / 100;
@@ -274,7 +299,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
     }
 
-    const kartaAmount = Math.round(kartaWeight * rate);
+    const kartaAmount = Math.round(kartaWeight * effectiveRate);
     
     const bags = Number(values.bags) || 0;
     const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
@@ -283,10 +308,10 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     // ✅ Net weight = weight - kartaWeight - bagWeight (like supplier: weight - kartaWeight)
     const netWeight = weight - kartaWeight - totalBagWeightQuintals;
     
-    const amount = Math.round(weight * rate); // Amount calculated on final weight (before karta and bags)
+    const amount = Math.round(weight * effectiveRate); // Amount calculated on final weight (before karta and bags) using effective rate
     
     // ✅ Calculate Bag Weight Deduction: Bag Weight (QTL) × Rate
-    const bagWeightDeductionAmount = Math.round(totalBagWeightQuintals * rate);
+    const bagWeightDeductionAmount = Math.round(totalBagWeightQuintals * effectiveRate);
     
     const brokerageRate = Number(values.brokerage || values.brokerageRate) || 0;
     const brokerageAmount = Math.round(weight * brokerageRate); // Brokerage on final weight
@@ -309,14 +334,31 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const transportationRate = Number((values as any).transportationRate || 0);
     const transportAmount = Math.round(weight * transportationRate);
 
-    // ✅ Original net amount = amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount
-    // Net Receivable = Amount - Karta - Bag Wt Deduction + Bag Amount - CD - Transport
-    let originalNetAmount = Math.round(amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount);
-    // Brokerage logic: Include = Add, Exclude = Subtract
-    if (values.isBrokerageIncluded) {
-        originalNetAmount += brokerageAmount; // Add when included
+    // ✅ For RICE BRAN: Calculate Net Receivable using Net Weight × Calculated Rate
+    // For others: Use existing formula
+    let originalNetAmount;
+    if (isRiceBran && calculatedRate) {
+        // Keep net weight to 2 decimal places, then multiply with calculated rate
+        const roundedNetWeight = Math.round(netWeight * 100) / 100; // Round to 2 decimal places
+        // Net Receivable = (Net Weight × Calculated Rate) + Bag Amount - CD - Transport - Brokerage
+        const netWeightAmount = roundedNetWeight * calculatedRate; // Use calculated rate with paise
+        originalNetAmount = Math.round(netWeightAmount + bagAmount - finalCdAmount - transportAmount);
+        // Brokerage logic: Include = Add, Exclude = Subtract
+        if (values.isBrokerageIncluded) {
+            originalNetAmount += brokerageAmount; // Add when included
+        } else {
+            originalNetAmount -= brokerageAmount; // Subtract when excluded
+        }
     } else {
-        originalNetAmount -= brokerageAmount; // Subtract when excluded
+        // ✅ Original net amount = amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount
+        // Net Receivable = Amount - Karta - Bag Wt Deduction + Bag Amount - CD - Transport
+        originalNetAmount = Math.round(amount - kartaAmount - bagWeightDeductionAmount + bagAmount - finalCdAmount - transportAmount);
+        // Brokerage logic: Include = Add, Exclude = Subtract
+        if (values.isBrokerageIncluded) {
+            originalNetAmount += brokerageAmount; // Add when included
+        } else {
+            originalNetAmount -= brokerageAmount; // Subtract when excluded
+        }
     }
 
     const paymentsForThisEntry = (paymentHistory || []).filter((p: any) => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));
@@ -350,6 +392,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         transportAmount: transportAmount, // Transport Amount = Transportation Rate × Final Weight
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
+        calculatedRate: isRiceBran ? calculatedRate : undefined, // Store calculated rate for RICE BRAN
     }
 };
 

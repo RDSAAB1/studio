@@ -165,7 +165,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     // Use useWatch to efficiently watch multiple fields at once (single subscription)
     const watchedValues = useWatch({
         control: form.control,
-        name: ['grossWeight', 'teirWeight', 'bags', 'bagWeightKg', 'rate', 'kartaPercentage', 'netWeight', 'brokerage', 'cd', 'cdAmount', 'bagRate', 'transportationRate', 'taxRate', 'isGstIncluded']
+        name: ['grossWeight', 'teirWeight', 'bags', 'bagWeightKg', 'rate', 'kartaPercentage', 'netWeight', 'brokerage', 'cd', 'cdAmount', 'bagRate', 'transportationRate', 'taxRate', 'isGstIncluded', 'variety', 'baseReport', 'collectedReport', 'riceBranGst']
     });
 
     const [
@@ -182,14 +182,21 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         bagRate,
         transportationRate,
         taxRate,
-        isGstIncluded
+        isGstIncluded,
+        variety,
+        baseReport,
+        collectedReport,
+        riceBranGst
     ] = watchedValues;
+    
+    // Check if RICE BRAN is selected
+    const isRiceBran = (variety || '').toUpperCase().trim() === 'RICE BRAN';
 
     // Calculate values for display
     const calculated = useMemo(() => {
         const formValues = form.getValues();
         return calculateCustomerEntry(formValues, []);
-    }, [grossWeight, teirWeight, bags, bagWeightKg, rate, kartaPercentage, netWeight, brokerage, cd, cdAmount, bagRate, transportationRate, form]);
+    }, [grossWeight, teirWeight, bags, bagWeightKg, rate, kartaPercentage, netWeight, brokerage, cd, cdAmount, bagRate, transportationRate, variety, baseReport, collectedReport, riceBranGst, form]);
 
     // Handle CD input mode change and auto-calculate
     useEffect(() => {
@@ -221,6 +228,31 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             }
         }
     }, [cd, cdInputMode, calculated.amount, form]);
+
+    // Set default values when RICE BRAN is selected
+    useEffect(() => {
+        if (isRiceBran) {
+            // Use setTimeout to ensure form values are updated after reset
+            const timer = setTimeout(() => {
+                const currentBaseReport = form.getValues('baseReport');
+                const currentRiceBranGst = form.getValues('riceBranGst');
+                const currentBagWeightKg = form.getValues('bagWeightKg');
+                
+                // Set defaults if fields are empty/zero/undefined/null
+                if (!currentBaseReport || currentBaseReport === 0) {
+                    form.setValue('baseReport', 15, { shouldValidate: false, shouldDirty: false });
+                }
+                if (!currentRiceBranGst || currentRiceBranGst === 0) {
+                    form.setValue('riceBranGst', 5, { shouldValidate: false, shouldDirty: false });
+                }
+                if (!currentBagWeightKg || currentBagWeightKg === 0) {
+                    form.setValue('bagWeightKg', 0.2, { shouldValidate: false, shouldDirty: false });
+                }
+            }, 50);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isRiceBran, form]);
 
     // Calculate tax amounts
     const taxCalculations = useMemo(() => {
@@ -320,6 +352,70 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </InputWithIcon>
                             </div>
                         </div>
+                        {/* RICE BRAN specific fields */}
+                        {isRiceBran && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-2 border-t border-border/50">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="baseReport" className="text-xs">Base Report</Label>
+                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="baseReport" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="baseReport" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0}
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                                placeholder="0.00"
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="collectedReport" className="text-xs">Collected Report</Label>
+                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="collectedReport" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="collectedReport" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0}
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                                placeholder="0.00"
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="riceBranGst" className="text-xs">GST %</Label>
+                                    <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="riceBranGst" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="riceBranGst" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0}
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                                placeholder="0.00"
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                </div>
+                                {calculated.calculatedRate !== undefined && (
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs text-muted-foreground">Calculated Rate</Label>
+                                        <div className="h-7 flex items-center pl-9 text-xs font-semibold text-primary">
+                                            ₹{Number(calculated.calculatedRate).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

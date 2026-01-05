@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw, X } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
@@ -33,6 +33,7 @@ interface CalculatedSummaryProps {
     onDeleteSelected?: () => void;
     onDeleteAll?: () => void;
     isDeleting?: boolean;
+    onClear?: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -70,7 +71,8 @@ export const CalculatedSummary = ({
     onUpdateSelected,
     onDeleteSelected,
     onDeleteAll,
-    isDeleting = false
+    isDeleting = false,
+    onClear
 }: CalculatedSummaryProps) => {
 
     // Only disable during delete operations, not during save/update (optimistic updates)
@@ -275,6 +277,12 @@ export const CalculatedSummary = ({
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>)}
                         </Button>
+
+                        {onClear && (
+                            <Button onClick={onClear} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
+                                <X className="mr-2 h-4 w-4" /> Clear
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardContent>

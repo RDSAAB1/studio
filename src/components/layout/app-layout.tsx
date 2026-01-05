@@ -296,10 +296,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         // Has query params - navigate to update them
         setActiveTabId(menuItem.id);
         startTransition(() => {
-          try {
-            router.push(targetPath, { scroll: false });
-          } catch (error) {
-            window.location.href = targetPath;
+          if (typeof window !== 'undefined') {
+            try {
+              router.push(targetPath);
+            } catch (error) {
+              window.location.href = targetPath;
+            }
           }
         });
         return;
@@ -323,16 +325,19 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           return;
         }
         
-        // Use router.push - Next.js 15 returns void
-        router.push(targetPath);
-      } catch (err) {
-        // As a resilience fallback (e.g., dev server hiccup), force a hard navigation
-        try {
-          if (typeof window !== 'undefined') {
+        // Use router.push for Next.js 15 (returns void, not a promise)
+        if (typeof window !== 'undefined') {
+          try {
+            router.push(targetPath);
+          } catch (err) {
+            // As a resilience fallback, force a hard navigation
             window.location.href = targetPath;
           }
-        } catch (_) {
-          // noop
+        }
+      } catch (err) {
+        // Synchronous error fallback
+        if (typeof window !== 'undefined') {
+          window.location.href = targetPath;
         }
       }
     });
@@ -380,41 +385,44 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   };
 
   const handleOpenTab = (menuItem: MenuItem) => {
-    // Find the parent menu item from allMenuItems
-    const parentMenuItem = allMenuItems.find(item => item.id === menuItem.id) || 
-                          allMenuItems.find(item => item.subMenus?.some(sub => sub.id === menuItem.id));
+    // Find the menu item from allMenuItems
+    const foundMenuItem = allMenuItems.find(item => item.id === menuItem.id);
     
     // If clicked item is a sub-menu, find its parent
-    let targetMenu: MenuItem | undefined;
-    if (parentMenuItem && parentMenuItem.id === menuItem.id) {
-      // Clicked on parent menu itself
-      targetMenu = parentMenuItem;
-    } else {
-      // Clicked on sub-menu item - find parent
-      targetMenu = allMenuItems.find(item => item.subMenus?.some(sub => sub.id === menuItem.id));
-      if (targetMenu) {
-        // Use the sub-menu item that was clicked
-        const clickedSubItem = targetMenu.subMenus?.find(sub => sub.id === menuItem.id);
-        if (clickedSubItem) {
-          // Clear all tabs and show only this menu's sub-menus
-          const allSubMenus = targetMenu.subMenus || [];
-          setOpenTabs(allSubMenus);
-          setActiveTabId(menuItem.id);
-          const path = clickedSubItem.href || menuItem.href || `/${menuItem.id}`;
-          startTransition(() => {
-            try {
-              router.push(path);
-            } catch {
-              try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
+    const parentWithSubMenu = allMenuItems.find(item => item.subMenus?.some(sub => sub.id === menuItem.id));
+    
+    if (parentWithSubMenu && !foundMenuItem) {
+      // Clicked on sub-menu item - navigate to that sub-menu
+      const clickedSubItem = parentWithSubMenu.subMenus?.find(sub => sub.id === menuItem.id);
+      if (clickedSubItem) {
+        // Clear all tabs and show only this menu's sub-menus
+        const allSubMenus = parentWithSubMenu.subMenus || [];
+        setOpenTabs(allSubMenus);
+        setActiveTabId(menuItem.id);
+        const path = clickedSubItem.href || menuItem.href || `/${menuItem.id}`;
+        startTransition(() => {
+          if (typeof window !== 'undefined') {
+            // For cash-bank route, use window.location
+            if (path.includes('/cash-bank')) {
+              window.location.href = path;
+            } else {
+              try {
+                router.push(path);
+              } catch (error) {
+                window.location.href = path;
+              }
             }
-          });
-          return;
-        }
+          }
+        });
+        return;
       }
     }
     
+    // Use the found menu item or the passed menuItem
+    const targetMenu = foundMenuItem || menuItem;
+    
     // If parent menu has subMenus, show all subMenus as tabs
-    if (targetMenu && targetMenu.subMenus && targetMenu.subMenus.length > 0) {
+    if (targetMenu.subMenus && targetMenu.subMenus.length > 0) {
       // Clear all existing tabs and set only this menu's sub-menus
       setOpenTabs(targetMenu.subMenus);
       // Set first sub-menu as active
@@ -422,27 +430,45 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       setActiveTabId(firstSubMenu.id);
       const path = firstSubMenu.href || `/${firstSubMenu.id}`;
       startTransition(() => {
-        try {
-          router.push(path);
-        } catch {
-          try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
+        if (typeof window !== 'undefined') {
+          if (path.includes('/cash-bank')) {
+            window.location.href = path;
+          } else {
+            try {
+              router.push(path);
+            } catch (error) {
+              window.location.href = path;
+            }
+          }
         }
       });
       return;
     }
     
     // If no subMenus, clear all tabs and show only this menu item
-    setOpenTabs([menuItem]);
-    setActiveTabId(menuItem.id);
+    setOpenTabs([targetMenu]);
+    setActiveTabId(targetMenu.id);
     // Use href if available, otherwise construct from id
-    const path = menuItem.href 
-      ? menuItem.href 
-      : (menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`);
+    const path = targetMenu.href 
+      ? targetMenu.href 
+      : (targetMenu.id === 'dashboard-overview' ? '/' : `/${targetMenu.id}`);
+    
     startTransition(() => {
-      try {
-        router.push(path);
-      } catch {
-        try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
+      if (typeof window !== 'undefined') {
+        // For cash-bank route, always use window.location to avoid prefetch errors
+        if (targetMenu.id === 'cash-bank' || path.includes('/cash-bank')) {
+          console.log('Navigating to cash-bank via window.location:', path);
+          window.location.href = path;
+        } else {
+          // For other routes, use Next.js router
+          try {
+            router.push(path);
+          } catch (error) {
+            console.warn('Router.push failed, using window.location:', error);
+            // Fallback to window.location if router fails
+            window.location.href = path;
+          }
+        }
       }
     });
   };

@@ -370,15 +370,52 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-0 p-0">
-                <div className="lg:col-span-2 order-2 lg:order-1 h-[90vh]">
-                    <ScrollArea className="h-full">
-                        <div id="document-content" className="p-4 sm:p-6">
+            <DialogContent className="max-w-7xl w-[95vw] grid grid-cols-1 lg:grid-cols-3 gap-0 p-0 bg-background overflow-hidden" style={{ maxHeight: '95vh' }}>
+                <div className="lg:col-span-2 order-2 lg:order-1 h-[90vh] bg-white overflow-auto border-r border-border" style={{ backgroundColor: '#ffffff' }}>
+                    <ScrollArea className="h-full w-full">
+                        <div id="document-content" className="p-4 sm:p-6 bg-white min-h-full" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+                            <style>{`
+                                #document-content p,
+                                #document-content span,
+                                #document-content div,
+                                #document-content td,
+                                #document-content th:not(.table-header-cell),
+                                #document-content h1,
+                                #document-content h2,
+                                #document-content h3,
+                                #document-content h4,
+                                #document-content li {
+                                    color: #000000 !important;
+                                }
+                                #document-content .table-header,
+                                #document-content .table-header *,
+                                #document-content .table-header th,
+                                #document-content .table-header-cell,
+                                #document-content thead,
+                                #document-content thead *,
+                                #document-content thead th {
+                                    color: #000000 !important;
+                                    font-weight: 700 !important;
+                                }
+                                #document-content .bg-gray-800,
+                                #document-content .bg-gray-800 *,
+                                #document-content .bg-gray-800 span,
+                                #document-content .print-bg-gray-800,
+                                #document-content .print-bg-gray-800 *,
+                                #document-content .print-bg-gray-800 span,
+                                #document-content .balance-due-section,
+                                #document-content .balance-due-section *,
+                                #document-content .balance-due-section span,
+                                #document-content .balance-due-text,
+                                #document-content span.balance-due-text {
+                                    color: #ffffff !important;
+                                }
+                            `}</style>
                            {renderDocument()}
                         </div>
                     </ScrollArea>
                 </div>
-                <div className="lg:col-span-1 order-1 lg:order-2 bg-muted/30 p-4 sm:p-6 border-l flex flex-col h-[90vh]">
+                <div className="lg:col-span-1 order-1 lg:order-2 bg-card border-l border-border p-4 sm:p-6 flex flex-col h-[90vh]">
                      <DialogHeader className="mb-4 flex-shrink-0">
                          <div className="flex items-center justify-between">
                              <DialogTitle>Edit Invoice Details</DialogTitle>

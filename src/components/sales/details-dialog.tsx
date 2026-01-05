@@ -220,7 +220,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                     <table className="w-full text-xs">
                                         <tbody>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(Number(customer.rate) || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {(customer.variety?.toUpperCase().trim() === 'RICE BRAN' && (customer as any).calculatedRate) ? `₹${Number((customer as any).calculatedRate).toFixed(2)}` : formatCurrency(Number(customer.rate) || 0)}</td></tr>
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(Number(customer.amount) || 0)}</td></tr>
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.labouryAmount) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}

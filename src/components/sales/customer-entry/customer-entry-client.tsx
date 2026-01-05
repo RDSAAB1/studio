@@ -70,6 +70,9 @@ export const formSchema = z.object({
     grDate: z.string().optional(),
     transport: z.string().optional(),
     transportationRate: z.coerce.number().min(0).default(0),
+    baseReport: z.coerce.number().min(0).optional(),
+    collectedReport: z.coerce.number().min(0).optional(),
+    riceBranGst: z.coerce.number().min(0).optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -78,16 +81,23 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dateStr = formatDateLocal(today);
+  
+  // Set default values for RICE BRAN
+  const isRiceBran = (lastVariety || '').toUpperCase().trim() === 'RICE BRAN';
+  const defaultBaseReport = isRiceBran ? 15 : 0;
+  const defaultRiceBranGst = isRiceBran ? 5 : 0;
+  const defaultBagWeightKg = isRiceBran ? 0.2 : 0;
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
     name: '', companyName: '', address: '', contact: '', gstin: '', stateName: '', stateCode: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
+    weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: defaultBagWeightKg, bagRate: 0, bagAmount: 0,
     brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
     transportationRate: 0, transportAmount: 0, cdAmount: 0,
+    baseReport: defaultBaseReport, collectedReport: 0, riceBranGst: defaultRiceBranGst, calculatedRate: 0,
   };
 };
 
@@ -367,6 +377,9 @@ export default function CustomerEntryClient() {
       stateCode: customerState.stateCode || '',
       shippingStateName: customerState.shippingStateName || '',
       shippingStateCode: customerState.shippingStateCode || '',
+      baseReport: customerState.baseReport || 0,
+      collectedReport: customerState.collectedReport || 0,
+      riceBranGst: customerState.riceBranGst || 0,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -377,8 +390,12 @@ export default function CustomerEntryClient() {
     setIsEditing(false);
     let nextSrNum = 1;
     if (safeCustomers.length > 0) {
-        const lastSrNo = safeCustomers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'C00000';
-        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+        // Find highest SR No (same logic as executeSubmit)
+        const maxSrNo = safeCustomers.reduce((max, c) => {
+            const num = parseInt(c.srNo.substring(1)) || 0;
+            return num > max ? num : max;
+        }, 0);
+        nextSrNum = maxSrNo + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
@@ -391,14 +408,40 @@ export default function CustomerEntryClient() {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('customer-entry-form-state');
     }
-    setTimeout(() => form.setFocus('srNo'), 50);
+    
+    // Set default values for RICE BRAN after form reset
+    setTimeout(() => {
+        const currentVariety = form.getValues('variety') || lastVariety || '';
+        const isRiceBran = currentVariety.toUpperCase().trim() === 'RICE BRAN';
+        
+        if (isRiceBran) {
+            form.setValue('baseReport', 15, { shouldValidate: false, shouldDirty: false });
+            form.setValue('riceBranGst', 5, { shouldValidate: false, shouldDirty: false });
+            form.setValue('bagWeightKg', 0.2, { shouldValidate: false, shouldDirty: false });
+        }
+        
+        form.setFocus('srNo');
+    }, 100);
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
+    // Skip processing if it's the placeholder 'C----' or empty
+    if (formattedSrNo === 'C----' || formattedSrNo === '' || formattedSrNo === 'C') {
+        return;
+    }
+    // If it's just a number, format it
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
         formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'C');
         form.setValue('srNo', formattedSrNo);
+    }
+    // If it already starts with 'C' and has numbers, use it as is
+    else if (formattedSrNo.startsWith('C') && formattedSrNo.length > 1) {
+        const numPart = formattedSrNo.substring(1);
+        if (!isNaN(parseInt(numPart)) && isFinite(Number(numPart))) {
+            // Already formatted, just use it
+            form.setValue('srNo', formattedSrNo);
+        }
     }
     const foundCustomer = safeCustomers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
@@ -581,7 +624,11 @@ export default function CustomerEntryClient() {
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
-        receiptType: 'Cash'
+        receiptType: 'Cash',
+        baseReport: formValues.baseReport || 0,
+        collectedReport: formValues.collectedReport || 0,
+        riceBranGst: formValues.riceBranGst || 0,
+        calculatedRate: (currentCustomer as any).calculatedRate || undefined, // Store calculated rate for RICE BRAN
     };
     
     try {
@@ -1280,6 +1327,160 @@ export default function CustomerEntryClient() {
     };
   }, [handleKeyboardShortcuts]);
 
+  // Global Enter key handler to work as Tab everywhere
+  useEffect(() => {
+    const handleGlobalEnterKey = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        const activeElement = document.activeElement as HTMLElement;
+        
+        // Skip if it's inside a dialog, menu, or command palette
+        if (activeElement.closest('[role="dialog"]') || 
+            activeElement.closest('[role="menu"]') || 
+            activeElement.closest('[cmdk-root]')) {
+          return;
+        }
+        
+        // Skip if dropdown is open
+        if (activeElement.closest('[data-state="open"]')) {
+          return;
+        }
+        
+        // Skip submit buttons
+        if (activeElement.tagName === 'BUTTON' && (activeElement as HTMLButtonElement).type === 'submit') {
+          return;
+        }
+        
+        // Skip if it's a form element (form-level handler will take care of it)
+        if (activeElement.closest('form')) {
+          return;
+        }
+        
+        // For non-form elements, find next focusable element
+        const allFocusable = Array.from(document.querySelectorAll(
+          'input:not([type="hidden"]):not([disabled]):not([readonly]), ' +
+          'textarea:not([disabled]):not([readonly]), ' +
+          'select:not([disabled]), ' +
+          'button:not([disabled]):not([type="submit"]), ' +
+          '[tabindex]:not([tabindex="-1"])'
+        )).filter(el => {
+          const element = el as HTMLElement;
+          return element.offsetParent !== null && 
+                 !element.hasAttribute('disabled') &&
+                 !element.closest('[role="dialog"]') &&
+                 !element.closest('[role="menu"]');
+        }) as HTMLElement[];
+        
+        const currentIndex = allFocusable.findIndex(el => el === activeElement || el.contains(activeElement));
+        if (currentIndex > -1 && currentIndex < allFocusable.length - 1) {
+          event.preventDefault();
+          event.stopPropagation();
+          allFocusable[currentIndex + 1].focus();
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleGlobalEnterKey, true);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalEnterKey, true);
+    };
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      const activeElement = document.activeElement as HTMLElement;
+      
+      // Skip if it's inside a dialog, menu, or command palette
+      if (activeElement.closest('[role="dialog"]') || 
+          activeElement.closest('[role="menu"]') || 
+          activeElement.closest('[cmdk-root]')) {
+        return;
+      }
+      
+      // Skip if dropdown is open (let it handle its own Enter key)
+      if (activeElement.closest('[role="combobox"]') && activeElement.closest('[data-state="open"]')) {
+        return;
+      }
+      
+      // For buttons, only skip if it's a submit button
+      if (activeElement.tagName === 'BUTTON') {
+        const button = activeElement as HTMLButtonElement;
+        if (button.type === 'submit') {
+          return;
+        }
+      }
+      
+      // Prevent form submission and stop propagation
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const formEl = e.currentTarget;
+      
+      // Get all focusable elements in the form using tab order
+      const getAllFocusableElements = (): HTMLElement[] => {
+        const selectors = [
+          'input:not([type="hidden"]):not([disabled]):not([readonly])',
+          'textarea:not([disabled]):not([readonly])',
+          'select:not([disabled])',
+          'button:not([disabled]):not([type="submit"])',
+          '[tabindex]:not([tabindex="-1"])',
+          '[contenteditable="true"]'
+        ].join(', ');
+        
+        return Array.from(formEl.querySelectorAll(selectors)).filter(el => {
+          const element = el as HTMLElement;
+          return element.offsetParent !== null && 
+                 !element.hasAttribute('disabled') &&
+                 !element.closest('[role="dialog"]') &&
+                 !element.closest('[role="menu"]') &&
+                 !element.closest('[data-state="open"]'); // Skip open dropdowns
+        }) as HTMLElement[];
+      };
+
+      const formElements = getAllFocusableElements();
+      
+      // Sort by tab order (tabindex or natural order)
+      formElements.sort((a, b) => {
+        const aTabIndex = a.tabIndex || (a instanceof HTMLInputElement || a instanceof HTMLButtonElement || a instanceof HTMLSelectElement || a instanceof HTMLTextAreaElement ? 0 : 999);
+        const bTabIndex = b.tabIndex || (b instanceof HTMLInputElement || b instanceof HTMLButtonElement || b instanceof HTMLSelectElement || b instanceof HTMLTextAreaElement ? 0 : 999);
+        
+        if (aTabIndex !== bTabIndex) {
+          return aTabIndex - bTabIndex;
+        }
+        
+        // If tabindex is same, use DOM order
+        const position = a.compareDocumentPosition(b);
+        if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+          return -1;
+        }
+        if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+          return 1;
+        }
+        return 0;
+      });
+
+      const currentElementIndex = formElements.findIndex(el => {
+        return el === document.activeElement || 
+               el.contains(document.activeElement) ||
+               (document.activeElement && el.contains(document.activeElement));
+      });
+      
+      if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+        // Find next focusable element
+        const nextElement = formElements[currentElementIndex + 1];
+        if (nextElement) {
+          nextElement.focus();
+          // If it's an input, select the text if it's 0 or 0.00
+          if (nextElement instanceof HTMLInputElement && (nextElement.value === '0' || nextElement.value === '0.00')) {
+            setTimeout(() => nextElement.select(), 0);
+          }
+        }
+      } else if (currentElementIndex === -1 && formElements.length > 0) {
+        // If current element not found, focus first element
+        formElements[0].focus();
+      }
+    }
+  };
+
   if (!isClient) {
     return null;
   }
@@ -1287,7 +1488,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(() => onSubmit())} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -1313,6 +1514,7 @@ export default function CustomerEntryClient() {
                 onImport={handleImport}
                 onExport={handleExport}
                 onSearch={setSearchTerm}
+                onClear={handleNew}
             />
         </form>
       </FormProvider>      

@@ -27,9 +27,9 @@ import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-f
 import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { getLoansRealtime } from "@/lib/firestore";
 import { db } from "@/lib/database";
-import type { FundTransaction, Income, Expense, Payment, CustomerPayment, Loan, Customer, BankAccount } from "@/lib/definitions";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useGlobalData } from "@/contexts/global-data-context";
 
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
@@ -62,7 +62,21 @@ const initialLoanFormState: Partial<Loan> = {
 
 export default function CashBankClient() {
     // ✅ Use global data context - NO duplicate listeners
-    const globalData = useGlobalData();
+    let globalData;
+    try {
+        globalData = useGlobalData();
+    } catch (error) {
+        console.error('Error accessing global data context:', error);
+        // Return error state
+        return (
+            <div className="flex h-64 w-full items-center justify-center">
+                <div className="text-center">
+                    <p className="text-destructive">Error loading Cash & Bank data</p>
+                    <p className="text-sm text-muted-foreground mt-2">Please refresh the page</p>
+                </div>
+            </div>
+        );
+    }
     
     // Map global data to local state
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
@@ -185,14 +199,11 @@ export default function CashBankClient() {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         
         return () => {
-            unsubFunds();
-            unsubIncomes();
-            unsubExpenses();
-            unsubPayments();
-            unsubCustomerPayments();
-            unsubLoans();
-            unsubSuppliers();
-            unsubBankAccounts();
+            // Only unsubscribe from loans since that's the only subscription we set up here
+            // Other data comes from global context, so no need to unsubscribe
+            if (unsubLoans && typeof unsubLoans === 'function') {
+                unsubLoans();
+            }
             window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
             window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -200,15 +211,18 @@ export default function CashBankClient() {
     }, []);
     // All data is now fetched directly via useState hooks above
     
-    const [isClient, setIsClient] = useState(false);
+    // Set isClient immediately on mount (client-side only)
+    const [isClient, setIsClient] = useState(typeof window !== 'undefined');
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
     const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
     const [currentFundTransaction, setCurrentFundTransaction] = useState<Partial<FundTransaction> | null>(null);
 
     useEffect(() => {
-        setIsClient(true);
-        // Use global data store - NO duplicate listeners
+        // Ensure isClient is set on client-side
+        if (typeof window !== 'undefined') {
+            setIsClient(true);
+        }
     }, []);
 
     const allExpenses = useMemo(() => [...expenses, ...supplierPayments], [expenses, supplierPayments]);
@@ -495,8 +509,16 @@ export default function CashBankClient() {
     };
 
 
+    // Show loading state while client-side hydration completes
     if (!isClient) {
-        return null;
+        return (
+            <div className="flex h-64 w-full items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+                    <p className="mt-4 text-sm text-muted-foreground">Loading Cash & Bank...</p>
+                </div>
+            </div>
+        );
     }
 
     return (

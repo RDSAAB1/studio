@@ -56,6 +56,12 @@ const formSchema = z.object({
     grNo: z.string().optional(),
     grDate: z.string().optional(),
     transport: z.string().optional(),
+    transportationRate: z.coerce.number().min(0).default(0),
+    baseReport: z.coerce.number().min(0).optional(),
+    collectedReport: z.coerce.number().min(0).optional(),
+    riceBranGst: z.coerce.number().min(0).optional(),
+    cdAmount: z.coerce.number().min(0).optional(),
+    kartaPercentage: z.coerce.number().min(0),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -125,6 +131,12 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
             grNo: '',
             grDate: '',
             transport: '',
+            transportationRate: 0,
+            baseReport: 0,
+            collectedReport: 0,
+            riceBranGst: 0,
+            cdAmount: 0,
+            kartaPercentage: 0,
         },
         shouldFocusError: false,
     });
@@ -283,6 +295,12 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                 grNo: customerToUse.grNo || '',
                 grDate: customerToUse.grDate || '',
                 transport: customerToUse.transport || '',
+                transportationRate: (customerToUse as any).transportationRate || 0,
+                baseReport: customerToUse.baseReport || 0,
+                collectedReport: customerToUse.collectedReport || 0,
+                riceBranGst: customerToUse.riceBranGst || 0,
+                cdAmount: (customerToUse as any).cdAmount || (customerToUse.cd || 0),
+                kartaPercentage: customerToUse.kartaPercentage || 0,
             };
             
             const customerWithDefaults: Customer = {
@@ -423,6 +441,12 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
                 grNo: values.grNo || '',
                 grDate: values.grDate || '',
                 transport: values.transport || '',
+                transportationRate: values.transportationRate || 0,
+                baseReport: values.baseReport || 0,
+                collectedReport: values.collectedReport || 0,
+                riceBranGst: values.riceBranGst || 0,
+                cdAmount: values.cdAmount || 0,
+                calculatedRate: (calculatedState as any).calculatedRate || undefined,
             };
 
             const { id, ...updateData } = completeEntry as any;

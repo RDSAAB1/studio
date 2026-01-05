@@ -90,6 +90,12 @@ export type Customer = {
   grDate?: string;
   transport?: string;
   isDeleted?: boolean; // For soft delete
+  
+  // RICE BRAN specific fields
+  baseReport?: number; // Base report for rate calculation
+  collectedReport?: number; // Collected report for rate calculation
+  riceBranGst?: number; // GST amount to add to calculated rate
+  calculatedRate?: number; // Final calculated rate (rate / baseReport * collectedReport + riceBranGst)
 };
 
 // Kanta Parchi - Separate collection for weight/calculation entries

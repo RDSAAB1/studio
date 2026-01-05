@@ -128,8 +128,8 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
     }
 
     // Desktop rendering
-    // For sales-entry and sales-payments, don't show dropdown - direct click navigation
-    if (!item.subMenus || item.id === 'sales-entry' || item.id === 'sales-payments') {
+    // For sales-entry, sales-payments, and cash-bank, don't show dropdown - direct click navigation
+    if (!item.subMenus || item.id === 'sales-entry' || item.id === 'sales-payments' || item.id === 'cash-bank') {
         return (
             <Tooltip>
                 <TooltipTrigger asChild>
@@ -150,8 +150,8 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarAct
         )
     }
     
-    // For sales-entry, sales-payments, and sales-reports, don't show dropdown - direct click navigation
-    if (item.id === 'sales-entry' || item.id === 'sales-payments' || item.id === 'sales-reports') {
+    // For sales-entry, sales-payments, sales-reports, and cash-bank, don't show dropdown - direct click navigation
+    if (item.id === 'sales-entry' || item.id === 'sales-payments' || item.id === 'sales-reports' || item.id === 'cash-bank') {
         return (
             <Tooltip>
                 <TooltipTrigger asChild>

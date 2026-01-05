@@ -79,6 +79,7 @@ export const allMenuItems: MenuItem[] = [
     id: "cash-bank",
     name: "Cash & Bank",
     icon: Landmark,
+    href: "/cash-bank",
   },
   {
     id: "sales-reports",
