@@ -354,6 +354,7 @@ export async function getMandiHeaderSettings(): Promise<MandiHeaderSettings | nu
         firmAddress: data.firmAddress || "",
         mandiName: data.mandiName || "",
         licenseNo: data.licenseNo || "",
+        licenseNo2: data.licenseNo2 || "",
         mandiType: data.mandiType || "",
         registerNo: data.registerNo || "",
         commodity: data.commodity || "",
@@ -367,6 +368,7 @@ export async function saveMandiHeaderSettings(settings: Partial<MandiHeaderSetti
     if (settings.firmAddress !== undefined) payload.firmAddress = settings.firmAddress;
     if (settings.mandiName !== undefined) payload.mandiName = settings.mandiName;
     if (settings.licenseNo !== undefined) payload.licenseNo = settings.licenseNo;
+    if (settings.licenseNo2 !== undefined) payload.licenseNo2 = settings.licenseNo2;
     if (settings.mandiType !== undefined) payload.mandiType = settings.mandiType;
     if (settings.registerNo !== undefined) payload.registerNo = settings.registerNo;
     if (settings.commodity !== undefined) payload.commodity = settings.commodity;
@@ -1361,9 +1363,11 @@ export function getAttendanceRealtime(
         firestoreAttendance = allAttendance;
         callback(allAttendance);
         
-        // Save to IndexedDB
+        // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
         if (db && allAttendance.length > 0) {
-            db.attendance.bulkPut(allAttendance).catch(() => {});
+            import('./chunked-operations').then(({ chunkedBulkPut }) => {
+                chunkedBulkPut(db.attendance, allAttendance, 100).catch(() => {});
+            });
         }
         
         // ✅ Save last sync time
@@ -1394,9 +1398,11 @@ export function getAttendanceRealtime(
             callback(attendance);
         }
         
-        // Save to IndexedDB
+        // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
         if (db && attendance.length > 0) {
-            db.attendance.bulkPut(attendance).catch(() => {});
+            import('./chunked-operations').then(({ chunkedBulkPut }) => {
+                chunkedBulkPut(db.attendance, attendance, 100).catch(() => {});
+            });
         }
         
         // ✅ Save last sync time
@@ -1910,24 +1916,15 @@ export async function getAllSuppliers(): Promise<Customer[]> {
     }
   }
 
-  // ✅ Use incremental sync - only get changed suppliers
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:suppliers');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
+  // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+  // Incremental sync misses documents without updatedAt or with incorrect timestamps
   let q;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      suppliersCollection,
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
+  try {
+    // Try with orderBy first (faster if index exists)
+    q = query(suppliersCollection, orderBy("srNo", "desc"));
+  } catch (error: any) {
+    // If orderBy fails (missing index), use simple query
+    console.warn(`[getAllSuppliers] orderBy query failed, using fallback:`, error.message);
     q = query(suppliersCollection);
   }
 
@@ -1937,9 +1934,10 @@ export async function getAllSuppliers(): Promise<Customer[]> {
   // Track Firestore read
   firestoreMonitor.logRead('suppliers', 'getAllSuppliers', suppliers.length);
   
-  // Save to local IndexedDB and update last sync time
+  // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
   if (db && suppliers.length > 0) {
-    await db.suppliers.bulkPut(suppliers);
+    const { chunkedBulkPut } = await import('./chunked-operations');
+    await chunkedBulkPut(db.suppliers, suppliers, 100);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:suppliers', String(Date.now()));
     }
@@ -1961,24 +1959,15 @@ export async function getAllCustomers(): Promise<Customer[]> {
     }
   }
 
-  // ✅ Use incremental sync - only get changed customers
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:customers');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
+  // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+  // Incremental sync misses documents without updatedAt or with incorrect timestamps
   let q;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      customersCollection,
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
+  try {
+    // Try with orderBy first (faster if index exists)
+    q = query(customersCollection, orderBy("srNo", "desc"));
+  } catch (error: any) {
+    // If orderBy fails (missing index), use simple query
+    console.warn(`[getAllCustomers] orderBy query failed, using fallback:`, error.message);
     q = query(customersCollection);
   }
 
@@ -1988,9 +1977,10 @@ export async function getAllCustomers(): Promise<Customer[]> {
   // Track Firestore read
   firestoreMonitor.logRead('customers', 'getAllCustomers', customers.length);
   
-  // Save to local IndexedDB and update last sync time
+  // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
   if (db && customers.length > 0) {
-    await db.customers.bulkPut(customers);
+    const { chunkedBulkPut } = await import('./chunked-operations');
+    await chunkedBulkPut(db.customers, customers, 100);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:customers', String(Date.now()));
     }
@@ -2049,30 +2039,16 @@ export async function getAllPayments(): Promise<Payment[]> {
     }
   }
 
-  // ✅ Use incremental sync - only get changed payments
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:payments');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
-  let q;
-  let govQ;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      supplierPaymentsCollection,
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-    govQ = query(
-      governmentFinalizedPaymentsCollection,
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
+  // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+  // Incremental sync misses documents without updatedAt or with incorrect timestamps
+  let q, govQ;
+  try {
+    // Try with orderBy first (faster if index exists)
+    q = query(supplierPaymentsCollection, orderBy("date", "desc"));
+    govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
+  } catch (error: any) {
+    // If orderBy fails (missing index), use simple query
+    console.warn(`[getAllPayments] orderBy query failed, using fallback:`, error.message);
     q = query(supplierPaymentsCollection);
     govQ = query(governmentFinalizedPaymentsCollection);
   }
@@ -2091,8 +2067,14 @@ export async function getAllPayments(): Promise<Payment[]> {
   
   // Save to local IndexedDB and update last sync time
   if (db && allPayments.length > 0) {
-    await db.payments.bulkPut(payments);
-    await db.governmentFinalizedPayments.bulkPut(govPayments);
+    // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
+    const { chunkedBulkPut } = await import('./chunked-operations');
+    if (payments.length > 0) {
+      await chunkedBulkPut(db.payments, payments, 100);
+    }
+    if (govPayments.length > 0) {
+      await chunkedBulkPut(db.governmentFinalizedPayments, govPayments, 100);
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:payments', String(Date.now()));
     }
@@ -2114,24 +2096,15 @@ export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
     }
   }
 
-  // ✅ Use incremental sync - only get changed customer payments
-  const getLastSyncTime = (): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem('lastSync:customerPayments');
-    return stored ? parseInt(stored, 10) : undefined;
-  };
-
-  const lastSyncTime = getLastSyncTime();
+  // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+  // Incremental sync misses documents without updatedAt or with incorrect timestamps
   let q;
-  
-  if (lastSyncTime) {
-    const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-    q = query(
-      customerPaymentsCollection,
-      where('updatedAt', '>', lastSyncTimestamp),
-      orderBy('updatedAt')
-    );
-  } else {
+  try {
+    // Try with orderBy first (faster if index exists)
+    q = query(customerPaymentsCollection, orderBy("date", "desc"));
+  } catch (error: any) {
+    // If orderBy fails (missing index), use simple query
+    console.warn(`[getAllCustomerPayments] orderBy query failed, using fallback:`, error.message);
     q = query(customerPaymentsCollection);
   }
 
@@ -2140,7 +2113,11 @@ export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
   
   // Save to local IndexedDB and update last sync time
   if (db && payments.length > 0) {
-    await db.customerPayments.bulkPut(payments);
+    // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
+    if (payments.length > 0) {
+      const { chunkedBulkPut } = await import('./chunked-operations');
+      await chunkedBulkPut(db.customerPayments, payments, 100);
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:customerPayments', String(Date.now()));
     }
@@ -2338,26 +2315,27 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
     };
     
     const fetchSuppliers = async (): Promise<Customer[]> => {
-        const lastSyncTime = getLastSyncTime();
-        
-        // ✅ Check if local data exists (synchronously check count)
-        let hasLocalSupplierData = false;
-        if (db && db.suppliers) {
-            try {
-                const count = await db.suppliers.count();
-                hasLocalSupplierData = count > 0;
-            } catch {
-                hasLocalSupplierData = false;
-            }
-        }
-        
+        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+        // Don't rely on incremental sync which might miss documents without updatedAt
         let suppliersQuery;
         let snapshot;
         
-        // ✅ Always do full sync to properly detect deletions
-        // Incremental sync doesn't detect deletions, so we need full sync
-        suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
-        snapshot = await getDocs(suppliersQuery);
+        try {
+            // Try with orderBy first (faster if index exists)
+            suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
+            snapshot = await getDocs(suppliersQuery);
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[suppliers] orderBy query failed, using fallback:`, error.message);
+            try {
+                suppliersQuery = query(suppliersCollection);
+                snapshot = await getDocs(suppliersQuery);
+            } catch (fallbackError: any) {
+                console.error(`[suppliers] Both queries failed:`, fallbackError);
+                throw fallbackError;
+            }
+        }
+        
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', snapshot.size);
         
@@ -2395,14 +2373,16 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
     let localCustomers: Customer[] = [];
     let callbackCalledFromIndexedDB = false;
     
-    // ✅ Read from local IndexedDB first (immediate response, no Firestore reads)
+    // ✅ OPTIMIZED: Read from local IndexedDB with chunked reading
     if (db) {
-        db.customers.orderBy('srNo').reverse().toArray().then((localData) => {
-            localCustomers = localData as Customer[];
-            callbackCalledFromIndexedDB = true;
-            callback(localData as Customer[]);
-        }).catch(() => {
-            callbackCalledFromIndexedDB = false;
+        import('./chunked-operations').then(({ chunkedToArray }) => {
+            chunkedToArray<Customer>(db.customers, 500, 'srNo', true).then((localData) => {
+                localCustomers = localData;
+                callbackCalledFromIndexedDB = true;
+                callback(localData);
+            }).catch(() => {
+                callbackCalledFromIndexedDB = false;
+            });
         });
     }
 
@@ -2416,26 +2396,26 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
     };
     
     const fetchCustomers = async (): Promise<Customer[]> => {
-        const lastSyncTime = getLastSyncTime();
-        
-        // ✅ Check if local data exists (synchronously check count)
-        let hasLocalCustomerData = false;
-        if (db && db.customers) {
-            try {
-                const count = await db.customers.count();
-                hasLocalCustomerData = count > 0;
-            } catch {
-                hasLocalCustomerData = false;
-            }
-        }
-        
+        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+        // Don't rely on incremental sync which might miss documents without updatedAt
         let customersQuery;
         let snapshot;
         
-        // ✅ Always do full sync to properly detect deletions
-        // Incremental sync doesn't detect deletions, so we need full sync
-        customersQuery = query(customersCollection, orderBy("srNo", "desc"));
-        snapshot = await getDocs(customersQuery);
+        try {
+            // Try with orderBy first (faster if index exists)
+            customersQuery = query(customersCollection, orderBy("srNo", "desc"));
+            snapshot = await getDocs(customersQuery);
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[customers] orderBy query failed, using fallback:`, error.message);
+            try {
+                customersQuery = query(customersCollection);
+                snapshot = await getDocs(customersQuery);
+            } catch (fallbackError: any) {
+                console.error(`[customers] Both queries failed:`, fallbackError);
+                throw fallbackError;
+            }
+        }
 
         firestoreMonitor.logRead('customers', 'getCustomersRealtime', snapshot.size);
         
@@ -2490,9 +2470,14 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     // ✅ Load from IndexedDB first (immediate response, no Firestore read)
     if (db) {
         // Use separate try-catch for each table to ensure we get data even if one fails
+        // ✅ OPTIMIZED: Use chunked reading for large datasets
         Promise.all([
-            db.payments.orderBy('date').reverse().toArray().catch(() => []),
-            db.governmentFinalizedPayments.orderBy('date').reverse().toArray().catch(() => [])
+            import('./chunked-operations').then(({ chunkedToArray }) => 
+                chunkedToArray<Payment>(db.payments, 500, 'date', true).catch(() => [])
+            ),
+            import('./chunked-operations').then(({ chunkedToArray }) => 
+                chunkedToArray<Payment>(db.governmentFinalizedPayments, 500, 'date', true).catch(() => [])
+            )
         ]).then(([regularData, govData]) => {
             // ALL payments from governmentFinalizedPayments table are gov payments
             // Force set receiptType to 'Gov.' for ALL payments from this table
@@ -2565,24 +2550,46 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                     getDocs(regularQuery),
                     getDocs(govQuery)
                 ]);
-            } catch (error) {
-                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
-
+            } catch (error: any) {
+                // If incremental sync fails (e.g., no updatedAt field or missing index), fallback to full sync
+                console.warn(`[payments] Incremental sync failed, using full sync:`, error.message);
+                try {
+                    regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
+                    govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
+                    [regularSnapshot, govSnapshot] = await Promise.all([
+                        getDocs(regularQuery),
+                        getDocs(govQuery)
+                    ]);
+                } catch (fallbackError: any) {
+                    // If orderBy also fails, try without orderBy
+                    console.warn(`[payments] orderBy query failed, using fallback:`, fallbackError.message);
+                    regularQuery = query(supplierPaymentsCollection);
+                    govQuery = query(governmentFinalizedPaymentsCollection);
+                    [regularSnapshot, govSnapshot] = await Promise.all([
+                        getDocs(regularQuery),
+                        getDocs(govQuery)
+                    ]);
+                }
+            }
+        } else {
+            // Full sync - get all (when no local data OR no lastSyncTime)
+            try {
                 regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
                 govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
                 [regularSnapshot, govSnapshot] = await Promise.all([
                     getDocs(regularQuery),
                     getDocs(govQuery)
                 ]);
+            } catch (error: any) {
+                // If orderBy fails, try without orderBy
+                console.warn(`[payments] orderBy query failed, using fallback:`, error.message);
+                regularQuery = query(supplierPaymentsCollection);
+                govQuery = query(governmentFinalizedPaymentsCollection);
+                [regularSnapshot, govSnapshot] = await Promise.all([
+                    getDocs(regularQuery),
+                    getDocs(govQuery)
+                ]);
             }
-        } else {
-            // Full sync - get all (when no local data OR no lastSyncTime)
-            regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
-            govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
-            [regularSnapshot, govSnapshot] = await Promise.all([
-                getDocs(regularQuery),
-                getDocs(govQuery)
-            ]);
         }
         
         const regularPayments = regularSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
@@ -2656,23 +2663,27 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             const freshRegularIds = new Set(regularPayments.map(p => p.id));
             const freshGovIds = new Set(govPaymentsWithType.map(p => p.id));
             
-            // Delete items that are no longer in Firestore
+            // ✅ OPTIMIZED: Use chunked operations to prevent blocking
             const regularIdsToDelete = Array.from(existingRegularIds).filter(id => !freshRegularIds.has(id));
             const govIdsToDelete = Array.from(existingGovIds).filter(id => !freshGovIds.has(id));
             
             if (regularIdsToDelete.length > 0) {
-                await db.payments.bulkDelete(regularIdsToDelete);
+                const { chunkedBulkDelete } = await import('./chunked-operations');
+                await chunkedBulkDelete(db.payments, regularIdsToDelete, 200);
             }
             if (govIdsToDelete.length > 0) {
-                await db.governmentFinalizedPayments.bulkDelete(govIdsToDelete);
+                const { chunkedBulkDelete } = await import('./chunked-operations');
+                await chunkedBulkDelete(db.governmentFinalizedPayments, govIdsToDelete, 200);
             }
             
-            // Update/add fresh data
+            // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
             if (regularPayments.length > 0) {
-                await db.payments.bulkPut(regularPayments);
+                const { chunkedBulkPut } = await import('./chunked-operations');
+                await chunkedBulkPut(db.payments, regularPayments, 100);
             }
             if (govPaymentsWithType.length > 0) {
-                await db.governmentFinalizedPayments.bulkPut(govPaymentsWithType);
+                const { chunkedBulkPut } = await import('./chunked-operations');
+                await chunkedBulkPut(db.governmentFinalizedPayments, govPaymentsWithType, 100);
             }
         }
     };
@@ -2844,7 +2855,15 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const fetchCustomerPayments = async (): Promise<CustomerPayment[]> => {
-        const snapshot = await getDocs(query(customerPaymentsCollection, orderBy("date", "desc")));
+        // ✅ FIX: Handle missing index errors gracefully
+        let snapshot;
+        try {
+            snapshot = await getDocs(query(customerPaymentsCollection, orderBy("date", "desc")));
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[customerPayments] orderBy query failed, using fallback:`, error.message);
+            snapshot = await getDocs(query(customerPaymentsCollection));
+        }
         const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
         firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', snapshot.size);
         return payments;
@@ -2871,7 +2890,15 @@ export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (err
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const fetchLoans = async (): Promise<Loan[]> => {
-        const snapshot = await getDocs(query(loansCollection, orderBy("startDate", "desc")));
+        // ✅ FIX: Handle missing index errors gracefully
+        let snapshot;
+        try {
+            snapshot = await getDocs(query(loansCollection, orderBy("startDate", "desc")));
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[loans] orderBy query failed, using fallback:`, error.message);
+            snapshot = await getDocs(query(loansCollection));
+        }
         const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
         firestoreMonitor.logRead('loans', 'getLoansRealtime', snapshot.size);
         return loans;
@@ -2898,7 +2925,15 @@ export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) 
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const fetchFundTransactions = async (): Promise<FundTransaction[]> => {
-        const snapshot = await getDocs(query(fundTransactionsCollection, orderBy("date", "desc")));
+        // ✅ FIX: Handle missing index errors gracefully
+        let snapshot;
+        try {
+            snapshot = await getDocs(query(fundTransactionsCollection, orderBy("date", "desc")));
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[fundTransactions] orderBy query failed, using fallback:`, error.message);
+            snapshot = await getDocs(query(fundTransactionsCollection));
+        }
         const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
         firestoreMonitor.logRead('fundTransactions', 'getFundTransactionsRealtime', snapshot.size);
         return transactions;
@@ -2925,7 +2960,15 @@ export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (
     const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const fetchIncomes = async (): Promise<Income[]> => {
-        const snapshot = await getDocs(query(incomesCollection, orderBy("date", "desc")));
+        // ✅ FIX: Handle missing index errors gracefully
+        let snapshot;
+        try {
+            snapshot = await getDocs(query(incomesCollection, orderBy("date", "desc")));
+        } catch (error: any) {
+            // If orderBy fails (missing index), fallback to query without orderBy
+            console.warn(`[incomes] orderBy query failed, using fallback:`, error.message);
+            snapshot = await getDocs(query(incomesCollection));
+        }
         const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
         firestoreMonitor.logRead('incomes', 'getIncomeRealtime', snapshot.size);
         return incomes;
@@ -2944,7 +2987,23 @@ export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (
 export function getExpensesRealtime(callback: (data: Expense[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            return db ? await db.expenses.orderBy('date').reverse().toArray() : [];
+            // ✅ FIX: Expenses are stored in transactions table, not expenses table
+            // ✅ FIX: Dexie doesn't support orderBy after where().equals()
+            if (db && db.transactions) {
+                try {
+                    const expenses = await db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray();
+                    return expenses as Expense[];
+                } catch {
+                    // Fallback: get all and filter/sort in memory
+                    const all = await db.transactions.where('type').equals('Expense').toArray();
+                    return all.sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateB - dateA;
+                    }) as Expense[];
+                }
+            }
+            return [];
         }, callback);
     }
 
@@ -2958,55 +3017,47 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
     };
 
     // ✅ Load from IndexedDB first (immediate response, no Firestore read)
-    if (db && db.expenses) {
-        db.expenses.orderBy('date').reverse().toArray().then((localData) => {
+    // ✅ FIX: Expenses are stored in transactions table, not expenses table
+    if (db && db.transactions) {
+        // ✅ FIX: Dexie doesn't support orderBy after where().equals()
+        // Use orderBy first, then filter, or sort in memory
+        db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray().then((localData) => {
             if (localData && localData.length > 0) { // Only call callback if local data exists
                 callback(localData as Expense[]);
             }
         }).catch(() => {
-            // If local read fails, continue with Firestore
+            // If orderBy fails, try without orderBy
+            db.transactions.where('type').equals('Expense').toArray().then((localData) => {
+                if (localData && localData.length > 0) {
+                    // Sort in memory by date
+                    const sorted = localData.sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateB - dateA; // Reverse order (newest first)
+                    });
+                    callback(sorted as Expense[]);
+                }
+            }).catch(() => {
+                // If local read fails, continue with Firestore
+            });
         });
     }
 
     const fetchExpenses = async (): Promise<Expense[]> => {
-        const lastSyncTime = getLastSyncTime();
-        
-        // ✅ Check if local data exists (synchronously check count)
-        let hasLocalExpenseData = false;
-        if (db && db.expenses) {
-            try {
-                const count = await db.expenses.count();
-                hasLocalExpenseData = count > 0;
-            } catch {
-                hasLocalExpenseData = false;
-            }
-        }
-        
+        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+        // Incremental sync misses documents without updatedAt or with incorrect timestamps
+        // This fixes missing expense entries like EX01220
         let expensesQuery;
         let snapshot;
         
-        // ✅ Only use incremental sync if we have BOTH lastSyncTime AND local data exists
-        // If IndexedDB is empty, do full sync even if lastSyncTime exists (data might have been cleared)
-        if (lastSyncTime && hasLocalExpenseData) {
-            // Use incremental sync - only get changes after last sync (when we have local data)
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            
-            try {
-                expensesQuery = query(
-                    expensesCollection,
-                    where('updatedAt', '>', lastSyncTimestamp),
-                    orderBy('updatedAt')
-                );
-                snapshot = await getDocs(expensesQuery);
-            } catch (error) {
-                // If incremental sync fails (e.g., no updatedAt field), fallback to full sync
-
-                expensesQuery = query(expensesCollection, orderBy("date", "desc"));
-                snapshot = await getDocs(expensesQuery);
-            }
-        } else {
-            // Full sync - get all (when no local data OR no lastSyncTime)
+        try {
+            // Try with orderBy first (faster if index exists)
             expensesQuery = query(expensesCollection, orderBy("date", "desc"));
+            snapshot = await getDocs(expensesQuery);
+        } catch (error: any) {
+            // If orderBy fails (missing index), use simple query
+            console.warn(`[expenses] orderBy query failed, using fallback:`, error.message);
+            expensesQuery = query(expensesCollection);
             snapshot = await getDocs(expensesQuery);
         }
         
@@ -3029,14 +3080,16 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
         const now = Date.now();
         if (now - lastFetchTime < 30000 && lastFetchPromise) {
             // Return existing data from IndexedDB if available, or wait for ongoing fetch
-            if (db && db.expenses) {
+            // ✅ FIX: Expenses are stored in transactions table, not expenses table
+            if (db && db.transactions) {
                 try {
                     // Wait for ongoing fetch if it exists
                     if (lastFetchPromise) {
                         return await lastFetchPromise;
                     }
                     // Otherwise return cached data
-                    const existingExpenses = await db.expenses.orderBy('date').reverse().toArray();
+                    // ✅ FIX: Dexie doesn't support orderBy after where().equals()
+                    const existingExpenses = await db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray();
                     return existingExpenses as Expense[];
                 } catch {
                     // If IndexedDB read fails, continue with fetch
@@ -3050,20 +3103,21 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
             const newExpenses = await fetchExpenses();
             const lastSyncTime = getLastSyncTime();
             
-            // Always merge with existing local data if doing incremental sync
-            if (db && db.expenses && lastSyncTime) {
-                const existingExpenses = await db.expenses.toArray();
-                const mergedMap = new Map<string, Expense>();
-                // Start with existing data
-                existingExpenses.forEach(e => mergedMap.set(e.id, e));
-                // Update/add with new data
-                newExpenses.forEach(e => mergedMap.set(e.id, e));
-                const merged = Array.from(mergedMap.values()).sort((a, b) => {
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
-                });
-                return merged;
+            // ✅ FIX: Save expenses to transactions table with type: 'Expense'
+            if (db && db.transactions) {
+                // Add type field to all expenses before saving
+                const expensesWithType = newExpenses.map(e => ({
+                    ...e,
+                    type: 'Expense' as const,
+                    transactionType: 'Expense' as const
+                }));
+                
+                // Save to transactions table
+                const { chunkedBulkPut } = await import('./chunked-operations');
+                await chunkedBulkPut(db.transactions, expensesWithType, 100);
             }
-            // Full sync - return all new expenses
+            
+            // Return all expenses (full sync always)
             return newExpenses;
         })();
         
@@ -3078,11 +3132,14 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
         return result;
     };
     
-    return createMetadataBasedListener<Expense>(
+        // ✅ FIX: Expenses are stored in transactions table, not expenses table
+        // Use undefined for localTableName so sync-registry-listener doesn't try to use non-existent table
+        // We handle saving to transactions table manually in sharedFetchFunction
+        return createMetadataBasedListener<Expense>(
         {
             collectionName: 'expenses',
             fetchFunction: sharedFetchFunction,
-            localTableName: 'expenses'
+            localTableName: undefined // Don't use expenses table - we save to transactions manually
         },
         callback,
         onError
@@ -4621,26 +4678,15 @@ export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
     try {
         if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
         
-        // ✅ Use incremental sync - only get changed entries
-        const getLastSyncTime = (): number | undefined => {
-            if (typeof window === 'undefined') return undefined;
-            const stored = localStorage.getItem('lastSync:ledgerEntries');
-            return stored ? parseInt(stored, 10) : undefined;
-        };
-
-        const lastSyncTime = getLastSyncTime();
+        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+        // Incremental sync misses documents without updatedAt or with incorrect timestamps
         let q;
-        
-        if (lastSyncTime) {
-            // Only get documents modified after last sync
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            q = query(
-                ledgerEntriesCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-        } else {
-            // First sync - get all (only once)
+        try {
+            // Try with orderBy first (faster if index exists)
+            q = query(ledgerEntriesCollection, orderBy('createdAt'));
+        } catch (error: any) {
+            // If orderBy fails (missing index), use simple query
+            console.warn(`[fetchAllLedgerEntries] orderBy query failed, using fallback:`, error.message);
             q = query(ledgerEntriesCollection);
         }
 

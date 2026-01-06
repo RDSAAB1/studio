@@ -49,8 +49,9 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
   const globalData = useGlobalData();
   const banks = globalData.banks;
   const bankBranches = globalData.bankBranches;
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.supplierBankAccounts);
+  const [loading, setLoading] = useState(false); // ✅ FIX: Start with false since we have initial data
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>('');
@@ -111,21 +112,21 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
     return Array.from(uniqueBranches.values());
   }, [watchedBankName, bankBranches]);
 
-  // Load supplier bank accounts from separate collection
+  // ✅ FIX: Sync from globalData to prevent data loss on navigation
+  useEffect(() => {
+    // Always sync from globalData on mount and when it changes
+    setBankAccounts(globalData.supplierBankAccounts);
+    setLoading(false);
+  }, [globalData.supplierBankAccounts]);
+  
+  // ✅ OPTIMIZED: Keep realtime listener for updates (non-blocking)
   useEffect(() => {
     const unsubscribe = getSupplierBankAccountsRealtime(
       (accounts) => {
         setBankAccounts(accounts);
-        setLoading(false);
       },
       (error) => {
-
-        toast({
-          title: "Error",
-          description: "Failed to load supplier bank accounts",
-          variant: "destructive",
-        });
-        setLoading(false);
+        // Silent fail - data will come from globalData
       }
     );
 

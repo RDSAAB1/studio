@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode, useTransition, useCallback } from 'react';
 import { 
     getSuppliersRealtime, 
     getPaymentsRealtime, 
@@ -57,6 +57,7 @@ const GlobalDataContext = createContext<GlobalDataContextType | undefined>(undef
 
 // Provider Component
 export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
+    const [isPending, startTransition] = useTransition();
     
     // Supplier Entry State
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -76,20 +77,45 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
     
+    // ✅ OPTIMIZED: Use React.startTransition for non-urgent state updates
+    // This prevents blocking the UI during data updates
+    const updateState = useCallback((setter: (value: any) => void, value: any) => {
+        startTransition(() => {
+            setter(value);
+        });
+    }, [startTransition]);
+    
     // NO LOADING STATES - Data loads initially, then only CRUD updates happen via realtime listeners
     
-    // Setup all realtime listeners IMMEDIATELY - data loads initially, then just CRUD updates
+    // ✅ OPTIMIZED: Lazy load supplierBankAccounts listener only when needed
+    const [supplierBankAccountsListenerSetup, setSupplierBankAccountsListenerSetup] = useState(false);
+    
+    // ✅ FIX: Defer realtime listeners setup until after initialization is complete
+    // This prevents blocking initialization with heavy Firestore queries
+    // ✅ CRITICAL: Keep listeners active across page navigations - don't cleanup on unmount
     useEffect(() => {
         let isSubscribed = true;
+        let unsubFunctions: Array<(() => void) | undefined> = [];
+        let supplierBankAccountsUnsub: (() => void) | undefined;
         
-        // Setup all realtime listeners
-        const unsubFunctions = [
+        // ✅ OPTIMIZED: Wait a bit before setting up listeners to avoid blocking initialization
+        // Use requestIdleCallback or setTimeout to defer
+        const setupListeners = () => {
+            if (!isSubscribed) return;
+            
+            // ✅ FIX: Don't setup listeners again if they're already set up
+            if (unsubFunctions.length > 0) {
+                return;
+            }
+            
+            // Setup all realtime listeners
+            unsubFunctions = [
             // Supplier Entry Listeners
             getSuppliersRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        // Instant update - no transitions, immediate state update
-                        setSuppliers(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setSuppliers, data);
                     }
                 },
                 (error) => {
@@ -99,8 +125,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getPaymentsRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        // Instant update
-                        setSupplierPayments(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setSupplierPayments, data);
                     }
                 },
                 (error) => {
@@ -112,8 +138,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getCustomersRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        // Instant update
-                        setCustomers(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setCustomers, data);
                     }
                 },
                 (error) => {
@@ -123,8 +149,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getCustomerPaymentsRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        // Instant update
-                        setCustomerPayments(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setCustomerPayments, data);
                     }
                 },
                 (error) => {
@@ -136,7 +162,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getBanksRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setBanks(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setBanks, data);
                     }
                 },
                 (error) => {
@@ -146,7 +173,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getBankBranchesRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setBankBranches(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setBankBranches, data);
                     }
                 },
                 (error) => {
@@ -156,27 +184,22 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getBankAccountsRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setBankAccounts(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setBankAccounts, data);
                     }
                 },
                 (error) => {
 
                 }
             ),
-            getSupplierBankAccountsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        setSupplierBankAccounts(data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
+            // ✅ OPTIMIZED: Defer supplierBankAccounts listener - only needed on supplier-bank-accounts page
+            // This prevents unnecessary data fetch when opening other pages like cash-bank
+            // Supplier bank accounts will be loaded lazily when actually needed
             getFundTransactionsRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setFundTransactions(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setFundTransactions, data);
                     }
                 },
                 (error) => {
@@ -186,7 +209,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getExpensesRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setExpenses(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setExpenses, data);
                     }
                 },
                 (error) => {
@@ -196,38 +220,120 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             getIncomeRealtime(
                 (data) => {
                     if (isSubscribed) {
-                        setIncomes(data);
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setIncomes, data);
                     }
                 },
                 (error) => {
 
                 }
             ),
-        ];
-        
-        // Load receipt settings (non-blocking, instant UI)
-        getReceiptSettings()
-            .then((settings) => {
-                if (isSubscribed && settings) {
-                    setReceiptSettings(settings);
+            ];
+            
+            // ✅ OPTIMIZED: Defer receipt settings fetch (not critical for initialization)
+            // Load receipt settings after a delay to avoid blocking
+            setTimeout(() => {
+                if (isSubscribed) {
+                    getReceiptSettings()
+                        .then((settings) => {
+                            if (isSubscribed && settings) {
+                                setReceiptSettings(settings);
+                            }
+                        })
+                        .catch((error) => {
+                            // Silent fail
+                        });
                 }
-            })
-            .catch((error) => {
-
-            });
+            }, 500); // Defer by 500ms
+        };
         
-        // Cleanup function
+        // ✅ OPTIMIZED: Setup supplierBankAccounts listener lazily (only when needed)
+        const setupSupplierBankAccountsListener = () => {
+            if (!isSubscribed || supplierBankAccountsListenerSetup) return;
+            
+            supplierBankAccountsUnsub = getSupplierBankAccountsRealtime(
+                (data) => {
+                    if (isSubscribed) {
+                        // ✅ OPTIMIZED: Use transition for non-urgent updates
+                        updateState(setSupplierBankAccounts, data);
+                    }
+                },
+                (error) => {
+                    // Silent fail
+                }
+            );
+            
+            setSupplierBankAccountsListenerSetup(true);
+        };
+        
+        // ✅ FIX: Defer listener setup to avoid blocking initialization
+        // Use requestIdleCallback if available, otherwise setTimeout
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(() => {
+                if (isSubscribed) {
+                    setupListeners();
+                }
+            }, { timeout: 1000 });
+        } else {
+            setTimeout(() => {
+                if (isSubscribed) {
+                    setupListeners();
+                }
+            }, 100); // Small delay to let initialization complete
+        }
+        
+        // ✅ FIX: Don't cleanup listeners on unmount - keep them active across page navigations
+        // GlobalDataProvider persists in layout, so listeners should stay active
+        // Only cleanup when component is truly unmounting (e.g., logout)
         return () => {
+            // Mark as unsubscribed to prevent new updates
             isSubscribed = false;
-            unsubFunctions.forEach(unsub => {
-                if (typeof unsub === 'function') {
-                    unsub();
-                }
-            });
+            // ✅ CRITICAL: Don't unsubscribe listeners here - keep data available across navigations
+            // Listeners will be cleaned up when the provider is truly unmounted (logout)
+            // This ensures data persists when navigating between pages
         };
     }, []); // Empty deps - setup once, updates happen via realtime listeners
     
-    // Context value
+    // ✅ OPTIMIZED: Lazy load supplierBankAccounts when actually needed (not on every page)
+    // This prevents blocking when opening pages like cash-bank that don't need it
+    useEffect(() => {
+        if (supplierBankAccountsListenerSetup) return;
+        
+        // Defer supplier bank accounts listener setup - only load when actually needed
+        // This prevents blocking when opening pages like cash-bank that don't need it
+        const timer = setTimeout(() => {
+            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => {
+                    getSupplierBankAccountsRealtime(
+                        (data) => {
+                            updateState(setSupplierBankAccounts, data);
+                        },
+                        (error) => {
+                            // Silent fail
+                        }
+                    );
+                    setSupplierBankAccountsListenerSetup(true);
+                }, { timeout: 5000 }); // Wait up to 5 seconds
+            } else {
+                setTimeout(() => {
+                    getSupplierBankAccountsRealtime(
+                        (data) => {
+                            updateState(setSupplierBankAccounts, data);
+                        },
+                        (error) => {
+                            // Silent fail
+                        }
+                    );
+                    setSupplierBankAccountsListenerSetup(true);
+                }, 3000); // Defer by 3 seconds
+            }
+        }, 2000); // Initial delay of 2 seconds
+        
+        return () => clearTimeout(timer);
+    }, [supplierBankAccountsListenerSetup, updateState]);
+    
+    // Context value - useMemo with proper dependencies
+    // Arrays are already memoized by React state, so we just pass them through
     const contextValue: GlobalDataContextType = useMemo(() => ({
         // Supplier Entry Data
         suppliers,

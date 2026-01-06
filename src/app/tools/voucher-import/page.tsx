@@ -444,6 +444,7 @@ const defaultHeaderSettings: MandiHeaderSettings = {
   firmAddress: "",
   mandiName: "",
   licenseNo: "",
+  licenseNo2: "",
   mandiType: "NON AMPC",
   registerNo: "",
   commodity: "",
@@ -1223,6 +1224,7 @@ export default function VoucherImportTool() {
     const effectiveMandiName = headerSettings.mandiName || fallbackMandiName;
     const effectiveLicense =
       headerSettings.licenseNo || fallbackLicenseInfo || "";
+    const effectiveLicense2 = headerSettings.licenseNo2 || "";
     const effectiveFinancialYear =
       headerSettings.financialYear || computedFinancialYear;
     const effectiveRegister =
@@ -1239,6 +1241,14 @@ export default function VoucherImportTool() {
       timeStyle: "short",
     }).format(new Date());
 
+    // Get commodity label for quantity column (completely in Hindi)
+    // Add "की" only if not already present in commodity name
+    const commodityLabel = effectiveCommodity 
+      ? (effectiveCommodity.includes(" की ") || effectiveCommodity.endsWith(" की"))
+        ? `${effectiveCommodity} मात्रा`
+        : `${effectiveCommodity} की मात्रा`
+      : "मात्रा";
+
     const rowsHtml = entries
       .map((entry, index) => {
         const mandiFee = Number(entry.mandiFee || 0);
@@ -1251,9 +1261,15 @@ export default function VoucherImportTool() {
           .filter(Boolean)
           .join(", ");
 
-        const utrValue =
+        const utrValueRaw =
           entry.transactionNumber ||
-          (entry.narration ? entry.narration.toUpperCase() : "");
+          (entry.narration ? entry.narration.toUpperCase() : "") ||
+          "";
+        // If UTR value is 5-6 digits (after removing all non-digit chars), use "TRANSFER" instead
+        const cleanedUtr = utrValueRaw ? utrValueRaw.replace(/\D/g, "") : "";
+        const utrValue = cleanedUtr && (cleanedUtr.length === 5 || cleanedUtr.length === 6) && /^\d+$/.test(cleanedUtr)
+          ? "TRANSFER" 
+          : utrValueRaw;
 
         return `
           <tr>
@@ -1305,10 +1321,12 @@ export default function VoucherImportTool() {
             }
             body {
               font-family: "Noto Sans Devanagari", "Mangal", "Segoe UI", Arial, sans-serif;
-              margin: 18px;
+              margin: 0;
+              padding: 20px;
               color: #1f2937;
               background: #ffffff;
               font-size: 12px;
+              line-height: 1.6;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
@@ -1339,59 +1357,97 @@ export default function VoucherImportTool() {
               opacity: 1;
             }
             .report-header {
-              margin-bottom: 18px;
-              border-bottom: 1px solid #d1d5db;
-              padding-bottom: 12px;
+              margin-bottom: 24px;
+              border-bottom: 3px solid #0f172a;
+              padding: 24px;
+              background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+              border-radius: 8px;
+              box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
             }
             .header-row {
               display: flex;
-              gap: 16px;
+              gap: 20px;
               flex-wrap: wrap;
               justify-content: space-between;
               align-items: flex-start;
             }
             .header-row + .header-row {
-              margin-top: 8px;
+              margin-top: 12px;
+              padding-top: 12px;
+              border-top: 1px solid #e5e7eb;
+            }
+            .header-row.primary {
+              align-items: center;
             }
             .header-row.primary .title-left {
-              font-weight: 600;
+              font-weight: 700;
               font-size: 15px;
-              color: #1f2937;
+              color: #0f172a;
+              white-space: nowrap;
+              min-width: 180px;
             }
             .header-row.primary .title-center {
               text-align: center;
               flex: 1;
+              min-width: 200px;
             }
             .firm-name {
-              font-size: 20px;
-              font-weight: 700;
+              font-size: 26px;
+              font-weight: 800;
               text-transform: uppercase;
-              color: #111827;
-              margin-bottom: 4px;
+              color: #0f172a;
+              margin-bottom: 10px;
+              letter-spacing: 1.2px;
+              text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             }
             .firm-sub {
-              font-size: 12px;
-              color: #374151;
+              font-size: 13px;
+              color: #475569;
               white-space: pre-wrap;
+              line-height: 1.7;
+              font-weight: 500;
             }
             .header-row.primary .title-right {
               text-align: right;
               font-size: 12px;
               color: #374151;
+              min-width: 280px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              align-items: flex-end;
+            }
+            .license-chip {
+              background: #0f172a !important;
+              background-image: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+              border: 2px solid #0f172a !important;
+              border-radius: 6px;
+              padding: 8px 14px;
+              font-size: 12px;
+              color: #ffffff !important;
+              font-weight: 700;
+              white-space: nowrap;
+              min-width: 260px;
+              text-align: right;
+              box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
             }
             .header-chip {
-              background: #f3f4f6;
-              border: 1px solid #d1d5db;
-              border-radius: 4px;
-              padding: 4px 8px;
-              font-size: 11px;
-              color: #111827;
+              background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+              border: 1.5px solid #cbd5e1;
+              border-radius: 6px;
+              padding: 7px 14px;
+              font-size: 12px;
+              color: #0f172a;
+              font-weight: 600;
+              white-space: nowrap;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
             }
             .header-row.secondary {
-              font-size: 11px;
+              font-size: 12px;
               color: #1f2937;
               gap: 12px;
               align-items: center;
+              flex-wrap: wrap;
             }
             .header-row.secondary > div {
               display: flex;
@@ -1400,68 +1456,177 @@ export default function VoucherImportTool() {
             }
             table {
               width: 100%;
-              border-collapse: collapse;
-              font-size: 11px;
+              border-collapse: separate;
+              border-spacing: 0;
+              font-size: 11.5px;
+              box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+              border-radius: 6px;
+              overflow: hidden;
+            }
+            thead {
+              background-color: #1e293b !important;
             }
             thead tr {
-              background: linear-gradient(90deg, #dbeafe, #e0e7ff);
+              background-color: #1e293b !important;
+              background: #1e293b !important;
+              background-image: none !important;
+            }
+            thead tr,
+            thead th {
+              background-color: #1e293b !important;
+              background: #1e293b !important;
             }
             th,
             td {
-              border: 1px solid #9ca3af;
-              padding: 4px 6px;
+              border: 1px solid #e2e8f0;
+              padding: 10px 8px;
               text-align: left;
-              vertical-align: top;
-              line-height: 1.2;
+              vertical-align: middle;
+              line-height: 1.5;
             }
             th {
-              font-weight: 600;
-              color: #1f2937;
+              font-weight: 800;
+              color: #ffffff !important;
+              background-color: #1e293b !important;
+              background: #1e293b !important;
+              background-image: none !important;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              border-color: #475569 !important;
+              text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            }
+            thead th {
+              background-color: #1e293b !important;
+              background: #1e293b !important;
+              color: #ffffff !important;
+            }
+            thead th:first-child {
+              border-top-left-radius: 4px;
+            }
+            thead th:last-child {
+              border-top-right-radius: 4px;
             }
             th .label-hi {
               display: block;
-              font-size: 11px;
-              font-weight: 700;
-              color: #111827;
+              font-size: 12px;
+              font-weight: 800;
+              color: #ffffff;
+              margin-bottom: 3px;
             }
             th .label-en {
               display: block;
-              font-size: 9px;
+              font-size: 10px;
               text-transform: uppercase;
-              letter-spacing: 0.4px;
-              color: #1f2937;
-              margin-top: 2px;
+              letter-spacing: 0.6px;
+              color: #cbd5e1;
+              margin-top: 3px;
+              font-weight: 600;
             }
             td.numeric {
               text-align: right;
               font-variant-numeric: tabular-nums;
+              font-weight: 600;
+              color: #0f172a;
             }
             td.nowrap {
               white-space: nowrap;
             }
-            tbody tr:nth-child(odd) {
-              background-color: #f9fafb;
+            td {
+              color: #1e293b;
+              font-size: 11.5px;
+              font-weight: 500;
             }
-            tbody tr:nth-child(even) {
+            tbody tr {
+              transition: background-color 0.1s;
+            }
+            tbody tr:nth-child(odd) {
               background-color: #ffffff;
             }
+            tbody tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            tbody tr:hover {
+              background-color: #f1f5f9;
+              box-shadow: inset 0 0 0 1px #cbd5e1;
+            }
             tfoot tr {
-              background: linear-gradient(90deg, #fef3c7, #fed7aa);
-              font-weight: 600;
+              background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+              font-weight: 800;
+              border-top: 3px solid #0f172a;
+              font-size: 12px;
+              color: #ffffff;
             }
             @media print {
+              * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
               body {
                 margin: 0;
+                padding: 15px;
+                background: #ffffff !important;
               }
               .preview-toolbar {
                 display: none !important;
               }
+              .report-header {
+                background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+                border-bottom: 3px solid #0f172a !important;
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
+              }
+              .license-chip {
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+                color: #ffffff !important;
+                border: 2px solid #0f172a !important;
+              }
+              .header-chip {
+                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                color: #0f172a !important;
+              }
+              thead {
+                background-color: #1e293b !important;
+              }
+              thead tr {
+                background-color: #1e293b !important;
+                background: #1e293b !important;
+                background-image: none !important;
+              }
+              thead th {
+                background-color: #1e293b !important;
+                background: #1e293b !important;
+                background-image: none !important;
+              }
+              th {
+                background-color: #1e293b !important;
+                background: #1e293b !important;
+                background-image: none !important;
+                color: #ffffff !important;
+                border-color: #475569 !important;
+              }
+              th .label-hi {
+                color: #ffffff !important;
+              }
+              th .label-en {
+                color: #cbd5e1 !important;
+              }
+              tfoot tr {
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+                color: #ffffff !important;
+              }
               table {
                 page-break-inside: auto;
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12) !important;
               }
               tr {
                 page-break-inside: avoid;
                 page-break-after: auto;
+              }
+              tbody tr:nth-child(even) {
+                background-color: #f8fafc !important;
+              }
+              tbody tr:nth-child(odd) {
+                background-color: #ffffff !important;
               }
             }
           </style>
@@ -1486,8 +1651,15 @@ export default function VoucherImportTool() {
               <div class="title-right">
                 ${
                   effectiveLicense
-                    ? `<div class="header-chip">${escapeHtml(
-                        effectiveLicense
+                    ? `<div class="license-chip">${escapeHtml(
+                        `मंडी लाइसेंस प्रसंस्करण इकाई: ${effectiveLicense}`
+                      )}</div>`
+                    : ""
+                }
+                ${
+                  effectiveLicense2
+                    ? `<div class="license-chip">${escapeHtml(
+                        `मंडी लाइसेंस थोक व्यापार: ${effectiveLicense2}`
                       )}</div>`
                     : ""
                 }
@@ -1530,76 +1702,72 @@ export default function VoucherImportTool() {
                   : ""
               }
               <div class="header-chip">कुल अभिलेख: ${entries.length}</div>
-              <div class="header-chip">तैयार दिनांक: ${escapeHtml(
-                generatedAt
-              )}</div>
             </div>
           </header>
           <main>
-            <table>
-              <thead>
-                <tr>
-                  <th>
-                    <span class="label-hi">एस.आर. क्रमांक</span>
+            <table style="border-collapse: separate; border-spacing: 0;">
+              <thead style="background-color: #1e293b !important;">
+                <tr style="background-color: #1e293b !important;">
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-en">SR. NO.</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">6R जारी तिथि</span>
                     <span class="label-en">6R DATE</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">किसान / पिता / पता</span>
                     <span class="label-en">FARMER / FATHER / ADDRESS</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">मोबाइल संख्या</span>
                     <span class="label-en">MOBILE NO.</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">गाटा संख्या</span>
                     <span class="label-en">GATA NO.</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">6R नंबर</span>
                     <span class="label-en">6R NUMBER</span>
                   </th>
-                  <th>
-                    <span class="label-hi">मात्रा (क्विंटल)</span>
-                    <span class="label-en">QUANTITY (QTL)</span>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
+                    <span class="label-hi">${escapeHtml(commodityLabel)}</span>
+                    <span class="label-en">QUANTITY</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">दर</span>
                     <span class="label-en">RATE</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">राशि</span>
                     <span class="label-en">AMOUNT</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">मंडी शुल्क 1%</span>
                     <span class="label-en">MANDI FEE 1%</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">सेस 0.5%</span>
                     <span class="label-en">CESS 0.5%</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">कुल मंडी शुल्क</span>
                     <span class="label-en">TOTAL MANDI FEE</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">भुगतान तिथि</span>
                     <span class="label-en">PAYMENT DATE</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">खाता संख्या</span>
                     <span class="label-en">ACCOUNT NO.</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">आईएफएससी</span>
                     <span class="label-en">IFSC</span>
                   </th>
-                  <th>
+                  <th style="background-color: #1e293b !important; color: #ffffff !important;">
                     <span class="label-hi">यूटीआर / ट्रांसफर</span>
                     <span class="label-en">UTR / TRANSFER</span>
                   </th>
@@ -1750,13 +1918,23 @@ export default function VoucherImportTool() {
             />
           </div>
           <div className="space-y-2">
-            <Label>License Number</Label>
+            <Label>Mandi License Prasanskarn IKAI</Label>
             <Input
               value={headerSettings.licenseNo}
               onChange={(event) =>
                 handleHeaderInputChange("licenseNo", event.target.value)
               }
               placeholder="उ/2024/190/16324939"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Mandi License Thok Vyapar</Label>
+            <Input
+              value={headerSettings.licenseNo2}
+              onChange={(event) =>
+                handleHeaderInputChange("licenseNo2", event.target.value)
+              }
+              placeholder="मंडी लाइसेंस थोक व्यापार"
             />
           </div>
           <div className="space-y-2">
@@ -1963,9 +2141,15 @@ export default function VoucherImportTool() {
                     ]
                       .filter(Boolean)
                       .join(", ");
-                    const utrValue =
+                    const utrValueRaw2 =
                       entry.transactionNumber ||
-                      (entry.narration ? entry.narration.toUpperCase() : "");
+                      (entry.narration ? entry.narration.toUpperCase() : "") ||
+                      "";
+                    // If UTR value is 5-6 digits (after removing all non-digit chars), use "TRANSFER" instead
+                    const cleanedUtr2 = utrValueRaw2 ? utrValueRaw2.replace(/\D/g, "") : "";
+                    const utrValue = cleanedUtr2 && (cleanedUtr2.length === 5 || cleanedUtr2.length === 6) && /^\d+$/.test(cleanedUtr2)
+                      ? "TRANSFER" 
+                      : utrValueRaw2;
                     return (
                     <TableRow
                       key={entry.id}

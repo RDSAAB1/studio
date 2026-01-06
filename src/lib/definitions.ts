@@ -530,6 +530,7 @@ export type MandiHeaderSettings = {
   firmAddress: string;
   mandiName: string;
   licenseNo: string;
+  licenseNo2: string;
   mandiType: string;
   registerNo: string;
   commodity: string;

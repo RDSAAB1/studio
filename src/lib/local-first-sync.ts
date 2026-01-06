@@ -13,8 +13,9 @@
 
 import { db } from './database';
 import { firestoreDB } from './firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy, writeBatch, limit, startAfter } from 'firebase/firestore';
 import { enqueueSyncTask } from './sync-queue';
+import { yieldToMainThread, chunkedBulkPut } from './chunked-operations';
 
 type CollectionName = 
     | 'suppliers' 
@@ -534,38 +535,89 @@ function saveLastSyncTime(collectionName: string, timestamp: number): void {
 /**
  * Sync from Firestore to local
  * Only runs when user interacts with the software
+ * ✅ OPTIMIZED: Non-blocking with chunked processing
  */
 async function syncFromFirestore() {
     if (!db || typeof window === 'undefined') return;
 
     try {
-        // ✅ Sync suppliers (only changed ones)
-        await syncCollectionFromFirestore('suppliers', 'suppliers', getLastSyncTime('suppliers'));
+        // ✅ OPTIMIZED: Sync collections in parallel (non-blocking)
+        // Core collections first, then optional ones
+        const coreSyncs = Promise.allSettled([
+            syncCollectionFromFirestore('suppliers', 'suppliers', getLastSyncTime('suppliers')),
+            syncCollectionFromFirestore('customers', 'customers', getLastSyncTime('customers')),
+            syncCollectionFromFirestore('payments', 'payments', getLastSyncTime('payments')),
+            syncCollectionFromFirestore('customerPayments', 'customerPayments', getLastSyncTime('customerPayments')),
+        ]);
         
-        // ✅ Sync customers (only changed ones)
-        await syncCollectionFromFirestore('customers', 'customers', getLastSyncTime('customers'));
+        // Yield to main thread after core syncs
+        await coreSyncs;
+        await yieldToMainThread();
         
-        // ✅ Sync payments (only changed ones)
-        await syncCollectionFromFirestore('payments', 'payments', getLastSyncTime('payments'));
-        
-        // ✅ Sync customer payments (only changed ones)
-        await syncCollectionFromFirestore('customerPayments', 'customerPayments', getLastSyncTime('customerPayments'));
-        
-        // ✅ Sync additional collections if needed (only changed ones)
+        // ✅ Sync additional collections (optional, non-blocking)
         // Note: These are optional and will be synced only if local table exists
-        try {
-            await syncCollectionFromFirestore('incomes', 'incomes', getLastSyncTime('incomes'));
-        } catch {}
-        try {
-            await syncCollectionFromFirestore('expenses', 'expenses', getLastSyncTime('expenses'));
-        } catch {}
+        const optionalSyncs = Promise.allSettled([
+            syncCollectionFromFirestore('incomes', 'incomes', getLastSyncTime('incomes')).catch(() => {}),
+            syncCollectionFromFirestore('expenses', 'expenses', getLastSyncTime('expenses')).catch(() => {}),
+        ]);
+        
+        // Don't await optional syncs - let them complete in background
+        optionalSyncs.catch(() => {});
+        
     } catch (error) {
-
+        // Silent fail - sync will retry on next interaction
     }
 }
 
 /**
+ * Helper to fetch all documents from Firestore with pagination
+ * Handles large collections that might exceed Firestore query limits
+ * ✅ FIXED: Ensures all documents are fetched, including those without updatedAt
+ */
+async function getAllDocsPaginated<T>(
+    collectionRef: any,
+    batchSize: number = 1000
+): Promise<T[]> {
+    const allDocs: T[] = [];
+    let lastDoc: any = null;
+    let hasMore = true;
+    
+    while (hasMore) {
+        let q;
+        if (lastDoc) {
+            q = query(collectionRef, startAfter(lastDoc), limit(batchSize));
+        } else {
+            q = query(collectionRef, limit(batchSize));
+        }
+        
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            hasMore = false;
+            break;
+        }
+        
+        snapshot.forEach((doc) => {
+            allDocs.push({ id: doc.id, ...doc.data() } as T);
+        });
+        
+        // Check if we got fewer docs than batch size (last batch)
+        if (snapshot.docs.length < batchSize) {
+            hasMore = false;
+        } else {
+            lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            // Yield to main thread between batches
+            await yieldToMainThread();
+        }
+    }
+    
+    return allDocs;
+}
+
+/**
  * Optimized version - sync only changed documents
+ * ✅ OPTIMIZED: Non-blocking with chunked processing
+ * ✅ FIXED: Includes documents without updatedAt field
  */
 async function syncCollectionFromFirestore(
     collectionName: CollectionName,
@@ -576,64 +628,138 @@ async function syncCollectionFromFirestore(
 
     try {
         const firestoreCollection = collection(firestoreDB, firestoreCollectionName);
-        
-        // ✅ Only get documents modified after last sync
-        let q;
-        if (lastSyncTime) {
-            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-            q = query(
-                firestoreCollection,
-                where('updatedAt', '>', lastSyncTimestamp),
-                orderBy('updatedAt')
-            );
-        } else {
-            // First sync - get all (only once)
-            q = query(firestoreCollection);
-        }
-        
-        const snapshot = await getDocs(q); // ✅ Only changed docs
-        
-        if (snapshot.empty) return; // No changes
-        
         const localTable = getLocalTable(collectionName);
         if (!localTable) return;
 
         const updates: any[] = [];
+        const updatesMap = new Map<string, any>(); // To avoid duplicates
         
-        snapshot.forEach((docSnap) => {
-            const data = { id: docSnap.id, ...docSnap.data() };
-            updates.push(data);
-        });
+        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
+        // Incremental sync can miss documents if:
+        // 1. updatedAt field is missing/null
+        // 2. updatedAt was not updated properly
+        // 3. Documents were added without proper updatedAt
+        // 4. Previous syncs missed some documents
+        
+        // Get ALL documents from Firestore (with pagination for large collections)
+        try {
+            const allDocs = await getAllDocsPaginated(firestoreCollection, 1000);
+            updates.push(...allDocs);
+        } catch (error) {
+            // If pagination fails, try simple query as fallback
+            try {
+                const allSnapshot = await getDocs(query(firestoreCollection));
+                allSnapshot.forEach((docSnap) => {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    updates.push(data);
+                });
+            } catch (fallbackError) {
+                // If both fail, log error but continue
+                console.error(`[${collectionName}] Failed to fetch all documents:`, fallbackError);
+            }
+        }
+        
+        // ✅ Also do incremental sync to catch recently updated documents
+        // This ensures we get the latest changes quickly
+        if (lastSyncTime) {
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            try {
+                const incrementalQuery = query(
+                    firestoreCollection,
+                    where('updatedAt', '>', lastSyncTimestamp),
+                    orderBy('updatedAt')
+                );
+                const incrementalSnapshot = await getDocs(incrementalQuery);
+                
+                incrementalSnapshot.forEach((docSnap) => {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    // Add to updatesMap to avoid duplicates
+                    const existingIndex = updates.findIndex(u => u.id === docSnap.id);
+                    if (existingIndex >= 0) {
+                        // Update existing entry with latest data
+                        updates[existingIndex] = data;
+                    } else {
+                        // Add new entry
+                        updates.push(data);
+                    }
+                });
+            } catch (error) {
+                // If incremental query fails (e.g., missing index), that's okay
+                // We already have all documents from full sync above
+            }
+        }
+        // Note: First sync is now handled by the full sync above (no else block needed)
 
         if (updates.length > 0) {
-            // Use bulkPut for efficiency
-            await localTable.bulkPut(updates);
+            // ✅ FIX: Handle expenses and incomes specially - they're stored in transactions table
+            if (collectionName === 'expenses' || collectionName === 'incomes') {
+                // Save to transactions table with type field
+                const transactionsTable = db.transactions;
+                if (transactionsTable) {
+                    const transactionsWithType = updates.map(item => ({
+                        ...item,
+                        type: collectionName === 'expenses' ? 'Expense' : 'Income',
+                        transactionType: collectionName === 'expenses' ? 'Expense' : 'Income'
+                    }));
+                    await chunkedBulkPut(transactionsTable, transactionsWithType, 100);
+                }
+            } else if (localTable) {
+                // ✅ OPTIMIZED: Use chunked bulkPut to prevent main thread blocking
+                await chunkedBulkPut(localTable, updates, 100);
+            }
             
             // ✅ Save last sync time (only if we got documents)
             const currentTime = Date.now();
             saveLastSyncTime(collectionName, currentTime);
             
-            // Remove from pending changes if it exists (conflict resolved)
+            // ✅ OPTIMIZED: Process pending changes in batches to avoid blocking
+            const pendingKeys: string[] = [];
             updates.forEach(item => {
                 const key = `${collectionName}:${item.id}`;
                 const pendingChange = pendingChanges.get(key);
                 
-                // If local change is older than Firestore data, remove from pending
+                // If local change is older than Firestore data, mark for removal
                 if (pendingChange) {
                     const firestoreTime = (item as any).updatedAt || (item as any).timestamp || 0;
                     if (firestoreTime > pendingChange.timestamp) {
-                        pendingChanges.delete(key);
+                        pendingKeys.push(key);
                     }
                 }
             });
+            
+            // Remove pending changes in batches
+            if (pendingKeys.length > 0) {
+                // Process in chunks to avoid blocking
+                const chunkSize = 50;
+                for (let i = 0; i < pendingKeys.length; i += chunkSize) {
+                    const chunk = pendingKeys.slice(i, i + chunkSize);
+                    chunk.forEach(key => pendingChanges.delete(key));
+                    
+                    // Yield to main thread every chunk
+                    if (i + chunkSize < pendingKeys.length) {
+                        await yieldToMainThread();
+                    }
+                }
+            }
         } else if (!lastSyncTime) {
             // ✅ First sync completed (even if no updates), save timestamp
             const currentTime = Date.now();
             saveLastSyncTime(collectionName, currentTime);
         }
     } catch (error: any) {
+        // ✅ FIX: Better error logging to help diagnose missing documents
+        console.error(`[${collectionName}] Sync failed:`, {
+            error: error?.message || String(error),
+            code: error?.code,
+            collection: collectionName,
+            firestoreCollection: firestoreCollectionName,
+            lastSyncTime: lastSyncTime ? new Date(lastSyncTime).toISOString() : 'none',
+            hasLocalTable: !!localTable
+        });
+        
         if (error?.code !== 'permission-denied' && error?.code !== 'unavailable') {
-
+            // Log but don't throw - will retry on next sync
+            // This helps identify sync issues that might cause missing documents
         }
     }
 }

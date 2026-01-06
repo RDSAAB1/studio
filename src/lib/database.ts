@@ -556,9 +556,11 @@ export async function syncAllDataWithDetails(
           // Handle special collections (incomes, expenses) that need type conversion
           if (config.name === 'incomes' || config.name === 'expenses') {
             // Convert to transactions with type field
+            // ✅ FIX: Use capitalized type to match everywhere else ('Expense' not 'expense')
             const transactions = dataToSync.map(item => ({
               ...item,
-              type: config.name === 'incomes' ? 'income' : 'expense'
+              type: config.name === 'incomes' ? 'Income' : 'Expense',
+              transactionType: config.name === 'incomes' ? 'Income' : 'Expense'
             } as Transaction));
             dataToSync = transactions;
           }

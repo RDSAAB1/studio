@@ -4,6 +4,7 @@ import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
+import { chunkedBulkPut, chunkedBulkDelete } from "./chunked-operations";
 
 type CollectionName = string;
 type FetchFunction<T> = () => Promise<T[]>;
@@ -39,6 +40,7 @@ export function createMetadataBasedListener<T>(
     let isInitialLoad = true;
     let callbackCalledFromIndexedDB = false;
     let checkInterval: NodeJS.Timeout | null = null;
+    let periodicSyncInterval: NodeJS.Timeout | null = null;
     
     // ✅ Step 1: Load from IndexedDB first (immediate response, no Firestore read)
     // Then immediately check Firestore to detect deletions (even if sync registry hasn't changed)
@@ -96,8 +98,9 @@ export function createMetadataBasedListener<T>(
         if (!snapshot.exists()) {
             // Registry doc doesn't exist yet - always do initial fetch to detect deletions
             if (isInitialLoad) {
-                // Always fetch on initial load, even if we have local data
-                // This ensures deletions are detected after refresh
+                // ✅ FIX: Always fetch FULL sync on initial load, even if sync_registry doesn't exist
+                // This ensures we get all documents, including those added without sync_registry update
+                console.log(`[${collectionName}] Sync registry doesn't exist - doing FULL initial sync`);
                 try {
                     const freshData = await fetchFunction();
                     
@@ -109,10 +112,11 @@ export function createMetadataBasedListener<T>(
                             const freshIds = new Set(freshData.map((item: any) => item.id));
                             const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
                             if (idsToDelete.length > 0) {
-                                await localTable.bulkDelete(idsToDelete);
+                                console.log(`[${collectionName}] Initial sync: deleting ${idsToDelete.length} items`);
+                                await chunkedBulkDelete(localTable, idsToDelete, 200);
                             }
                             if (freshData.length > 0) {
-                                await localTable.bulkPut(freshData);
+                                await chunkedBulkPut(localTable, freshData, 100);
                             }
                         }
                     }
@@ -120,6 +124,7 @@ export function createMetadataBasedListener<T>(
                     callback(freshData);
                     isInitialLoad = false;
                 } catch (error) {
+                    console.error(`[${collectionName}] Initial sync failed:`, error);
                     onError(error as Error);
                 }
             }
@@ -145,10 +150,11 @@ export function createMetadataBasedListener<T>(
             isInitialLoad
         });
         
-        // ✅ Step 3: Only fetch if there's an ACTUAL change (timestamp or trigger changed)
+        // ✅ Step 3: Always fetch on initial load to catch any missed documents
         if (isInitialLoad) {
-            // Initial load - always fetch
-            console.log(`[${collectionName}] Initial load - fetching`);
+            // Initial load - always fetch FULL sync to ensure we get all documents
+            // This catches any documents that might have been missed due to sync registry issues
+            console.log(`[${collectionName}] Initial load - fetching FULL sync`);
             isInitialLoad = false;
             // Continue to fetch below
         } else {
@@ -225,16 +231,16 @@ export function createMetadataBasedListener<T>(
                         const existingIds = new Set(existingItems.map((item: any) => item.id));
                         const freshIds = new Set(freshData.map((item: any) => item.id));
                         
-                        // Delete items that are no longer in Firestore
+                        // ✅ OPTIMIZED: Use chunked bulkDelete to prevent blocking
                         const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
                         if (idsToDelete.length > 0) {
                             console.log(`[${collectionName}] 🗑️ Detected ${idsToDelete.length} deletions:`, idsToDelete);
-                            await localTable.bulkDelete(idsToDelete);
+                            await chunkedBulkDelete(localTable, idsToDelete, 200);
                         }
                         
-                        // Update/add fresh data
+                        // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
                         if (freshData.length > 0) {
-                            await localTable.bulkPut(freshData);
+                            await chunkedBulkPut(localTable, freshData, 100);
                         } else if (idsToDelete.length > 0) {
                             // If all items were deleted, ensure IndexedDB is empty
                             await localTable.clear();
@@ -289,10 +295,12 @@ export function createMetadataBasedListener<T>(
             isInitialLoad = false;
             
         } catch (error) {
+            console.error(`[${collectionName}] Error fetching data:`, error);
             onError(error as Error);
         }
     }, (error) => {
         // Handle Firestore errors
+        console.error(`[${collectionName}] Sync registry listener error:`, error);
         if (isFirestoreTemporarilyDisabled()) {
             // Fallback to polling if Firestore is disabled
             const pollUnsub = createPollingFallback(fetchFunction, callback);
@@ -302,11 +310,121 @@ export function createMetadataBasedListener<T>(
         onError(error);
     });
     
-    // Return unsubscribe function that also cleans up interval
+    // ✅ FIX: Add immediate sync check on mount + periodic full sync check to catch any missed documents
+    // This ensures documents added without sync_registry update are caught quickly
+    const performFullSyncCheck = async () => {
+        try {
+            const freshData = await fetchFunction();
+            
+            // ✅ FIX: Handle expenses specially - they're stored in transactions table
+            if (collectionName === 'expenses' && db && db.transactions) {
+                const localData = await db.transactions.where('type').equals('Expense').toArray();
+                const localIds = new Set(localData.map((item: any) => item.id));
+                const freshIds = new Set(freshData.map((item: any) => item.id));
+                
+                // Find missing documents (in Firestore but not in local)
+                const missingIds = Array.from(freshIds).filter(id => !localIds.has(id));
+                if (missingIds.length > 0) {
+                    console.log(`[${collectionName}] 🔍 Full sync check found ${missingIds.length} missing documents:`, missingIds);
+                    const missingDocs = freshData.filter(item => missingIds.includes(item.id));
+                    // Add type field before saving
+                    const expensesWithType = missingDocs.map(e => ({
+                        ...e,
+                        type: 'Expense' as const,
+                        transactionType: 'Expense' as const
+                    }));
+                    await chunkedBulkPut(db.transactions, expensesWithType, 100);
+                    
+                    // Also check for extra documents (in local but not in Firestore - might be deleted)
+                    const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                    if (extraIds.length > 0) {
+                        console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} extra documents (deleted):`, extraIds);
+                        await chunkedBulkDelete(db.transactions, extraIds, 200);
+                    }
+                    
+                    // Update callback with fresh data
+                    callback([...freshData]);
+                    return true; // Indicates changes were found
+                } else {
+                    // Check for deletions
+                    const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                    if (extraIds.length > 0) {
+                        console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} deleted documents:`, extraIds);
+                        await chunkedBulkDelete(db.transactions, extraIds, 200);
+                        callback([...freshData]);
+                        return true; // Indicates changes were found
+                    }
+                }
+            } else if (db && localTableName) {
+                const localTable = (db as any)[localTableName];
+                if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
+                    const localData = await localTable.toArray();
+                    const localIds = new Set(localData.map((item: any) => item.id));
+                    const freshIds = new Set(freshData.map((item: any) => item.id));
+                    
+                    // Find missing documents (in Firestore but not in local)
+                    const missingIds = Array.from(freshIds).filter(id => !localIds.has(id));
+                    if (missingIds.length > 0) {
+                        console.log(`[${collectionName}] 🔍 Full sync check found ${missingIds.length} missing documents:`, missingIds);
+                        const missingDocs = freshData.filter(item => missingIds.includes(item.id));
+                        await chunkedBulkPut(localTable, missingDocs, 100);
+                        
+                        // Also check for extra documents (in local but not in Firestore - might be deleted)
+                        const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                        if (extraIds.length > 0) {
+                            console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} extra documents (deleted):`, extraIds);
+                            await chunkedBulkDelete(localTable, extraIds, 200);
+                        }
+                        
+                        // Update callback with fresh data
+                        callback([...freshData]);
+                        return true; // Indicates changes were found
+                    } else {
+                        // Check for deletions
+                        const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                        if (extraIds.length > 0) {
+                            console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} deleted documents:`, extraIds);
+                            await chunkedBulkDelete(localTable, extraIds, 200);
+                            callback([...freshData]);
+                            return true; // Indicates changes were found
+                        }
+                    }
+                }
+            }
+            return false; // No changes found
+        } catch (error) {
+            console.error(`[${collectionName}] Full sync check failed:`, error);
+            return false;
+        }
+    };
+    
+    // ✅ Immediate sync check after initial load (wait 2 seconds to let initial load complete)
+    // ✅ FIX: Also run for expenses (even though localTableName is undefined, we handle it specially)
+    if (typeof window !== 'undefined' && (localTableName || collectionName === 'expenses')) {
+        setTimeout(() => {
+            performFullSyncCheck().then((hadChanges) => {
+                if (hadChanges) {
+                    console.log(`[${collectionName}] ✅ Immediate sync check completed and found changes`);
+                }
+            });
+        }, 2000); // 2 seconds after mount
+        
+        // ✅ Periodic full sync check (every 2 minutes) to catch any missed documents
+        // Reduced from 5 minutes to 2 minutes for faster detection
+        periodicSyncInterval = setInterval(() => {
+            performFullSyncCheck();
+        }, 2 * 60 * 1000); // 2 minutes
+    }
+    
+    // Return unsubscribe function that also cleans up intervals
     return () => {
         if (checkInterval) {
             clearInterval(checkInterval);
             checkInterval = null;
+        }
+        if (periodicSyncInterval) {
+            clearInterval(periodicSyncInterval);
+            periodicSyncInterval = null;
         }
         unsubscribe();
     };

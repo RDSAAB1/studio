@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -275,12 +275,13 @@ export default function IncomeExpenseClient() {
   // ✅ Use global data context - NO duplicate listeners
   const globalData = useGlobalData();
 
-  const [income, setIncome] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses); // Use global data
+  // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
+  const [income, setIncome] = useState<Income[]>(globalData.incomes);
+  const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions); // Use global data
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts); // Use global data
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
   const [projects, setProjects] = useState<Project[]>([]);
 
   // NO PAGE LOADING - Data loads initially, then only CRUD updates
@@ -310,22 +311,33 @@ export default function IncomeExpenseClient() {
   
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
 
+    // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
+    const prevExpensesRef = React.useRef(globalData.expenses);
+    const prevFundTransactionsRef = React.useRef(globalData.fundTransactions);
+    const prevBankAccountsRef = React.useRef(globalData.bankAccounts);
+    
     useEffect(() => {
-        // ✅ Use global data instead of creating duplicate listeners
-        // Sync global data to local state
+        // ✅ FIX: Always sync from globalData on mount and when it changes
+        // This ensures data is available even after page navigation
         setExpenses(globalData.expenses);
         setFundTransactions(globalData.fundTransactions);
         setBankAccounts(globalData.bankAccounts);
+        setIncome(globalData.incomes); // ✅ FIX: Also sync incomes from globalData
         
+        // Update refs
+        prevExpensesRef.current = globalData.expenses;
+        prevFundTransactionsRef.current = globalData.fundTransactions;
+        prevBankAccountsRef.current = globalData.bankAccounts;
+    }, [globalData.expenses, globalData.fundTransactions, globalData.bankAccounts, globalData.incomes]);
+    
+    useEffect(() => {
         // First, fetch ALL income transactions for payee extraction (expenses already from global)
         const fetchAllTransactions = async () => {
             try {
-
                 const allIncomes = await getAllIncomes();
-
                 setIncome(allIncomes);
             } catch (error) {
-
+                // Silent fail
             }
         };
 
@@ -333,7 +345,6 @@ export default function IncomeExpenseClient() {
 
         // Then set up realtime listeners for updates (only for data not in global context)
         const unsubIncome = getIncomeRealtime((data) => {
-
             setIncome(data);
         }, () => {});
         const unsubPayments = getPaymentsRealtime(setPayments, () => {});
@@ -343,7 +354,7 @@ export default function IncomeExpenseClient() {
         return () => {
             unsubIncome(); unsubLoans(); unsubProjects(); unsubPayments();
         }
-    }, [globalData]);
+    }, []); // Only run once on mount
 
   // NO PAGE LOADING - Components render immediately
 

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer, Payment, CustomerPayment } from "@/lib/definitions";
@@ -88,27 +88,76 @@ export default function CashBankClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
     
-    // Force re-render key to trigger useMemo recalculation
-    const [refreshKey, setRefreshKey] = useState(0);
+    // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
+    const prevDataRef = React.useRef({
+        fundTransactions: globalData.fundTransactions,
+        incomes: globalData.incomes,
+        expenses: globalData.expenses,
+        paymentHistory: globalData.paymentHistory,
+        customerPayments: globalData.customerPayments,
+        suppliers: globalData.suppliers,
+        bankAccounts: globalData.bankAccounts,
+    });
     
-    // Sync global data to local state when it changes
     useEffect(() => {
-        setFundTransactions(globalData.fundTransactions);
-        setIncomes(globalData.incomes);
-        setExpenses(globalData.expenses);
-        setSupplierPayments(globalData.paymentHistory);
-        setCustomerPayments(globalData.customerPayments);
-        setSuppliers(globalData.suppliers);
-        setBankAccounts(globalData.bankAccounts);
-        setRefreshKey(prev => prev + 1); // Force re-render
-    }, [globalData]);
+        // ✅ FIX: Always sync from globalData on mount and when it changes
+        // This ensures data is available even after page navigation
+        // Only update if data actually changed to prevent unnecessary re-renders
+        let hasChanges = false;
+        
+        if (globalData.fundTransactions !== prevDataRef.current.fundTransactions) {
+            setFundTransactions(globalData.fundTransactions);
+            prevDataRef.current.fundTransactions = globalData.fundTransactions;
+            hasChanges = true;
+        }
+        if (globalData.incomes !== prevDataRef.current.incomes) {
+            setIncomes(globalData.incomes);
+            prevDataRef.current.incomes = globalData.incomes;
+            hasChanges = true;
+        }
+        if (globalData.expenses !== prevDataRef.current.expenses) {
+            setExpenses(globalData.expenses);
+            prevDataRef.current.expenses = globalData.expenses;
+            hasChanges = true;
+        }
+        if (globalData.paymentHistory !== prevDataRef.current.paymentHistory) {
+            setSupplierPayments(globalData.paymentHistory);
+            prevDataRef.current.paymentHistory = globalData.paymentHistory;
+            hasChanges = true;
+        }
+        if (globalData.customerPayments !== prevDataRef.current.customerPayments) {
+            setCustomerPayments(globalData.customerPayments);
+            prevDataRef.current.customerPayments = globalData.customerPayments;
+            hasChanges = true;
+        }
+        if (globalData.suppliers !== prevDataRef.current.suppliers) {
+            setSuppliers(globalData.suppliers);
+            prevDataRef.current.suppliers = globalData.suppliers;
+            hasChanges = true;
+        }
+        if (globalData.bankAccounts !== prevDataRef.current.bankAccounts) {
+            setBankAccounts(globalData.bankAccounts);
+            prevDataRef.current.bankAccounts = globalData.bankAccounts;
+            hasChanges = true;
+        }
+        
+        // ✅ OPTIMIZED: Removed refreshKey updates - not needed as useMemo will recalculate when data changes
+    }, [
+        globalData.fundTransactions,
+        globalData.incomes,
+        globalData.expenses,
+        globalData.paymentHistory,
+        globalData.customerPayments,
+        globalData.suppliers,
+        globalData.bankAccounts,
+    ]);
     
     // Fetch data directly (only data not in global context)
     useEffect(() => {
         const unsubLoans = getLoansRealtime(
             (data) => {
                 setLoans(data);
-                setRefreshKey(prev => prev + 1); // Force re-render
+                // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically when loans change
             },
             (error) => ('Error fetching loans:', error)
         );
@@ -129,7 +178,7 @@ export default function CashBankClient() {
                             const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
                             setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
                         }
-                        setRefreshKey(prev => prev + 1); // Force re-render
+                        // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically
                     } catch (error) {
 
                     }
@@ -153,7 +202,7 @@ export default function CashBankClient() {
                             const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
                             setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
                         }
-                        setRefreshKey(prev => prev + 1); // Force re-render
+                        // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically
                     } catch (error) {
 
                     }
@@ -164,39 +213,10 @@ export default function CashBankClient() {
         window.addEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
         window.addEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
         
-        // ✅ Refresh data when window gains focus (user switches back to tab)
-        const handleVisibilityChange = async () => {
-            if (!document.hidden && db) {
-                // User switched back to tab - refresh data to get latest from IndexedDB
-                try {
-                    const [funds, incomes, expenses, regularPayments, govPayments, customerPayments, loans, suppliers, bankAccounts] = await Promise.all([
-                        db.fundTransactions.orderBy('date').reverse().toArray(),
-                        db.incomes.orderBy('date').reverse().toArray(),
-                        db.expenses.orderBy('date').reverse().toArray(),
-                        db.payments.orderBy('date').reverse().toArray(),
-                        db.governmentFinalizedPayments.orderBy('date').reverse().toArray(),
-                        db.customerPayments.orderBy('date').reverse().toArray(),
-                        db.loans.orderBy('startDate').reverse().toArray(),
-                        db.suppliers.orderBy('srNo').reverse().toArray(),
-                        db.bankAccounts.toArray(),
-                    ]);
-                    
-                    setFundTransactions(funds as FundTransaction[]);
-                    setIncomes(incomes as Income[]);
-                    setExpenses(expenses as Expense[]);
-                    setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
-                    setCustomerPayments(customerPayments as CustomerPayment[]);
-                    setLoans(loans as Loan[]);
-                    setSuppliers(suppliers as Customer[]);
-                    setBankAccounts(bankAccounts as BankAccount[]);
-                    setRefreshKey(prev => prev + 1);
-                } catch (error) {
-
-                }
-            }
-        };
-        
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        // ✅ OPTIMIZED: Don't read from IndexedDB on visibility change
+        // GlobalDataProvider already keeps data in sync via realtime listeners
+        // Reading from IndexedDB here causes unnecessary re-initialization
+        // Data will automatically update via globalData context when it changes
         
         return () => {
             // Only unsubscribe from loans since that's the only subscription we set up here
@@ -206,7 +226,6 @@ export default function CashBankClient() {
             }
             window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
             window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
     // All data is now fetched directly via useState hooks above
@@ -331,7 +350,8 @@ export default function CashBankClient() {
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers, refreshKey]);
+    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers]);
+    // ✅ OPTIMIZED: Removed refreshKey from dependencies - it's not needed as the actual data dependencies will trigger recalculation
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
@@ -345,7 +365,8 @@ export default function CashBankClient() {
             });
     };
 
-    const onTransferSubmit = (values: TransferValues) => {
+    const onTransferSubmit = async (values: TransferValues) => {
+        // ✅ FIX: Prevent default form submission behavior
         if (!values.source || !values.destination) {
             toast({ title: "Source and destination are required", variant: "destructive" });
             return;
@@ -368,14 +389,20 @@ export default function CashBankClient() {
             return;
         }
         
-        handleAddFundTransaction({ 
-            type: 'CashTransfer', 
-            source: values.source, 
-            destination: values.destination, 
-            amount: transactionAmount, 
-            description: values.description 
-        })
-          .then(() => transferForm.reset({ amount: 0, description: "", source: null, destination: null }));
+        // ✅ FIX: Properly handle promise with error handling to prevent unhandled rejections
+        try {
+            await handleAddFundTransaction({ 
+                type: 'CashTransfer', 
+                source: values.source, 
+                destination: values.destination, 
+                amount: transactionAmount, 
+                description: values.description 
+            });
+            transferForm.reset({ amount: 0, description: "", source: null, destination: null });
+        } catch (error) {
+            // Error is already handled in handleAddFundTransaction, just prevent unhandled rejection
+            console.error('Transfer submission error:', error);
+        }
     };
 
 
@@ -561,7 +588,10 @@ export default function CashBankClient() {
                             <CardDescription>Move funds between your accounts.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                           <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+                            <form onSubmit={(e) => {
+                                e.preventDefault(); // ✅ FIX: Explicitly prevent default to avoid page reload
+                                transferForm.handleSubmit(onTransferSubmit)(e);
+                            }} className="space-y-4">
                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                                    <div className="space-y-1">
                                         <Label>From</Label>

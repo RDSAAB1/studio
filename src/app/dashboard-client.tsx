@@ -42,20 +42,25 @@ const PIE_COLORS = ['#22c55e', '#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
+    
+    // ✅ Use global data context - NO duplicate listeners
+    const globalData = useGlobalData();
+    
+    // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
+    const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers);
+    const [customers, setCustomers] = useState<Customer[]>(globalData.customers);
     const [kantaParchi, setKantaParchi] = useState<KantaParchi[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>(globalData.incomes);
+    const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
+    const [supplierPayments, setSupplierPayments] = useState<Payment[]>(globalData.paymentHistory);
+    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>(globalData.customerPayments);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
+    const [isLoading, setIsLoading] = useState(false); // ✅ FIX: Start with false since we have initial data
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
@@ -66,12 +71,23 @@ export default function DashboardClient() {
     const [level2, setLevel2] = useState<string | null>(null);
     const [level3, setLevel3] = useState<string | null>(null);
     
-    // ✅ Use global data context - NO duplicate listeners
-    const globalData = useGlobalData();
+    // ✅ OPTIMIZED: Only sync when data actually changes
+    const prevDataRef = React.useRef({
+        suppliers: globalData.suppliers,
+        customers: globalData.customers,
+        paymentHistory: globalData.paymentHistory,
+        customerPayments: globalData.customerPayments,
+        incomes: globalData.incomes,
+        expenses: globalData.expenses,
+        fundTransactions: globalData.fundTransactions,
+        bankAccounts: globalData.bankAccounts,
+    });
     
     useEffect(() => {
         setIsClient(true);
-        // Use global data instead of creating duplicate listeners
+        
+        // ✅ FIX: Always sync from globalData on mount and when it changes
+        // This ensures data is available even after page navigation
         setSuppliers(globalData.suppliers);
         setCustomers(globalData.customers);
         setSupplierPayments(globalData.paymentHistory);
@@ -81,14 +97,37 @@ export default function DashboardClient() {
         setFundTransactions(globalData.fundTransactions);
         setBankAccounts(globalData.bankAccounts);
         
-        // Only fetch data that's not in global context
+        // Update refs
+        prevDataRef.current = {
+            suppliers: globalData.suppliers,
+            customers: globalData.customers,
+            paymentHistory: globalData.paymentHistory,
+            customerPayments: globalData.customerPayments,
+            incomes: globalData.incomes,
+            expenses: globalData.expenses,
+            fundTransactions: globalData.fundTransactions,
+            bankAccounts: globalData.bankAccounts,
+        };
+        
+        setIsLoading(false);
+    }, [
+        globalData.suppliers,
+        globalData.customers,
+        globalData.paymentHistory,
+        globalData.customerPayments,
+        globalData.incomes,
+        globalData.expenses,
+        globalData.fundTransactions,
+        globalData.bankAccounts,
+    ]);
+    
+    useEffect(() => {
+        // Only fetch data that's not in global context (run once on mount)
         const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, () => {});
         const unsubLoans = getLoansRealtime(setLoans, () => {});
         const unsubProjects = getProjectsRealtime(setProjects, () => {});
         const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, () => {});
         const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, () => {});
-        
-        setIsLoading(false);
 
         return () => {
             unsubKantaParchi();
@@ -97,7 +136,7 @@ export default function DashboardClient() {
             unsubExpCats();
             unsubIncCats();
         };
-    }, [globalData]);
+    }, []); // Only run once on mount
     
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
