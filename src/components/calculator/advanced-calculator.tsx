@@ -420,11 +420,11 @@ const GSTCalculator = () => {
         <div className="p-4 space-y-4">
             <div className="space-y-1">
                 <Label htmlFor="gst-amount">Amount</Label>
-                <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
+                <Input id="gst-amount" name="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
             </div>
             <div className="space-y-1">
                 <Label htmlFor="gst-rate">GST Rate (%)</Label>
-                <Input id="gst-rate" type="number" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="h-8"/>
+                <Input id="gst-rate" name="gst-rate" type="number" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="h-8"/>
             </div>
             <div className="space-y-2">
                 <Label>Calculation Type</Label>
@@ -498,10 +498,10 @@ const DateCalculator = () => {
             <Card>
                  <CardContent className="p-4 space-y-3">
                     <h3 className="text-sm font-semibold">Add/Subtract from Date</h3>
-                     <div className="space-y-1"><Label className="text-xs">Start Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-8 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{calcDate ? format(calcDate, "PPP") : "Select Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calcDate} onSelect={setCalcDate} initialFocus /></PopoverContent></Popover></div>
+                     <div className="space-y-1"><Label htmlFor="calcStartDate" className="text-xs">Start Date</Label><Popover><PopoverTrigger asChild><Button id="calcStartDate" variant={"outline"} className="w-full h-8 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{calcDate ? format(calcDate, "PPP") : "Select Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calcDate} onSelect={setCalcDate} initialFocus /></PopoverContent></Popover></div>
                      <div className="flex items-center gap-2">
-                        <Input type="number" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="h-8 text-sm" />
-                        <Select value={addUnit} onValueChange={(v) => setAddUnit(v as any)}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="days">Days</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select>
+                        <Input id="addValue" name="addValue" type="number" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="h-8 text-sm" />
+                        <Select value={addUnit} onValueChange={(v) => setAddUnit(v as any)}><SelectTrigger id="addUnit" className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="days">Days</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select>
                     </div>
                     <div className="pt-2"><p className="text-sm">Result: <span className="font-bold">{resultDate}</span></p></div>
                 </CardContent>

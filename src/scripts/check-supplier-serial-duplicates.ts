@@ -24,7 +24,8 @@ export async function checkSupplierSerialDuplicates(): Promise<DuplicateAnalysis
         const suppliersRef = collection(firestoreDB, 'suppliers');
         const snapshot = await getDocs(suppliersRef);
         
-        const suppliers: any[] = [];
+        type SupplierRecord = { id: string; srNo?: string } & Record<string, any>;
+        const suppliers: SupplierRecord[] = [];
         const srNoMap = new Map<string, any[]>();
         const idMap = new Map<string, any[]>();
         const emptySrNos: any[] = [];
@@ -32,7 +33,7 @@ export async function checkSupplierSerialDuplicates(): Promise<DuplicateAnalysis
         
         // Process all suppliers
         snapshot.forEach((doc) => {
-            const supplier = { id: doc.id, ...doc.data() };
+            const supplier: SupplierRecord = { id: doc.id, ...(doc.data() as Record<string, any>) };
             suppliers.push(supplier);
             
             // Check srNo

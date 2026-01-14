@@ -1,13 +1,23 @@
 'use client';
 
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc, getDoc, DocumentReference, WriteBatch, Timestamp } from 'firebase/firestore';
+import type { Transaction as FirestoreTransaction } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency, generateReadableId } from "@/lib/utils";
-import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
+import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount, Transaction as AppTransaction } from "@/lib/definitions";
 import { format } from 'date-fns';
 import { db } from './database';
+import { logError } from './error-logger';
+import { retryFirestoreOperation } from './retry-utils';
+
+// Helper function to handle errors silently (for background operations)
+function handleSilentError(error: unknown, context: string): void {
+  // Log error using error logging service
+  logError(error, context, 'low');
+}
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
+const customersCollection = collection(firestoreDB, "customers");
 const expensesCollection = collection(firestoreDB, "expenses");
 const incomesCollection = collection(firestoreDB, "incomes");
 const paymentsCollection = collection(firestoreDB, "payments");
@@ -16,6 +26,19 @@ const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmen
 const settingsCollection = collection(firestoreDB, "settings");
 const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
 
+type SupplierDetails = {
+    name?: string;
+    fatherName?: string;
+    address?: string;
+};
+
+type BankDetails = {
+    bank?: string;
+    branch?: string;
+    acNo?: string;
+    ifscCode?: string;
+};
+
 
 interface ProcessPaymentResult {
     success: boolean;
@@ -23,16 +46,56 @@ interface ProcessPaymentResult {
     payment?: Payment;
 }
 
-export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
+interface ProcessPaymentContext {
+    selectedCustomerKey?: string;
+    selectedEntries?: Customer[];
+    editingPayment?: Payment;
+    paymentAmount?: number;
+    paymentMethod?: string;
+    selectedAccountId?: string;
+    cdEnabled?: boolean;
+    calculatedCdAmount?: number;
+    settleAmount?: number;
+    totalOutstandingForSelected?: number;
+    paymentType?: string;
+    financialState?: unknown;
+    bankAccounts?: BankAccount[];
+    paymentId?: string;
+    rtgsSrNo?: string;
+    paymentDate?: Date | string;
+    utrNo?: string;
+    checkNo?: string;
+    sixRNo?: string;
+    sixRDate?: Date | string;
+    parchiNo?: string;
+    rtgsQuantity?: number;
+    rtgsRate?: number;
+    rtgsAmount?: number;
+    govQuantity?: number;
+    govRate?: number;
+    govAmount?: number;
+    govRequiredAmount?: number;
+    supplierDetails?: SupplierDetails;
+    bankDetails?: BankDetails;
+    cdAt?: string;
+    isCustomer?: boolean;
+    extraAmount?: number;
+    centerName?: string;
+    extraAmountBaseType?: string;
+    calcTargetAmount?: number;
+    suppliers?: Customer[];
+}
+
+export const processPaymentLogic = async (context: ProcessPaymentContext): Promise<ProcessPaymentResult> => {
     const {
         selectedCustomerKey, selectedEntries: incomingSelectedEntries, editingPayment,
         paymentAmount, paymentMethod, selectedAccountId,
         cdEnabled, calculatedCdAmount, settleAmount, totalOutstandingForSelected,
         paymentType, financialState, bankAccounts, paymentId, rtgsSrNo,
         paymentDate, utrNo, checkNo, sixRNo, sixRDate, parchiNo,
-        rtgsQuantity, rtgsRate, rtgsAmount, govQuantity, govRate, govAmount,
-        govRequiredAmount: userGovRequiredAmount, // Gov Required Amount from form
-        supplierDetails, bankDetails,
+        rtgsQuantity = 0, rtgsRate = 0, rtgsAmount = 0, govQuantity = 0, govRate = 0, govAmount = 0,
+        govRequiredAmount: userGovRequiredAmount = 0,
+        supplierDetails = {}, bankDetails = {},
         cdAt, // CD mode: 'partial_on_paid', 'on_unpaid_amount', 'on_full_amount', etc.
         isCustomer = false, // Flag to determine if this is a customer payment
         extraAmount: userExtraAmount, // Extra amount from form (Gov. payment only)
@@ -49,9 +112,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     // Build selected entries for edit mode if not provided
     let selectedEntries = incomingSelectedEntries || [];
     if ((!selectedEntries || selectedEntries.length === 0) && editingPayment?.paidFor?.length) {
-        const suppliers: Customer[] = Array.isArray((context as any).suppliers) ? (context as any).suppliers : [];
+        const suppliers: Customer[] = Array.isArray(context.suppliers) ? context.suppliers : [];
         selectedEntries = editingPayment.paidFor
-            .map((pf: any) => suppliers.find(s => s.srNo === pf.srNo))
+            .map((pf: PaidFor) => suppliers.find(s => s.srNo === pf.srNo))
             .filter(Boolean) as Customer[];
     }
 
@@ -67,7 +130,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
     // finalAmountToPay = "To Be Paid" amount (actual payment amount, WITHOUT CD)
     // settleAmount = "To Be Paid" + CD (total settlement amount, for validation/display only)
-    const finalAmountToPay = paymentAmount;
+    const finalAmountToPay = Number(paymentAmount) || 0;
     
     const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
@@ -76,7 +139,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     }
     
     // Only apply CD if cdEnabled is true
-    const effectiveCdAmount = cdEnabled ? calculatedCdAmount : 0;
+    const effectiveCdAmount = cdEnabled ? (Number(calculatedCdAmount) || 0) : 0;
     
     // Total to settle = actual payment amount + CD (for validation only, not saved)
     const totalToSettle = finalAmountToPay + effectiveCdAmount;
@@ -85,8 +148,9 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     // Allow payments even if outstanding is 0 or negative (for overpayment scenarios)
     // Gov. payment allows overpayment (receipt se zyada payment)
     // When CD is disabled, settleAmount should equal finalAmountToPay, so we validate totalToSettle
-    if (paymentMethod !== 'Gov.' && totalOutstandingForSelected > 0 && totalToSettle > totalOutstandingForSelected + 0.01) { // Add a small tolerance for floating point issues
-        return { success: false, message: `Settlement amount (${formatCurrency(totalToSettle)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelected)}) for the selected entries.` };
+    const totalOutstandingForSelectedVal = Number(totalOutstandingForSelected) || 0;
+    if (paymentMethod !== 'Gov.' && totalOutstandingForSelectedVal > 0 && totalToSettle > totalOutstandingForSelectedVal + 0.01) { // Add a small tolerance for floating point issues
+        return { success: false, message: `Settlement amount (${formatCurrency(totalToSettle)}) cannot exceed the total outstanding (${formatCurrency(totalOutstandingForSelectedVal)}) for the selected entries.` };
     }
 
     if (finalAmountToPay <= 0 && effectiveCdAmount <= 0) {
@@ -200,7 +264,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             totalCdForEntry += cdAmount;
                         } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
                             // Old format: Calculate proportionally from payment.cdAmount
-                            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                            const paidList = payment.paidFor || [];
+                            const totalPaidForInPayment = paidList.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
                             if (totalPaidForInPayment > 0) {
                                 const proportion = paidAmount / totalPaidForInPayment;
                                 cdAmount = Math.round(payment.cdAmount * proportion * 100) / 100;
@@ -220,7 +285,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 let previousCdAmount = 0;
                 
                 if (editingPayment) {
-                    const previousPaidFor = editingPayment.paidFor?.find((pf: any) => pf.srNo === entry.srNo);
+                    const previousPaidFor = editingPayment.paidFor?.find((pf: PaidFor) => pf.srNo === entry.srNo);
                     if (previousPaidFor) {
                         previousPaidAmount = Number(previousPaidFor.amount || 0);
                         
@@ -229,7 +294,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     previousCdAmount = Number(previousPaidFor.cdAmount || 0);
                         } else if (editingPayment.cdAmount && editingPayment.paidFor && editingPayment.paidFor.length > 0) {
                             // Old format: Calculate proportionally
-                            const totalEditingPaymentAmount = editingPayment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                            const paidList = editingPayment.paidFor || [];
+                            const totalEditingPaymentAmount = paidList.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
                             if (totalEditingPaymentAmount > 0) {
                                 const proportion = previousPaidAmount / totalEditingPaymentAmount;
                                 previousCdAmount = Math.round(editingPayment.cdAmount * proportion * 100) / 100;
@@ -297,15 +363,16 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     // Skip current editing payment
                     if (editingPayment && payment.id === editingPayment.id) continue;
                     
-                    const paidForThisEntry = payment.paidFor?.find((pf: any) => pf.srNo === entry.srNo);
+                    const paidForThisEntry = payment.paidFor?.find((pf: PaidFor) => pf.srNo === entry.srNo);
                     if (paidForThisEntry) {
                         // New format: CD stored directly in paidFor
                         if ('cdAmount' in paidForThisEntry && paidForThisEntry.cdAmount) {
                             totalCdForEntry += Number(paidForThisEntry.cdAmount || 0);
                         } 
                         // Old format: Calculate proportionally
-                        else if (payment.cdApplied && payment.cdAmount && payment.paidFor?.length > 0) {
-                            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + (pf.amount || 0), 0);
+                        else if (payment.cdApplied && payment.cdAmount && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
+                            const paidList = payment.paidFor || [];
+                            const totalPaidForInPayment = paidList.reduce((sum: number, pf: PaidFor) => sum + (pf.amount || 0), 0);
                             if (totalPaidForInPayment > 0) {
                                 const proportion = (paidForThisEntry.amount || 0) / totalPaidForInPayment;
                                 totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
@@ -624,7 +691,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     if (previousGovPayments.length > 0) {
                         // Get the most recent Gov. payment's adjustedOriginal for this entry
                         const mostRecentGovPayment = previousGovPayments[0];
-                        const paidForThisEntry = mostRecentGovPayment.paidFor?.find((pf: any) => pf.srNo === eo.entry.srNo);
+                        const paidForThisEntry = mostRecentGovPayment.paidFor?.find((pf: PaidFor) => pf.srNo === eo.entry.srNo);
                         if (paidForThisEntry && (paidForThisEntry as any).adjustedOriginal !== undefined) {
                             previousAdjustedOriginal = Number((paidForThisEntry as any).adjustedOriginal);
                         }
@@ -667,7 +734,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     // Target-based calculation:
                     // Extra = (Target Amount / Gov Rate) * Extra Rate per Quintal
                     // Gov Required = Target Amount + Extra
-                    const targetAmt = typeof calcTargetAmount === 'function' ? calcTargetAmount() : (calcTargetAmount || 0);
+                    const targetAmt = calcTargetAmount || 0;
                     const currentGovRate = govRate || 0;
                     
                     // Calculate extra amount: (Target Amount / Gov Rate) * Extra Rate per Quintal
@@ -1037,7 +1104,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             
             // Verify: For Gov. payments, verify extraAmount values are correct
             if (paymentMethod === 'Gov.' && totalExtraAmount > 0) {
-                const totalPaidForExtraAmount = paidForDetails.reduce((sum, pf: any) => sum + (pf.extraAmount || 0), 0);
+                const totalPaidForExtraAmount = paidForDetails.reduce((sum, pf: PaidFor) => sum + (pf.extraAmount || 0), 0);
                 const extraAmountDiff = Math.abs(totalPaidForExtraAmount - totalExtraAmount);
                 // CRITICAL: If mismatch detected, fix the extraAmount values
                 if (extraAmountDiff > 0.01) {
@@ -1049,7 +1116,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                     
                     if (totalReceiptOutstanding > 0) {
                         // Recalculate proportions and redistribute
-                        paidForDetails.forEach((pf: any) => {
+                        paidForDetails.forEach((pf: PaidFor) => {
                             const eo = entryOutstandings.find(e => e.entry.srNo === pf.srNo);
                             if (eo) {
                                 const outstanding = Math.max(0, eo.outstanding || 0);
@@ -1059,7 +1126,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         });
                         
                         // Fix last entry to account for rounding
-                        const recalculatedTotal = paidForDetails.reduce((sum, pf: any) => sum + (pf.extraAmount || 0), 0);
+                        const recalculatedTotal = paidForDetails.reduce((sum, pf: PaidFor) => sum + (pf.extraAmount || 0), 0);
                         const remainingDiff = totalExtraAmount - recalculatedTotal;
                         if (paidForDetails.length > 0 && Math.abs(remainingDiff) > 0.01) {
                             const lastEntry = paidForDetails[paidForDetails.length - 1];
@@ -1067,7 +1134,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                         }
                         
                         // Recalculate adjustedOriginal and adjustedOutstanding with corrected extraAmount
-                        paidForDetails.forEach((pf: any) => {
+                        paidForDetails.forEach((pf: PaidFor) => {
                             const eo = entryOutstandings.find(e => e.entry.srNo === pf.srNo);
                             if (eo) {
                                 const baseOriginal = adjustedOriginalPerEntry[pf.srNo] || (eo.originalAmount || 0);
@@ -1692,16 +1759,18 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         }
         // If still empty (e.g., partial edit without changing selection), fallback to previous mapping
         if (paidForDetails.length === 0 && editingPayment?.paidFor?.length) {
-            paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
+            paidForDetails = editingPayment.paidFor.map((pf: PaidFor) => ({ srNo: pf.srNo, amount: pf.amount } as PaidFor));
         }
         
         // For RTGS and Gov., paymentId should be rtgsSrNo
-        const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
+        const finalPaymentId = ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId) || generateReadableId('SP', 0, 5);
         
         // Validate paymentDate before formatting
         let formattedDate: string;
-        if (paymentDate && paymentDate instanceof Date && !isNaN(paymentDate.getTime())) {
+        if (paymentDate instanceof Date && !isNaN(paymentDate.getTime())) {
             formattedDate = format(paymentDate, 'yyyy-MM-dd');
+        } else if (typeof paymentDate === 'string' && paymentDate.trim()) {
+            formattedDate = paymentDate;
         } else {
             formattedDate = format(new Date(), 'yyyy-MM-dd');
         }
@@ -1711,11 +1780,11 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             date: formattedDate,
             // amount = "To Be Paid" amount (actual payment, WITHOUT CD)
             // cdAmount = CD amount (separate field)
-            amount: Math.round(finalAmountToPay), cdAmount: Math.round(effectiveCdAmount),
-            cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
+            amount: Math.round(Number(finalAmountToPay) || 0), cdAmount: Math.round(Number(effectiveCdAmount) || 0),
+            cdApplied: cdEnabled, type: paymentType || 'Full', receiptType: paymentMethod || (paymentMethod === 'Gov.' ? 'Gov.' : (paymentMethod === 'RTGS' ? 'RTGS' : 'Cash')),
             notes: paymentMethod === 'Gov.' ? '' : `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`, // Empty notes for Gov.
             paidFor: paidForDetails,
-            sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+            sixRDate: sixRDate instanceof Date && !isNaN(sixRDate.getTime()) ? format(sixRDate, 'yyyy-MM-dd') : (typeof sixRDate === 'string' ? sixRDate : ''),
             parchiNo: parchiNo,
             supplierName: toTitleCase(supplierDetails.name),
             supplierFatherName: toTitleCase(supplierDetails.fatherName),
@@ -1730,10 +1799,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             paymentDataBase.quantity = rtgsQuantity;
             paymentDataBase.rate = rtgsRate;
             paymentDataBase.rtgsAmount = rtgsAmount;
-            paymentDataBase.bankName = bankDetails.bank;
-            paymentDataBase.bankBranch = bankDetails.branch;
-            paymentDataBase.bankAcNo = bankDetails.acNo;
-            paymentDataBase.bankIfsc = bankDetails.ifscCode;
+            paymentDataBase.bankName = bankDetails.bank || '';
+            paymentDataBase.bankBranch = bankDetails.branch || '';
+            paymentDataBase.bankAcNo = bankDetails.acNo || '';
+            paymentDataBase.bankIfsc = bankDetails.ifscCode || '';
             paymentDataBase.bankAccountId = accountIdForPayment;
         } else if (paymentMethod === 'Gov.') {
             // Gov. payment specific fields
@@ -1759,10 +1828,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             // Online payment
             paymentDataBase.utrNo = utrNo;
             paymentDataBase.checkNo = checkNo;
-            paymentDataBase.bankName = bankDetails.bank;
-            paymentDataBase.bankBranch = bankDetails.branch;
-            paymentDataBase.bankAcNo = bankDetails.acNo;
-            paymentDataBase.bankIfsc = bankDetails.ifscCode;
+            paymentDataBase.bankName = bankDetails.bank || '';
+            paymentDataBase.bankBranch = bankDetails.branch || '';
+            paymentDataBase.bankAcNo = bankDetails.acNo || '';
+            paymentDataBase.bankIfsc = bankDetails.ifscCode || '';
             paymentDataBase.bankAccountId = accountIdForPayment;
         }
 
@@ -1797,7 +1866,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
     } catch (err) {
         // Error updating sync registry
     }
-    } catch (err: any) {
+    } catch (err: unknown) {
         // Quota/offline fallback: write locally and enqueue sync
         const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
         if (isQuotaError(err)) {
@@ -1807,7 +1876,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             if (incomingSelectedEntries && incomingSelectedEntries.length > 0) {
                 paidForDetails = incomingSelectedEntries.map((e: Customer) => ({ srNo: e.srNo, amount: 0 } as any)); // amounts already embedded via distribution above; safe placeholder
             } else if (editingPayment?.paidFor?.length) {
-                paidForDetails = editingPayment.paidFor.map((pf: any) => ({ srNo: pf.srNo, amount: pf.amount } as any));
+                paidForDetails = editingPayment.paidFor.map((pf: PaidFor) => ({ srNo: pf.srNo, amount: pf.amount } as PaidFor));
             }
             
             // Calculate Gov. payment extra amount for offline fallback (if not already calculated)
@@ -1823,15 +1892,15 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 fallbackCalculatedExtraAmount = 0;
             }
             
-            const finalPaymentId = (paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId;
+            const finalPaymentId = ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId) || generateReadableId('SP', 0, 5);
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: finalPaymentId, customerId: selectedCustomerKey || '',
-                date: (paymentDate && paymentDate instanceof Date && !isNaN(paymentDate.getTime())) ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                amount: Math.round(finalAmountToPay), cdAmount: Math.round(calculatedCdAmount),
-                cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
+                date: (paymentDate instanceof Date && !isNaN(paymentDate.getTime())) ? format(paymentDate, 'yyyy-MM-dd') : (typeof paymentDate === 'string' && paymentDate.trim() ? paymentDate : format(new Date(), 'yyyy-MM-dd')),
+                amount: Math.round(Number(finalAmountToPay) || 0), cdAmount: Math.round(Number(calculatedCdAmount) || 0),
+                cdApplied: cdEnabled, type: paymentType || 'Full', receiptType: paymentMethod || (paymentMethod === 'Gov.' ? 'Gov.' : (paymentMethod === 'RTGS' ? 'RTGS' : 'Cash')),
                 notes: paymentMethod === 'Gov.' ? '' : `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                 paidFor: paidForDetails,
-                sixRDate: (sixRDate && sixRDate instanceof Date && !isNaN(sixRDate.getTime())) ? format(sixRDate, 'yyyy-MM-dd') : '',
+                sixRDate: (sixRDate instanceof Date && !isNaN(sixRDate.getTime())) ? format(sixRDate, 'yyyy-MM-dd') : (typeof sixRDate === 'string' ? sixRDate : ''),
                 parchiNo: parchiNo,
                 supplierName: toTitleCase(supplierDetails.name),
                 supplierFatherName: toTitleCase(supplierDetails.fatherName),
@@ -1846,10 +1915,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                 paymentDataBase.quantity = rtgsQuantity;
                 paymentDataBase.rate = rtgsRate;
                 paymentDataBase.rtgsAmount = rtgsAmount;
-                paymentDataBase.bankName = bankDetails.bank;
-                paymentDataBase.bankBranch = bankDetails.branch;
-                paymentDataBase.bankAcNo = bankDetails.acNo;
-                paymentDataBase.bankIfsc = bankDetails.ifscCode;
+                paymentDataBase.bankName = bankDetails.bank || '';
+                paymentDataBase.bankBranch = bankDetails.branch || '';
+                paymentDataBase.bankAcNo = bankDetails.acNo || '';
+                paymentDataBase.bankIfsc = bankDetails.ifscCode || '';
                 (paymentDataBase as any).bankAccountId = accountIdForPayment;
             } else if (paymentMethod === 'Gov.') {
                 (paymentDataBase as any).rtgsSrNo = rtgsSrNo;
@@ -1868,10 +1937,10 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
             } else {
                 paymentDataBase.utrNo = utrNo;
                 paymentDataBase.checkNo = checkNo;
-                paymentDataBase.bankName = bankDetails.bank;
-                paymentDataBase.bankBranch = bankDetails.branch;
-                paymentDataBase.bankAcNo = bankDetails.acNo;
-                paymentDataBase.bankIfsc = bankDetails.ifscCode;
+                paymentDataBase.bankName = bankDetails.bank || '';
+                paymentDataBase.bankBranch = bankDetails.branch || '';
+                paymentDataBase.bankAcNo = bankDetails.acNo || '';
+                paymentDataBase.bankIfsc = bankDetails.ifscCode || '';
                 (paymentDataBase as any).bankAccountId = accountIdForPayment;
             }
             const paymentIdToUse = editingPayment ? editingPayment.id : ((paymentMethod === 'RTGS' || paymentMethod === 'Gov.') ? rtgsSrNo : paymentId);
@@ -1980,10 +2049,12 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
                             detail: { affectedSrNos: allAffectedSrNos, isCustomer } 
                         }));
                     } catch (error) {
+                        handleSilentError(error, 'processPaymentLogic - event dispatch');
                     }
                 }
             } catch (error) {
                 // Don't fail the payment save if recalculation fails
+                handleSilentError(error, 'processPaymentLogic - recalculation fallback');
             }
         })();
     }
@@ -2084,11 +2155,13 @@ async function recalculateOutstandingForAffectedEntries(
                         detail: { affectedSrNos, isCustomer } 
                     }));
                 } catch (error) {
+                    handleSilentError(error, 'recalculateOutstandingForSrNo - event dispatch');
                 }
             }
         }
     } catch (error) {
         // Don't throw - this is a background update
+        handleSilentError(error, 'recalculateOutstandingForSrNo - background update fallback');
     }
 }
 
@@ -2115,7 +2188,7 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
     // Check if this is a Gov. payment
     const isGovPayment = paymentToDelete.receiptType === 'Gov.';
     
-    const performDelete = async (transOrBatch: any) => {
+    const performDelete = async (transOrBatch: FirestoreTransaction) => {
         // For Gov. payments, use the governmentFinalizedPayments collection
         // For other payments, use the regular payments collection
         let paymentCollection;
@@ -2153,7 +2226,7 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
             notifySyncRegistry(collectionName, {}).catch(err => {});
         } catch (err) {
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         // Quota/offline fallback: delete locally and enqueue sync
         const { isQuotaError, markFirestoreDisabled } = await import('./realtime-guard');
         if (isQuotaError(err)) {
@@ -2186,6 +2259,7 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
                     }
                     await enqueueSyncTask(deleteTaskType, { id: paymentToDelete.id }, { attemptImmediate: true, dedupeKey: `${deleteTaskType}:${paymentToDelete.id}` });
                 } catch (error) {
+                    handleSilentError(error, 'deletePayment - sync task enqueue');
                 }
                 
                 // ✅ Trigger custom event to notify listeners of IndexedDB delete
@@ -2202,9 +2276,11 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
                             } 
                         }));
                     } catch (error) {
+                        handleSilentError(error, 'deletePayment - event dispatch');
                     }
                 }
             } catch (err) {
+                handleSilentError(err, 'deletePayment - background operation fallback');
             }
         })();
     }
@@ -2223,12 +2299,12 @@ export const handleDeletePaymentLogic = async (context: { paymentId: string; pay
                             detail: { affectedSrNos, isCustomer } 
                         }));
                     } catch (error) {
+                        handleSilentError(error, 'updatePayment - event dispatch');
                     }
                 }
             } catch (error) {
+                handleSilentError(error, 'updatePayment - background operation fallback');
             }
         })();
     }
 };
-
-

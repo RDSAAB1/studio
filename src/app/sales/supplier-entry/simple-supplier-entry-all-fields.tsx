@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useTransition, useRef, useDeferredValue } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -15,17 +15,16 @@ import SimpleSupplierFormAllFields from "@/components/sales/simple-supplier-form
 import { SimpleCalculatedSummary } from "@/components/sales/simple-calculated-summary";
 import { SupplierNavigationBar } from "@/components/sales/supplier-navigation-bar";
 import { SimpleSupplierTable } from "@/components/sales/simple-supplier-table";
-import { CombinedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import type { ConsolidatedReceiptData } from "@/lib/definitions";
-import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
-import { DetailsDialog } from "@/components/sales/details-dialog";
+import { SupplierEntryDialogs } from "./components/supplier-entry-dialogs";
+import { useSupplierImportExport } from "./hooks/use-supplier-import-export";
+import { useSupplierSearch } from "./hooks/use-supplier-search";
 import { CompactSupplierTable } from "@/components/sales/compact-supplier-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, Save, Plus, Search, Trash2, Printer } from "lucide-react";
 import type { Customer, OptionItem } from "@/lib/definitions";
-import * as XLSX from 'xlsx';
 
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, latestSupplier?: Customer): CompleteSupplierFormValues => {
     const today = new Date();
@@ -77,7 +76,6 @@ export default function SimpleSupplierEntryAllFields() {
     const [currentView, setCurrentView] = useState<'entry' | 'data'>('entry');
     const [isEditing, setIsEditing] = useState(false);
     const [dataLoaded, setDataLoaded] = useState(false);
-    const [isPending, startTransition] = useTransition();
     // NO LOADING STATES - Data loads initially, then only CRUD updates
     const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
     const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
@@ -89,126 +87,26 @@ export default function SimpleSupplierEntryAllFields() {
     const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
     const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
     const [documentType, setDocumentType] = useState<'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt'>('tax-invoice');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchSteps, setSearchSteps] = useState<string[]>([]);
-    const deferredSearchQuery = useDeferredValue(searchQuery);
-    const deferredSearchSteps = useDeferredValue(searchSteps);
+    // Import/Export hook
+    const {
+      handleExport,
+      handleImportClick,
+      handleImportChange,
+      importInputRef,
+    } = useSupplierImportExport({ allSuppliers });
 
-    // Import/Export refs
-    const importInputRef = useRef<HTMLInputElement | null>(null);
+    // Search hook
+    const {
+      searchQuery,
+      searchSteps,
+      filteredSuppliers,
+      handleSearchChange,
+      isPending: isSearchPending,
+    } = useSupplierSearch({ allSuppliers });
     const formRef = useRef<HTMLFormElement | null>(null);
     const firstInputRef = useRef<HTMLInputElement | null>(null);
 
-    const handleExport = useCallback(() => {
-        const rows = (allSuppliers || []).map((s) => ({
-            'SR NO.': s.srNo,
-            'DATE': s.date,
-            'NAME': s.name,
-            'FATHER NAME': s.fatherName,
-            'ADDRESS': s.address,
-            'CONTACT': s.contact,
-            'VEHICLE NO': s.vehicleNo,
-            'VARIETY': s.variety,
-            'GROSS WT': s.grossWeight,
-            'TIER WT': s.teirWeight,
-            'NET WT': s.netWeight,
-            'RATE': s.rate,
-            'KARTA %': s.kartaPercentage,
-            'LAB RATE': s.labouryRate,
-            'BROKERAGE': s.brokerage,
-            'BROKERAGE RATE': s.brokerageRate,
-            'BROKERAGE ADD/SUB': s.brokerageAddSubtract ? 'ADD' : 'SUB',
-            'KANTA': s.kanta,
-            'AMOUNT': s.amount,
-            'KARTA AMT': s.kartaAmount,
-            'LAB AMT': s.labouryAmount,
-            'NET AMT': s.netAmount,
-            'TERM': s.term,
-            'DUE DATE': s.dueDate,
-            'SO': s.so,
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(rows);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers');
-        XLSX.writeFile(workbook, 'suppliers-export.xlsx');
-        toast({ title: 'Exported', description: `${rows.length} rows exported` });
-    }, [allSuppliers, toast]);
-
-    const handleImportClick = useCallback(() => {
-        importInputRef.current?.click();
-    }, []);
-
-    const handleImportChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        try {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = e.target?.result as ArrayBuffer | string;
-                    const workbook = XLSX.read(data, { type: typeof data === 'string' ? 'binary' : 'array', cellNF: true, cellText: false });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-
-                    let nextSrNum = (allSuppliers || []).length > 0
-                        ? Math.max(...(allSuppliers || []).map(c => parseInt((c.srNo || 'S0000').substring(1)) || 0)) + 1
-                        : 1;
-
-                    let imported = 0;
-                    for (const item of json) {
-                        const supplierData: Customer = {
-                            id: item['ID'] || crypto.randomUUID(),
-                            srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                            date: item['DATE'] || format(new Date(), 'yyyy-MM-dd'),
-                            name: toTitleCase(item['NAME'] || ''),
-                            fatherName: toTitleCase(item['FATHER NAME'] || ''),
-                            address: toTitleCase(item['ADDRESS'] || ''),
-                            contact: String(item['CONTACT'] || ''),
-                            vehicleNo: String(item['VEHICLE NO'] || '').toUpperCase(),
-                            variety: toTitleCase(item['VARIETY'] || ''),
-                            grossWeight: Number(item['GROSS WT']) || 0,
-                            teirWeight: Number(item['TIER WT']) || 0,
-                            netWeight: Number(item['NET WT']) || 0,
-                            rate: Number(item['rate'] ?? item['RATE']) || 0,
-                            kartaPercentage: Number(item['KARTA %']) || 0,
-                            labouryRate: Number(item['LAB RATE']) || 0,
-                            brokerage: Number(item['BROKERAGE']) || 0,
-                            brokerageRate: Number(item['BROKERAGE RATE']) || 0,
-                            brokerageAddSubtract: String(item['BROKERAGE ADD/SUB'] || 'ADD').toUpperCase() === 'ADD',
-                            kanta: Number(item['KANTA']) || 0,
-                            amount: Number(item['AMOUNT']) || 0,
-                            kartaAmount: Number(item['KARTA AMT']) || 0,
-                            labouryAmount: Number(item['LAB AMT']) || 0,
-                            netAmount: Number(item['NET AMT']) || 0,
-                            term: String(item['TERM'] || ''),
-                            dueDate: String(item['DUE DATE'] || ''),
-                            so: String(item['SO'] || ''),
-                            forceUnique: Boolean(item['FORCE UNIQUE'] || false),
-                            paymentType: String(item['PAYMENT TYPE'] || ''),
-                            // optional/unused columns remain default/undefined
-                        } as Customer;
-
-                        await addSupplier(supplierData);
-                        imported++;
-                    }
-
-                    toast({ title: 'Imported', description: `${imported} rows imported` });
-                } catch (err) {
-                    toast({ variant: 'destructive', title: 'Import failed', description: 'Invalid file format' });
-                } finally {
-                    event.target.value = '';
-                }
-            };
-
-            // Read file
-            reader.readAsBinaryString(file);
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Import failed', description: 'Could not read file' });
-        }
-    }, [allSuppliers, toast]);
+    // Import/Export handlers are now from useSupplierImportExport hook
 
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
@@ -901,82 +799,7 @@ export default function SimpleSupplierEntryAllFields() {
         setIsDocumentPreviewOpen(true);
     }, []);
 
-    // Pre-index suppliers for faster search (only when allSuppliers changes)
-    const indexedSuppliers = useMemo(() => {
-        if (!allSuppliers || allSuppliers.length === 0) return [];
-        
-        return allSuppliers.map(supplier => ({
-            ...supplier,
-            searchIndex: [
-                supplier.name?.toLowerCase() || '',
-                supplier.so?.toLowerCase() || '',
-                supplier.address?.toLowerCase() || '',
-                supplier.srNo?.toLowerCase() || '',
-                supplier.contact?.toLowerCase() || '',
-                supplier.vehicleNo?.toLowerCase() || ''
-            ].join(' ')
-        }));
-    }, [allSuppliers]);
-
-    // Multi-step filtering logic with deferred values for smooth typing
-    const filteredSuppliers = useMemo(() => {
-        if (!indexedSuppliers || indexedSuppliers.length === 0) {
-            return [];
-        }
-
-        // If no search query or search steps, return all suppliers
-        if (!deferredSearchQuery || deferredSearchQuery.trim() === '' || deferredSearchSteps.length === 0) {
-            return indexedSuppliers;
-        }
-
-        // If only one search step, do optimized search using pre-indexed data
-        if (deferredSearchSteps.length === 1) {
-            const query = deferredSearchSteps[0].toLowerCase().trim();
-            if (!query) return indexedSuppliers;
-            
-            // Use pre-indexed search string for faster filtering
-            return indexedSuppliers.filter(supplier => 
-                supplier.searchIndex.includes(query)
-            );
-        }
-
-        // Multiple search steps - apply progressive filtering with early exit
-        let result = indexedSuppliers;
-        
-        for (const step of deferredSearchSteps) {
-            const query = step.toLowerCase().trim();
-            if (!query) continue;
-            
-            // Early exit if no results
-            if (result.length === 0) break;
-            
-            // Use pre-indexed search for faster filtering
-            result = result.filter(supplier => 
-                supplier.searchIndex.includes(query)
-            );
-        }
-
-        return result;
-    }, [indexedSuppliers, deferredSearchQuery, deferredSearchSteps]);
-
-    // Handle search input with multi-step filtering - optimized for no lag
-    const handleSearchChange = useCallback((value: string) => {
-        // Update input immediately for responsive UI
-        setSearchQuery(value);
-        
-        // Use startTransition for non-urgent state updates to prevent blocking
-        startTransition(() => {
-            // If empty, clear search steps
-            if (!value || value.trim() === '') {
-                setSearchSteps([]);
-                return;
-            }
-            
-            // Split by comma and filter out empty strings
-            const steps = value.split(',').map(step => step.trim()).filter(step => step.length > 0);
-            setSearchSteps(steps);
-        });
-    }, []);
+    // Search/filter logic is now from useSupplierSearch hook
 
     const handlePrintSupplier = useCallback((supplier: Customer) => {
         // Open print format window for supplier
@@ -1525,40 +1348,21 @@ export default function SimpleSupplierEntryAllFields() {
                 {currentView === 'data' && dataView}
             </div>
 
-            {/* Print Dialogs */}
-            <CombinedReceiptPrintDialog
-                receipts={receiptsToPrint}
-                consolidatedData={consolidatedReceiptData}
+            <SupplierEntryDialogs
+                receiptsToPrint={receiptsToPrint}
+                setReceiptsToPrint={setReceiptsToPrint}
+                consolidatedReceiptData={consolidatedReceiptData}
+                setConsolidatedReceiptData={setConsolidatedReceiptData}
                 allConsolidatedGroups={allConsolidatedGroups}
-                settings={receiptSettings}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setReceiptsToPrint([]);
-                        setConsolidatedReceiptData(null);
-                        setAllConsolidatedGroups([]);
-                    }
-                }}
-                isCustomer={false}
-            />
-            
-            {/* Removed standalone individual and consolidated dialogs; combined dialog handles all */}
-
-            {/* Details and Document Preview Dialogs */}
-            <DetailsDialog
-                isOpen={!!detailsCustomer}
-                onOpenChange={(open) => !open && setDetailsCustomer(null)}
-                customer={detailsCustomer}
-                paymentHistory={[]} // No payment history for suppliers
-                entryType="Supplier"
-            />
-            
-            <DocumentPreviewDialog
-                isOpen={isDocumentPreviewOpen}
-                setIsOpen={setIsDocumentPreviewOpen}
-                customer={documentPreviewCustomer}
+                setAllConsolidatedGroups={setAllConsolidatedGroups}
+                receiptSettings={receiptSettings}
+                detailsCustomer={detailsCustomer}
+                setDetailsCustomer={setDetailsCustomer}
+                isDocumentPreviewOpen={isDocumentPreviewOpen}
+                setIsDocumentPreviewOpen={setIsDocumentPreviewOpen}
+                documentPreviewCustomer={documentPreviewCustomer}
                 documentType={documentType}
                 setDocumentType={setDocumentType}
-                receiptSettings={receiptSettings}
             />
         </div>
     );

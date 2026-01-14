@@ -2,6 +2,14 @@
 
 import type { SyncTask, SyncTaskStatus } from "./definitions";
 import { db } from "./database";
+import { logError } from "./error-logger";
+import { retry } from "./retry-utils";
+
+// Helper function to handle errors silently (for listener callbacks)
+function handleSilentError(error: unknown, context: string): void {
+  // Log error using error logging service
+  logError(error, context, 'low');
+}
 
 type SyncProcessor<T = unknown> = (task: SyncTask<T>) => Promise<void>;
 
@@ -60,7 +68,7 @@ function notifyListeners(stats: SyncQueueStats) {
     try {
       listener(stats);
     } catch (error) {
-
+      handleSilentError(error, 'notifyListeners - listener callback');
     }
   });
 }

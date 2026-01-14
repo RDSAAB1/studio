@@ -5,7 +5,7 @@ import type { Customer, Payment, Holiday } from './definitions';
 import { isSunday, addDays, differenceInCalendarDays, isValid, parseISO, format } from 'date-fns';
 
 interface SupplierFormValues {
-    date: Date;
+    date: Date | string;
     term: string | number;
     srNo?: string;
     grossWeight?: number;
@@ -17,17 +17,21 @@ interface SupplierFormValues {
     brokerage?: number;
     brokerageRate?: number;
     isBrokerageIncluded?: boolean;
+    brokerageAddSubtract?: boolean;
 }
 
 interface CustomerFormValues {
-    date: Date;
+    date: Date | string;
     srNo?: string;
     grossWeight?: number;
     teirWeight?: number;
+    kartaPercentage?: number;
+    variety?: string;
     bags?: number;
     bagWeightKg?: number;
     rate?: number;
     brokerageRate?: number;
+    brokerage?: number;
     cd?: number;
     cdAmount?: number;
     kanta?: number;
@@ -84,7 +88,7 @@ export function formatPaymentId(num: number | string) {
 
 export function formatCurrency(amount: number): string {
   if (isNaN(amount)) amount = 0;
-  const options = {
+  const options: Intl.NumberFormatOptions = {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
@@ -395,6 +399,84 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         calculatedRate: isRiceBran ? calculatedRate : undefined, // Store calculated rate for RICE BRAN
     }
 };
+
+/**
+ * Converts technical errors to user-friendly error messages
+ * @param error - The error object (Error, string, or unknown)
+ * @param context - Optional context about where the error occurred
+ * @returns A user-friendly error message
+ */
+export function getUserFriendlyErrorMessage(error: unknown, context?: string): string {
+  // Handle string errors
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  // Handle Error objects
+  if (error instanceof Error) {
+    const message = error.message;
+    
+    // Firebase/Firestore specific errors
+    if (message.includes('permission-denied') || message.includes('PERMISSION_DENIED')) {
+      return 'You do not have permission to perform this action. Please contact your administrator.';
+    }
+    
+    if (message.includes('unavailable') || message.includes('UNAVAILABLE')) {
+      return 'The service is temporarily unavailable. Please try again in a moment.';
+    }
+    
+    if (message.includes('quota-exceeded') || message.includes('QUOTA_EXCEEDED')) {
+      return 'Service quota exceeded. Please try again later or contact support.';
+    }
+    
+    if (message.includes('network') || message.includes('NETWORK')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+    
+    if (message.includes('not-found') || message.includes('NOT_FOUND')) {
+      return context 
+        ? `The requested ${context} was not found.`
+        : 'The requested item was not found.';
+    }
+    
+    if (message.includes('already-exists') || message.includes('ALREADY_EXISTS')) {
+      return context
+        ? `This ${context} already exists. Please use a different value.`
+        : 'This item already exists. Please use a different value.';
+    }
+    
+    if (message.includes('invalid-argument') || message.includes('INVALID_ARGUMENT')) {
+      return 'Invalid input provided. Please check your data and try again.';
+    }
+    
+    if (message.includes('deadline-exceeded') || message.includes('DEADLINE_EXCEEDED')) {
+      return 'The operation took too long. Please try again.';
+    }
+    
+    // Database errors
+    if (message.includes('database') || message.includes('DATABASE')) {
+      return 'A database error occurred. Please try again or contact support if the problem persists.';
+    }
+    
+    // Generic error - return the message if it's user-friendly, otherwise provide a generic one
+    if (message.length > 0 && message.length < 100 && !message.includes('Error:') && !message.includes('at ')) {
+      return message;
+    }
+  }
+
+  // Handle objects with message property
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message: unknown }).message);
+    if (message && message !== '[object Object]') {
+      return getUserFriendlyErrorMessage(message, context);
+    }
+  }
+
+  // Default fallback
+  return context
+    ? `An error occurred while ${context}. Please try again or contact support if the problem persists.`
+    : 'An unexpected error occurred. Please try again or contact support if the problem persists.';
+}
 
 export const levenshteinDistance = (s1: string, s2: string): number => {
     s1 = s1.toLowerCase();

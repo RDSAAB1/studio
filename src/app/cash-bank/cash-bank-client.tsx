@@ -66,7 +66,6 @@ export default function CashBankClient() {
     try {
         globalData = useGlobalData();
     } catch (error) {
-        console.error('Error accessing global data context:', error);
         // Return error state
         return (
             <div className="flex h-64 w-full items-center justify-center">
@@ -401,7 +400,6 @@ export default function CashBankClient() {
             transferForm.reset({ amount: 0, description: "", source: null, destination: null });
         } catch (error) {
             // Error is already handled in handleAddFundTransaction, just prevent unhandled rejection
-            console.error('Transfer submission error:', error);
         }
     };
 

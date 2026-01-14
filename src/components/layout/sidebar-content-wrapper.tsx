@@ -65,6 +65,7 @@ const menuItems = [
       { id: "Reports-OrderTracking", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
       { id: "Reports-ProductCatalog", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
       { id: "Reports-FirestoreMonitor", name: "Firestore Monitor", href: "/admin/firestore-monitor", icon: <Activity className="h-5 w-5" /> },
+      { id: "Reports-TasksFile", name: "Taskfile (TASKS.md)", href: "/admin/tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
     ],
   },
   {

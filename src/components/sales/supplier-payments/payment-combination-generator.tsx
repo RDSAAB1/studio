@@ -82,8 +82,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
             <div className={cn("grid grid-cols-1 gap-2", 
                 hideRateFields ? "sm:grid-cols-1" : showRsAndBagFields ? "sm:grid-cols-5" : "sm:grid-cols-3")}>
                 <div className="space-y-1">
-                    <Label className="text-[11px] whitespace-nowrap">Target Amt</Label>
+                    <Label htmlFor="targetAmount" className="text-[11px] whitespace-nowrap">Target Amt</Label>
                     <Input
+                        id="targetAmount"
+                        name="targetAmount"
                         type="number"
                         value={calcTargetAmount}
                         onChange={(e) => setCalcTargetAmount(Number(e.target.value))}
@@ -93,8 +95,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                 {!hideRateFields && (
                     <>
                         <div className="space-y-1">
-                            <Label className="text-[11px] whitespace-nowrap">Min Rate</Label>
+                            <Label htmlFor="minRate" className="text-[11px] whitespace-nowrap">Min Rate</Label>
                             <Input
+                                id="minRate"
+                                name="minRate"
                                 type="number"
                                 value={minRate}
                                 onChange={(e) => setMinRate(Number(e.target.value))}
@@ -102,8 +106,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[11px] whitespace-nowrap">Max Rate</Label>
+                            <Label htmlFor="maxRate" className="text-[11px] whitespace-nowrap">Max Rate</Label>
                             <Input
+                                id="maxRate"
+                                name="maxRate"
                                 type="number"
                                 value={maxRate}
                                 onChange={(e) => setMaxRate(Number(e.target.value))}
@@ -115,8 +121,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                 {/* Rs field - only show for Gov. payment if rate fields are not hidden */}
                 {showRsAndBagFields && setRsValue && !hideRateFields && (
                     <div className="space-y-1">
-                        <Label className="text-[11px] whitespace-nowrap">Rs</Label>
+                        <Label htmlFor="rsValue" className="text-[11px] whitespace-nowrap">Rs</Label>
                         <Input
+                            id="rsValue"
+                            name="rsValue"
                             type="number"
                             value={rsValue || ''}
                             onChange={(e) => setRsValue(Number(e.target.value) || 0)}
@@ -127,8 +135,10 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                 )}
                 {showRsAndBagFields && (
                     <div className="space-y-1">
-                        <Label className="text-[11px] whitespace-nowrap">Bag Qty</Label>
+                        <Label htmlFor="bagQty" className="text-[11px] whitespace-nowrap">Bag Qty</Label>
                         <Input
+                            id="bagQty"
+                            name="bagQty"
                             type="number"
                             value={bagSize ?? ''}
                             onChange={(e) => {

@@ -22,6 +22,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { Loader2, Percent } from "lucide-react";
 
+// Helper function to handle errors silently (for non-critical lookup operations)
+function handleSilentError(error: unknown, context: string): void {
+  // Error is intentionally handled silently for non-critical lookup operations
+  // In production, this could be sent to an error tracking service
+  if (process.env.NODE_ENV === 'development') {
+    // Only log in development for debugging
+    // eslint-disable-next-line no-console
+    console.debug(`[Supplier Entry Edit] Silent error in ${context}:`, error);
+  }
+}
+
 const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
@@ -152,7 +163,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                     fullEntry = await db.suppliers.get(entry.id) as Customer | null;
 
                 } catch (error) {
-
+                    handleSilentError(error, 'loadSupplierData - get by id');
                 }
             }
             
@@ -162,7 +173,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                     fullEntry = await db.suppliers.where('srNo').equals(entry.srNo).first() as Customer | null;
 
                 } catch (error) {
-
+                    handleSilentError(error, 'loadSupplierData - get by srNo');
                 }
             }
             
@@ -178,7 +189,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
 
                     }
                 } catch (error) {
-
+                    handleSilentError(error, 'loadSupplierData - find id by srNo');
                 }
             }
 
@@ -324,6 +335,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                         }
                     } catch (error) {
                         // Ignore lookup errors
+                        handleSilentError(error, 'handleSave - supplier lookup by id');
                     }
                 }
                 
@@ -335,6 +347,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                         }
                     } catch (error) {
                         // Ignore lookup errors
+                        handleSilentError(error, 'handleSave - supplier lookup by id');
                     }
                 }
 
@@ -392,7 +405,6 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 // Perform database update
                 const success = await updateSupplier(id, updateData);
                 if (!success) {
-                    console.error('Background updateSupplier returned false');
                     toast({ title: "Update failed", description: "Failed to update entry in database", variant: "destructive" });
                     return;
                 }
@@ -401,7 +413,6 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
                 await forceSyncToFirestore();
             } catch (error) {
-                console.error('Background update failed:', error);
                 toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
             }
         })();

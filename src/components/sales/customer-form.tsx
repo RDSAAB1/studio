@@ -408,8 +408,8 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </div>
                                 {calculated.calculatedRate !== undefined && (
                                     <div className="space-y-0.5">
-                                        <Label className="text-xs text-muted-foreground">Calculated Rate</Label>
-                                        <div className="h-7 flex items-center pl-9 text-xs font-semibold text-primary">
+                                        <Label htmlFor="calculatedRate" className="text-xs text-muted-foreground">Calculated Rate</Label>
+                                        <div id="calculatedRate" className="h-7 flex items-center pl-9 text-xs font-semibold text-primary">
                                             ₹{Number(calculated.calculatedRate).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                         </div>
                                     </div>
@@ -432,8 +432,9 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs">Date</Label>
+                                    <Label htmlFor={`customerDate-${field.name}`} className="text-xs">Date</Label>
                                     <SmartDatePicker
+                                        id={`customerDate-${field.name}`}
                                         value={field.value}
                                         onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                         placeholder="Pick a date"
@@ -451,6 +452,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                     </div>
                                     <div className="relative z-[9999]">
                                     <CustomDropdown
+                                        id="name"
                                         options={nameOptions}
                                         value={form.watch('name')}
                                         onChange={(value) => {
@@ -470,7 +472,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <div className="space-y-0.5">
                                 <Label htmlFor="contact" className="text-xs">Contact No.</Label>
                                 <InputWithIcon icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                   <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                   <Controller name="contact" control={form.control} render={({ field }) => ( <Input id="contact" {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -490,7 +492,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <div className="space-y-0.5">
                                 <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                                 <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-7 text-xs pl-9" /> )}/>
+                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input id="vehicleNo" {...field} onChange={handleCapitalizeOnChange} className="h-7 text-xs pl-9" /> )}/>
                                 </InputWithIcon>
                             </div>
                              <Controller name="paymentType" control={form.control} render={({ field }) => (

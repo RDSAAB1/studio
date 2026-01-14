@@ -226,12 +226,12 @@ export const GovForm = (props: any) => {
                     </div>
                     <div className="bg-gradient-to-br from-primary/10 via-muted/75 to-muted/55 p-2 border-t border-primary/20">
                         <div className="flex items-center justify-between gap-2">
-                            <Label className="text-[10px] font-extrabold text-muted-foreground">Calculation Base:</Label>
+                            <Label htmlFor="calculationBase" className="text-[10px] font-extrabold text-muted-foreground">Calculation Base:</Label>
                             <Select 
                                 value={extraAmountBaseType} 
                                 onValueChange={(v) => setExtraAmountBaseType(v as 'receipt' | 'target')}
                             >
-                                <SelectTrigger className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner w-40">
+                                <SelectTrigger id="calculationBase" className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner w-40">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

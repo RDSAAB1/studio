@@ -26,6 +26,16 @@ import { runTransaction, doc, collection, getDoc, Timestamp } from 'firebase/fir
 import { firestoreDB } from '@/lib/firebase';
 import { db } from '@/lib/database';
 
+// Helper function to handle errors silently (for non-critical operations)
+function handleSilentError(error: unknown, context: string): void {
+  // Error is intentionally handled silently for non-critical operations
+  // In production, this could be sent to an error tracking service
+  if (process.env.NODE_ENV === 'development') {
+    // Only log in development for debugging
+    // eslint-disable-next-line no-console
+    console.debug(`[Document Preview] Silent error in ${context}:`, error);
+  }
+}
 
 interface DocumentPreviewDialogProps {
     isOpen: boolean;
@@ -272,7 +282,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     } as Customer;
                     await db.customers.put(customerToUpdate);
                 } catch (error) {
-
+                    handleSilentError(error, 'saveAndPrint - customer update');
                 }
             }
 
@@ -305,7 +315,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
                     iframeDoc.head.appendChild(style);
                 } catch (e) {
-
+                    handleSilentError(e, 'saveAndPrint - iframe style injection');
                 }
             });
 
@@ -440,8 +450,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                             <Card>
                                 <CardHeader className="p-3"><CardTitle className="text-base">Tax & Invoice Info</CardTitle></CardHeader>
                                 <CardContent className="p-3 space-y-3">
-                                    <div className="space-y-1"><Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label><Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label><Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label><Input id="hsnCode" name="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label><Input id="taxRate" name="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                     
                                      <div className="flex items-center justify-center pt-2">
                                         <button
@@ -475,12 +485,13 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                              <Card>
                                 <CardHeader className="p-3"><CardTitle className="text-base">Additional Details</CardTitle></CardHeader>
                                 <CardContent className="p-3 grid grid-cols-2 gap-3">
-                                    <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label className="text-xs">Gate Pass No.</Label><Input value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label className="text-xs">G.R. No.</Label><Input value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label htmlFor="nineRNo" className="text-xs">9R No.</Label><Input id="nineRNo" name="nineRNo" value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label htmlFor="gatePassNo" className="text-xs">Gate Pass No.</Label><Input id="gatePassNo" name="gatePassNo" value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label htmlFor="grNo" className="text-xs">G.R. No.</Label><Input id="grNo" name="grNo" value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">G.R. Date</Label>
+                                        <Label htmlFor="grDate" className="text-xs">G.R. Date</Label>
                                         <SmartDatePicker
+                                            id="grDate"
                                             value={invoiceDetails.grDate || ""}
                                             onChange={(next) => setInvoiceDetails({...invoiceDetails, grDate: next })}
                                             inputClassName="h-8 text-xs"

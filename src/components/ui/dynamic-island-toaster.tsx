@@ -3,7 +3,7 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 export default function DynamicIslandToaster() {
   const { toasts } = useToast();
@@ -14,14 +14,46 @@ export default function DynamicIslandToaster() {
     setIsClient(true);
   }, []);
   
+  // ✅ FIX: Move useMemo before early return to follow Rules of Hooks
+  // ✅ IMPROVED: Better error detection - check variant, title, and description
+  // Filter out success toasts - only show errors/warnings
+  const filteredToasts = useMemo(() => {
+    // Return empty array if not client yet (to avoid hydration issues)
+    if (!isClient) {
+      return [];
+    }
+    
+    return toasts.filter((t) => {
+      // Explicitly exclude success toasts
+      if (t.variant === 'success') {
+        return false;
+      }
+      
+      // Show destructive (error) toasts
+      if (t.variant === 'destructive') {
+        return true;
+      }
+      
+      // Check for error keywords in title or description
+      const titleStr = t.title?.toString().toLowerCase() || '';
+      const descStr = t.description?.toString().toLowerCase() || '';
+      const errorKeywords = ['error', 'failed', 'failure', 'invalid', 'warning', 'alert', 'issue', 'problem'];
+      
+      const hasErrorKeyword = errorKeywords.some(keyword => 
+        titleStr.includes(keyword) || descStr.includes(keyword)
+      );
+      
+      return hasErrorKeyword;
+    });
+  }, [toasts, isClient]);
+  
+  // Early return after all hooks are called
   if (!isClient) {
     // On the server or during the initial client render, render nothing
     // to avoid the hydration mismatch.
     return null;
   }
-
-  // Filter out success toasts - only show errors/warnings
-  const filteredToasts = toasts.filter(t => t.variant === 'destructive' || (!t.variant && t.title?.toString().toLowerCase().includes('error')));
+  
   const hasToasts = filteredToasts.length > 0;
   const toast = filteredToasts[0]; // Always work with the first toast
 
@@ -44,6 +76,10 @@ export default function DynamicIslandToaster() {
         // Ensure it doesn't block interactions
         pointerEvents: 'none',
       }}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-label={hasToasts ? "Notification" : "No notifications"}
     >
       <div
         key={toast?.id || 'empty'}

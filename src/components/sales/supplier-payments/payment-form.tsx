@@ -171,8 +171,9 @@ export const PaymentForm = (props: any) => {
                             {/* Payment Date - Hidden for RTGS (will be filled from RTGS Report) */}
                             {paymentMethod !== 'RTGS' && (
                                 <div className="space-y-1 col-span-2">
-                                    <Label className="text-[10px] font-bold">Payment Date</Label>
+                                    <Label htmlFor="paymentDate" className="text-[10px] font-bold">Payment Date</Label>
                                     <SmartDatePicker
+                                        id="paymentDate"
                                         value={paymentDate}
                                         onChange={(val) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                         placeholder="Pick a date"
@@ -185,15 +186,17 @@ export const PaymentForm = (props: any) => {
                             
                             {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold">{paymentMethod === 'Cash' ? 'Payment ID (Voucher No.)' : 'Payment ID'}</Label>
-                                    <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
+                                    <Label htmlFor="paymentId" className="text-[10px] font-bold">{paymentMethod === 'Cash' ? 'Payment ID (Voucher No.)' : 'Payment ID'}</Label>
+                                    <Input id="paymentId" name="paymentId" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
                             )}
                              
                             {(paymentMethod === 'Cash' || paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold">Parchi No. (SR#)</Label>
+                                    <Label htmlFor="parchiNo" className="text-[10px] font-bold">Parchi No. (SR#)</Label>
                                     <Input 
+                                        id="parchiNo"
+                                        name="parchiNo"
                                         value={parchiNo || ''} 
                                         onChange={(e) => {
 
@@ -209,27 +212,28 @@ export const PaymentForm = (props: any) => {
 
                              {paymentMethod === 'Online' && (
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold">Check No. / Ref</Label>
-                                    <Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"/>
+                                    <Label htmlFor="checkNo" className="text-[10px] font-bold">Check No. / Ref</Label>
+                                    <Input id="checkNo" name="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"/>
                                 </div>
                             )}
 
                              {paymentMethod === 'RTGS' && (
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold">RTGS SR No.</Label>
-                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
+                                    <Label htmlFor="rtgsSrNo" className="text-[10px] font-bold">RTGS SR No.</Label>
+                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
                             )}
 
                              {paymentMethod === 'Gov.' && (
                                 <>
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold">Gov. SR No.</Label>
-                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
+                                    <Label htmlFor="govSrNo" className="text-[10px] font-bold">Gov. SR No.</Label>
+                                    <Input id="govSrNo" name="govSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-[10px] font-mono border-2 border-primary/20 focus:border-primary" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold flex items-center gap-1">Center Name <Button variant="ghost" size="icon" className="h-3.5 w-3.5 shrink-0 hover:bg-primary/10" onClick={() => setIsCenterNameDialogOpen(true)} title="Manage Center Names"><Settings className="h-2.5 w-2.5"/></Button></Label>
+                                    <Label htmlFor="centerName" className="text-[10px] font-bold flex items-center gap-1">Center Name <Button variant="ghost" size="icon" className="h-3.5 w-3.5 shrink-0 hover:bg-primary/10" onClick={() => setIsCenterNameDialogOpen(true)} title="Manage Center Names"><Settings className="h-2.5 w-2.5"/></Button></Label>
                                     <CustomDropdown
+                                        id="centerName"
                                         options={centerNameOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))}
                                         value={centerName || null}
                                         onChange={(value) => {
@@ -255,9 +259,9 @@ export const PaymentForm = (props: any) => {
                             {/* Payment Type - Hidden for Gov. payments (they are always Partial) */}
                             {paymentMethod !== 'Gov.' && (
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold">Payment Type</Label>
+                                <Label htmlFor="paymentType" className="text-[10px] font-bold">Payment Type</Label>
                                 <Select value={paymentType} onValueChange={setPaymentType}>
-                                    <SelectTrigger className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger id="paymentType" className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Full">Full</SelectItem>
                                         <SelectItem value="Partial">Partial</SelectItem>
@@ -268,12 +272,14 @@ export const PaymentForm = (props: any) => {
                             
                             <div className="space-y-1">
                                 <Label htmlFor="settle-amount" className="text-[10px] font-bold">Settle Amount</Label>
-                                <Input id="settle-amount" type="number" value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-[10px] border-2 border-primary/20 focus:border-primary", paymentType === 'Partial' && 'bg-muted/50')} />
+                                <Input id="settle-amount" name="settle-amount" type="number" value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)} onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Partial'} className={cn("h-8 text-[10px] border-2 border-primary/20 focus:border-primary", paymentType === 'Partial' && 'bg-muted/50')} />
                             </div>
 
                              <div className="space-y-1">
-                                <Label className="text-[10px] font-extrabold text-green-600">To Be Paid</Label>
+                                <Label htmlFor="toBePaid" className="text-[10px] font-extrabold text-green-600">To Be Paid</Label>
                                 <Input 
+                                    id="toBePaid"
+                                    name="toBePaid"
                                     type="number" 
                                     value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)} 
                                     onChange={(e) => {
@@ -298,8 +304,9 @@ export const PaymentForm = (props: any) => {
                             {/* Payment From - Hidden for Gov. payments */}
                             {paymentMethod !== 'Gov.' && (
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold">Payment From</Label>
+                                <Label htmlFor="paymentFrom" className="text-[10px] font-bold">Payment From</Label>
                                 <CustomDropdown
+                                    id="paymentFrom"
                                     options={paymentFromOptions}
                                     value={selectedAccountId}
                                     onChange={(value) => setSelectedAccountId(value)}

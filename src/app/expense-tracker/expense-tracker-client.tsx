@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,12 +24,18 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getAllIncomes, updateExpensePayee, updateIncomePayee, deleteExpensesForPayee, deleteIncomesForPayee, addAccount, updateAccount, deleteAccount, getAccount, getAccountsRealtime } from "@/lib/firestore";
+import { ExpenseTrackerTable, type DisplayTransaction } from "./components/expense-tracker-table";
+import { SummaryMetricsCard } from "./components/summary-metrics-card";
+import { TransactionForm } from "./components/transaction-form";
+import { useCategoryManager } from "./hooks/use-category-manager";
+import { useAccountManager } from "./hooks/use-account-manager";
+import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getAllIncomes } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
-import { firestoreDB } from "@/lib/firebase"; 
+import { firestoreDB } from "@/lib/firebase";
+import { ErrorBoundary } from "@/components/error-boundary"; 
 
 
 import { Loader2, Pen, Save, Trash, FileText, ArrowUpDown, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X } from "lucide-react";
@@ -70,9 +76,6 @@ const transactionFormSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
-// This combines both income and expense for the list display
-type DisplayTransaction = (Income | Expense) & { id: string };
-
 const getInitialFormState = (nextTxId: string): TransactionFormValues => {
   // Use persistent date from localStorage, fallback to today
   let persistentDate = new Date();
@@ -109,163 +112,6 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
 };
 
 
-const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
-    <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {icon}
-        </div>
-        {children}
-    </div>
-);
-
-// Expense Tracker Table Component with Infinite Scroll
-const ExpenseTrackerTable = memo(function ExpenseTrackerTable({
-  runningLedger,
-  allSelected,
-  someSelected,
-  toggleSelectAll,
-  requestSort,
-  selectedTransactionIds,
-  toggleTransactionSelection,
-  getDisplayId,
-  handleEdit,
-  handleDelete,
-}: {
-  runningLedger: any[];
-  allSelected: boolean;
-  someSelected: boolean;
-  toggleSelectAll: (checked: boolean) => void;
-  requestSort: (key: any) => void;
-  selectedTransactionIds: Set<string>;
-  toggleTransactionSelection: (id: string, checked: boolean) => void;
-  getDisplayId: (tx: any) => string;
-  handleEdit: (tx: any) => void;
-  handleDelete: (tx: any) => void;
-}) {
-  const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(runningLedger, {
-    totalItems: runningLedger.length,
-    initialLoad: 30,
-    loadMore: 30,
-    threshold: 5,
-    enabled: runningLedger.length > 30,
-  });
-
-  const visibleTransactions = runningLedger.slice(0, visibleItems);
-
-  return (
-    <div className="flex flex-col -mt-px">
-      <div className="overflow-x-auto">
-        <Table className="min-w-[600px]">
-          <TableHeader className="bg-muted/50 sticky top-0 z-10 border-t border-muted">
-          <TableRow>
-            <TableHead className="w-[36px] text-center text-xs py-2">
-              <Checkbox
-                checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                onCheckedChange={(value) => toggleSelectAll(value === true)}
-                aria-label="Select all transactions"
-              />
-            </TableHead>
-            <TableHead className="cursor-pointer text-xs py-2" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-            <TableHead className="cursor-pointer text-xs py-2" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-            <TableHead className="text-xs py-2">Description</TableHead>
-            <TableHead className="text-right text-xs py-2">Debit</TableHead>
-            <TableHead className="text-right text-xs py-2">Credit</TableHead>
-            <TableHead className="text-right text-xs py-2">Running Balance</TableHead>
-            <TableHead className="text-center text-xs py-2">Actions</TableHead>
-          </TableRow>
-          </TableHeader>
-        </Table>
-      </div>
-      <ScrollArea ref={scrollRef} className="h-[380px]">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[600px]">
-          <TableBody>
-          {visibleTransactions.map((transaction) => (
-            <TableRow key={transaction.id}>
-              <TableCell className="text-center py-1.5">
-                <Checkbox
-                  checked={selectedTransactionIds.has(transaction.id)}
-                  onCheckedChange={(value) => toggleTransactionSelection(transaction.id, value === true)}
-                  aria-label={`Select transaction ${getDisplayId(transaction)}`}
-                />
-              </TableCell>
-              <TableCell className="font-mono text-xs py-1.5">{getDisplayId(transaction)}</TableCell>
-              <TableCell className="text-xs py-1.5">{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
-              <TableCell className="text-xs py-1.5">{transaction.description || toTitleCase(transaction.payee)}</TableCell>
-              <TableCell className="text-right text-rose-600 font-medium text-xs py-1.5">{transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}</TableCell>
-              <TableCell className="text-right text-emerald-600 font-medium text-xs py-1.5">{transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}</TableCell>
-              <TableCell className={cn("text-right font-semibold text-xs py-1.5", transaction.runningBalance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                {formatCurrency(transaction.runningBalance)}
-              </TableCell>
-              <TableCell className="text-center py-1.5">
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(transaction)}><Pen className="h-3 w-3" /></Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6"><Trash className="h-3 w-3 text-destructive" /></Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </TableCell>
-            </TableRow>
-          ))}
-          {/* NO LOADING - Data loads instantly, infinite scroll works in background */}
-          {!hasMore && runningLedger.length > 30 && (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-2 text-xs text-muted-foreground">
-                Showing all {runningLedger.length} transactions
-              </TableCell>
-            </TableRow>
-          )}
-          </TableBody>
-        </Table>
-      </div>
-    </ScrollArea>
-    </div>
-  );
-});
-
-const SummaryMetricsCard = ({
-  metrics,
-}: {
-  metrics: Array<{ label: string; value: string; tone?: string; subtext?: string }>;
-}) => (
-  <Card>
-    <CardContent className="p-2 sm:p-3">
-      <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
-        {metrics.map((metric, index) => (
-          <div
-            key={metric.label}
-            className={cn(
-              "flex-1 min-w-[140px] sm:pl-0",
-              index !== 0 && "sm:border-l sm:border-border/40 sm:pl-4"
-            )}
-          >
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
-              {metric.label}
-            </div>
-            <div className={cn("mt-0.5 text-base font-semibold text-foreground", metric.tone)}>
-              {metric.value}
-            </div>
-            {metric.subtext && (
-              <div className="text-[11px] text-muted-foreground mt-0.5">{metric.subtext}</div>
-            )}
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-);
 
 export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
@@ -292,19 +138,25 @@ export default function IncomeExpenseClient() {
     direction: 'descending', // Newest first by default
   });
   
-  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  // Category management hook
+  const {
+    incomeCategories,
+    expenseCategories,
+    setIncomeCategories,
+    setExpenseCategories,
+    isCategoryManagerOpen,
+    setIsCategoryManagerOpen,
+    refreshCategories,
+    handleAddCategory,
+    handleUpdateCategoryName,
+    handleDeleteCategory,
+    handleAddSubCategory,
+    handleDeleteSubCategory,
+  } = useCategoryManager();
+  
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
-  const [isEditAccountOpen, setIsEditAccountOpen] = useState(false);
-  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
-  const [newAccount, setNewAccount] = useState({ name: '', contact: '', address: '', nature: '' as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
-  const [editAccount, setEditAccount] = useState({ name: '', contact: '', address: '', nature: '' as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
-  const [accounts, setAccounts] = useState<Map<string, Account>>(new Map());
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   const [bulkDate, setBulkDate] = useState<string>("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
@@ -392,41 +244,6 @@ export default function IncomeExpenseClient() {
       return uniqueList;
   }, [allTransactions]);
 
-  const filteredTransactions = useMemo(() => {
-      if (!selectedAccount) return allTransactions;
-      return allTransactions.filter(
-          (transaction) => toTitleCase(transaction.payee) === selectedAccount
-      );
-  }, [allTransactions, selectedAccount]);
-
-  const accountOptions = useMemo(() => {
-      const names = new Set<string>();
-      
-      // Add payees from transactions (income/expense)
-      uniquePayees.forEach(name => {
-          const normalized = toTitleCase(name.trim());
-          if (normalized) names.add(normalized);
-      });
-
-      // Add accounts from accounts Map (includes newly created accounts)
-      accounts.forEach((account, accountName) => {
-          if (account?.name) {
-              const normalized = toTitleCase(account.name.trim());
-              if (normalized) names.add(normalized);
-          }
-      });
-
-      const options = Array.from(names)
-          .sort((a, b) => a.localeCompare(b))
-          .map(name => ({
-              value: name,
-              label: name,
-          }));
-
-
-      return options;
-  }, [uniquePayees, accounts]);
-
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
       
@@ -474,6 +291,75 @@ export default function IncomeExpenseClient() {
     setFocus,
     formState: { errors },
   } = form;
+  
+  // Store handleAutoFill in a ref so it can be updated
+  const handleAutoFillRef = useRef<((payeeName: string) => void) | undefined>(undefined);
+  
+  // Account management hook (initialized after form, handleAutoFill will be set via ref)
+  const {
+    selectedAccount,
+    setSelectedAccount,
+    isAddAccountOpen,
+    setIsAddAccountOpen,
+    isEditAccountOpen,
+    setIsEditAccountOpen,
+    isDeleteAccountOpen,
+    setIsDeleteAccountOpen,
+    newAccount,
+    setNewAccount,
+    editAccount,
+    setEditAccount,
+    accounts,
+    handleAddAccount,
+    handleSaveNewAccount,
+    handleEditAccount,
+    handleSaveEditAccount,
+    handleDeleteAccount,
+  } = useAccountManager({
+    setValue,
+    setIsSubmitting,
+    handleAutoFill: (payeeName: string) => {
+      if (handleAutoFillRef.current) {
+        handleAutoFillRef.current(payeeName);
+      }
+    },
+  });
+  
+  // These useMemo hooks depend on account manager hook, so they must come after it
+  const filteredTransactions = useMemo(() => {
+      if (!selectedAccount) return allTransactions;
+      return allTransactions.filter(
+          (transaction) => toTitleCase(transaction.payee) === selectedAccount
+      );
+  }, [allTransactions, selectedAccount]);
+
+  const accountOptions = useMemo(() => {
+      const names = new Set<string>();
+      
+      // Add payees from transactions (income/expense)
+      uniquePayees.forEach(name => {
+          const normalized = toTitleCase(name.trim());
+          if (normalized) names.add(normalized);
+      });
+
+      // Add accounts from accounts Map (includes newly created accounts)
+      accounts.forEach((account, accountName) => {
+          if (account?.name) {
+              const normalized = toTitleCase(account.name.trim());
+              if (normalized) names.add(normalized);
+          }
+      });
+
+      const options = Array.from(names)
+          .sort((a, b) => a.localeCompare(b))
+          .map(name => ({
+              value: name,
+              label: name,
+          }));
+
+
+      return options;
+  }, [uniquePayees, accounts]);
   
   // Use useWatch to efficiently watch multiple fields at once (single subscription)
   const watchedValues = useWatch({
@@ -613,6 +499,11 @@ export default function IncomeExpenseClient() {
     }
   }, [allTransactions, setValue, toast, uniquePayees]);
 
+  // Update the ref when handleAutoFill changes
+  useEffect(() => {
+    handleAutoFillRef.current = handleAutoFill;
+  }, [handleAutoFill]);
+
   const handleNew = useCallback(() => {
     setEditingTransaction(null);
     const nextId = getNextTransactionId('Expense');
@@ -632,168 +523,6 @@ export default function IncomeExpenseClient() {
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
       setEditingTransaction(transaction);
   }, []);
-
-  // Load accounts from Firestore
-  useEffect(() => {
-    const unsubscribe = getAccountsRealtime((accountList) => {
-      const mappedAccounts = new Map<string, Account>();
-      accountList.forEach(account => {
-        if (account?.name) {
-          const normalizedName = toTitleCase(account.name.trim());
-          mappedAccounts.set(normalizedName, account);
-        }
-      });
-      setAccounts(mappedAccounts);
-    }, (error) => {
-
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Auto-fill form when account is selected
-  useEffect(() => {
-    if (selectedAccount) {
-      const account = accounts.get(selectedAccount);
-      if (account) {
-        if (account.contact) setValue('description', account.contact, { shouldValidate: false });
-        if (account.nature) setValue('expenseNature', account.nature, { shouldValidate: false });
-        if (account.category) setValue('category', account.category, { shouldValidate: false });
-        if (account.subCategory) setValue('subCategory', account.subCategory, { shouldValidate: false });
-      }
-    }
-  }, [selectedAccount, accounts, setValue]);
-
-  const handleAddAccount = useCallback(() => {
-      setNewAccount({ name: '', contact: '', address: '', nature: '', category: '', subCategory: '' });
-      setIsAddAccountOpen(true);
-  }, []);
-
-  const handleSaveNewAccount = useCallback(async () => {
-      if (!newAccount.name.trim()) {
-          toast({ title: 'Error', description: 'Please enter an account name', variant: 'destructive' });
-          return;
-      }
-      try {
-          setIsSubmitting(true);
-          const accountData: Account = {
-              name: newAccount.name.trim(),
-              contact: (newAccount.contact?.trim() || '').length > 0 ? newAccount.contact.trim() : undefined,
-              address: (newAccount.address?.trim() || '').length > 0 ? newAccount.address.trim() : undefined,
-              nature: newAccount.nature || undefined,
-              category: (newAccount.category?.trim() || '').length > 0 ? newAccount.category.trim() : undefined,
-              subCategory: (newAccount.subCategory?.trim() || '').length > 0 ? newAccount.subCategory.trim() : undefined,
-          };
-          await addAccount(accountData);
-          
-          const normalized = toTitleCase(newAccount.name.trim());
-          setSelectedAccount(normalized);
-          setValue('payee', normalized, { shouldValidate: true });
-          setIsAddAccountOpen(false);
-          setNewAccount({ name: '', contact: '', address: '', nature: '', category: '', subCategory: '' });
-          toast({ title: 'Success', description: `Account "${normalized}" added successfully.` });
-      } catch (error) {
-
-          toast({ title: 'Error', description: 'Failed to add account', variant: 'destructive' });
-      } finally {
-          setIsSubmitting(false);
-      }
-  }, [newAccount, setValue, toast]);
-
-  const handleEditAccount = useCallback(() => {
-      if (!selectedAccount) return;
-      const account = accounts.get(selectedAccount);
-      if (account) {
-          setEditAccount({
-              name: account.name || '',
-              contact: account.contact || '',
-              address: account.address || '',
-              nature: (account.nature as 'Permanent' | 'Seasonal' | '') || '',
-              category: account.category || '',
-              subCategory: account.subCategory || '',
-          });
-      } else {
-          setEditAccount({ name: selectedAccount, contact: '', address: '', nature: '', category: '', subCategory: '' });
-      }
-      setIsEditAccountOpen(true);
-  }, [selectedAccount, accounts]);
-
-  const handleSaveEditAccount = useCallback(async () => {
-      if (!selectedAccount || !editAccount.name.trim()) {
-          toast({ title: 'Error', description: 'Please enter an account name', variant: 'destructive' });
-          return;
-      }
-      const oldName = selectedAccount;
-      const newName = toTitleCase(editAccount.name.trim());
-      
-      try {
-          setIsSubmitting(true);
-          const accountData: Account = {
-              name: newName,
-              contact: editAccount.contact.trim() || undefined,
-              address: editAccount.address.trim() || undefined,
-              nature: editAccount.nature || undefined,
-              category: editAccount.category.trim() || undefined,
-              subCategory: editAccount.subCategory.trim() || undefined,
-          };
-          
-          // Update account in accounts collection
-          await updateAccount(accountData, oldName);
-          
-          // If name changed, update all transactions
-          if (oldName !== newName) {
-              await Promise.all([
-                  updateExpensePayee(oldName, newName),
-                  updateIncomePayee(oldName, newName)
-              ]);
-              setSelectedAccount(newName);
-              setValue('payee', newName, { shouldValidate: true });
-          }
-          
-          setIsEditAccountOpen(false);
-          toast({ title: 'Success', description: `Account "${oldName}" updated successfully.` });
-      } catch (error) {
-
-          toast({ title: 'Error', description: 'Failed to update account', variant: 'destructive' });
-      } finally {
-          setIsSubmitting(false);
-      }
-  }, [selectedAccount, editAccount, setValue, toast]);
-
-  const handleDeleteAccount = useCallback(async () => {
-      if (!selectedAccount) return;
-
-      try {
-          setIsSubmitting(true);
-          // Delete account from accounts collection
-          await deleteAccount(selectedAccount);
-          // Delete all transactions for this payee
-          await Promise.all([
-              deleteExpensesForPayee(selectedAccount),
-              deleteIncomesForPayee(selectedAccount)
-          ]);
-          
-          setSelectedAccount(null);
-          setValue('payee', '', { shouldValidate: true });
-          setIsDeleteAccountOpen(false);
-          toast({ title: 'Success', description: `Account "${selectedAccount}" and all its transactions have been deleted` });
-      } catch (error) {
-
-          toast({ title: 'Error', description: 'Failed to delete account', variant: 'destructive' });
-      } finally {
-          setIsSubmitting(false);
-      }
-  }, [selectedAccount, setValue, toast]);
-
-
-  useEffect(() => {
-      if (selectedAccount) {
-          setValue('payee', selectedAccount, { shouldValidate: true });
-          handleAutoFill(selectedAccount);
-      } else {
-          setValue('payee', '', { shouldValidate: true });
-      }
-  }, [selectedAccount, handleAutoFill, setValue]);
 
 
   useEffect(() => {
@@ -924,14 +653,9 @@ export default function IncomeExpenseClient() {
     // Load all categories initially
     const loadAllCategories = async () => {
       try {
-        const [incomeCats, expenseCats] = await Promise.all([
-          getAllIncomeCategories(),
-          getAllExpenseCategories()
-        ]);
-        setIncomeCategories(incomeCats);
-        setExpenseCategories(expenseCats);
+        await refreshCategories();
       } catch (error) {
-
+        // Error handled by hook
       }
     };
     loadAllCategories();
@@ -1373,17 +1097,52 @@ export default function IncomeExpenseClient() {
     });
   }, [sortedTransactions, filteredTransactions]);
 
+  // Track previous runningLedger IDs to avoid unnecessary state updates
+  const prevRunningLedgerIdsRef = useRef<string>('');
+  const isUpdatingRef = useRef(false);
+  
+  // Create a stable ID string for comparison (sorted for consistency)
+  const runningLedgerIds = useMemo(() => {
+    const ids = runningLedger.map(tx => tx.id).sort().join(',');
+    return ids;
+  }, [runningLedger]);
+  
+  // Store runningLedger in a ref to access it in useEffect without dependency
+  const runningLedgerRef = useRef(runningLedger);
+  runningLedgerRef.current = runningLedger;
+
   useEffect(() => {
+    // Prevent infinite loops by checking if we're already updating
+    if (isUpdatingRef.current) {
+      return;
+    }
+    
+    // Only update if the IDs actually changed
+    const currentIds = runningLedgerIds;
+    if (prevRunningLedgerIdsRef.current === currentIds) {
+      return;
+    }
+    prevRunningLedgerIdsRef.current = currentIds;
+    
+    isUpdatingRef.current = true;
     setSelectedTransactionIds(prev => {
       const next = new Set<string>();
-      runningLedger.forEach((tx) => {
+      runningLedgerRef.current.forEach((tx) => {
         if (prev.has(tx.id)) {
           next.add(tx.id);
         }
       });
+      
+      // Only update if the Set actually changed
+      if (next.size === prev.size && Array.from(next).every(id => prev.has(id))) {
+        isUpdatingRef.current = false;
+        return prev; // Return same reference to avoid re-render
+      }
+      
+      isUpdatingRef.current = false;
       return next;
     });
-  }, [runningLedger]);
+  }, [runningLedgerIds]);
 
   const allSelected = runningLedger.length > 0 && selectedTransactionIds.size === runningLedger.length;
   const someSelected = selectedTransactionIds.size > 0 && !allSelected;
@@ -1575,7 +1334,8 @@ export default function IncomeExpenseClient() {
   // NO PAGE LOADING - Always render immediately
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
       <Card>
         <CardContent className="p-3 sm:p-4 space-y-4">
           <div className="flex items-center gap-4">
@@ -1659,348 +1419,25 @@ export default function IncomeExpenseClient() {
           </div>
 
             <div className="border-t pt-2 mt-2">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
-              <input type="hidden" {...register('payee')} />
-
-                <div className="grid grid-cols-2 gap-2">
-                <Controller
-                  name="date"
-                  control={control}
-                  render={({ field }) => (
-                      <div className="space-y-0.5">
-                      <Label className="text-xs">Date</Label>
-                      <SmartDatePicker
-                        value={field.value}
-                        onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                        placeholder="Pick a date"
-                          inputClassName="h-7 text-xs"
-                        returnDate={true}
-                      />
-                    </div>
-                  )}
-                />
-
-                  <div className="space-y-0.5">
-                  <Label htmlFor="transactionId" className="text-xs">
-                    Transaction ID
-                  </Label>
-                    <InputWithIcon icon={<FileText className="h-3 w-3 text-muted-foreground" />}>
-                    <Input
-                      id="transactionId"
-                      {...register("transactionId")}
-                      onBlur={handleTransactionIdBlur}
-                        className="h-7 text-xs pl-8"
-                    />
-                  </InputWithIcon>
-                  </div>
-                </div>
-
-
-                <div className="grid grid-cols-2 gap-2">
-                <Controller
-                  name="incomeAmount"
-                  control={control}
-                  render={({ field }) => (
-                      <div className="space-y-0.5">
-                      <Label className="text-xs text-emerald-700">Credit Amount (Income)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                        onChange={(e) => {
-                          setLastAmountSource('income');
-                          const value = e.target.value;
-                          field.onChange(value === '' ? '' : Number(value));
-                        }}
-                          className="h-7 text-xs border-emerald-200 focus-visible:ring-emerald-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  )}
-                />
-
-                <Controller
-                  name="expenseAmount"
-                  control={control}
-                  render={({ field }) => (
-                      <div className="space-y-0.5">
-                      <Label className="text-xs text-rose-700">Debit Amount (Expense)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                        onChange={(e) => {
-                          setLastAmountSource('expense');
-                          const value = e.target.value;
-                          field.onChange(value === '' ? '' : Number(value));
-                        }}
-                          className="h-7 text-xs border-rose-200 focus-visible:ring-rose-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  )}
-                />
-                </div>
-
-                <Controller
-                  name="paymentMethod"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="space-y-0.5">
-                      <Label className="text-xs">Payment Method</Label>
-                      <CustomDropdown
-                        options={[
-                          { value: 'Cash', label: 'Cash' },
-                          ...bankAccounts.map((acc) => ({
-                            value: acc.id,
-                            label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})`,
-                          })),
-                        ]}
-                        value={field.value === 'Cash' ? 'Cash' : bankAccounts.find((acc) => acc.id === watch('bankAccountId'))?.id}
-                        onChange={(value) => {
-                          if (value === 'Cash') {
-                            setValue('paymentMethod', 'Cash');
-                            setValue('bankAccountId', undefined);
-                          } else {
-                            const account = bankAccounts.find((acc) => acc.id === value);
-                            setValue('paymentMethod', account?.bankName || '');
-                            setValue('bankAccountId', value);
-                          }
-                          field.onChange(value);
-                        }}
-                        placeholder="Select Payment Method"
-                        inputClassName="h-7 text-xs"
-                      />
-                    </div>
-                  )}
-                />
-
-                <div className="space-y-0.5">
-                  <Label htmlFor="description" className="text-xs">Description</Label>
-                  <Controller name="description" control={control} render={({ field }) => <Input id="description" placeholder="Brief description of the transaction..." className="h-7 text-xs" {...field} />} />
-                </div>
-
-                {errors.amount && (
-                  <div className="text-xs text-destructive">
-                    {errors.amount.message}
-                  </div>
-                )}
-
-              <input type="hidden" {...register('amount', { valueAsNumber: true })} />
-
-              {isAdvanced && (
-                  <div className="border-t pt-2 mt-2">
-                    <h3 className="text-xs font-semibold mb-1">Advanced Options</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-0.5">
-                      <Label htmlFor="status" className="text-xs">Status</Label>
-                      <Controller
-                        name="status"
-                        control={control}
-                        render={({ field }) => (
-                          <CustomDropdown
-                            options={[
-                              { value: "Paid", label: "Paid" },
-                              { value: "Pending", label: "Pending" },
-                              { value: "Overdue", label: "Overdue" }
-                            ]}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select Status"
-                              inputClassName="h-7 text-xs"
-                          />
-                        )}
-                      />
-                    </div>
-
-                      <div className="space-y-0.5">
-                      <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                      <Controller
-                        name="taxAmount"
-                        control={control}
-                        render={({ field }) => (
-                            <InputWithIcon icon={<Percent className="h-3 w-3 text-muted-foreground" />}>
-                              <Input id="taxAmount" type="number" {...field} className="h-7 text-xs pl-8" />
-                          </InputWithIcon>
-                        )}
-                      />
-                    </div>
-
-                      <div className="space-y-0.5">
-                      <Label htmlFor="cdAmount" className="text-xs">CD Amount</Label>
-                      <Controller
-                        name="cdAmount"
-                        control={control}
-                        render={({ field }) => (
-                            <InputWithIcon icon={<Percent className="h-3 w-3 text-muted-foreground" />}>
-                              <Input id="cdAmount" type="number" {...field} className="h-7 text-xs pl-8" />
-                          </InputWithIcon>
-                        )}
-                      />
-                    </div>
-
-                    {selectedTransactionType === 'Expense' && (
-                      <Controller
-                        name="expenseType"
-                        control={control}
-                        render={({ field }) => (
-                            <div className="space-y-0.5">
-                            <Label className="text-xs">Expense Type</Label>
-                            <CustomDropdown
-                              options={[
-                                { value: "Personal", label: "Personal" },
-                                { value: "Business", label: "Business" }
-                              ]}
-                              value={field.value}
-                              onChange={field.onChange}
-                              placeholder="Select Expense Type"
-                                inputClassName="h-7 text-xs"
-                            />
-                          </div>
-                        )}
-                      />
-                    )}
-
-                      <div className="space-y-0.5">
-                      <Label htmlFor="mill" className="text-xs">Mill</Label>
-                      <Controller
-                        name="mill"
-                        control={control}
-                        render={({ field }) => (
-                            <InputWithIcon icon={<Landmark className="h-3 w-3 text-muted-foreground" />}>
-                              <Input id="mill" {...field} className="h-7 text-xs pl-8" />
-                          </InputWithIcon>
-                        )}
-                      />
-                    </div>
-                    
-                      <div className="space-y-0.5">
-                      <Label className="text-xs">Project</Label>
-                      <Controller
-                        name="projectId"
-                        control={control}
-                        render={({ field }) => (
-                          <CustomDropdown
-                            options={[
-                              { value: 'none', label: 'None' },
-                              ...projects.map(project => ({ value: project.id, label: project.name }))
-                            ]}
-                            value={field.value || 'none'}
-                            onChange={field.onChange}
-                            placeholder="Select Project"
-                              inputClassName="h-7 text-xs"
-                          />
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isCalculated && (
-                  <div className="border-t pt-2 mt-2">
-                    <h3 className="text-xs font-semibold mb-1">Calculation</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-0.5">
-                      <Label htmlFor="quantity" className="text-xs">Quantity</Label>
-                        <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-7 text-xs" />} />
-                    </div>
-
-                      <div className="space-y-0.5">
-                      <Label htmlFor="expense-rate" className="text-xs">Rate</Label>
-                        <Controller name="rate" control={control} render={({ field }) => <Input id="expense-rate" type="number" {...field} className="h-7 text-xs" />} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isRecurring && (
-                  <div className="border-t pt-2 mt-2">
-                    <h3 className="text-xs font-semibold mb-1">Recurring Details</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                    <Controller name="recurringFrequency" control={control} render={({ field }) => (
-                        <div className="space-y-0.5">
-                        <Label className="text-xs">Frequency</Label>
-                        <CustomDropdown
-                          options={[
-                            { value: "daily", label: "Daily" },
-                            { value: "weekly", label: "Weekly" },
-                            { value: "monthly", label: "Monthly" },
-                            { value: "yearly", label: "Yearly" }
-                          ]}
-                          value={field.value}
-                          onChange={field.onChange}
-                          placeholder="Select Frequency"
-                            inputClassName="h-7 text-xs"
-                        />
-                      </div>
-                    )} />
-
-                    <Controller name="nextDueDate" control={control} render={({ field }) => (
-                        <div className="space-y-0.5">
-                        <Label className="text-xs">Next Due Date</Label>
-                        <SmartDatePicker
-                          value={field.value}
-                          onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                          placeholder="Pick a date"
-                            inputClassName="h-7 text-xs"
-                          returnDate={true}
-                        />
-                      </div>
-                    )} />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <SegmentedSwitch 
-                    id="isAdvanced" 
-                    checked={isAdvanced} 
-                    onCheckedChange={setIsAdvanced}
-                    leftLabel="Off"
-                    rightLabel="On"
-                    className="w-32"
-                  />
-                  <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none">
-                      Advanced
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <SegmentedSwitch 
-                    id="isCalculated" 
-                    checked={isCalculated} 
-                    onCheckedChange={setIsCalculated}
-                    leftLabel="Off"
-                    rightLabel="On"
-                    className="w-32"
-                  />
-                  <Label htmlFor="isCalculated" className="text-sm font-medium leading-none">
-                      Calculate
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <SegmentedSwitch 
-                    id="isRecurring" 
-                    checked={isRecurring} 
-                    onCheckedChange={setIsRecurring}
-                    leftLabel="Off"
-                    rightLabel="On"
-                    className="w-32"
-                  />
-                  <Label htmlFor="isRecurring" className="text-sm font-medium leading-none">
-                      Recurring
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      {editingTransaction ? 'Update' : 'Save'}
-                  </Button>
-                </div>
-              </div>
-            </form>
+              <TransactionForm
+                form={form}
+                onSubmit={handleSubmit(onSubmit)}
+                handleNew={handleNew}
+                handleTransactionIdBlur={handleTransactionIdBlur}
+                isSubmitting={isSubmitting}
+                editingTransaction={editingTransaction}
+                isAdvanced={isAdvanced}
+                setIsAdvanced={setIsAdvanced}
+                isCalculated={isCalculated}
+                setIsCalculated={setIsCalculated}
+                isRecurring={isRecurring}
+                setIsRecurring={setIsRecurring}
+                setLastAmountSource={setLastAmountSource}
+                bankAccounts={bankAccounts}
+                projects={projects}
+                selectedTransactionType={selectedTransactionType}
+                errors={errors}
+              />
             </div>
           </CardContent>
         </Card>
@@ -2069,7 +1506,7 @@ export default function IncomeExpenseClient() {
                   <>
                     <SmartDatePicker
                       value={bulkDate}
-                      onChange={(next) => setBulkDate(next || "")}
+                      onChange={(next) => setBulkDate(typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : "")}
                       placeholder="Select date"
                       inputClassName="h-9 text-sm"
                       buttonClassName="h-9 w-9"
@@ -2111,6 +1548,247 @@ export default function IncomeExpenseClient() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Account Dialog */}
+      <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+        <DialogContent className="max-w-2xl p-0 gap-0 bg-emerald-950 border-emerald-800">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-emerald-800">
+            <DialogTitle className="text-lg font-semibold text-white">Add New Account</DialogTitle>
+            <DialogDescription className="text-sm text-emerald-300 mt-1">
+              Enter account details for auto-fill in transactions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-2 max-h-[calc(90vh-200px)] overflow-y-auto bg-emerald-950">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountName" className="text-xs text-emerald-200">
+                    Account Name <span className="text-rose-400">*</span>
+                  </Label>
+                  <Input
+                    id="newAccountName"
+                    value={newAccount.name}
+                    onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
+                    placeholder="Enter account name..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountContact" className="text-xs text-emerald-200">Contact No.</Label>
+                  <Input
+                    id="newAccountContact"
+                    value={newAccount.contact}
+                    onChange={(e) => setNewAccount({ ...newAccount, contact: e.target.value })}
+                    placeholder="Enter contact number..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountNature" className="text-xs text-emerald-200">Nature</Label>
+                  <div className="bg-emerald-900 border border-emerald-500 rounded-md">
+                    <CustomDropdown
+                      options={[
+                        { value: 'Permanent', label: 'Permanent' },
+                        { value: 'Seasonal', label: 'Seasonal' },
+                      ]}
+                      value={newAccount.nature || null}
+                      onChange={(value) => {
+                        setNewAccount({ ...newAccount, nature: value as 'Permanent' | 'Seasonal' | '', category: '', subCategory: '' });
+                      }}
+                      placeholder="Select nature..."
+                      maxRows={5}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <Label htmlFor="newAccountAddress" className="text-xs text-emerald-200">Address</Label>
+                  <Input
+                    id="newAccountAddress"
+                    value={newAccount.address}
+                    onChange={(e) => setNewAccount({ ...newAccount, address: e.target.value })}
+                    placeholder="Enter address..."
+                    className="h-7 text-xs bg-emerald-900 border-emerald-500 text-white placeholder:text-emerald-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500"
+                  />
+                </div>
+                {newAccount.nature && (
+                  <>
+                    <div className="space-y-0.5">
+                      <Label htmlFor="newAccountCategory" className="text-xs text-emerald-200">Category</Label>
+                      <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!newAccount.nature ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <CustomDropdown
+                          options={newAccount.nature 
+                            ? expenseCategories
+                                .filter(cat => cat.nature === newAccount.nature)
+                                .map(cat => ({ value: cat.name, label: cat.name }))
+                            : []
+                          }
+                          value={newAccount.category || null}
+                          onChange={(value) => {
+                            setNewAccount({ ...newAccount, category: value || '', subCategory: '' });
+                          }}
+                          placeholder="Select category..."
+                          maxRows={5}
+                          showScrollbar={true}
+                        />
+                      </div>
+                    </div>
+                    {newAccount.category && (
+                      <div className="space-y-0.5">
+                        <Label htmlFor="newAccountSubCategory" className="text-xs text-emerald-200">Sub Category</Label>
+                        <div className={`bg-emerald-900 border border-emerald-500 rounded-md ${!newAccount.category ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <CustomDropdown
+                            options={newAccount.category
+                              ? (expenseCategories.find(cat => cat.name === newAccount.category)?.subCategories || 
+                                 incomeCategories.find(cat => cat.name === newAccount.category)?.subCategories || [])
+                                  .map(sub => ({ value: sub, label: sub }))
+                              : []
+                            }
+                            value={newAccount.subCategory || null}
+                            onChange={(value) => {
+                              setNewAccount({ ...newAccount, subCategory: value || '' });
+                            }}
+                            placeholder="Select sub category..."
+                            maxRows={5}
+                            showScrollbar={true}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t border-emerald-800 bg-emerald-950">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddAccountOpen(false)}
+              className="border-emerald-600 text-emerald-200 hover:bg-emerald-900"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveNewAccount}
+              disabled={isSubmitting}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Add Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card>
+          <CardHeader className="flex flex-col gap-0 p-0">
+            {(() => {
+              const accountName = selectedAccount;
+              
+              // Only show if we have account selected
+              if (!accountName) return null;
+              
+              // Get account details from accounts map
+              const account = accounts.get(accountName);
+              
+              // Get details from transactions
+              const accountTransactions = filteredTransactions.filter(
+                tx => toTitleCase(tx.payee) === accountName
+              );
+              
+              // Get nature from account or transactions
+              const nature = account?.nature || accountTransactions.find(tx => (tx as any).expenseNature)?.expenseNature || null;
+              
+              // Get category from account or transactions
+              const category = account?.category || accountTransactions.find(tx => tx.category)?.category || null;
+              
+              // Get subCategory from account or transactions
+              const subCategory = account?.subCategory || accountTransactions.find(tx => tx.subCategory)?.subCategory || null;
+              
+              return (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 pt-4 pb-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Name</p>
+                    <p className="text-xs text-foreground">{accountName || '—'}</p>
+                  </div>
+                  {account?.contact && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Contact</p>
+                      <p className="text-xs text-foreground">{account.contact}</p>
+                    </div>
+                  )}
+                  {account?.address && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Address</p>
+                      <p className="text-xs text-foreground">{account.address}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Nature</p>
+                    <p className="text-xs text-foreground">{nature ? toTitleCase(nature) : '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Category</p>
+                    <p className="text-xs text-foreground">{category ? toTitleCase(category) : '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Sub Category</p>
+                    <p className="text-xs text-foreground">{subCategory ? toTitleCase(subCategory) : '—'}</p>
+                  </div>
+                </div>
+              );
+            })()}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 pt-2 pb-0">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {selectedTransactionIds.size > 0 && (
+                  <>
+                    <SmartDatePicker
+                      value={bulkDate}
+                      onChange={(next) => setBulkDate(typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : "")}
+                      placeholder="Select date"
+                      inputClassName="h-9 text-sm"
+                      buttonClassName="h-9 w-9"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleBulkDateUpdate}
+                      disabled={isBulkUpdating || !bulkDate}
+                    >
+                      {isBulkUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Apply Date ({selectedTransactionIds.size})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTransactionIds(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ExpenseTrackerTable 
+              runningLedger={runningLedger}
+              allSelected={allSelected}
+              someSelected={someSelected}
+              toggleSelectAll={toggleSelectAll}
+              requestSort={requestSort}
+              selectedTransactionIds={selectedTransactionIds}
+              toggleTransactionSelection={toggleTransactionSelection}
+              getDisplayId={getDisplayId}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+            />
+          </CardContent>
+        </Card>
 
       {/* Add Account Dialog */}
       <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
@@ -2384,62 +2062,13 @@ export default function IncomeExpenseClient() {
         onOpenChange={setIsCategoryManagerOpen}
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
-        onAddCategory={async (collection, category) => {
-          await addCategory(collection, category);
-          // Immediately refresh categories
-          const [incomeCats, expenseCats] = await Promise.all([
-            getAllIncomeCategories(),
-            getAllExpenseCategories()
-          ]);
-          setIncomeCategories(incomeCats);
-          setExpenseCategories(expenseCats);
-          toast({ title: 'Category added', variant: 'success' });
-        }}
-        onUpdateCategoryName={async (collection, id, name) => {
-          await updateCategoryName(collection, id, name);
-          // Immediately refresh categories
-          const [incomeCats, expenseCats] = await Promise.all([
-            getAllIncomeCategories(),
-            getAllExpenseCategories()
-          ]);
-          setIncomeCategories(incomeCats);
-          setExpenseCategories(expenseCats);
-          toast({ title: 'Category updated', variant: 'success' });
-        }}
-        onDeleteCategory={async (collection, id) => {
-          await deleteCategory(collection, id);
-          // Immediately refresh categories
-          const [incomeCats, expenseCats] = await Promise.all([
-            getAllIncomeCategories(),
-            getAllExpenseCategories()
-          ]);
-          setIncomeCategories(incomeCats);
-          setExpenseCategories(expenseCats);
-          toast({ title: 'Category deleted', variant: 'success' });
-        }}
-        onAddSubCategory={async (collection, categoryId, subCategoryName) => {
-          await addSubCategory(collection, categoryId, subCategoryName);
-          // Immediately refresh categories
-          const [incomeCats, expenseCats] = await Promise.all([
-            getAllIncomeCategories(),
-            getAllExpenseCategories()
-          ]);
-          setIncomeCategories(incomeCats);
-          setExpenseCategories(expenseCats);
-          toast({ title: 'Subcategory added', variant: 'success' });
-        }}
-        onDeleteSubCategory={async (collection, categoryId, subCategoryName) => {
-          await deleteSubCategory(collection, categoryId, subCategoryName);
-          // Immediately refresh categories
-          const [incomeCats, expenseCats] = await Promise.all([
-            getAllIncomeCategories(),
-            getAllExpenseCategories()
-          ]);
-          setIncomeCategories(incomeCats);
-          setExpenseCategories(expenseCats);
-          toast({ title: 'Subcategory deleted', variant: 'success' });
-        }}
+        onAddCategory={handleAddCategory}
+        onUpdateCategoryName={handleUpdateCategoryName}
+        onDeleteCategory={handleDeleteCategory}
+        onAddSubCategory={handleAddSubCategory}
+        onDeleteSubCategory={handleDeleteSubCategory}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

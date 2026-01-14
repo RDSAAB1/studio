@@ -72,8 +72,7 @@ registerSyncProcessor<{ id: string }>("delete:supplier", async (task) => {
 				docRef = doc(suppliersCollection, id);
 				docSnap = await getDoc(docRef);
 				if (!docSnap.exists()) {
-					console.warn(`[delete:supplier] Document not found with id: ${id}`);
-					// Don't throw error - just log and return (document might already be deleted)
+					// Document might already be deleted, just return
 					return;
 				}
 			}

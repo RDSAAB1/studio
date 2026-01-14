@@ -639,8 +639,9 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                              </div>
                          ) : (
                              <div className="space-y-1">
-                                 <Label className="text-[10px] font-extrabold text-foreground">Final WT</Label>
+                                 <Label htmlFor="finalWeightToggle" className="text-[10px] font-extrabold text-foreground">Final WT</Label>
                                  <button
+                                     id="finalWeightToggle"
                                      type="button"
                                      onClick={() => setUseFinalWeight(!useFinalWeight)}
                                      className="relative w-full min-w-[140px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
@@ -671,8 +672,9 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                     {combination && (
                         <div className="grid gap-2 grid-cols-3">
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-extrabold text-foreground">Round Fig</Label>
+                                <Label htmlFor={`roundFigToggle-${combination.id}`} className="text-[10px] font-extrabold text-foreground">Round Fig</Label>
                                 <button
+                                    id={`roundFigToggle-${combination.id}`}
                                     type="button"
                                     onClick={() => combination.setRoundFigureToggle(!combination.roundFigureToggle)}
                                     className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
@@ -697,8 +699,9 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                                 </button>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-extrabold text-foreground">Amount</Label>
+                                <Label htmlFor={`amountToggle-${combination.id}`} className="text-[10px] font-extrabold text-foreground">Amount</Label>
                                 <button
+                                    id={`amountToggle-${combination.id}`}
                                     type="button"
                                     onClick={() => combination.setAllowPaiseAmount(!combination.allowPaiseAmount)}
                                     className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
@@ -725,8 +728,9 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                                 </button>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-extrabold text-foreground">Step</Label>
+                                <Label htmlFor={`stepToggle-${combination.id}`} className="text-[10px] font-extrabold text-foreground">Step</Label>
                                 <button
+                                    id={`stepToggle-${combination.id}`}
                                     type="button"
                                     onClick={() => combination.setRateStep(combination.rateStep === 1 ? 5 : 1)}
                                     className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"

@@ -17,6 +17,9 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import type { DateRange } from 'react-day-picker';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { ensureFirstFullSync, getSyncCounts } from '@/lib/database';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const StatCard = ({ title, value, icon, colorClass, isLoading, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, description?: string }) => (
     <Card className="shadow-sm">
@@ -60,7 +63,8 @@ export default function DashboardClient() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
-    const [isLoading, setIsLoading] = useState(false); // ✅ FIX: Start with false since we have initial data
+    const [isLoading, setIsLoading] = useState(false);
+    const [syncCounts, setSyncCounts] = useState<{ collection: string; indexeddb: number; firestore: number }[]>([]);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
@@ -137,6 +141,14 @@ export default function DashboardClient() {
             unsubIncCats();
         };
     }, []); // Only run once on mount
+    
+    useEffect(() => {
+        (async () => {
+            await ensureFirstFullSync();
+            const rows = await getSyncCounts();
+            setSyncCounts(rows);
+        })();
+    }, []);
     
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
@@ -265,6 +277,53 @@ export default function DashboardClient() {
         }
     }, [filteredData, kantaParchi, customers, customerPayments]);
     
+    const appCountsMap = useMemo(() => ({
+        suppliers: suppliers.length,
+        customers: customers.length,
+        payments: supplierPayments.length,
+        customerPayments: customerPayments.length,
+        incomes: incomes.length,
+        expenses: expenses.length,
+        fundTransactions: fundTransactions.length,
+        banks: globalData.banks.length,
+        bankBranches: (globalData as any).bankBranches?.length || 0,
+        bankAccounts: bankAccounts.length,
+        supplierBankAccounts: (globalData as any).supplierBankAccounts?.length || 0,
+        projects: projects.length,
+        loans: loans.length,
+    }), [suppliers, customers, supplierPayments, customerPayments, incomes, expenses, fundTransactions, globalData.banks, (globalData as any).bankBranches, bankAccounts, (globalData as any).supplierBankAccounts, projects, loans]);
+
+    const softwareCounts = useMemo(() => {
+        const entries: Array<{ name: string; count: number }> = [];
+        const push = (name: string, count: number | undefined | null) => entries.push({ name, count: Number(count || 0) });
+        push('suppliers', appCountsMap.suppliers);
+        push('customers', appCountsMap.customers);
+        push('payments', appCountsMap.payments);
+        push('customerPayments', appCountsMap.customerPayments);
+        push('incomes', appCountsMap.incomes);
+        push('expenses', appCountsMap.expenses);
+        push('fundTransactions', appCountsMap.fundTransactions);
+        push('banks', appCountsMap.banks);
+        push('bankBranches', appCountsMap.bankBranches);
+        push('bankAccounts', appCountsMap.bankAccounts);
+        push('supplierBankAccounts', appCountsMap.supplierBankAccounts);
+        push('projects', appCountsMap.projects);
+        push('loans', appCountsMap.loans);
+        return entries.filter(row => row.count > 0);
+    }, [appCountsMap]);
+    
+    // ✅ OPTIMIZED: Memoize groupDataByField function to prevent recreation on every render
+    // Define before use to avoid "Cannot access before initialization" error
+    const groupDataByField = React.useCallback((data: any[], field: string) => {
+        const grouped = data.reduce((acc, item) => {
+            const key = item[field] || 'Uncategorized';
+            acc[key] = (acc[key] || 0) + item.amount;
+            return acc;
+        }, {} as { [key: string]: number });
+
+        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
+    }, []);
+    
      const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
@@ -322,7 +381,7 @@ export default function DashboardClient() {
              return [salesData, ...byCategory];
         }
         return [];
-    }, [level1, filteredData, incomeCategories]);
+    }, [level1, filteredData, groupDataByField]);
 
     const level3Data = useMemo(() => {
         if (!level1 || !level2) return [];
@@ -336,13 +395,13 @@ export default function DashboardClient() {
              return groupDataByField(sourceData, 'subCategory');
         }
         return groupDataByField(sourceData, 'category');
-    }, [level1, level2, filteredData, incomeCategories]);
+    }, [level1, level2, filteredData, groupDataByField]);
     
     const level4Data = useMemo(() => {
         if (!level1 || !level2 || !level3) return [];
         let sourceData = filteredData.filteredExpenses.filter(e => e.expenseNature === level2 && e.category === level3);
         return groupDataByField(sourceData, 'subCategory');
-    }, [level1, level2, level3, filteredData]);
+    }, [level1, level2, level3, filteredData, groupDataByField]);
     
     const incomeExpenseChartData = useMemo(() => {
         const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
@@ -401,22 +460,15 @@ export default function DashboardClient() {
     
         return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
     }, [allIncomes, allExpenses, bankAccounts]);
-    
 
-    function groupDataByField(data: any[], field: string) {
-        const grouped = data.reduce((acc, item) => {
-            const key = item[field] || 'Uncategorized';
-            acc[key] = (acc[key] || 0) + item.amount;
-            return acc;
-        }, {} as { [key: string]: number });
-
-        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
-    }
-
-    const breadcrumbs = ['Overview'];
-    if (level1) breadcrumbs.push(level1);
-    if (level2) breadcrumbs.push(level2);
-    if (level3) breadcrumbs.push(level3);
+    // ✅ OPTIMIZED: Memoize breadcrumbs to prevent recreation on every render
+    const breadcrumbs = useMemo(() => {
+        const crumbs = ['Overview'];
+        if (level1) crumbs.push(level1);
+        if (level2) crumbs.push(level2);
+        if (level3) crumbs.push(level3);
+        return crumbs;
+    }, [level1, level2, level3]);
 
     const handleBreadcrumbClick = (index: number) => {
         if (index < 3) setLevel3(null);
@@ -518,23 +570,24 @@ export default function DashboardClient() {
 
 
     return (
-        <div className="space-y-6">
-            <Card>
-                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">Dashboard</CardTitle>
-                    <CardDescription>Filter and view your business overview.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <DateRangePicker date={date} onDateChange={setDate} />
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Button variant="outline" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDate({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 Days</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
-                    </div>
-                </CardContent>
-            </Card>
+        <ErrorBoundary>
+            <div className="space-y-6">
+                <Card>
+                     <CardHeader>
+                        <CardTitle className="flex items-center gap-2">Dashboard</CardTitle>
+                        <CardDescription>Filter and view your business overview.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
+                        <DateRangePicker date={date} onDateChange={setDate} />
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Button variant="outline" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
+                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
+                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
+                            <Button variant="outline" size="sm" onClick={() => setDate({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 Days</Button>
+                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
+                        </div>
+                    </CardContent>
+                </Card>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" isLoading={isLoading}/>
@@ -657,6 +710,62 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
             
+            <Card>
+                <CardHeader>
+                    <CardTitle>Sync Counts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Collection</TableHead>
+                                <TableHead>In App</TableHead>
+                                <TableHead>IndexedDB</TableHead>
+                                <TableHead>Firestore</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {syncCounts.map((row) => {
+                                const inApp = (appCountsMap as any)[row.collection] ?? 0;
+                                return (
+                                    <TableRow key={row.collection}>
+                                        <TableCell className="font-medium">{row.collection}</TableCell>
+                                        <TableCell>{inApp}</TableCell>
+                                        <TableCell>{row.indexeddb}</TableCell>
+                                        <TableCell>{row.firestore}</TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Software Table Counts</CardTitle>
+                    <CardDescription>App ke andar loaded entries ka summary</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Table</TableHead>
+                                <TableHead>Total Entries (In App)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {softwareCounts.map((row) => (
+                                <TableRow key={row.name}>
+                                    <TableCell className="font-medium">{row.name}</TableCell>
+                                    <TableCell>{row.count}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -708,5 +817,6 @@ export default function DashboardClient() {
             {/* Manufacturing Costing */}
             <ManufacturingCosting />
         </div>
+        </ErrorBoundary>
     );
 }

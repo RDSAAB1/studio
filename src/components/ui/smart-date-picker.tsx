@@ -480,8 +480,10 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
           <div className="p-2 border-b bg-muted/30">
             <div className="flex items-end gap-2">
               <div className="flex flex-col gap-1 min-w-[50px]">
-                <Label className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Day</Label>
+                <Label htmlFor="calendarDay" className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Day</Label>
                 <Input
+                  id="calendarDay"
+                  name="calendarDay"
                   type="number"
                   min="1"
                   max="31"
@@ -501,8 +503,10 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
                 />
               </div>
               <div className="flex flex-col gap-1 min-w-[50px]">
-                <Label className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Month</Label>
+                <Label htmlFor="calendarMonth" className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Month</Label>
                 <Input
+                  id="calendarMonth"
+                  name="calendarMonth"
                   type="number"
                   min="1"
                   max="12"
@@ -522,8 +526,10 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
                 />
               </div>
               <div className="flex flex-col gap-1 min-w-[65px]">
-                <Label className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Year</Label>
+                <Label htmlFor="calendarYear" className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Year</Label>
                 <Input
+                  id="calendarYear"
+                  name="calendarYear"
                   type="number"
                   min="1000"
                   max="9999"

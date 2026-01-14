@@ -96,6 +96,8 @@ export type Customer = {
   collectedReport?: number; // Collected report for rate calculation
   riceBranGst?: number; // GST amount to add to calculated rate
   calculatedRate?: number; // Final calculated rate (rate / baseReport * collectedReport + riceBranGst)
+  createdAt?: unknown;
+  updatedAt?: unknown;
 };
 
 // Kanta Parchi - Separate collection for weight/calculation entries
@@ -191,6 +193,7 @@ export type Transaction = {
   id: string; // Firestore unique ID
   transactionId: string; // Human-readable ID (e.g., IN00001, EX00001)
   date: string;
+  type?: 'Income' | 'Expense';
   transactionType: 'Income' | 'Expense';
   category: string;
   subCategory: string;
@@ -214,6 +217,7 @@ export type Transaction = {
   loanId?: string; 
   bankAccountId?: string;
   isDeleted?: boolean;
+  createdAt?: string; // ISO timestamp for sorting/ordering
 };
 
 export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
@@ -272,6 +276,8 @@ export type SupplierPayment = {
     customerId: string; 
     date: string;
     amount: number;
+    createdAt?: unknown;
+    updatedAt?: unknown;
     cdAmount?: number;
     cdApplied?: boolean;
     type: string; 
@@ -311,10 +317,16 @@ export type CustomerPayment = {
     customerId: string;
     date: string;
     amount: number;
+    createdAt?: unknown;
+    updatedAt?: unknown;
     type: 'Full' | 'Partial';
     paymentMethod: 'Cash' | 'Online';
     notes?: string;
-    paidFor?: { srNo: string; amount: number }[];
+    paidFor?: PaidFor[];
+    cdAmount?: number;
+    receiptType?: string;
+    rtgsAmount?: number;
+    rtgsSrNo?: string;
     incomeTransactionId?: string;
     bankAccountId?: string;
     isDeleted?: boolean;
@@ -411,6 +423,7 @@ export type CustomerSummary = {
 export type OptionItem = {
     id: string;
     name: string;
+    type?: string;
 };
 
 export type AppOptions = {

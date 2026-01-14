@@ -47,16 +47,18 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   return (
     <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium">Date</Label>
+        <Label htmlFor="entryDate" className="text-[11px] font-medium">Date</Label>
         <SmartDatePicker
+          id="entryDate"
           value={entryForm.date}
           onChange={(next) => onEntryFormChange({ ...entryForm, date: next })}
           disabled={!activeAccount || saving}
         />
       </div>
       <div className="space-y-1 md:col-span-2">
-        <Label className="text-[11px] font-medium">Particulars</Label>
+        <Label htmlFor="entryParticulars" className="text-[11px] font-medium">Particulars</Label>
         <Input
+          id="entryParticulars"
           type="text"
           value={entryForm.particulars}
           onChange={(event) =>
@@ -71,8 +73,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium">Debit (₹)</Label>
+        <Label htmlFor="entryDebit" className="text-[11px] font-medium">Debit (₹)</Label>
         <Input
+          id="entryDebit"
           type="number"
           min="0"
           step="0.01"
@@ -85,8 +88,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium">Credit (₹)</Label>
+        <Label htmlFor="entryCredit" className="text-[11px] font-medium">Credit (₹)</Label>
         <Input
+          id="entryCredit"
           type="number"
           min="0"
           step="0.01"
@@ -99,8 +103,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         />
       </div>
       <div className="space-y-1 md:col-span-2">
-        <Label className="text-[11px] font-medium">Remarks</Label>
+        <Label htmlFor="entryRemarks" className="text-[11px] font-medium">Remarks</Label>
         <Textarea
+          id="entryRemarks"
+          name="entryRemarks"
           value={entryForm.remarks}
           onChange={(event) =>
             onEntryFormChange({ ...entryForm, remarks: event.target.value })
@@ -111,9 +117,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         />
       </div>
       <div className="space-y-1 md:col-span-2">
-        <Label className="text-[11px] font-medium">Linked Account (optional)</Label>
+        <Label htmlFor="linkAccountId" className="text-[11px] font-medium">Linked Account (optional)</Label>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <select
+            id="linkAccountId"
+            name="linkAccountId"
             value={linkAccountId}
             onChange={(event) => onLinkAccountChange(event.target.value)}
             disabled={!activeAccount || saving || accounts.length <= 1}

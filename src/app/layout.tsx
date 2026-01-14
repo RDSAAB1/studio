@@ -16,6 +16,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings } from "@/lib/firestore";
 import { syncAllData } from '@/lib/database';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
+import { ErrorBoundary } from '@/components/error-boundary';
 import '@/lib/sync-processors'; // register sync processors early
 
 
@@ -392,11 +393,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <meta name="mobile-web-app-capable" content="yes" />
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
-                <StateProvider>
-                    <AuthWrapper>
-                        {children}
-                    </AuthWrapper>
-                </StateProvider>
+                <ErrorBoundary>
+                    <StateProvider>
+                        <AuthWrapper>
+                            {children}
+                        </AuthWrapper>
+                    </StateProvider>
+                </ErrorBoundary>
                 {/* Toaster hidden - using DynamicIslandToaster in header instead */}
                 {/* <Toaster /> */}
                 <GlobalConfirmDialog />

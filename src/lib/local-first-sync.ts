@@ -13,9 +13,17 @@
 
 import { db } from './database';
 import { firestoreDB } from './firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy, writeBatch, limit, startAfter } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, query, where, Timestamp, orderBy, writeBatch, limit, startAfter, CollectionReference, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { enqueueSyncTask } from './sync-queue';
 import { yieldToMainThread, chunkedBulkPut } from './chunked-operations';
+import { logError } from './error-logger';
+import { retryFirestoreOperation } from './retry-utils';
+
+// Helper function to handle errors silently (for sync fallback scenarios)
+function handleSilentError(error: unknown, context: string): void {
+  // Log error using error logging service
+  logError(error, context, 'low');
+}
 
 type CollectionName = 
     | 'suppliers' 
@@ -42,8 +50,8 @@ interface LocalChange {
     id: string;
     type: ChangeType;
     collection: CollectionName;
-    data?: any;
-    changes?: any;
+    data?: Record<string, unknown>;
+    changes?: Record<string, unknown>;
     timestamp: number;
 }
 
@@ -122,7 +130,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                     updatedAt: (data as any).updatedAt || now.toISOString(),
                     createdAt: (data as any).createdAt || now.toISOString()
                 };
-                await localTable.put(dataWithTimestamp);
+                await localTable.put(dataWithTimestamp as any);
                 pendingChanges.set(`${collectionName}:${id}`, {
                     id,
                     type: 'create',
@@ -146,7 +154,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                         updatedAt: new Date().toISOString()
                     };
 
-                    await localTable.put(updated);
+                    await localTable.put(updated as any);
                     
                     // Verify the update
                     const verify = await localTable.get(id);
@@ -165,7 +173,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                     scheduleSyncToFirestore();
                     // ✅ Force immediate sync for update operations to ensure Firestore is updated
                     await syncToFirestore();
-                    return updated;
+                    return updated as unknown as T;
                 } else {
 
                     // If not found locally, treat as create
@@ -177,7 +185,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                             updatedAt: (data as any).updatedAt || now.toISOString(),
                             createdAt: (data as any).createdAt || now.toISOString()
                         };
-                        await localTable.put(dataWithTimestamp);
+                        await localTable.put(dataWithTimestamp as any);
                         pendingChanges.set(`${collectionName}:${id}`, {
                             id,
                             type: 'create',
@@ -230,10 +238,10 @@ export async function readLocalFirst<T extends { id: string }>(
     try {
         if (id) {
             const item = await localTable.get(id);
-            return item as T | null;
+            return item as unknown as T | null;
         } else {
             const items = await localTable.toArray();
-            return items as T[];
+            return items as unknown as T[];
         }
     } catch (error) {
 
@@ -315,17 +323,17 @@ function scheduleSyncToFirestore() {
 /**
  * Convert ISO string dates to Firestore Timestamps
  */
-function convertDatesToTimestamps(data: any): any {
+function convertDatesToTimestamps<T extends Record<string, unknown>>(data: T): T {
     if (!data || typeof data !== 'object') return data;
     
     const converted = { ...data };
     
     // Convert updatedAt and createdAt from ISO string to Timestamp
     if (converted.updatedAt && typeof converted.updatedAt === 'string') {
-        converted.updatedAt = Timestamp.fromDate(new Date(converted.updatedAt));
+        (converted as Record<string, unknown>).updatedAt = Timestamp.fromDate(new Date(converted.updatedAt));
     }
     if (converted.createdAt && typeof converted.createdAt === 'string') {
-        converted.createdAt = Timestamp.fromDate(new Date(converted.createdAt));
+        (converted as Record<string, unknown>).createdAt = Timestamp.fromDate(new Date(converted.createdAt));
     }
     
     return converted;
@@ -372,8 +380,9 @@ export async function syncToFirestore() {
                             // Convert ISO string dates to Firestore Timestamps
                             const firestoreData = convertDatesToTimestamps(change.data);
                             batch.set(docRef, firestoreData);
-                        } catch (error: any) {
-                            if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
+                        } catch (error: unknown) {
+                            const firestoreError = error as { code?: string };
+                            if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
                                 // Queue for later sync - use correct task type
                                 const taskType = getSyncTaskType(change.collection, 'create');
                                 // ✅ Pass the full data object directly (processors expect Customer/Supplier object, not {id, data})
@@ -406,8 +415,9 @@ export async function syncToFirestore() {
                                     batch.set(docRef, firestoreData);
                                 }
                             }
-                        } catch (error: any) {
-                            if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
+                        } catch (error: unknown) {
+                            const firestoreError = error as { code?: string };
+                            if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
                                 // Queue for later sync - use correct task type
                                 const taskType = getSyncTaskType(change.collection, 'update');
                                 await enqueueSyncTask(
@@ -438,12 +448,13 @@ export async function syncToFirestore() {
                         );
                         // Don't add to batch since sync queue will handle it
                         continue;
-                    } catch (error: any) {
+                    } catch (error: unknown) {
                         // If enqueue fails, try direct delete as fallback
                         try {
                             batch.delete(docRef);
-                        } catch (deleteError: any) {
-                            if (deleteError?.code === 'permission-denied' || deleteError?.code === 'unavailable') {
+                        } catch (deleteError: unknown) {
+                            const firestoreError = deleteError as { code?: string };
+                            if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
                                 // Re-queue for later
                                 pendingChanges.set(`${change.collection}:${change.id}`, change);
                             } else {
@@ -468,15 +479,16 @@ export async function syncToFirestore() {
                     }
                 }
             } catch (registryError) {
-
                 // Continue even if registry update fails
+                handleSilentError(registryError, 'syncToFirestore - registry update fallback');
             }
             
             // Commit batch for this change
             try {
                 await batch.commit();
-            } catch (error: any) {
-                if (error?.code === 'permission-denied' || error?.code === 'unavailable') {
+            } catch (error: unknown) {
+                const firestoreError = error as { code?: string };
+                if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
                     // Re-queue the change
                     pendingChanges.set(`${change.collection}:${change.id}`, change);
                 } else {
@@ -497,7 +509,7 @@ export async function syncToFirestore() {
  */
 let syncFromFirestoreScheduled = false;
 let lastSyncTime = 0;
-const SYNC_COOLDOWN = 5000; // Minimum 5 seconds between syncs
+const SYNC_COOLDOWN = 60_000; // Minimum 60 seconds between syncs to reduce reads
 
 function scheduleSyncFromFirestore() {
     if (syncFromFirestoreScheduled) return;
@@ -566,6 +578,7 @@ async function syncFromFirestore() {
         
     } catch (error) {
         // Silent fail - sync will retry on next interaction
+        handleSilentError(error, 'syncToFirestore - background sync fallback');
     }
 }
 
@@ -574,12 +587,12 @@ async function syncFromFirestore() {
  * Handles large collections that might exceed Firestore query limits
  * ✅ FIXED: Ensures all documents are fetched, including those without updatedAt
  */
-async function getAllDocsPaginated<T>(
-    collectionRef: any,
+async function getAllDocsPaginated<T extends DocumentData>(
+    collectionRef: CollectionReference<T>,
     batchSize: number = 1000
 ): Promise<T[]> {
     const allDocs: T[] = [];
-    let lastDoc: any = null;
+    let lastDoc: QueryDocumentSnapshot<T> | null = null;
     let hasMore = true;
     
     while (hasMore) {
@@ -598,14 +611,14 @@ async function getAllDocsPaginated<T>(
         }
         
         snapshot.forEach((doc) => {
-            allDocs.push({ id: doc.id, ...doc.data() } as T);
+            allDocs.push({ id: doc.id, ...(doc.data() as object) } as unknown as T);
         });
         
         // Check if we got fewer docs than batch size (last batch)
         if (snapshot.docs.length < batchSize) {
             hasMore = false;
         } else {
-            lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            lastDoc = snapshot.docs[snapshot.docs.length - 1] as unknown as QueryDocumentSnapshot<T>;
             // Yield to main thread between batches
             await yieldToMainThread();
         }
@@ -631,36 +644,10 @@ async function syncCollectionFromFirestore(
         const localTable = getLocalTable(collectionName);
         if (!localTable) return;
 
-        const updates: any[] = [];
-        const updatesMap = new Map<string, any>(); // To avoid duplicates
+        const updates: (DocumentData & { id: string })[] = [];
+        const updatesMap = new Map<string, DocumentData>(); // To avoid duplicates
         
-        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
-        // Incremental sync can miss documents if:
-        // 1. updatedAt field is missing/null
-        // 2. updatedAt was not updated properly
-        // 3. Documents were added without proper updatedAt
-        // 4. Previous syncs missed some documents
-        
-        // Get ALL documents from Firestore (with pagination for large collections)
-        try {
-            const allDocs = await getAllDocsPaginated(firestoreCollection, 1000);
-            updates.push(...allDocs);
-        } catch (error) {
-            // If pagination fails, try simple query as fallback
-            try {
-                const allSnapshot = await getDocs(query(firestoreCollection));
-                allSnapshot.forEach((docSnap) => {
-                    const data = { id: docSnap.id, ...docSnap.data() };
-                    updates.push(data);
-                });
-            } catch (fallbackError) {
-                // If both fail, log error but continue
-                console.error(`[${collectionName}] Failed to fetch all documents:`, fallbackError);
-            }
-        }
-        
-        // ✅ Also do incremental sync to catch recently updated documents
-        // This ensures we get the latest changes quickly
+        // ✅ Incremental sync only (reduces reads dramatically)
         if (lastSyncTime) {
             const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
             try {
@@ -684,11 +671,22 @@ async function syncCollectionFromFirestore(
                     }
                 });
             } catch (error) {
-                // If incremental query fails (e.g., missing index), that's okay
-                // We already have all documents from full sync above
+                // If incremental query fails, do not fallback to full sync automatically
+                // This avoids massive reads; will retry on next scheduled sync
+                handleSilentError(error, 'syncCollectionFromFirestore - incremental query error');
+            }
+        } else {
+            // ✅ First sync only: fetch all documents once
+            try {
+                const allSnapshot = await getDocs(query(firestoreCollection));
+                allSnapshot.forEach((docSnap) => {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    updates.push(data);
+                });
+            } catch (fallbackError) {
+                handleSilentError(fallbackError, 'syncCollectionFromFirestore - initial full sync error');
             }
         }
-        // Note: First sync is now handled by the full sync above (no else block needed)
 
         if (updates.length > 0) {
             // ✅ FIX: Handle expenses and incomes specially - they're stored in transactions table
@@ -701,11 +699,11 @@ async function syncCollectionFromFirestore(
                         type: collectionName === 'expenses' ? 'Expense' : 'Income',
                         transactionType: collectionName === 'expenses' ? 'Expense' : 'Income'
                     }));
-                    await chunkedBulkPut(transactionsTable, transactionsWithType, 100);
+                    await chunkedBulkPut(transactionsTable, transactionsWithType as any[], 100);
                 }
             } else if (localTable) {
                 // ✅ OPTIMIZED: Use chunked bulkPut to prevent main thread blocking
-                await chunkedBulkPut(localTable, updates, 100);
+                await chunkedBulkPut(localTable, updates as any[], 100);
             }
             
             // ✅ Save last sync time (only if we got documents)
@@ -746,20 +744,11 @@ async function syncCollectionFromFirestore(
             const currentTime = Date.now();
             saveLastSyncTime(collectionName, currentTime);
         }
-    } catch (error: any) {
-        // ✅ FIX: Better error logging to help diagnose missing documents
-        console.error(`[${collectionName}] Sync failed:`, {
-            error: error?.message || String(error),
-            code: error?.code,
-            collection: collectionName,
-            firestoreCollection: firestoreCollectionName,
-            lastSyncTime: lastSyncTime ? new Date(lastSyncTime).toISOString() : 'none',
-            hasLocalTable: !!localTable
-        });
-        
-        if (error?.code !== 'permission-denied' && error?.code !== 'unavailable') {
-            // Log but don't throw - will retry on next sync
-            // This helps identify sync issues that might cause missing documents
+    } catch (error: unknown) {
+        // Error handling - will retry on next sync
+        const firestoreError = error as { code?: string };
+        if (firestoreError?.code !== 'permission-denied' && firestoreError?.code !== 'unavailable') {
+            // Will retry on next sync
         }
     }
 }
@@ -798,4 +787,3 @@ export async function forceSyncToFirestore(): Promise<void> {
 export async function forceSyncFromFirestore(): Promise<void> {
     await syncFromFirestore();
 }
-

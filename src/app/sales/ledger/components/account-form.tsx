@@ -27,8 +27,10 @@ export const AccountForm: React.FC<AccountFormProps> = ({
       className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-card shadow-sm p-4 md:grid-cols-3"
     >
       <div className="space-y-1">
-        <Label className="text-sm font-medium">Account Name</Label>
+        <Label htmlFor="accountName" className="text-sm font-medium">Account Name</Label>
         <Input
+          id="accountName"
+          name="accountName"
           type="text"
           required
           value={newAccount.name}
@@ -40,8 +42,10 @@ export const AccountForm: React.FC<AccountFormProps> = ({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-sm font-medium">Address</Label>
+        <Label htmlFor="accountAddress" className="text-sm font-medium">Address</Label>
         <Input
+          id="accountAddress"
+          name="accountAddress"
           type="text"
           value={newAccount.address || ""}
           onChange={(event) =>
@@ -52,8 +56,10 @@ export const AccountForm: React.FC<AccountFormProps> = ({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-sm font-medium">Contact Number</Label>
+        <Label htmlFor="accountContact" className="text-sm font-medium">Contact Number</Label>
         <Input
+          id="accountContact"
+          name="accountContact"
           type="text"
           value={newAccount.contact || ""}
           onChange={(event) =>

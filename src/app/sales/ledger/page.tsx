@@ -234,7 +234,6 @@ const LedgerPage: React.FC = () => {
           data: account,
         };
     });
-    console.log('[Ledger] Dropdown options:', options.length, options);
     return options;
   }, [accounts]);
 
@@ -321,14 +320,12 @@ const LedgerPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = getLedgerAccountsRealtime(
       (data) => {
-        console.log('[Ledger] Accounts loaded:', data.length, data);
         setAccounts(data);
         if (!activeAccountId && data.length > 0) {
           setActiveAccountId(data[0].id);
         }
       },
       (error) => {
-        console.error('[Ledger] Error loading accounts:', error);
         toast({
           title: "Unable to load accounts",
           description: "We could not fetch ledger accounts. Please try again.",
@@ -1856,8 +1853,9 @@ const LedgerPage: React.FC = () => {
               className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-muted/30 p-3 md:grid-cols-4"
             >
               <div className="md:col-span-3 space-y-1">
-                <Label className="text-[11px] font-medium">Cash Account Name</Label>
+                <Label htmlFor="newCashAccountName" className="text-[11px] font-medium">Cash Account Name</Label>
                 <Input
+                  id="newCashAccountName"
                   value={newCashAccountName}
                   onChange={(event) => setNewCashAccountName(event.target.value)}
                   placeholder="e.g. Counter Cash, Safe, Petty Cash"

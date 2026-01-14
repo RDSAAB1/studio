@@ -343,7 +343,7 @@ export const useSupplierPayments = () => {
     // Load centerNameOptions for Gov payments
     useEffect(() => {
         const unsubCenterNames = getOptionsRealtime('centerNames', setCenterNameOptions, (err) => {
-            console.error("Error fetching center names:", err);
+            // Error fetching center names
         });
         return () => {
             unsubCenterNames();

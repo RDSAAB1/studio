@@ -73,13 +73,8 @@ function startNextServer() {
       env: { ...process.env, PORT: '3000' },
     });
 
-    nextServer.stdout.on('data', (data) => {
-      console.log(`Next.js: ${data}`);
-    });
-
-    nextServer.stderr.on('data', (data) => {
-      console.error(`Next.js Error: ${data}`);
-    });
+    nextServer.stdout.on('data', () => {});
+    nextServer.stderr.on('data', () => {});
   }
 }
 
@@ -124,4 +119,3 @@ app.on('web-contents-created', (event, contents) => {
     require('electron').shell.openExternal(navigationUrl);
   });
 });
-

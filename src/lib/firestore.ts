@@ -31,6 +31,21 @@ import { firestoreMonitor } from "./firestore-monitor";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, Account } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { format } from "date-fns";
+import { logError } from "./error-logger";
+import { retryFirestoreOperation } from "./retry-utils";
+import { createMetadataBasedListener } from "./sync-registry-listener";
+
+// Helper function to handle errors silently (for fallback scenarios)
+// This can be replaced with a proper error logging service later
+function handleSilentError(error: unknown, context: string): void {
+  // Error is intentionally handled silently for fallback scenarios
+  // In production, this could be sent to an error tracking service
+  if (process.env.NODE_ENV === 'development') {
+    // Only log in development for debugging
+    // eslint-disable-next-line no-console
+    console.debug(`[Firestore] Silent error in ${context}:`, error);
+  }
+}
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -74,17 +89,33 @@ function stripUndefined<T extends Record<string, any>>(data: T): T {
 
 // --- User Refresh Token Functions ---
 export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const userDocRef = doc(firestoreDB, "users", userId);
-    await setDoc(userDocRef, { refreshToken: refreshToken }, { merge: true });
+    try {
+        const userDocRef = doc(firestoreDB, "users", userId);
+        await retryFirestoreOperation(
+            () => setDoc(userDocRef, { refreshToken: refreshToken }, { merge: true }),
+            `saveRefreshToken for user ${userId}`
+        );
+    } catch (error) {
+        logError(error, `saveRefreshToken(${userId})`, 'medium');
+        throw error;
+    }
 }
 
 export async function getRefreshToken(userId: string): Promise<string | null> {
-    const userDocRef = doc(firestoreDB, "users", userId);
-    const docSnap = await getDoc(userDocRef);
-    if (docSnap.exists() && docSnap.data().refreshToken) {
-        return docSnap.data().refreshToken;
+    try {
+        const userDocRef = doc(firestoreDB, "users", userId);
+        const docSnap = await retryFirestoreOperation(
+            () => getDoc(userDocRef),
+            `getRefreshToken for user ${userId}`
+        );
+        if (docSnap.exists() && docSnap.data().refreshToken) {
+            return docSnap.data().refreshToken;
+        }
+        return null;
+    } catch (error) {
+        logError(error, `getRefreshToken(${userId})`, 'medium');
+        throw error;
     }
-    return null;
 }
 
 
@@ -97,8 +128,9 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
             if (localOptions.length > 0) {
                 callback(localOptions);
             }
-        }).catch(() => {
+        }).catch((error) => {
             // If local read fails, continue with Firestore
+            handleSilentError(error, 'getOptionsRealtime - local read fallback');
         });
     }
 
@@ -128,28 +160,44 @@ export async function addOption(collectionName: string, optionData: { name: stri
         throw new Error('Option name cannot be empty');
     }
     
-    const name = optionData.name.trim().toUpperCase();
-    
-    const docRef = doc(optionsCollection, collectionName);
-    
-    // Get current items first
-    const docSnap = await getDoc(docRef);
-    const currentItems = docSnap.exists() ? (docSnap.data().items || []) : [];
-    
-    // Check if item already exists
-    if (currentItems.includes(name)) {
-        throw new Error(`Option "${name}" already exists`);
-    }
-    
-    // Add new item
-    await setDoc(docRef, {
-        items: arrayUnion(name)
-    }, { merge: true });
-    
-    // Also update local IndexedDB immediately
-    if (db) {
-        const optionItem = { id: name.toLowerCase(), name, type: collectionName };
-        await db.options.put(optionItem);
+    try {
+        const name = optionData.name.trim().toUpperCase();
+        
+        const docRef = doc(optionsCollection, collectionName);
+        
+        // Get current items first
+        const docSnap = await retryFirestoreOperation(
+            () => getDoc(docRef),
+            `addOption - get current items for ${collectionName}`
+        );
+        const currentItems = docSnap.exists() ? (docSnap.data().items || []) : [];
+        
+        // Check if item already exists
+        if (currentItems.includes(name)) {
+            throw new Error(`Option "${name}" already exists`);
+        }
+        
+        // Add new item
+        await retryFirestoreOperation(
+            () => setDoc(docRef, {
+                items: arrayUnion(name)
+            }, { merge: true }),
+            `addOption - set item for ${collectionName}`
+        );
+        
+        // Also update local IndexedDB immediately
+        if (db) {
+            try {
+                const optionItem = { id: name.toLowerCase(), name, type: collectionName };
+                await db.options.put(optionItem);
+            } catch (dbError) {
+                logError(dbError, `addOption - IndexedDB update for ${collectionName}`, 'low');
+                // Continue even if IndexedDB update fails
+            }
+        }
+    } catch (error) {
+        logError(error, `addOption(${collectionName})`, 'medium');
+        throw error;
     }
 }
 
@@ -159,68 +207,91 @@ export async function updateOption(collectionName: string, id: string, optionDat
         throw new Error('Option name cannot be empty');
     }
     
-    const newName = optionData.name.trim().toUpperCase();
-    const docRef = doc(optionsCollection, collectionName);
-    
-    // Get current items
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-        throw new Error(`Collection ${collectionName} does not exist`);
-    }
-    
-    const currentItems = docSnap.data().items || [];
-    
-    // Find the old name by id (id is usually the lowercase name)
-    const oldName = currentItems.find((item: string) => item.toLowerCase() === id.toLowerCase());
-    
-    if (!oldName) {
-        throw new Error(`Option with id "${id}" not found`);
-    }
-    
-    // Check if new name already exists (and it's not the same as old name)
-    if (currentItems.includes(newName) && oldName !== newName) {
-        throw new Error(`Option "${newName}" already exists`);
-    }
-    
-    // Update: remove old name and add new name
-    const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
-    
-    await setDoc(docRef, {
-        items: updatedItems
-    }, { merge: true });
-    
-    // Update local IndexedDB
-    if (db) {
-        // Find old option by type and id (id is lowercase name)
-        const oldOptions = await db.options.where('type').equals(collectionName).toArray();
-        const oldOption = oldOptions.find(opt => {
-            // Check both id field and name field (id might be auto-increment or lowercase name)
-            const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);
-            const optName = String(opt.name || '').toLowerCase();
-            return optId === id.toLowerCase() || optName === id.toLowerCase() || optName === oldName.toLowerCase();
-        });
+    try {
+        const newName = optionData.name.trim().toUpperCase();
+        const docRef = doc(optionsCollection, collectionName);
         
-        if (oldOption) {
-            // Delete old option (use the actual id from the found option)
-            await db.options.delete(oldOption.id);
+        // Get current items
+        const docSnap = await retryFirestoreOperation(
+            () => getDoc(docRef),
+            `updateOption - get current items for ${collectionName}`
+        );
+        if (!docSnap.exists()) {
+            throw new Error(`Collection ${collectionName} does not exist`);
         }
         
-        // Add new option with lowercase name as id
-        const optionItem = { 
-            id: newName.toLowerCase(), 
-            name: newName, 
-            type: collectionName 
-        };
-        await db.options.put(optionItem);
+        const currentItems = docSnap.data().items || [];
+        
+        // Find the old name by id (id is usually the lowercase name)
+        const oldName = currentItems.find((item: string) => item.toLowerCase() === id.toLowerCase());
+        
+        if (!oldName) {
+            throw new Error(`Option with id "${id}" not found`);
+        }
+        
+        // Check if new name already exists (and it's not the same as old name)
+        if (currentItems.includes(newName) && oldName !== newName) {
+            throw new Error(`Option "${newName}" already exists`);
+        }
+        
+        // Update: remove old name and add new name
+        const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
+        
+        await retryFirestoreOperation(
+            () => setDoc(docRef, {
+                items: updatedItems
+            }, { merge: true }),
+            `updateOption - set updated items for ${collectionName}`
+        );
+        
+        // Update local IndexedDB
+        if (db) {
+            try {
+                // Find old option by type and id (id is lowercase name)
+                const oldOptions = await db.options.where('type').equals(collectionName).toArray();
+                const oldOption = oldOptions.find(opt => {
+                    // Check both id field and name field (id might be auto-increment or lowercase name)
+                    const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);
+                    const optName = String(opt.name || '').toLowerCase();
+                    return optId === id.toLowerCase() || optName === id.toLowerCase() || optName === oldName.toLowerCase();
+                });
+                
+                if (oldOption) {
+                    // Delete old option (use the actual id from the found option)
+                    await db.options.delete(oldOption.id);
+                }
+                
+                // Add new option with lowercase name as id
+                const optionItem = { 
+                    id: newName.toLowerCase(), 
+                    name: newName, 
+                    type: collectionName 
+                };
+                await db.options.put(optionItem);
+            } catch (dbError) {
+                logError(dbError, `updateOption - IndexedDB update for ${collectionName}`, 'low');
+                // Continue even if IndexedDB update fails
+            }
+        }
+    } catch (error) {
+        logError(error, `updateOption(${collectionName}, ${id})`, 'medium');
+        throw error;
     }
-    
 }
 
 export async function deleteOption(collectionName: string, id: string, name: string): Promise<void> {
-    const docRef = doc(optionsCollection, collectionName);
-    await updateDoc(docRef, {
-        items: arrayRemove(name)
-    });
+    try {
+        const docRef = doc(optionsCollection, collectionName);
+        await retryFirestoreOperation(
+            () => updateDoc(docRef, {
+                items: arrayRemove(name)
+            }),
+            `deleteOption - remove item from ${collectionName}`
+        );
+    } catch (error) {
+        logError(error, `deleteOption(${collectionName}, ${id})`, 'medium');
+        throw error;
+    }
 }
 
 
@@ -443,18 +514,23 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // --- Supplier Functions ---
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
-    // ✅ Use srNo as document ID if available, otherwise use the provided id
-    // This ensures suppliers are saved with serial number as document ID in Firestore
-    const documentId = supplierData.srNo && supplierData.srNo.trim() !== '' && supplierData.srNo !== 'S----' 
-        ? supplierData.srNo 
-        : supplierData.id;
-    
-    // Ensure the id field matches the document ID
-    const supplierWithCorrectId = { ...supplierData, id: documentId };
-    
-    // Use local-first sync manager
-    const { writeLocalFirst } = await import('./local-first-sync');
-    return await writeLocalFirst('suppliers', 'create', documentId, supplierWithCorrectId) as Customer;
+    try {
+        // ✅ Use srNo as document ID if available, otherwise use the provided id
+        // This ensures suppliers are saved with serial number as document ID in Firestore
+        const documentId = supplierData.srNo && supplierData.srNo.trim() !== '' && supplierData.srNo !== 'S----' 
+            ? supplierData.srNo 
+            : supplierData.id;
+        
+        // Ensure the id field matches the document ID
+        const supplierWithCorrectId = { ...supplierData, id: documentId };
+        
+        // Use local-first sync manager
+        const { writeLocalFirst } = await import('./local-first-sync');
+        return await writeLocalFirst('suppliers', 'create', documentId, supplierWithCorrectId) as Customer;
+    } catch (error) {
+        logError(error, `addSupplier(${supplierData.srNo || supplierData.id})`, 'high');
+        throw error;
+    }
 }
 
 // Find supplier Firestore document ID by serial number
@@ -498,14 +574,14 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
           // Find all payments with old SR No in paidFor from IndexedDB (no Firestore read)
           const allPayments = await db.payments.toArray();
           const affectedPayments = allPayments.filter(p => 
-            p.paidFor?.some((pf: any) => pf.srNo === oldSrNo)
+            p.paidFor?.some((pf: PaidFor) => pf.srNo === oldSrNo)
           );
           
           if (affectedPayments.length > 0) {
             // Update IndexedDB first
             for (const payment of affectedPayments) {
               if (payment.paidFor) {
-                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                const updatedPaidFor = payment.paidFor.map((pf: PaidFor) => 
                   pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                 );
                 await db.payments.update(payment.id, {
@@ -519,7 +595,7 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
             const { enqueueSyncTask } = await import('./sync-queue');
             for (const payment of affectedPayments) {
               if (payment.paidFor) {
-                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                const updatedPaidFor = payment.paidFor.map((pf: PaidFor) => 
                   pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                 );
                 await enqueueSyncTask(
@@ -532,6 +608,8 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
           }
         } catch (error) {
           // Continue with supplier update even if payment update fails
+          // Payment updates are non-critical for supplier update operation
+          handleSilentError(error, 'updateSupplier - payment update');
         }
       }
     }
@@ -555,13 +633,13 @@ export async function deleteSupplier(id: string): Promise<void> {
 
   try {
     // Get supplier data from IndexedDB first (local-first)
-    let supplierData: any = null;
+    let supplierData: Customer | null = null;
     let supplierSrNo: string | null = null;
     let documentId: string = id; // Default to provided id
     
     if (db) {
       // Try to get by id first
-      supplierData = await db.suppliers.get(id);
+      supplierData = (await db.suppliers.get(id)) || null;
       if (supplierData) {
         supplierSrNo = supplierData.srNo;
       } else {
@@ -582,8 +660,8 @@ export async function deleteSupplier(id: string): Promise<void> {
     if (supplierDoc.exists()) {
       documentId = id;
       if (!supplierData) {
-        supplierData = supplierDoc.data();
-        supplierSrNo = supplierData.srNo;
+        supplierData = supplierDoc.data() as unknown as Customer | null;
+        supplierSrNo = (supplierData as any)?.srNo;
       }
     } else if (supplierSrNo && supplierSrNo.trim() !== '' && supplierSrNo !== 'S----') {
       // 2. Try with srNo as document ID (new entries are saved this way)
@@ -591,7 +669,7 @@ export async function deleteSupplier(id: string): Promise<void> {
       if (supplierDoc.exists()) {
         documentId = supplierSrNo;
         if (!supplierData) {
-          supplierData = supplierDoc.data();
+          supplierData = supplierDoc.data() as unknown as Customer | null;
         }
       } else {
         // 3. Try to find by srNo query (for old entries saved with random IDs)
@@ -601,7 +679,7 @@ export async function deleteSupplier(id: string): Promise<void> {
           supplierDoc = snap.docs[0];
           documentId = supplierDoc.id; // Use the actual Firestore document ID
           if (!supplierData) {
-            supplierData = supplierDoc.data();
+            supplierData = supplierDoc.data() as unknown as Customer | null;
           }
         } else {
           // 4. Last resort: try id as srNo query
@@ -611,11 +689,10 @@ export async function deleteSupplier(id: string): Promise<void> {
             supplierDoc = snap2.docs[0];
             documentId = supplierDoc.id;
             if (!supplierData) {
-              supplierData = supplierDoc.data();
-              supplierSrNo = supplierData.srNo;
+              supplierData = supplierDoc.data() as unknown as Customer | null;
+              supplierSrNo = (supplierData as any)?.srNo;
             }
           } else {
-            console.warn(`[deleteSupplier] Supplier not found with id: ${id}`);
             return; // Not found
           }
         }
@@ -628,35 +705,34 @@ export async function deleteSupplier(id: string): Promise<void> {
         supplierDoc = snap.docs[0];
         documentId = supplierDoc.id;
         if (!supplierData) {
-          supplierData = supplierDoc.data();
-          supplierSrNo = supplierData.srNo;
+          supplierData = supplierDoc.data() as unknown as Customer | null;
+          supplierSrNo = (supplierData as any)?.srNo;
         }
       } else {
-        console.warn(`[deleteSupplier] Supplier not found with id: ${id}`);
         return; // Not found
       }
     }
     
     if (!supplierSrNo && supplierData) {
-      supplierSrNo = supplierData.srNo;
+      supplierSrNo = (supplierData as any)?.srNo;
     }
     
     // Find all payments associated with this supplier's serial number from IndexedDB
     const paymentsToDelete: string[] = [];
-    const paymentsToUpdate: Array<{ id: string; paidFor: any[]; amount: number }> = [];
+    const paymentsToUpdate: Array<{ id: string; paidFor: PaidFor[]; amount: number }> = [];
     
     if (db) {
       const allPayments = await db.payments.toArray();
       for (const payment of allPayments) {
         if (payment.paidFor && Array.isArray(payment.paidFor)) {
-          const matchingPaidFor = payment.paidFor.find((pf: any) => pf.srNo === supplierSrNo);
+          const matchingPaidFor = payment.paidFor.find((pf: PaidFor) => pf.srNo === supplierSrNo);
           if (matchingPaidFor) {
             if (payment.paidFor.length === 1) {
               // Payment is only for this supplier, delete it completely
               paymentsToDelete.push(payment.id);
             } else {
               // Payment is for multiple entries, remove this supplier from paidFor
-              const updatedPaidFor = payment.paidFor.filter((pf: any) => pf.srNo !== supplierSrNo);
+              const updatedPaidFor = payment.paidFor.filter((pf: PaidFor) => pf.srNo !== supplierSrNo);
               const amountToDeduct = matchingPaidFor.amount || 0;
               paymentsToUpdate.push({
                 id: payment.id,
@@ -817,7 +893,7 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
                 amount: recalculatedData.amount,
                 originalNetAmount: recalculatedData.originalNetAmount,
                 netAmount: recalculatedData.originalNetAmount, // Reset netAmount to original
-                dueDate: recalculatedData.dueDate,
+                dueDate: (recalculatedData as any).dueDate,
             };
             
             batch.update(supplierRef, updatePayload);
@@ -836,18 +912,23 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
 
 // --- Customer Functions ---
 export async function addCustomer(customerData: Customer): Promise<Customer> {
-    // ✅ Use srNo as document ID if available, otherwise use the provided id
-    // This ensures customers are saved with serial number as document ID in Firestore
-    const documentId = customerData.srNo && customerData.srNo.trim() !== '' && customerData.srNo !== 'C----' 
-        ? customerData.srNo 
-        : customerData.id;
-    
-    // Ensure the id field matches the document ID
-    const customerWithCorrectId = { ...customerData, id: documentId };
-    
-    // Use local-first sync manager
-    const { writeLocalFirst } = await import('./local-first-sync');
-    return await writeLocalFirst('customers', 'create', documentId, customerWithCorrectId) as Customer;
+    try {
+        // ✅ Use srNo as document ID if available, otherwise use the provided id
+        // This ensures customers are saved with serial number as document ID in Firestore
+        const documentId = customerData.srNo && customerData.srNo.trim() !== '' && customerData.srNo !== 'C----' 
+            ? customerData.srNo 
+            : customerData.id;
+        
+        // Ensure the id field matches the document ID
+        const customerWithCorrectId = { ...customerData, id: documentId };
+        
+        // Use local-first sync manager
+        const { writeLocalFirst } = await import('./local-first-sync');
+        return await writeLocalFirst('customers', 'create', documentId, customerWithCorrectId) as Customer;
+    } catch (error) {
+        logError(error, `addCustomer(${customerData.srNo || customerData.id})`, 'high');
+        throw error;
+    }
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
@@ -873,20 +954,20 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
                     // Find all customerPayments with old SR No in paidFor from IndexedDB (no Firestore read)
                     const allPayments = await db.customerPayments.toArray();
                     const affectedPayments = allPayments.filter(p => 
-                        p.paidFor?.some((pf: any) => pf.srNo === oldSrNo)
+                        p.paidFor?.some((pf: PaidFor) => pf.srNo === oldSrNo)
                     );
                     
                     if (affectedPayments.length > 0) {
                         // Update IndexedDB first
                         for (const payment of affectedPayments) {
                             if (payment.paidFor) {
-                                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                                const updatedPaidFor = payment.paidFor.map((pf: PaidFor) => 
                                     pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                                 );
                                 await db.customerPayments.update(payment.id, {
                                     paidFor: updatedPaidFor,
                                     updatedAt: new Date().toISOString()
-                                } as any).catch(() => {});
+                                }).catch(() => {});
                             }
                         }
                         
@@ -894,7 +975,7 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
                         const { enqueueSyncTask } = await import('./sync-queue');
                         for (const payment of affectedPayments) {
                             if (payment.paidFor) {
-                                const updatedPaidFor = payment.paidFor.map((pf: any) => 
+                                const updatedPaidFor = payment.paidFor.map((pf: PaidFor) => 
                                     pf.srNo === oldSrNo ? { ...pf, srNo: newSrNo! } : pf
                                 );
                                 await enqueueSyncTask(
@@ -907,6 +988,8 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
                     }
                 } catch (error) {
                     // Continue with customer update even if payment update fails
+                    // Payment updates are non-critical for customer update operation
+                    handleSilentError(error, 'updateCustomer - payment update');
                 }
             }
         }
@@ -915,7 +998,7 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
     // Use local-first sync manager
     try {
         const { writeLocalFirst } = await import('./local-first-sync');
-        await writeLocalFirst('customers', 'update', id, undefined, customerData);
+        await writeLocalFirst<Customer>('customers', 'update', id, undefined, customerData as Partial<Customer>);
         return true;
     } catch (error) {
         return false;
@@ -1036,11 +1119,11 @@ export function getCustomerDocumentsRealtime(callback: (documents: CustomerDocum
 }
 
 // --- Inventory Item Functions ---
-export async function addInventoryItem(item: any) {
+export async function addInventoryItem(item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
   const docRef = await addDoc(inventoryItemsCollection, item);
   return { id: docRef.id, ...item };
 }
-export async function updateInventoryItem(id: string, item: any) {
+export async function updateInventoryItem(id: string, item: Partial<InventoryItem>): Promise<void> {
   const docRef = doc(inventoryItemsCollection, id);
   await updateDoc(docRef, item);
 }
@@ -1061,7 +1144,7 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     const allPayments = await db.payments.toArray();
     for (const payment of allPayments) {
       if (payment.paidFor && Array.isArray(payment.paidFor)) {
-        const hasMatchingSrNo = payment.paidFor.some((pf: any) => pf.srNo === srNo);
+        const hasMatchingSrNo = payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo);
         if (hasMatchingSrNo) {
           paymentIdsToDelete.push(payment.id);
         }
@@ -1108,7 +1191,7 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
     const allPayments = await db.customerPayments.toArray();
     for (const payment of allPayments) {
       if (payment.paidFor && Array.isArray(payment.paidFor)) {
-        const hasMatchingSrNo = payment.paidFor.some((pf: any) => pf.srNo === srNo);
+        const hasMatchingSrNo = payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo);
         if (hasMatchingSrNo) {
           paymentIdsToDelete.push(payment.id);
         }
@@ -1375,7 +1458,7 @@ export function getAttendanceRealtime(
             localStorage.setItem('lastSync:attendance', String(Date.now()));
         }
     }).catch((error) => {
-        onError(error);
+        onError(error as Error);
     });
 
     // ✅ Set up realtime listener for future changes
@@ -1409,8 +1492,8 @@ export function getAttendanceRealtime(
         if (snapshot.size > 0 && typeof window !== 'undefined') {
             localStorage.setItem('lastSync:attendance', String(Date.now()));
         }
-    }, (err: any) => {
-        onError(err);
+    }, (err: unknown) => {
+        onError(err as Error);
     });
 }
 
@@ -1473,33 +1556,47 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 
 // --- Income and Expense specific functions ---
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
-    const formatSettings = await getFormatSettings();
-    const newTransactionId = incomeData.transactionId || (await (async () => {
-        const incomesSnapshot = await getDocs(query(incomesCollection, orderBy('transactionId', 'desc'), limit(1)));
-        const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', '')) || 0;
-        return generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
-    })());
+    try {
+        const formatSettings = await getFormatSettings();
+        const newTransactionId = incomeData.transactionId || (await (async () => {
+            const incomesSnapshot = await retryFirestoreOperation(
+                () => getDocs(query(incomesCollection, orderBy('transactionId', 'desc'), limit(1))),
+                'addIncome - get last transaction ID'
+            );
+            const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', '')) || 0;
+            return generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
+        })());
 
-    // SAFETY CHECK: Prevent overwriting existing document
-    const docRef = doc(incomesCollection, newTransactionId);
-    const existingDoc = await getDoc(docRef);
-    
-    if (existingDoc.exists()) {
-        throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
+        // SAFETY CHECK: Prevent overwriting existing document
+        const docRef = doc(incomesCollection, newTransactionId);
+        const existingDoc = await retryFirestoreOperation(
+            () => getDoc(docRef),
+            'addIncome - check existing document'
+        );
+        
+        if (existingDoc.exists()) {
+            throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
+        }
+        
+        const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
+        
+        // ✅ Use batch write to ensure atomicity with sync registry
+        const batch = writeBatch(firestoreDB);
+        batch.set(docRef, newIncome);
+        
+        // ✅ Update sync registry atomically
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('incomes', { batch });
+        
+        await retryFirestoreOperation(
+            () => batch.commit(),
+            'addIncome - commit batch'
+        );
+        return newIncome;
+    } catch (error) {
+        logError(error, `addIncome(${incomeData.transactionId || 'new'})`, 'high');
+        throw error;
     }
-    
-    const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
-    
-    // ✅ Use batch write to ensure atomicity with sync registry
-    const batch = writeBatch(firestoreDB);
-    batch.set(docRef, newIncome);
-    
-    // ✅ Update sync registry atomically
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('incomes', { batch });
-    
-    await batch.commit();
-    return newIncome;
 }
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
@@ -1824,6 +1921,7 @@ export async function getHolidays(): Promise<Holiday[]> {
             }
         } catch (error) {
             // If local read fails, continue with Firestore
+            handleSilentError(error, 'getHolidays - local read fallback');
         }
     }
 
@@ -1913,6 +2011,7 @@ export async function getAllSuppliers(): Promise<Customer[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllSuppliers - local read fallback');
     }
   }
 
@@ -1922,9 +2021,8 @@ export async function getAllSuppliers(): Promise<Customer[]> {
   try {
     // Try with orderBy first (faster if index exists)
     q = query(suppliersCollection, orderBy("srNo", "desc"));
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If orderBy fails (missing index), use simple query
-    console.warn(`[getAllSuppliers] orderBy query failed, using fallback:`, error.message);
     q = query(suppliersCollection);
   }
 
@@ -1956,6 +2054,7 @@ export async function getAllCustomers(): Promise<Customer[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllCustomers - local read fallback');
     }
   }
 
@@ -1965,9 +2064,8 @@ export async function getAllCustomers(): Promise<Customer[]> {
   try {
     // Try with orderBy first (faster if index exists)
     q = query(customersCollection, orderBy("srNo", "desc"));
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If orderBy fails (missing index), use simple query
-    console.warn(`[getAllCustomers] orderBy query failed, using fallback:`, error.message);
     q = query(customersCollection);
   }
 
@@ -2036,6 +2134,7 @@ export async function getAllPayments(): Promise<Payment[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllPayments - local read fallback');
     }
   }
 
@@ -2046,9 +2145,8 @@ export async function getAllPayments(): Promise<Payment[]> {
     // Try with orderBy first (faster if index exists)
     q = query(supplierPaymentsCollection, orderBy("date", "desc"));
     govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If orderBy fails (missing index), use simple query
-    console.warn(`[getAllPayments] orderBy query failed, using fallback:`, error.message);
     q = query(supplierPaymentsCollection);
     govQ = query(governmentFinalizedPaymentsCollection);
   }
@@ -2093,6 +2191,7 @@ export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllCustomerPayments - local read fallback');
     }
   }
 
@@ -2102,9 +2201,8 @@ export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
   try {
     // Try with orderBy first (faster if index exists)
     q = query(customerPaymentsCollection, orderBy("date", "desc"));
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If orderBy fails (missing index), use simple query
-    console.warn(`[getAllCustomerPayments] orderBy query failed, using fallback:`, error.message);
     q = query(customerPaymentsCollection);
   }
 
@@ -2136,6 +2234,7 @@ export async function getAllIncomes(): Promise<Income[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllIncomes - local read fallback');
     }
   }
 
@@ -2161,6 +2260,7 @@ export async function getAllExpenses(): Promise<Expense[]> {
       }
     } catch (error) {
       // If local read fails, continue with Firestore
+      handleSilentError(error, 'getAllExpenses - local read fallback');
     }
   }
 
@@ -2306,7 +2406,6 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const getLastSyncTime = (): number | undefined => {
         if (typeof window === 'undefined') return undefined;
@@ -2315,35 +2414,18 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
     };
     
     const fetchSuppliers = async (): Promise<Customer[]> => {
-        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
-        // Don't rely on incremental sync which might miss documents without updatedAt
-        let suppliersQuery;
         let snapshot;
-        
         try {
-            // Try with orderBy first (faster if index exists)
-            suppliersQuery = query(suppliersCollection, orderBy("srNo", "desc"));
-            snapshot = await getDocs(suppliersQuery);
-        } catch (error: any) {
-            // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[suppliers] orderBy query failed, using fallback:`, error.message);
-            try {
-                suppliersQuery = query(suppliersCollection);
-                snapshot = await getDocs(suppliersQuery);
-            } catch (fallbackError: any) {
-                console.error(`[suppliers] Both queries failed:`, fallbackError);
-                throw fallbackError;
-            }
+            const fullQ = query(suppliersCollection, orderBy('srNo', 'desc'));
+            snapshot = await getDocs(fullQ);
+        } catch {
+            snapshot = await getDocs(query(suppliersCollection));
         }
-        
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         firestoreMonitor.logRead('suppliers', 'getSuppliersRealtime', snapshot.size);
-        
-        // Update last sync time
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:suppliers', Date.now().toString());
         }
-        
         return suppliers;
     };
     
@@ -2387,7 +2469,6 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
     }
 
     // ✅ Use metadata-based listener to properly handle deletions
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const getLastSyncTime = (): number | undefined => {
         if (typeof window === 'undefined') return undefined;
@@ -2396,36 +2477,18 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
     };
     
     const fetchCustomers = async (): Promise<Customer[]> => {
-        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
-        // Don't rely on incremental sync which might miss documents without updatedAt
-        let customersQuery;
         let snapshot;
-        
         try {
-            // Try with orderBy first (faster if index exists)
-            customersQuery = query(customersCollection, orderBy("srNo", "desc"));
-            snapshot = await getDocs(customersQuery);
-        } catch (error: any) {
-            // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[customers] orderBy query failed, using fallback:`, error.message);
-            try {
-                customersQuery = query(customersCollection);
-                snapshot = await getDocs(customersQuery);
-            } catch (fallbackError: any) {
-                console.error(`[customers] Both queries failed:`, fallbackError);
-                throw fallbackError;
-            }
+            const fullQ = query(customersCollection, orderBy('srNo', 'desc'));
+            snapshot = await getDocs(fullQ);
+        } catch {
+            snapshot = await getDocs(query(customersCollection));
         }
-
         firestoreMonitor.logRead('customers', 'getCustomersRealtime', snapshot.size);
-        
         const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        
-        // Update last sync time
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:customers', Date.now().toString());
         }
-        
         return customers;
     };
     
@@ -2455,7 +2518,6 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
     }
 
     // ✅ Use metadata-based listener - listen to sync_registry instead of actual collections
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     // ✅ Use incremental sync - only fetch NEW/CHANGED payments after last sync
     const getLastSyncTime = (): number | undefined => {
@@ -2550,9 +2612,8 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                     getDocs(regularQuery),
                     getDocs(govQuery)
                 ]);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 // If incremental sync fails (e.g., no updatedAt field or missing index), fallback to full sync
-                console.warn(`[payments] Incremental sync failed, using full sync:`, error.message);
                 try {
                     regularQuery = query(supplierPaymentsCollection, orderBy("date", "desc"));
                     govQuery = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
@@ -2560,9 +2621,8 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                         getDocs(regularQuery),
                         getDocs(govQuery)
                     ]);
-                } catch (fallbackError: any) {
+                } catch (fallbackError: unknown) {
                     // If orderBy also fails, try without orderBy
-                    console.warn(`[payments] orderBy query failed, using fallback:`, fallbackError.message);
                     regularQuery = query(supplierPaymentsCollection);
                     govQuery = query(governmentFinalizedPaymentsCollection);
                     [regularSnapshot, govSnapshot] = await Promise.all([
@@ -2580,9 +2640,8 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
                     getDocs(regularQuery),
                     getDocs(govQuery)
                 ]);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 // If orderBy fails, try without orderBy
-                console.warn(`[payments] orderBy query failed, using fallback:`, error.message);
                 regularQuery = query(supplierPaymentsCollection);
                 govQuery = query(governmentFinalizedPaymentsCollection);
                 [regularSnapshot, govSnapshot] = await Promise.all([
@@ -2852,20 +2911,20 @@ export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) 
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
     
     const fetchCustomerPayments = async (): Promise<CustomerPayment[]> => {
-        // ✅ FIX: Handle missing index errors gracefully
         let snapshot;
         try {
-            snapshot = await getDocs(query(customerPaymentsCollection, orderBy("date", "desc")));
-        } catch (error: any) {
-            // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[customerPayments] orderBy query failed, using fallback:`, error.message);
+            const fullQ = query(customerPaymentsCollection, orderBy("date", "desc"));
+            snapshot = await getDocs(fullQ);
+        } catch {
             snapshot = await getDocs(query(customerPaymentsCollection));
         }
         const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
         firestoreMonitor.logRead('customerPayments', 'getCustomerPaymentsRealtime', snapshot.size);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:customerPayments', Date.now().toString());
+        }
         return payments;
     };
     
@@ -2887,16 +2946,15 @@ export function getLoansRealtime(callback: (data: Loan[]) => void, onError: (err
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchLoans = async (): Promise<Loan[]> => {
         // ✅ FIX: Handle missing index errors gracefully
         let snapshot;
         try {
             snapshot = await getDocs(query(loansCollection, orderBy("startDate", "desc")));
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[loans] orderBy query failed, using fallback:`, error.message);
             snapshot = await getDocs(query(loansCollection));
         }
         const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
@@ -2922,20 +2980,21 @@ export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) 
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchFundTransactions = async (): Promise<FundTransaction[]> => {
-        // ✅ FIX: Handle missing index errors gracefully
         let snapshot;
         try {
-            snapshot = await getDocs(query(fundTransactionsCollection, orderBy("date", "desc")));
-        } catch (error: any) {
-            // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[fundTransactions] orderBy query failed, using fallback:`, error.message);
+            const fullQ = query(fundTransactionsCollection, orderBy("date", "desc"));
+            snapshot = await getDocs(fullQ);
+        } catch {
             snapshot = await getDocs(query(fundTransactionsCollection));
         }
         const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
         firestoreMonitor.logRead('fundTransactions', 'getFundTransactionsRealtime', snapshot.size);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:fundTransactions', Date.now().toString());
+        }
         return transactions;
     };
     
@@ -2953,24 +3012,38 @@ export function getFundTransactionsRealtime(callback: (data: FundTransaction[]) 
 export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            return db ? await db.incomes.orderBy('date').reverse().toArray() : [];
+            if (db && db.transactions) {
+                try {
+                    const incomes = await db.transactions.orderBy('date').reverse().filter(t => (t as any).type === 'Income').toArray();
+                    return incomes as Income[];
+                } catch {
+                    const all = await db.transactions.where('type').equals('Income').toArray();
+                    return all.sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateB - dateA;
+                    }) as Income[];
+                }
+            }
+            return [];
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchIncomes = async (): Promise<Income[]> => {
-        // ✅ FIX: Handle missing index errors gracefully
         let snapshot;
         try {
-            snapshot = await getDocs(query(incomesCollection, orderBy("date", "desc")));
-        } catch (error: any) {
-            // If orderBy fails (missing index), fallback to query without orderBy
-            console.warn(`[incomes] orderBy query failed, using fallback:`, error.message);
+            const fullQ = query(incomesCollection, orderBy('date', 'desc'));
+            snapshot = await getDocs(fullQ);
+        } catch {
             snapshot = await getDocs(query(incomesCollection));
         }
         const incomes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
         firestoreMonitor.logRead('incomes', 'getIncomeRealtime', snapshot.size);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lastSync:incomes', Date.now().toString());
+        }
         return incomes;
     };
     
@@ -2978,7 +3051,7 @@ export function getIncomeRealtime(callback: (data: Income[]) => void, onError: (
         {
             collectionName: 'incomes',
             fetchFunction: fetchIncomes,
-            localTableName: 'incomes'
+            localTableName: undefined
         },
         callback,
         onError
@@ -2991,7 +3064,7 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
             // ✅ FIX: Dexie doesn't support orderBy after where().equals()
             if (db && db.transactions) {
                 try {
-                    const expenses = await db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray();
+                    const expenses = await db.transactions.orderBy('date').reverse().filter(t => (t as any).type === 'Expense').toArray();
                     return expenses as Expense[];
                 } catch {
                     // Fallback: get all and filter/sort in memory
@@ -3007,7 +3080,7 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     // ✅ Use incremental sync - only fetch NEW/CHANGED expenses after last sync
     const getLastSyncTime = (): number | undefined => {
@@ -3021,7 +3094,7 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
     if (db && db.transactions) {
         // ✅ FIX: Dexie doesn't support orderBy after where().equals()
         // Use orderBy first, then filter, or sort in memory
-        db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray().then((localData) => {
+        db.transactions.orderBy('date').reverse().filter(t => (t as any).type === 'Expense').toArray().then((localData) => {
             if (localData && localData.length > 0) { // Only call callback if local data exists
                 callback(localData as Expense[]);
             }
@@ -3037,38 +3110,26 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
                     });
                     callback(sorted as Expense[]);
                 }
-            }).catch(() => {
+            }).catch((error) => {
                 // If local read fails, continue with Firestore
+                handleSilentError(error, 'getExpensesRealtime - local read fallback');
             });
         });
     }
 
     const fetchExpenses = async (): Promise<Expense[]> => {
-        // ✅ FIX: Always do FULL sync to ensure we get ALL documents
-        // Incremental sync misses documents without updatedAt or with incorrect timestamps
-        // This fixes missing expense entries like EX01220
-        let expensesQuery;
         let snapshot;
-        
         try {
-            // Try with orderBy first (faster if index exists)
-            expensesQuery = query(expensesCollection, orderBy("date", "desc"));
-            snapshot = await getDocs(expensesQuery);
-        } catch (error: any) {
-            // If orderBy fails (missing index), use simple query
-            console.warn(`[expenses] orderBy query failed, using fallback:`, error.message);
-            expensesQuery = query(expensesCollection);
-            snapshot = await getDocs(expensesQuery);
+            const fullQ = query(expensesCollection, orderBy('date', 'desc'));
+            snapshot = await getDocs(fullQ);
+        } catch {
+            snapshot = await getDocs(query(expensesCollection));
         }
-        
         const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
         firestoreMonitor.logRead('expenses', 'getExpensesRealtime', snapshot.size);
-        
-        // Update last sync time
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:expenses', Date.now().toString());
         }
-        
         return expenses;
     };
     
@@ -3089,7 +3150,7 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
                     }
                     // Otherwise return cached data
                     // ✅ FIX: Dexie doesn't support orderBy after where().equals()
-                    const existingExpenses = await db.transactions.orderBy('date').reverse().filter(t => t.type === 'Expense').toArray();
+                    const existingExpenses = await db.transactions.orderBy('date').reverse().filter(t => (t as any).type === 'Expense').toArray();
                     return existingExpenses as Expense[];
                 } catch {
                     // If IndexedDB read fails, continue with fetch
@@ -3103,21 +3164,29 @@ export function getExpensesRealtime(callback: (data: Expense[]) => void, onError
             const newExpenses = await fetchExpenses();
             const lastSyncTime = getLastSyncTime();
             
-            // ✅ FIX: Save expenses to transactions table with type: 'Expense'
             if (db && db.transactions) {
-                // Add type field to all expenses before saving
                 const expensesWithType = newExpenses.map(e => ({
                     ...e,
                     type: 'Expense' as const,
                     transactionType: 'Expense' as const
                 }));
-                
-                // Save to transactions table
                 const { chunkedBulkPut } = await import('./chunked-operations');
                 await chunkedBulkPut(db.transactions, expensesWithType, 100);
+                try {
+                    const existingLocal = await db.transactions.where('type').equals('Expense').toArray();
+                    const mergedMap = new Map<string, Expense>();
+                    existingLocal.forEach((e: any) => mergedMap.set(e.id, e as Expense));
+                    expensesWithType.forEach((e: any) => mergedMap.set(e.id, e as Expense));
+                    const merged = Array.from(mergedMap.values()).sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateB - dateA;
+                    });
+                    return merged;
+                } catch {
+                    return expensesWithType as Expense[];
+                }
             }
-            
-            // Return all expenses (full sync always)
             return newExpenses;
         })();
         
@@ -3183,7 +3252,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             );
         } catch (error) {
             // If query fails (e.g., missing index), fallback to full sync
-
+            handleSilentError(error, 'getIncomesAndExpensesRealtime - incomes query fallback');
             incomesQuery = query(incomesCollection, orderBy("date", "desc"));
         }
     } else {
@@ -3228,7 +3297,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
         }
         
         mergeAndCallback();
-    }, (err: any) => {
+    }, (err: unknown) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
             incomeDone = true;
@@ -3249,7 +3318,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             }, onError);
             return;
         }
-        onError(err);
+        onError(err as Error);
     });
 
     const shouldDoFullSyncExpenses = !expensesLastSync || (Date.now() - expensesLastSync > 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -3265,7 +3334,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             );
         } catch (error) {
             // If query fails (e.g., missing index), fallback to full sync
-
+            handleSilentError(error, 'getIncomesAndExpensesRealtime - expenses query fallback');
             expensesQuery = query(expensesCollection, orderBy("date", "desc"));
         }
     } else {
@@ -3310,7 +3379,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
         }
         
         mergeAndCallback();
-    }, (err: any) => {
+    }, (err: unknown) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
             expenseDone = true;
@@ -3331,7 +3400,7 @@ export function getIncomeAndExpensesRealtime(callback: (data: Transaction[]) => 
             }, onError);
             return;
         }
-        onError(err);
+        onError(err as Error);
     });
     
     return () => {
@@ -3352,8 +3421,8 @@ function removeDuplicateBankAccounts(accounts: BankAccount[]): BankAccount[] {
                 uniqueMap.set(accountNumber, account);
             } else {
                 // Keep the one with more recent updatedAt or createdAt
-                const existingTime = existing.updatedAt || existing.createdAt || '';
-                const currentTime = account.updatedAt || account.createdAt || '';
+                const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                const currentTime = (account as any).updatedAt || (account as any).createdAt || '';
                 if (currentTime > existingTime) {
                     uniqueMap.set(accountNumber, account);
                 }
@@ -3373,10 +3442,10 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
     
     try {
         const existingAccounts = await db.bankAccounts.toArray();
-        const accountMap = new Map<string, any[]>();
+        const accountMap = new Map<string, BankAccount[]>();
         
         // Group existing accounts by account number
-        existingAccounts.forEach((account: any) => {
+        existingAccounts.forEach((account: BankAccount) => {
             const accountNumber = account.accountNumber?.trim() || '';
             if (accountNumber) {
                 if (!accountMap.has(accountNumber)) {
@@ -3392,13 +3461,13 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
             if (accounts.length > 1) {
                 // Sort by updatedAt/createdAt, keep the most recent
                 accounts.sort((a, b) => {
-                    const timeA = a.updatedAt || a.createdAt || '';
-                    const timeB = b.updatedAt || b.createdAt || '';
+                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
+                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
                     return timeB.localeCompare(timeA);
                 });
                 
                 // Delete all except the first (most recent)
-                const deleteIds = accounts.slice(1).map((a: any) => a.id).filter((id: any) => id !== undefined);
+                const deleteIds = accounts.slice(1).map((a: BankAccount) => a.id).filter((id: string | undefined): id is string => id !== undefined);
                 toDelete.push(...deleteIds);
             }
         }
@@ -3419,7 +3488,7 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
         // First add existing accounts (already deduplicated in database)
         // But deduplicate again in memory to be safe
         const existingUnique = new Map<string, BankAccount>();
-        existingAccounts.forEach((account: any) => {
+        existingAccounts.forEach((account: BankAccount) => {
             const accountNumber = account.accountNumber?.trim() || '';
             if (accountNumber) {
                 const existing = existingUnique.get(accountNumber);
@@ -3427,8 +3496,8 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
                     existingUnique.set(accountNumber, account);
                 } else {
                     // Keep the most recent
-                    const existingTime = existing.updatedAt || existing.createdAt || '';
-                    const currentTime = account.updatedAt || account.createdAt || '';
+                    const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                    const currentTime = (account as any).updatedAt || (account as any).createdAt || '';
                     if (currentTime > existingTime) {
                         existingUnique.set(accountNumber, account);
                     }
@@ -3450,8 +3519,8 @@ async function cleanupAndPrepareBankAccounts(incomingAccounts: BankAccount[]): P
                     finalAccounts.set(accountNumber, account);
                 } else {
                     // Keep the one with more recent updatedAt or createdAt
-                    const existingTime = existing.updatedAt || existing.createdAt || '';
-                    const currentTime = account.updatedAt || account.createdAt || '';
+                    const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                    const currentTime = (account as any).updatedAt || (account as any).createdAt || '';
                     if (currentTime > existingTime) {
                         finalAccounts.set(accountNumber, account);
                     }
@@ -3541,7 +3610,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
         }
     }).catch((error) => {
 
-        onError(error);
+        onError(error as Error);
     });
 
     // ✅ Set up realtime listener for future changes
@@ -3577,7 +3646,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:bankAccounts', String(Date.now()));
         }
-    }, (err: any) => {
+    }, (err: unknown) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
             const pollUnsub = createPollingFallback(async () => {
@@ -3586,7 +3655,7 @@ export function getBankAccountsRealtime(callback: (data: BankAccount[]) => void,
             (pollUnsub as any).__fromQuota__ = true;
             return;
         }
-        onError(err);
+        onError(err as Error);
     });
 }
 
@@ -3848,7 +3917,7 @@ export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (err
         if (cachedBanks.length > 0) {
             callback(cachedBanks);
         } else {
-            onError(error);
+            onError(error as Error);
         }
     });
 }
@@ -3894,7 +3963,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
         }
     }).catch((error) => {
 
-        onError(error);
+        onError(error as Error);
     });
 
     // ✅ Set up realtime listener for future changes
@@ -3927,7 +3996,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
         if (typeof window !== 'undefined') {
             localStorage.setItem('lastSync:bankBranches', String(Date.now()));
         }
-    }, (err: any) => {
+    }, (err: unknown) => {
         if (isQuotaError(err)) {
             markFirestoreDisabled();
             const pollUnsub = createPollingFallback(async () => {
@@ -3936,7 +4005,7 @@ export function getBankBranchesRealtime(callback: (data: BankBranch[]) => void, 
             (pollUnsub as any).__fromQuota__ = true;
             return;
         }
-        onError(err);
+        onError(err as Error);
     });
 }
 
@@ -4371,7 +4440,7 @@ export function getLedgerAccountsRealtime(
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchLedgerAccounts = async (): Promise<LedgerAccount[]> => {
         const snapshot = await getDocs(query(ledgerAccountsCollection, orderBy('name')));
@@ -4592,7 +4661,7 @@ export function getLedgerCashAccountsRealtime(
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchLedgerCashAccounts = async (): Promise<LedgerCashAccount[]> => {
         const snapshot = await getDocs(query(ledgerCashAccountsCollection, orderBy('name')));
@@ -4684,9 +4753,8 @@ export async function fetchAllLedgerEntries(): Promise<LedgerEntry[]> {
         try {
             // Try with orderBy first (faster if index exists)
             q = query(ledgerEntriesCollection, orderBy('createdAt'));
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If orderBy fails (missing index), use simple query
-            console.warn(`[fetchAllLedgerEntries] orderBy query failed, using fallback:`, error.message);
             q = query(ledgerEntriesCollection);
         }
 
@@ -4742,7 +4810,7 @@ export function getLedgerEntriesRealtime(
         }, callback);
     }
 
-    const { createMetadataBasedListener } = require('./sync-registry-listener');
+    
     
     const fetchLedgerEntries = async (): Promise<LedgerEntry[]> => {
         let q;
@@ -5037,7 +5105,7 @@ export async function addMandiReport(report: MandiReport): Promise<MandiReport> 
     try {
         const docRef = doc(mandiReportsCollection, payload.id);
         await setDoc(docRef, payload, { merge: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
         throw error;
     }
     
@@ -5072,7 +5140,12 @@ export async function updateMandiReport(id: string, updates: Partial<MandiReport
     if (db) {
         try {
             const existing = await db.mandiReports.get(id);
-            await db.mandiReports.put({ ...(existing || { id }), ...updates, updatedAt: updatePayload.updatedAt });
+            await db.mandiReports.put({
+                ...(existing || { id }),
+                ...updates,
+                voucherNo: (updates.voucherNo ?? existing?.voucherNo ?? ""),
+                updatedAt: updatePayload.updatedAt,
+            } as MandiReport);
 
         } catch (error) {
 
@@ -5101,8 +5174,8 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                 return localReports;
             }
         } catch (error) {
-
             // If local read fails, continue with Firestore
+            handleSilentError(error, 'getAllMandiReports - local read fallback');
         }
     }
 
@@ -5149,7 +5222,7 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
             } else {
 
             }
-        } catch (collectionGroup6PError: any) {
+        } catch (collectionGroup6PError: unknown) {
 
 
         }
@@ -5181,12 +5254,12 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                             }
                         });
                     }
-                } catch (subcollectionError: any) {
+                } catch (subcollectionError: unknown) {
 
                 }
             }
             
-        } catch (manualQueryError: any) {
+        } catch (manualQueryError: unknown) {
 
         }
         
@@ -5210,7 +5283,7 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
                     }
                 }
             });
-        } catch (directError: any) {
+        } catch (directError: unknown) {
 
         }
         
@@ -5248,7 +5321,7 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
         }
         
         return allReports;
-    } catch (error: any) {
+    } catch (error: unknown) {
 
         
         // Try a simple direct query as last resort
@@ -5274,7 +5347,7 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
             }
             
             return reports;
-        } catch (fallbackError: any) {
+        } catch (fallbackError: unknown) {
 
             return [];
         }
@@ -5347,7 +5420,7 @@ export function getMandiReportsRealtime(
         }
     }).catch((error) => {
 
-        onError(error);
+        onError(error as Error);
     });
 
     // ✅ Set up realtime listener for future changes
@@ -5386,9 +5459,8 @@ export function getMandiReportsRealtime(
         if (snapshot.size > 0 && typeof window !== 'undefined') {
             localStorage.setItem('lastSync:mandiReports', String(Date.now()));
         }
-    }, (err: any) => {
-
-        onError(err);
+    }, (err: unknown) => {
+        onError(err as Error);
     });
 }
 
@@ -5428,8 +5500,8 @@ export function getManufacturingCostingRealtime(
         } else {
             callback(null);
         }
-    }, (err: any) => {
-        onError(err);
+    }, (err: unknown) => {
+        onError(err as Error);
     });
 }
 

@@ -28,7 +28,7 @@ interface CollectionConfig<T> {
  * 
  * This dramatically reduces Firestore reads by only fetching when metadata indicates changes
  */
-export function createMetadataBasedListener<T>(
+export function createMetadataBasedListener<T extends { id: string }>(
     config: CollectionConfig<T>,
     callback: (data: T[]) => void,
     onError: (error: Error) => void
@@ -93,14 +93,11 @@ export function createMetadataBasedListener<T>(
     const registryDocRef = doc(collection(firestoreDB, "sync_registry"), registryDocId);
     
     const unsubscribe = onSnapshot(registryDocRef, async (snapshot) => {
-        console.log(`[${collectionName}] Sync registry snapshot received, exists: ${snapshot.exists()}`);
-        
         if (!snapshot.exists()) {
             // Registry doc doesn't exist yet - always do initial fetch to detect deletions
             if (isInitialLoad) {
                 // ✅ FIX: Always fetch FULL sync on initial load, even if sync_registry doesn't exist
                 // This ensures we get all documents, including those added without sync_registry update
-                console.log(`[${collectionName}] Sync registry doesn't exist - doing FULL initial sync`);
                 try {
                     const freshData = await fetchFunction();
                     
@@ -108,11 +105,10 @@ export function createMetadataBasedListener<T>(
                     if (db && localTableName) {
                         const localTable = (db as any)[localTableName];
                         if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
-                            const existingIds = new Set((await localTable.toArray()).map((item: any) => item.id));
-                            const freshIds = new Set(freshData.map((item: any) => item.id));
-                            const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
+                            const existingIds = new Set<string>((await localTable.toArray()).map((item: { id: string }) => item.id));
+                            const freshIds = new Set<string>(freshData.map((item) => item.id));
+                            const idsToDelete = Array.from(existingIds).filter((id) => !freshIds.has(id));
                             if (idsToDelete.length > 0) {
-                                console.log(`[${collectionName}] Initial sync: deleting ${idsToDelete.length} items`);
                                 await chunkedBulkDelete(localTable, idsToDelete, 200);
                             }
                             if (freshData.length > 0) {
@@ -121,10 +117,30 @@ export function createMetadataBasedListener<T>(
                         }
                     }
                     
+                    if (db && db.transactions && (collectionName === 'expenses' || collectionName === 'incomes')) {
+                        const isExpense = collectionName === 'expenses';
+                        const localData = await db.transactions.where('type').equals(isExpense ? 'Expense' : 'Income').toArray();
+                        const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
+                        const freshIds = new Set<string>(freshData.map((item) => item.id));
+                        const missingIds = Array.from(freshIds).filter((id) => !localIds.has(id));
+                        if (missingIds.length > 0) {
+                            const missingDocs = freshData.filter(item => missingIds.includes((item as any).id));
+                            const withType = missingDocs.map(e => ({
+                                ...e,
+                                type: isExpense ? 'Expense' : 'Income',
+                                transactionType: isExpense ? 'Expense' : 'Income'
+                            }));
+                            await chunkedBulkPut(db.transactions, withType as any[], 100);
+                        }
+                        const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
+                        if (extraIds.length > 0) {
+                            await chunkedBulkDelete(db.transactions, extraIds, 200);
+                        }
+                    }
+                    
                     callback(freshData);
                     isInitialLoad = false;
                 } catch (error) {
-                    console.error(`[${collectionName}] Initial sync failed:`, error);
                     onError(error as Error);
                 }
             }
@@ -141,26 +157,15 @@ export function createMetadataBasedListener<T>(
         const lastKnownTrigger = typeof window !== 'undefined' ? (window as any)[lastTriggerKey] : null;
         const lastKnownTimestampStr = typeof window !== 'undefined' ? (window as any)[lastTimestampKey] : null;
         
-        console.log(`[${collectionName}] Sync registry change detected:`, {
-            hasTimestamp: !!currentTimestamp,
-            hasTrigger: currentTrigger !== undefined,
-            currentTrigger,
-            lastKnownTrigger,
-            lastKnownTimestampStr,
-            isInitialLoad
-        });
-        
         // ✅ Step 3: Always fetch on initial load to catch any missed documents
         if (isInitialLoad) {
             // Initial load - always fetch FULL sync to ensure we get all documents
             // This catches any documents that might have been missed due to sync registry issues
-            console.log(`[${collectionName}] Initial load - fetching FULL sync`);
             isInitialLoad = false;
             // Continue to fetch below
         } else {
             // If we don't have last known values yet, always fetch (first update after initial load)
             if (lastKnownTimestampStr === null && lastKnownTrigger === null) {
-                console.log(`[${collectionName}] No last known values - fetching (first update)`);
                 // Continue to fetch below
             } else {
                 // Check if timestamp changed
@@ -172,7 +177,6 @@ export function createMetadataBasedListener<T>(
                     
                     if (lastKnownTimestampStr !== currentTimestampStr) {
                         timestampChanged = true;
-                        console.log(`[${collectionName}] Timestamp changed: ${lastKnownTimestampStr} -> ${currentTimestampStr}`);
                     }
                 }
                 
@@ -184,23 +188,11 @@ export function createMetadataBasedListener<T>(
                 const triggerChanged = hasCurrentTrigger && 
                                       (hasLastTrigger ? currentTrigger !== lastKnownTrigger : true);
                 
-                console.log(`[${collectionName}] Change check:`, {
-                    timestampChanged,
-                    triggerChanged,
-                    currentTrigger,
-                    lastKnownTrigger,
-                    hasCurrentTrigger,
-                    hasLastTrigger,
-                    willFetch: timestampChanged || triggerChanged
-                });
-                
                 // Only fetch if timestamp OR trigger changed (actual change detected)
                 if (timestampChanged || triggerChanged) {
-                    console.log(`[${collectionName}] ✅ Change detected - fetching (timestamp: ${timestampChanged}, trigger: ${triggerChanged})`);
                     // Continue to fetch below (don't return)
                 } else {
                     // No change detected - skip fetch to avoid unnecessary reads
-                    console.log(`[${collectionName}] ⏭️ No change detected, skipping fetch`);
                     return; // Skip fetch
                 }
             }
@@ -228,13 +220,12 @@ export function createMetadataBasedListener<T>(
                     } else {
                         // Get all existing IDs from IndexedDB BEFORE updating
                         const existingItems = await localTable.toArray();
-                        const existingIds = new Set(existingItems.map((item: any) => item.id));
-                        const freshIds = new Set(freshData.map((item: any) => item.id));
+                        const existingIds = new Set<string>(existingItems.map((item: { id: string }) => item.id));
+                        const freshIds = new Set<string>(freshData.map((item) => item.id));
                         
                         // ✅ OPTIMIZED: Use chunked bulkDelete to prevent blocking
-                        const idsToDelete = Array.from(existingIds).filter(id => !freshIds.has(id));
+                        const idsToDelete = Array.from(existingIds).filter((id) => !freshIds.has(id));
                         if (idsToDelete.length > 0) {
-                            console.log(`[${collectionName}] 🗑️ Detected ${idsToDelete.length} deletions:`, idsToDelete);
                             await chunkedBulkDelete(localTable, idsToDelete, 200);
                         }
                         
@@ -249,12 +240,24 @@ export function createMetadataBasedListener<T>(
                         // After updating IndexedDB, get the final data (which excludes deleted items)
                         // This ensures the callback gets the correct data that matches IndexedDB
                         finalData = freshData; // freshData already excludes deleted items from Firestore
-                        
-                        // Log deletion detection for debugging
-                        if (idsToDelete.length > 0) {
-                            console.log(`[${collectionName}] ✅ Deleted ${idsToDelete.length} items from IndexedDB:`, idsToDelete);
-                        }
                     }
+                }
+            }
+            
+            if (db && db.transactions && (collectionName === 'expenses' || collectionName === 'incomes')) {
+                const isExpense = collectionName === 'expenses';
+                const withType = freshData.map(e => ({
+                    ...e,
+                    type: isExpense ? 'Expense' : 'Income',
+                    transactionType: isExpense ? 'Expense' : 'Income'
+                }));
+                await chunkedBulkPut(db.transactions, withType as any[], 100);
+                const localData = await db.transactions.where('type').equals(isExpense ? 'Expense' : 'Income').toArray();
+                const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
+                const freshIds = new Set<string>(freshData.map((item) => item.id));
+                const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
+                if (extraIds.length > 0) {
+                    await chunkedBulkDelete(db.transactions, extraIds, 200);
                 }
             }
             
@@ -264,7 +267,6 @@ export function createMetadataBasedListener<T>(
             // This ensures other devices' IndexedDB and UI update immediately
             // Always create a new array reference to ensure React detects the change
             const dataToCallback = [...finalData];
-            console.log(`[${collectionName}] Sync registry change detected, updating with ${dataToCallback.length} items`);
             callback(dataToCallback);
             
             // Update last known timestamp and trigger (save BEFORE callback to ensure it's saved)
@@ -286,7 +288,6 @@ export function createMetadataBasedListener<T>(
             if (typeof window !== 'undefined') {
                 if (currentTrigger !== undefined && currentTrigger !== null) {
                     (window as any)[`lastTrigger_${collectionName}`] = currentTrigger;
-                    console.log(`[${collectionName}] Saved trigger: ${currentTrigger}`);
                 } else {
                     // Clear trigger if it's undefined/null (document might not have trigger field yet)
                     (window as any)[`lastTrigger_${collectionName}`] = null;
@@ -295,19 +296,17 @@ export function createMetadataBasedListener<T>(
             isInitialLoad = false;
             
         } catch (error) {
-            console.error(`[${collectionName}] Error fetching data:`, error);
             onError(error as Error);
         }
     }, (error) => {
         // Handle Firestore errors
-        console.error(`[${collectionName}] Sync registry listener error:`, error);
         if (isFirestoreTemporarilyDisabled()) {
             // Fallback to polling if Firestore is disabled
             const pollUnsub = createPollingFallback(fetchFunction, callback);
             return pollUnsub;
         }
         
-        onError(error);
+        onError(error as Error);
     });
     
     // ✅ FIX: Add immediate sync check on mount + periodic full sync check to catch any missed documents
@@ -319,13 +318,12 @@ export function createMetadataBasedListener<T>(
             // ✅ FIX: Handle expenses specially - they're stored in transactions table
             if (collectionName === 'expenses' && db && db.transactions) {
                 const localData = await db.transactions.where('type').equals('Expense').toArray();
-                const localIds = new Set(localData.map((item: any) => item.id));
-                const freshIds = new Set(freshData.map((item: any) => item.id));
+                const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
+                const freshIds = new Set<string>(freshData.map((item) => item.id));
                 
                 // Find missing documents (in Firestore but not in local)
-                const missingIds = Array.from(freshIds).filter(id => !localIds.has(id));
+                const missingIds = Array.from(freshIds).filter((id) => !localIds.has(id));
                 if (missingIds.length > 0) {
-                    console.log(`[${collectionName}] 🔍 Full sync check found ${missingIds.length} missing documents:`, missingIds);
                     const missingDocs = freshData.filter(item => missingIds.includes(item.id));
                     // Add type field before saving
                     const expensesWithType = missingDocs.map(e => ({
@@ -336,9 +334,8 @@ export function createMetadataBasedListener<T>(
                     await chunkedBulkPut(db.transactions, expensesWithType, 100);
                     
                     // Also check for extra documents (in local but not in Firestore - might be deleted)
-                    const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                    const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
                     if (extraIds.length > 0) {
-                        console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} extra documents (deleted):`, extraIds);
                         await chunkedBulkDelete(db.transactions, extraIds, 200);
                     }
                     
@@ -347,9 +344,8 @@ export function createMetadataBasedListener<T>(
                     return true; // Indicates changes were found
                 } else {
                     // Check for deletions
-                    const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                    const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
                     if (extraIds.length > 0) {
-                        console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} deleted documents:`, extraIds);
                         await chunkedBulkDelete(db.transactions, extraIds, 200);
                         callback([...freshData]);
                         return true; // Indicates changes were found
@@ -359,20 +355,18 @@ export function createMetadataBasedListener<T>(
                 const localTable = (db as any)[localTableName];
                 if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
                     const localData = await localTable.toArray();
-                    const localIds = new Set(localData.map((item: any) => item.id));
-                    const freshIds = new Set(freshData.map((item: any) => item.id));
+                    const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
+                    const freshIds = new Set<string>(freshData.map((item) => item.id));
                     
                     // Find missing documents (in Firestore but not in local)
-                    const missingIds = Array.from(freshIds).filter(id => !localIds.has(id));
+                    const missingIds = Array.from(freshIds).filter((id) => !localIds.has(id));
                     if (missingIds.length > 0) {
-                        console.log(`[${collectionName}] 🔍 Full sync check found ${missingIds.length} missing documents:`, missingIds);
                         const missingDocs = freshData.filter(item => missingIds.includes(item.id));
                         await chunkedBulkPut(localTable, missingDocs, 100);
                         
                         // Also check for extra documents (in local but not in Firestore - might be deleted)
-                        const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                        const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
                         if (extraIds.length > 0) {
-                            console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} extra documents (deleted):`, extraIds);
                             await chunkedBulkDelete(localTable, extraIds, 200);
                         }
                         
@@ -381,9 +375,8 @@ export function createMetadataBasedListener<T>(
                         return true; // Indicates changes were found
                     } else {
                         // Check for deletions
-                        const extraIds = Array.from(localIds).filter(id => !freshIds.has(id));
+                        const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
                         if (extraIds.length > 0) {
-                            console.log(`[${collectionName}] 🗑️ Full sync check found ${extraIds.length} deleted documents:`, extraIds);
                             await chunkedBulkDelete(localTable, extraIds, 200);
                             callback([...freshData]);
                             return true; // Indicates changes were found
@@ -393,27 +386,26 @@ export function createMetadataBasedListener<T>(
             }
             return false; // No changes found
         } catch (error) {
-            console.error(`[${collectionName}] Full sync check failed:`, error);
             return false;
         }
     };
     
-    // ✅ Immediate sync check after initial load (wait 2 seconds to let initial load complete)
-    // ✅ FIX: Also run for expenses (even though localTableName is undefined, we handle it specially)
+    const shouldEnablePeriodicSync = () => {
+        if (typeof window === 'undefined') return false;
+        const flag = window.localStorage?.getItem('periodic-sync-enabled');
+        return flag === 'true';
+    };
+    
     if (typeof window !== 'undefined' && (localTableName || collectionName === 'expenses')) {
-        setTimeout(() => {
-            performFullSyncCheck().then((hadChanges) => {
-                if (hadChanges) {
-                    console.log(`[${collectionName}] ✅ Immediate sync check completed and found changes`);
-                }
-            });
-        }, 2000); // 2 seconds after mount
-        
-        // ✅ Periodic full sync check (every 2 minutes) to catch any missed documents
-        // Reduced from 5 minutes to 2 minutes for faster detection
-        periodicSyncInterval = setInterval(() => {
-            performFullSyncCheck();
-        }, 2 * 60 * 1000); // 2 minutes
+        if (shouldEnablePeriodicSync()) {
+            setTimeout(() => {
+                performFullSyncCheck();
+            }, 2000);
+            
+            periodicSyncInterval = setInterval(() => {
+                performFullSyncCheck();
+            }, 10 * 60 * 1000);
+        }
     }
     
     // Return unsubscribe function that also cleans up intervals
@@ -433,7 +425,7 @@ export function createMetadataBasedListener<T>(
 /**
  * Helper to create a fetch function from a Firestore query
  */
-export function createFetchFunctionFromQuery<T>(
+export function createFetchFunctionFromQuery<T extends { id: string }>(
     firestoreQuery: Query,
     transformFn?: (doc: any) => T
 ): FetchFunction<T> {
@@ -446,4 +438,3 @@ export function createFetchFunctionFromQuery<T>(
         return data;
     };
 }
-

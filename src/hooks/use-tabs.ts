@@ -147,6 +147,7 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "admin/migrations", name: "Database Migrations", icon: Database },
         { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search },
+        { id: "admin/tasks", name: "Task Progress", icon: ClipboardCheck },
     ]
   },
 ];

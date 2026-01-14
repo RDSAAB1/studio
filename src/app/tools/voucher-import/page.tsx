@@ -725,6 +725,8 @@ export default function VoucherImportTool() {
   const [isSaving, setIsSaving] = useState(false);
   const [headerSettings, setHeaderSettings] = useState<MandiHeaderSettings>(defaultHeaderSettings);
   const [isHeaderSaving, setIsHeaderSaving] = useState(false);
+  const [filterFrom, setFilterFrom] = useState<Date | undefined>(undefined);
+  const [filterTo, setFilterTo] = useState<Date | undefined>(undefined);
 
   const resetForm = useCallback(() => {
     setActiveId(null);
@@ -1112,6 +1114,25 @@ export default function VoucherImportTool() {
     [activeId, entries]
   );
 
+  const filteredEntries = useMemo(() => {
+    let list = entries;
+    if (filterFrom) {
+      list = list.filter((entry) => {
+        if (!entry.purchaseDate) return false;
+        const d = parse(entry.purchaseDate, "yyyy-MM-dd", new Date());
+        return d >= filterFrom;
+      });
+    }
+    if (filterTo) {
+      list = list.filter((entry) => {
+        if (!entry.purchaseDate) return false;
+        const d = parse(entry.purchaseDate, "yyyy-MM-dd", new Date());
+        return d <= filterTo;
+      });
+    }
+    return list;
+  }, [entries, filterFrom, filterTo]);
+
   const formatDisplayDate = (value?: string | null) =>
     value ? displayDate(value) : "";
 
@@ -1172,11 +1193,12 @@ export default function VoucherImportTool() {
     }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
 
   const buildPrintableReportHtml = (includePreviewControls = false) => {
-    if (!entries.length) {
+    const source = filteredEntries.length ? filteredEntries : entries;
+    if (!source.length) {
       return "";
     }
 
-    const firstEntry = entries[0];
+    const firstEntry = source[0];
 
     const computeFinancialYear = (rawDate?: string) => {
       if (!rawDate) return "";
@@ -1192,7 +1214,7 @@ export default function VoucherImportTool() {
 
     const computedFinancialYear =
       computeFinancialYear(firstEntry?.purchaseDate) ||
-      computeFinancialYear(entries.find((e) => e.purchaseDate)?.purchaseDate) ||
+      computeFinancialYear(source.find((e) => e.purchaseDate)?.purchaseDate) ||
       "";
 
     const fallbackFirmName =
@@ -1249,7 +1271,7 @@ export default function VoucherImportTool() {
         : `${effectiveCommodity} की मात्रा`
       : "मात्रा";
 
-    const rowsHtml = entries
+    const rowsHtml = source
       .map((entry, index) => {
         const mandiFee = Number(entry.mandiFee || 0);
         const developmentCess = Number(entry.developmentCess || 0);
@@ -1701,7 +1723,7 @@ export default function VoucherImportTool() {
                     )}</div>`
                   : ""
               }
-              <div class="header-chip">कुल अभिलेख: ${entries.length}</div>
+              <div class="header-chip">कुल अभिलेख: ${source.length}</div>
             </div>
           </header>
           <main>
@@ -2067,12 +2089,12 @@ export default function VoucherImportTool() {
                 Grid mirrors the Excel column layout for quick verification.
               </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handlePreviewReport}
-                disabled={!entries.length}
+                disabled={!filteredEntries.length}
                 className="flex items-center gap-2"
               >
                 <Eye className="h-4 w-4" />
@@ -2081,7 +2103,7 @@ export default function VoucherImportTool() {
               <Button
                 type="button"
                 onClick={handlePrintReport}
-                disabled={!entries.length}
+                disabled={!filteredEntries.length}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
                 <Printer className="h-4 w-4" />
@@ -2097,6 +2119,28 @@ export default function VoucherImportTool() {
                 <Download className="h-4 w-4" />
                 Download Excel
               </Button>
+              <SmartDatePicker
+                value={filterFrom}
+                onChange={(val) =>
+                  setFilterFrom(
+                    val instanceof Date ? val : val ? new Date(val) : undefined
+                  )
+                }
+                placeholder="From Date"
+                inputClassName="h-9 w-[150px]"
+                returnDate={true}
+              />
+              <SmartDatePicker
+                value={filterTo}
+                onChange={(val) =>
+                  setFilterTo(
+                    val instanceof Date ? val : val ? new Date(val) : undefined
+                  )
+                }
+                placeholder="To Date"
+                inputClassName="h-9 w-[150px]"
+                returnDate={true}
+              />
             </div>
           </div>
         </CardHeader>
@@ -2126,7 +2170,7 @@ export default function VoucherImportTool() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry, index) => {
+                  {filteredEntries.map((entry, index) => {
                     const totalMandiFee =
                       entry.totalCharges ||
                       Math.round(
@@ -2230,7 +2274,7 @@ export default function VoucherImportTool() {
                     </TableRow>
                     );
                   })}
-                  {entries.length === 0 && (
+                  {filteredEntries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={17} className="text-center py-10">
                         {'No entries yet. Paste inputs above and click "Parse & Merge".'}
@@ -2498,4 +2542,3 @@ export default function VoucherImportTool() {
     </>
   );
 }
-

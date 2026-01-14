@@ -11,8 +11,21 @@ import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { addBank, addSupplierBankAccount } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
+import type { Bank, BankBranch, BankAccount, Payment } from '@/lib/definitions';
 
-export const RtgsForm = (props: any) => {
+interface RtgsFormProps {
+    bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
+    setBankDetails: (details: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => void;
+    editingPayment?: Payment;
+    setIsBankSettingsOpen: (open: boolean) => void;
+    supplierDetails?: { name?: string; [key: string]: unknown };
+    setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
+    bankAccounts?: BankAccount[];
+    banks?: Bank[];
+    bankBranches?: BankBranch[];
+}
+
+export const RtgsForm = (props: RtgsFormProps) => {
     const { toast } = useToast();
     const {
         bankDetails, setBankDetails,
@@ -39,7 +52,7 @@ export const RtgsForm = (props: any) => {
         }
         const options = banks
             .filter(bank => bank && (bank.name || bank.id)) // Filter out invalid banks
-            .map((bank: any) => ({
+            .map((bank: Bank) => ({
                 value: bank.name || bank.id || '',
                 label: toTitleCase(bank.name || bank.id || '')
             }))
@@ -56,11 +69,11 @@ export const RtgsForm = (props: any) => {
         if (!Array.isArray(bankBranches)) return [];
         const uniqueBranches = new Map<string, { value: string; label: string }>();
         const selectedBankName = (bankDetails.bank || '').trim().toLowerCase();
-        const matchingBranches = bankBranches.filter((branch: any) => {
+        const matchingBranches = bankBranches.filter((branch: BankBranch) => {
             const branchBankName = (branch.bankName || '').trim().toLowerCase();
             return branchBankName === selectedBankName;
         });
-        matchingBranches.forEach((branch: any) => {
+        matchingBranches.forEach((branch: BankBranch) => {
             const branchName = branch.branchName?.trim();
             if (branchName && !uniqueBranches.has(branchName)) {
                 uniqueBranches.set(branchName, { 
@@ -80,7 +93,7 @@ export const RtgsForm = (props: any) => {
         // Filter by bank if selected (case-insensitive comparison with normalization)
         if (bankDetails.bank) {
             const selectedBank = bankDetails.bank.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBankName = (acc.bankName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 const matches = accBankName === selectedBank;
                 return matches;
@@ -90,7 +103,7 @@ export const RtgsForm = (props: any) => {
         // Filter by branch if selected (case-insensitive comparison with normalization)
         if (bankDetails.branch) {
             const selectedBranch = bankDetails.branch.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBranchName = (acc.branchName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 const matches = accBranchName === selectedBranch;
                 return matches;
@@ -117,7 +130,7 @@ export const RtgsForm = (props: any) => {
         // Filter by bank if selected (case-insensitive comparison with normalization)
         if (bankDetails.bank) {
             const selectedBank = bankDetails.bank.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBankName = (acc.bankName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 return accBankName === selectedBank;
             });
@@ -126,13 +139,13 @@ export const RtgsForm = (props: any) => {
         // Filter by branch if selected (case-insensitive comparison with normalization)
         if (bankDetails.branch) {
             const selectedBranch = bankDetails.branch.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBranchName = (acc.branchName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 return accBranchName === selectedBranch;
             });
         }
         
-        return filtered.map((acc: any) => {
+        return filtered.map((acc: BankAccount) => {
             const name = acc.accountHolderName || '';
             return {
                 value: `${name}__${acc.accountNumber}`, // Use combined key to handle duplicate names
@@ -154,8 +167,8 @@ export const RtgsForm = (props: any) => {
     };
 
     const handleBranchSelect = (branchName: string | null) => {
-        const selectedBranch = bankBranches.find((b: any) => b.bankName === bankDetails.bank && b.branchName === branchName);
-        setBankDetails((prev: any) => ({
+        const selectedBranch = bankBranches.find((b: BankBranch) => b.bankName === bankDetails.bank && b.branchName === branchName);
+        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
             ...prev,
             branch: branchName || '',
             ifscCode: selectedBranch ? selectedBranch.ifscCode : prev.ifscCode
@@ -164,10 +177,10 @@ export const RtgsForm = (props: any) => {
     
     const handleIfscBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         const ifsc = e.target.value.toUpperCase();
-        setBankDetails((prev: any) => ({...prev, ifscCode: ifsc}));
-        const matchingBranch = bankBranches.find((b: any) => b.ifscCode === ifsc);
+        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({...prev, ifscCode: ifsc}));
+        const matchingBranch = bankBranches.find((b: BankBranch) => b.ifscCode === ifsc);
         if (matchingBranch) {
-            setBankDetails((prev: any) => ({
+            setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
                 ...prev,
                 bank: matchingBranch.bankName,
                 branch: matchingBranch.branchName,
@@ -195,8 +208,9 @@ export const RtgsForm = (props: any) => {
                 {/* Row 1 */}
                 <div className="grid grid-cols-2 gap-2 items-end">
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">A/C Holder</Label>
+                        <Label htmlFor="rtgsAccountHolder" className="text-[10px]">A/C Holder</Label>
                         <CustomDropdown
+                            id="rtgsAccountHolder"
                             options={nameOptions.map(opt => ({ 
                                 value: opt.value, 
                                 label: opt.label,
@@ -244,29 +258,30 @@ export const RtgsForm = (props: any) => {
                         />
                     </div>
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">Bank</Label>
-                        <CustomDropdown options={bankOptions} value={bankDetails.bank} onChange={handleBankSelect} onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }} placeholder="Select or add bank" />
+                        <Label htmlFor="rtgsBank" className="text-[10px]">Bank</Label>
+                        <CustomDropdown id="rtgsBank" options={bankOptions} value={bankDetails.bank} onChange={handleBankSelect} onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }} placeholder="Select or add bank" />
                     </div>
                 </div>
                 {/* Row 2 */}
                 <div className="grid grid-cols-2 gap-2 items-end">
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">Branch</Label>
-                        <CustomDropdown options={availableBranchOptions} value={bankDetails.branch} onChange={handleBranchSelect} onAdd={handleAddBranch} placeholder="Select or add branch"/>
+                        <Label htmlFor="rtgsBranch" className="text-[10px]">Branch</Label>
+                        <CustomDropdown id="rtgsBranch" options={availableBranchOptions} value={bankDetails.branch} onChange={handleBranchSelect} onAdd={handleAddBranch} placeholder="Select or add branch"/>
                     </div>
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">IFSC</Label>
-                        <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-7 text-[10px] font-mono uppercase"/>
+                        <Label htmlFor="rtgsIfsc" className="text-[10px]">IFSC</Label>
+                        <Input id="rtgsIfsc" name="rtgsIfsc" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-7 text-[10px] font-mono uppercase"/>
                     </div>
                 </div>
                 {/* Row 3 */}
                 <div className="grid grid-cols-2 gap-2 items-end">
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">A/C No.</Label>
+                        <Label htmlFor="rtgsAccountNumber" className="text-[10px]">A/C No.</Label>
                         <CustomDropdown
+                            id="rtgsAccountNumber"
                             options={React.useMemo(() => {
                                 if (!Array.isArray(filteredBankAccounts)) return [];
-                                return filteredBankAccounts.map((acc: any) => ({
+                                return filteredBankAccounts.map((acc: BankAccount) => ({
                                     value: acc.accountNumber,
                                     label: acc.accountNumber
                                 }));
@@ -274,7 +289,7 @@ export const RtgsForm = (props: any) => {
                             value={bankDetails.acNo || ''}
                             onChange={async (value) => {
                                 if (value) {
-                                    const selectedAccount = filteredBankAccounts.find((acc: any) => acc.accountNumber === value);
+                                    const selectedAccount = filteredBankAccounts.find((acc: BankAccount) => acc.accountNumber === value);
                                     if (selectedAccount) {
                                         // Auto-fill all bank details from selected account
                                         setBankDetails({
@@ -294,7 +309,7 @@ export const RtgsForm = (props: any) => {
                                         if (bankDetails.bank && bankDetails.branch && bankDetails.ifscCode && supplierDetails.name) {
                                             try {
                                                 // Check if account already exists
-                                                const exists = bankAccounts.some((acc: any) => acc.accountNumber === value);
+                                                const exists = bankAccounts.some((acc: BankAccount) => acc.accountNumber === value);
                                                 if (!exists) {
                                                     await addSupplierBankAccount({
                                                         accountHolderName: supplierDetails.name,
@@ -309,7 +324,7 @@ export const RtgsForm = (props: any) => {
                                                         description: "New supplier bank account has been saved",
                                                     });
                                                 }
-                                            } catch (error: any) {
+                                            } catch (error: unknown) {
 
                                                 // Don't show error toast, just continue
                                             }

@@ -11,24 +11,24 @@ import { useGlobalData } from '@/contexts/global-data-context';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Banknote, Scale, FileText, Filter, Calendar as CalendarIcon, User, MapPin, Phone, UserCircle } from "lucide-react";
+import { Loader2, Banknote, Scale, FileText, User, MapPin, Phone, UserCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
+import { PaymentFilters } from '@/components/sales/supplier-payments/payment-filters';
+import { SupplierSummaryCards } from '@/components/sales/supplier-payments/supplier-summary-cards';
+import { CdForm } from '@/components/sales/supplier-payments/cd-form';
+import { GeneratePaymentOptions } from '@/components/sales/supplier-payments/generate-payment-options';
+import { PaymentDialogs } from '@/components/sales/supplier-payments/payment-dialogs';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
@@ -45,9 +45,9 @@ import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-fil
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
 import { useOutsiderData } from "@/hooks/use-outsider-data";
 import { useOutsiderPayments } from "@/hooks/use-outsider-payments";
-import { StatementPreview } from "../supplier-profile/components/statement-preview";
-import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
 import { GovHistoryTableDirect } from '@/components/sales/supplier-payments/gov-history-table-direct';
+import { usePaymentFilters } from "./hooks/use-payment-filters";
+import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
 
 
 // Helper functions for formatting
@@ -150,9 +150,6 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [activeTransactionTab, setActiveTransactionTab] = useState<string>("all");
   const [historyTab, setHistoryTab] = useState<'cash' | 'gov' | 'rtgs'>('cash');
-  const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
-  const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
-  const [filterVariety, setFilterVariety] = useState<string>("all");
   const [rsValue, setRsValue] = useState<number>(0);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistoryType, setSelectedHistoryType] = useState<'cash' | 'gov' | 'rtgs'>('cash');
@@ -197,6 +194,11 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     }
   }, [type, supplierSummaryMap, hook.customerSummaryMap]);
 
+  // Get filter state first (needed for useSupplierFiltering)
+  const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+  const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+  const [filterVariety, setFilterVariety] = useState<string>("all");
+
   const { filteredSupplierOptions } = useSupplierFiltering(
     type === 'outsider' ? new Map() : supplierSummaryMap,
     hook.selectedCustomerKey as string | null,
@@ -206,58 +208,24 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     type === 'outsider' ? null : MILL_OVERVIEW_KEY
   );
 
-  const isWithinDateRange = useCallback(
-    (dateString?: string | Date) => {
-      if (!filterStartDate && !filterEndDate) return true;
-      if (!dateString) return false;
-      const date =
-        typeof dateString === "string" ? new Date(dateString) : dateString;
-      if (Number.isNaN(date.getTime())) return false;
-      if (filterStartDate && date < filterStartDate) return false;
-      if (filterEndDate && date > filterEndDate) return false;
-      return true;
-    },
-    [filterStartDate, filterEndDate]
-  );
-
-  const varietyFilteredSupplierOptions = useMemo(() => {
-    if (type === 'outsider') return [];
-    if (!filterVariety || filterVariety === "all") {
-      return filteredSupplierOptions;
-    }
-    return filteredSupplierOptions.filter((option) => {
-      const transactions = option.data?.allTransactions || [];
-      return transactions.some(
-        (transaction: any) =>
-          toTitleCase(transaction?.variety || "") === filterVariety
-      );
-    });
-  }, [type, filteredSupplierOptions, filterVariety]);
-
-  const varietyOptions = useMemo(() => {
-    if (type === 'outsider') return [];
-    const varieties = new Set<string>();
-    supplierSummaryMap.forEach((summary) => {
-      summary?.allTransactions?.forEach((transaction: any) => {
-        if (transaction?.variety) {
-          varieties.add(toTitleCase(transaction.variety));
-        }
-      });
-    });
-    return Array.from(varieties).sort();
-  }, [type, supplierSummaryMap]);
-
-  const hasActiveSupplierFilters = Boolean(
-    filterStartDate ||
-    filterEndDate ||
-    filterVariety !== "all"
-  );
-
-  const handleClearSupplierFilters = () => {
-    setFilterStartDate(undefined);
-    setFilterEndDate(undefined);
-    setFilterVariety("all");
-  };
+  // Get filter logic from hook
+  const {
+    isWithinDateRange,
+    varietyFilteredSupplierOptions,
+    varietyOptions,
+    hasActiveFilters: hasActiveSupplierFilters,
+    handleClearFilters: handleClearSupplierFilters,
+  } = usePaymentFilters({
+    type,
+    filteredSupplierOptions,
+    supplierSummaryMap,
+    filterStartDate,
+    setFilterStartDate,
+    filterEndDate,
+    setFilterEndDate,
+    filterVariety,
+    setFilterVariety,
+  });
 
   // Removed automatic Mill Overview selection - let user select manually
 
@@ -300,7 +268,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const transactionsForSelectedSupplier = useMemo(() => {
     if (type === 'outsider') return [];
     const allTransactions = selectedSupplierSummary?.allTransactions || [];
-    return allTransactions.filter((transaction: any) => {
+    return allTransactions.filter((transaction: Customer) => {
       const matchesDate = isWithinDateRange(transaction?.date);
       const matchesVariety =
         !filterVariety ||
@@ -399,7 +367,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
           if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
             totalCd += Number(paidForEntry.cdAmount || 0);
           } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
             if (totalPaidForInPayment > 0) {
               const proportion = Number(paidForEntry.amount || 0) / totalPaidForInPayment;
               totalCd += Math.round(payment.cdAmount * proportion * 100) / 100;
@@ -477,7 +445,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
             if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
               entryCd += Number(paidForEntry.cdAmount || 0);
             } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-              const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+              const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
               if (totalPaidForInPayment > 0) {
                 const proportion = Number(paidForEntry.amount || 0) / totalPaidForInPayment;
                 entryCd += Math.round(payment.cdAmount * proportion * 100) / 100;
@@ -571,20 +539,20 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       ? hook.selectedEntries
       : transactionsForSelectedSupplier;
     
-    const outstanding = transactions.filter((t: any) => {
+    const outstanding = transactions.filter((t: Customer) => {
       const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
       return totalPaid === 0 && (t.originalNetAmount || 0) > 0;
     });
-    const running = transactions.filter((t: any) => {
+    const running = transactions.filter((t: Customer) => {
       const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
       const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
       return outstanding >= 200 && totalPaid > 0;
     });
-    const profitable = transactions.filter((t: any) => {
+    const profitable = transactions.filter((t: Customer) => {
       const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
       return outstanding >= 1 && outstanding < 200;
     });
-    const paid = transactions.filter((t: any) => {
+    const paid = transactions.filter((t: Customer) => {
       const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
       return outstanding < 1;
     });
@@ -701,7 +669,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
           })) as Payment[];
         }
       } catch (error) {
-        console.error('Error loading gov payments directly:', error);
+        // Error loading gov payments directly
       }
       return [];
     };
@@ -955,181 +923,28 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                     </div>
                                     
                                     {/* Search and Filter Section */}
-                                    <div className="flex flex-col gap-2.5">
-                                    {/* Single Row: All elements in one row */}
-                                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-                                        {/* Name Dropdown (Search Type) */}
-                                        <div className="w-full lg:w-[120px] flex-shrink-0">
-                                            <Select value={searchType} onValueChange={(value) => setSearchType(value as typeof searchType)}>
-                                                <SelectTrigger className="h-8 text-[11px] border-2 border-primary/20 focus:border-primary font-semibold">
-                                                    <SelectValue placeholder="Name" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="name">Name</SelectItem>
-                                                    <SelectItem value="fatherName">Father Name</SelectItem>
-                                                    <SelectItem value="address">Address</SelectItem>
-                                                    <SelectItem value="contact">Contact</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        
-                                        {/* Search Supplier Input */}
-                                        <div className="flex-1 min-w-0">
-                                            <CustomDropdown
-                                                options={varietyFilteredSupplierOptions.map(({ value, data, label }) => {
-                                                    // If label already exists (e.g., for Mill Overview), use it but still pass data
-                                                    if (label) {
-                                                        return { value, label, data: data || {} };
-                                                    }
-                                                    // Otherwise, create label from data
-                                                    return {
-                                                    value,
-                                                    label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim(),
-                                                    data: data || {}
-                                                    };
-                                                })}
-                                                value={hook.selectedCustomerKey}
-                                                onChange={onSelectSupplierKey}
-                                                placeholder="Search supplier..."
-                                                inputClassName="h-8 border-2 border-primary/20 focus:border-primary text-[11px] font-semibold"
-                                                searchType={searchType}
-                                                onSearchTypeChange={undefined}
-                                            />
-                                        </div>
-                                        
-                                        {/* Serial Number Search */}
-                                        <div className="w-full lg:w-[180px] flex-shrink-0">
-                                            <div className="relative">
-                                                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/70" />
-                                                <Input
-                                                    placeholder="Serial No..."
-                                                    value={hook.serialNoSearch}
-                                                    onChange={(e) => hook.handleSerialNoSearch(e.target.value)}
-                                                    onBlur={hook.handleSerialNoBlur}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            hook.handleSerialNoBlur();
-                                                            e.currentTarget.blur();
-                                                        }
-                                                    }}
-                                                    className="pl-8 h-8 border-2 border-primary/20 focus:border-primary text-[11px] font-semibold"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className={`h-8 w-8 border-2 transition-all ${hasActiveSupplierFilters ? "text-primary border-primary bg-primary/10 shadow-md" : "border-primary/20 hover:border-primary/30 hover:bg-primary/5"}`}
-                                        title="Filter suppliers"
-                                      >
-                                        <Filter className="h-4 w-4" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                <PopoverContent className="w-64 space-y-3 text-[11px] z-50 border-2 border-primary/20 shadow-xl" align="end">
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[11px] font-semibold">Start Date</Label>
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <Button
-                                          variant="outline"
-                                          className={cn(
-                                            "w-full justify-start text-left font-normal h-8 text-[11px] border-2 border-primary/20 focus:border-primary",
-                                            !filterStartDate && "text-muted-foreground"
-                                          )}
-                                        >
-                                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                                          {filterStartDate ? format(filterStartDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                                        <Calendar
-                                          mode="single"
-                                          selected={filterStartDate}
-                                          onSelect={setFilterStartDate}
-                                          initialFocus
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[11px] font-semibold">End Date</Label>
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <Button
-                                          variant="outline"
-                                          className={cn(
-                                            "w-full justify-start text-left font-normal h-8 text-[11px] border-2 border-primary/20 focus:border-primary",
-                                            !filterEndDate && "text-muted-foreground"
-                                          )}
-                                        >
-                                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                                          {filterEndDate ? format(filterEndDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
-                                        <Calendar
-                                          mode="single"
-                                          selected={filterEndDate}
-                                          onSelect={setFilterEndDate}
-                                          initialFocus
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[11px] font-semibold">Variety</Label>
-                                    <Select
-                                      value={filterVariety}
-                                      onValueChange={(value) => setFilterVariety(value)}
-                                    >
-                                      <SelectTrigger className="h-8 text-[11px] border-2 border-primary/20 focus:border-primary">
-                                        <SelectValue placeholder="All varieties" />
-                                      </SelectTrigger>
-                                      <SelectContent className="z-[60]">
-                                        <SelectItem value="all">All varieties</SelectItem>
-                                        {varietyOptions.map((variety) => (
-                                          <SelectItem key={variety} value={variety}>
-                                            {variety}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="flex items-center justify-between pt-1 border-t border-border/30">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 text-[11px] font-semibold hover:bg-primary/10 hover:text-primary"
-                                      onClick={handleClearSupplierFilters}
-                                    >
-                                      Reset
-                                    </Button>
-                                    <span className="text-[10px] text-muted-foreground font-medium">
-                                      Filters apply instantly
-                                    </span>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                                <Button size="sm" className="h-8 text-[11px] font-semibold border-2 border-primary/20 hover:border-primary/30 hover:bg-primary/5" variant="outline" onClick={hook.resetPaymentForm} disabled={hook.isProcessing}>Clear</Button>
-                                <Button size="sm" className="h-8 text-[11px] font-bold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg" onClick={hook.processPayment} disabled={hook.isProcessing}>
-                                    {hook.isProcessing ? (
-                                        <>
-                                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                            Processing...
-                                        </>
-                                    ) : (
-                                        "Finalize"
-                                    )}
-                                </Button>
-                                        </div>
-                                    </div>
-                                    </div>
+                                    <PaymentFilters
+                                      searchType={searchType}
+                                      onSearchTypeChange={setSearchType}
+                                      supplierOptions={varietyFilteredSupplierOptions}
+                                      selectedSupplierKey={hook.selectedCustomerKey}
+                                      onSupplierSelect={onSelectSupplierKey}
+                                      serialNoSearch={hook.serialNoSearch}
+                                      onSerialNoSearch={hook.handleSerialNoSearch}
+                                      onSerialNoBlur={hook.handleSerialNoBlur}
+                                      filterStartDate={filterStartDate}
+                                      filterEndDate={filterEndDate}
+                                      filterVariety={filterVariety}
+                                      varietyOptions={varietyOptions}
+                                      hasActiveFilters={hasActiveSupplierFilters}
+                                      onFilterStartDateChange={setFilterStartDate}
+                                      onFilterEndDateChange={setFilterEndDate}
+                                      onFilterVarietyChange={setFilterVariety}
+                                      onClearFilters={handleClearSupplierFilters}
+                                      onClearPaymentForm={hook.resetPaymentForm}
+                                      onProcessPayment={hook.processPayment}
+                                      isProcessing={hook.isProcessing}
+                                    />
                                     
                                     {/* Transaction Tabs: All, Outstanding, Running, Profitable, Paid + Generate Statement */}
                                     {hook.selectedCustomerKey && selectedSupplierSummary && (
@@ -1319,53 +1134,15 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                             )}
                             
                             {/* CD Form - Full Width, Single Row (when CD is enabled) */}
-                            {hook.cdEnabled && (
-                              <Card className="text-[10px] mt-2 border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
-                                <CardContent className="p-2.5">
-                                  <div className="flex items-end gap-2.5">
-                                    <div className="space-y-1 flex-1">
-                                      <Label className="text-[10px] font-bold">CD At</Label>
-                                      <Select value={hook.cdAt} onValueChange={hook.setCdAt}>
-                                        <SelectTrigger className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="partial_on_paid">Partial CD on Paid Amount</SelectItem>
-                                          <SelectItem value="on_unpaid_amount">CD on Unpaid Amount</SelectItem>
-                                          <SelectItem value="on_full_amount">Full CD on Full Amount</SelectItem>
-                                          <SelectItem value="proportional_cd">Proportional CD (Exact Distribution)</SelectItem>
-                                          <SelectItem value="on_previously_paid_no_cd">On Paid Amount (No CD)</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-1 flex-1">
-                                      <Label htmlFor="cd-percent" className="text-[10px] font-bold">CD%</Label>
-                                      <Input 
-                                        id="cd-percent" 
-                                        type="number" 
-                                        value={hook.cdPercent} 
-                                        onChange={e => hook.setCdPercent(parseFloat(e.target.value) || 0)} 
-                                        className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary" 
-                                      />
-                                    </div>
-                                    <div className="space-y-1 flex-1">
-                                      <Label className="text-[10px] font-bold">CD Amt</Label>
-                                      <div className="flex items-center gap-1.5">
-                                        <Input
-                                          type="number"
-                                          inputMode="decimal"
-                                          step="0.01"
-                                          value={Number.isFinite(hook.calculatedCdAmount) ? hook.calculatedCdAmount : 0}
-                                          onChange={e => hook.setCdAmount(parseFloat(e.target.value) || 0)}
-                                          className="h-8 text-[10px] font-extrabold text-primary border-2 border-primary/30 bg-primary/10 focus:border-primary"
-                                        />
-                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap font-bold px-2 py-1 rounded-md bg-background/60 border border-border/30">
-                                          {formatCurrency(hook.calculatedCdAmount)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
+                            <CdForm
+                              cdEnabled={hook.cdEnabled}
+                              cdAt={hook.cdAt}
+                              setCdAt={hook.setCdAt}
+                              cdPercent={hook.cdPercent}
+                              setCdPercent={hook.setCdPercent}
+                              calculatedCdAmount={hook.calculatedCdAmount}
+                              setCdAmount={hook.setCdAmount}
+                            />
                             
                             {/* Bank Details and Generate Options - Full Screen Half-Half (Only for Supplier Payments) */}
                                 {type === 'supplier' && hook.paymentMethod === 'RTGS' && (
@@ -1377,59 +1154,25 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                   </CardContent>
                                 </Card>
                                 {/* Generate Payment Options Section - Right Half */}
-                                <Card className="text-[10px] border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
-                                  <CardHeader className="pb-2 px-2.5 pt-2.5 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-b-2 border-primary/20">
-                                    <CardTitle className="text-[11px] font-extrabold text-foreground">Generate Payment Options</CardTitle>
-                                    </CardHeader>
-                                  <CardContent className="space-y-2 p-2.5">
-                                    {/* Row 1 */}
-                                    <div className="grid grid-cols-3 gap-2">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-bold">Quantity</Label>
-                                          <Input
-                                            type="number"
-                                            value={hook.rtgsQuantity}
-                                            onChange={(e) => hook.setRtgsQuantity(Number(e.target.value) || 0)}
-                                          className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
-                                          />
-                                        </div>
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-bold">Rate</Label>
-                                          <Input
-                                            type="number"
-                                            value={hook.rtgsRate}
-                                            onChange={(e) => hook.setRtgsRate(Number(e.target.value) || 0)}
-                                          className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
-                                          />
-                                        </div>
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-bold">Amount</Label>
-                                          <Input
-                                            type="number"
-                                            value={hook.rtgsAmount}
-                                            onChange={(e) => hook.setRtgsAmount(Number(e.target.value) || 0)}
-                                          className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary"
-                                            placeholder="Auto-filled from To Be Paid"
-                                          />
-                                        </div>
-                                      </div>
-                                    {/* Row 2 */}
-                                      <PaymentCombinationGenerator
-                                        calcTargetAmount={hook.calcTargetAmount}
-                                        setCalcTargetAmount={hook.setCalcTargetAmount}
-                                        minRate={hook.minRate}
-                                        setMinRate={hook.setMinRate}
-                                        maxRate={hook.maxRate}
-                                        setMaxRate={hook.setMaxRate}
-                                        rsValue={rsValue}
-                                        setRsValue={setRsValue}
-                                        selectPaymentAmount={hook.selectPaymentAmount}
-                                        combination={paymentCombination}
-                                        showResults={false}
-                                        paymentMethod={hook.paymentMethod}
-                                      />
-                                    </CardContent>
-                                  </Card>
+                                <GeneratePaymentOptions
+                                  rtgsQuantity={hook.rtgsQuantity}
+                                  setRtgsQuantity={hook.setRtgsQuantity}
+                                  rtgsRate={hook.rtgsRate}
+                                  setRtgsRate={hook.setRtgsRate}
+                                  rtgsAmount={hook.rtgsAmount}
+                                  setRtgsAmount={hook.setRtgsAmount}
+                                  calcTargetAmount={hook.calcTargetAmount}
+                                  setCalcTargetAmount={hook.setCalcTargetAmount}
+                                  minRate={hook.minRate}
+                                  setMinRate={hook.setMinRate}
+                                  maxRate={hook.maxRate}
+                                  setMaxRate={hook.setMaxRate}
+                                  rsValue={rsValue}
+                                  setRsValue={setRsValue}
+                                  selectPaymentAmount={hook.selectPaymentAmount}
+                                  combination={paymentCombination}
+                                  paymentMethod={hook.paymentMethod}
+                                />
                               </div>
                                 )}
 
@@ -1535,234 +1278,9 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
           
           {/* Summary Sections at the bottom - same as supplier profile - HIDDEN for outsider (no supplier data, no outstanding entries) */}
           {type !== 'outsider' && filteredSupplierSummary && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-4">
-              {/* Operational Summary Card */}
-              <Card className="border border-gray-400/50">
-                <CardHeader className="pb-1 px-2 pt-2">
-                  <CardTitle className="text-[12px] font-semibold flex items-center gap-1.5">
-                    <Scale size={12} className="text-muted-foreground"/>
-                    Operational Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-0.5 px-2 pb-2 text-[11px]">
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Gross Wt:</span>
-                      <span className="font-medium">{formatWeight(filteredSupplierSummary.totalGrossWeight)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Teir Wt:</span>
-                      <span className="font-medium">{formatWeight(filteredSupplierSummary.totalTeirWeight)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Final Wt:</span>
-                      <span className="font-bold">{formatWeight(filteredSupplierSummary.totalFinalWeight)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Karta Wt (@{formatPercentage(filteredSupplierSummary.averageKartaPercentage)}):</span>
-                      <span className="font-medium">{formatWeight(filteredSupplierSummary.totalKartaWeight)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Net Wt:</span>
-                      <span className="font-bold text-primary">{formatWeight(filteredSupplierSummary.totalNetWeight)}</span>
-                    </div>
-                  </div>
-                  <Separator className="my-1"/>
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Average Rate:</span>
-                      <span className="font-medium">{formatRate(filteredSupplierSummary.averageRate)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Min Rate:</span>
-                      <span className="font-medium">{formatRate(filteredSupplierSummary.minRate || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Max Rate:</span>
-                      <span className="font-medium">{formatRate(filteredSupplierSummary.maxRate || 0)}</span>
-                    </div>
-                    {((filteredSupplierSummary as any).averageOriginalPrice || 0) > 0 && (
-                      <div className="flex justify-between pt-0.5 border-t border-muted">
-                        <span className="text-muted-foreground text-[10px]">Avg. Original Price:</span>
-                        <span className="font-medium text-[10px]">{formatRate((filteredSupplierSummary as any).averageOriginalPrice || 0)}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Deduction Summary Card */}
-              <Card className="border border-gray-400/50">
-                <CardHeader className="pb-1 px-2 pt-2">
-                  <CardTitle className="text-[12px] font-semibold flex items-center gap-1.5">
-                    <FileText size={12} className="text-muted-foreground"/>
-                    Deduction Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-0.5 px-2 pb-2 text-[11px]">
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Amount (@{formatRate(filteredSupplierSummary.averageRate)}/kg):</span>
-                      <span className="font-medium">{formatCurrency(filteredSupplierSummary.totalAmount || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Karta (@{formatPercentage(filteredSupplierSummary.averageKartaPercentage)}):</span>
-                      <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(filteredSupplierSummary.totalKartaAmount || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Laboury (@{formatDecimal(filteredSupplierSummary.averageLabouryRate)}):</span>
-                      <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(filteredSupplierSummary.totalLabouryAmount || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Kanta:</span>
-                      <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(filteredSupplierSummary.totalKanta || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Other:</span>
-                      <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(filteredSupplierSummary.totalBrokerage || 0)}</span>
-                    </div>
-                    <div className="flex justify-between pt-0.5 border-t border-muted">
-                      <span className="text-muted-foreground text-[10px]">Total Deductions:</span>
-                      <span className="font-semibold text-red-500 dark:text-red-400 text-[10px]">
-                        - {formatCurrency(
-                          (filteredSupplierSummary.totalKartaAmount || 0) +
-                          (filteredSupplierSummary.totalLabouryAmount || 0) +
-                          (filteredSupplierSummary.totalKanta || 0) +
-                          (filteredSupplierSummary.totalBrokerage || 0)
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <Separator className="my-1"/>
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Base Original Amount:</span>
-                      <span className="font-semibold text-primary">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
-                    </div>
-                    {((filteredSupplierSummary as any).totalExtraAmount || 0) > 0 && (
-                      <>
-                        <div className="flex justify-between pl-2">
-                          <span className="text-muted-foreground text-[10px]">+ Extra Amount (Gov.):</span>
-                          <span className="font-semibold text-green-600 text-[10px]">{formatCurrency((filteredSupplierSummary as any).totalExtraAmount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between pt-0.5 border-t border-primary/20">
-                          <span className="text-muted-foreground font-medium">Adjusted Original:</span>
-                          <span className="font-bold text-primary">{formatCurrency((filteredSupplierSummary as any).totalAdjustedOriginal || filteredSupplierSummary.totalOriginalAmount || 0)}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Financial Summary Card */}
-              <Card className="border border-gray-400/50">
-                <CardHeader className="pb-1 px-2 pt-2">
-                  <CardTitle className="text-[12px] font-semibold flex items-center gap-1.5">
-                    <Banknote size={12} className="text-muted-foreground"/>
-                    Financial Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 px-2 pb-2 text-[11px]">
-                  {/* Original Amount Section */}
-                  <div className="space-y-0.5 bg-primary/5 p-1.5 rounded border border-primary/20">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground font-medium">Base Original Amount:</span>
-                      <span className="font-semibold text-primary">{formatCurrency(filteredSupplierSummary.totalOriginalAmount || 0)}</span>
-                    </div>
-                    {((filteredSupplierSummary as any).totalExtraAmount || 0) > 0 && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground text-[10px]">Extra Amount (Gov.):</span>
-                          <span className="font-semibold text-green-600 text-[10px]">+ {formatCurrency((filteredSupplierSummary as any).totalExtraAmount || 0)}</span>
-                        </div>
-                        <Separator className="my-0.5"/>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground font-medium">Adjusted Original:</span>
-                          <span className="font-bold text-primary text-xs">{formatCurrency((filteredSupplierSummary as any).totalAdjustedOriginal || filteredSupplierSummary.totalOriginalAmount || 0)}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Payment Breakdown */}
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Paid:</span>
-                      <span className="font-medium text-green-600">{formatCurrency(filteredSupplierSummary.totalPaid || 0)}</span>
-                    </div>
-                    <div className="flex justify-between pl-2">
-                      <span className="text-muted-foreground text-[10px]">• Cash Paid:</span>
-                      <span className="font-medium text-green-500 text-[10px]">{formatCurrency(filteredSupplierSummary.totalCashPaid || 0)}</span>
-                    </div>
-                    <div className="flex justify-between pl-2">
-                      <span className="text-muted-foreground text-[10px]">• RTGS Paid:</span>
-                      <span className="font-medium text-green-500 text-[10px]">{formatCurrency(filteredSupplierSummary.totalRtgsPaid || 0)}</span>
-                    </div>
-                    {(() => {
-                      // IMPORTANT: Sum ALL paidFor amounts for Gov payments, not just one entry per payment
-                      // This ensures all entries in a single Gov payment are counted
-                      const govPaid = (filteredSupplierSummary.allPayments || [])
-                        .filter((p: Payment) => {
-                          const receiptType = ((p as any).receiptType || '').trim();
-                          return receiptType === 'Gov.' || receiptType.toLowerCase() === 'gov' || receiptType.toLowerCase().startsWith('gov');
-                        })
-                        .reduce((sum: number, p: Payment) => {
-                          // Sum ALL paidFor amounts for this Gov payment that match filtered transactions
-                          const matchingPaidFor = p.paidFor?.filter(pf => 
-                            (filteredSupplierSummary.allTransactions || []).some((t: Customer) => t.srNo === pf.srNo)
-                          ) || [];
-                          
-                          // Sum ALL matching paidFor amounts, not just one
-                          const govPaidForThisPayment = matchingPaidFor.reduce((paymentSum, pf) => 
-                            paymentSum + (pf.amount || 0), 0
-                          );
-                          
-                          return sum + govPaidForThisPayment;
-                        }, 0);
-                      if (govPaid > 0) {
-                        return (
-                          <div className="flex justify-between pl-2">
-                            <span className="text-muted-foreground text-[10px]">• Gov. Paid:</span>
-                            <span className="font-medium text-green-500 text-[10px]">{formatCurrency(govPaid)}</span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total CD Granted:</span>
-                      <span className="font-medium text-blue-600">{formatCurrency(filteredSupplierSummary.totalCdAmount || 0)}</span>
-                    </div>
-                  </div>
-                  
-                  <Separator className="my-1"/>
-                  
-                  {/* Transaction Stats */}
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Transactions:</span>
-                      <span className="font-medium">{filteredSupplierSummary.allTransactions?.length || 0} Entries</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Outstanding Entries:</span>
-                      <span className="font-medium text-red-500 dark:text-red-400">{filteredSupplierSummary.outstandingEntryIds?.length || 0} Entries</span>
-                    </div>
-                  </div>
-                  
-                  <Separator className="my-1"/>
-                  
-                  {/* Final Outstanding */}
-                  <div className="bg-red-50 dark:bg-red-950/20 p-1.5 rounded border border-red-200 dark:border-red-800">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground font-semibold">Final Outstanding:</span>
-                      <span className="font-bold text-red-600 dark:text-red-400 text-sm">{formatCurrency(filteredSupplierSummary.totalOutstanding || 0)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <SupplierSummaryCards summary={filteredSupplierSummary as any} />
           )}
+
 
           {type === 'supplier' ? (
             <SupplierEntryEditDialog
@@ -1835,59 +1353,20 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
             />
           )}
 
-          <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-            <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 printable-statement-container bg-card">
-              <DialogHeader className="sr-only">
-                <DialogTitle>Statement Preview</DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-background">
-                {selectedSupplierSummary ? (
-                  <StatementPreview data={filteredSupplierSummary} />
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">No supplier selected</div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Full Screen History Dialog */}
-          <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-            <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0">
-              <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                <DialogTitle className="text-lg font-semibold">
-                  {selectedHistoryType === 'cash' && 'Cash History'}
-                  {selectedHistoryType === 'rtgs' && 'RTGS History'}
-                  {selectedHistoryType === 'gov' && 'Gov History'}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 min-h-0 overflow-auto p-6">
-                {selectedHistoryType === 'cash' && (
-                  <PaymentHistoryCompact
-                    payments={cashHistoryRows}
-                    onEdit={hook.handleEditPayment}
-                    onDelete={hook.handleDeletePayment}
-                    historyType="cash"
-                  />
-                )}
-                {selectedHistoryType === 'rtgs' && (
-                  <PaymentHistoryCompact
-                    payments={rtgsHistoryRows}
-                    onEdit={hook.handleEditPayment}
-                    onDelete={hook.handleDeletePayment}
-                    historyType="rtgs"
-                  />
-                )}
-                {selectedHistoryType === 'gov' && (
-                  <PaymentHistoryCompact
-                    payments={govHistoryRows}
-                    onEdit={hook.handleEditPayment}
-                    onDelete={hook.handleDeletePayment}
-                    historyType="gov"
-                  />
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <PaymentDialogs
+            isStatementOpen={isStatementOpen}
+            setIsStatementOpen={setIsStatementOpen}
+            selectedSupplierSummary={selectedSupplierSummary}
+            filteredSupplierSummary={filteredSupplierSummary}
+            historyDialogOpen={historyDialogOpen}
+            setHistoryDialogOpen={setHistoryDialogOpen}
+            selectedHistoryType={selectedHistoryType}
+            cashHistoryRows={cashHistoryRows}
+            rtgsHistoryRows={rtgsHistoryRows}
+            govHistoryRows={govHistoryRows}
+            onEditPayment={hook.handleEditPayment}
+            onDeletePayment={hook.handleDeletePayment}
+          />
         </div>
     );
 }

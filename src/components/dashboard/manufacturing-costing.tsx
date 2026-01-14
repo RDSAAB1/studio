@@ -5,20 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calculator, DollarSign, Package, TrendingUp, Plus, Trash2, Target, Percent, Loader2, Settings } from 'lucide-react';
+import { Calculator, DollarSign, Package, TrendingUp, Plus, Percent, Loader2, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 import { getManufacturingCostingRealtime, saveManufacturingCosting, type ManufacturingCostingData } from '@/lib/firestore';
-
-interface Product {
-    id: string;
-    name: string;
-    percentage: number;
-    sellingPrice?: number;
-    soldPercentage?: number; // Percentage of product that has been sold
-    targetProfit?: number; // Target profit for remaining stock
-}
+import { useManufacturingCalculations, type Product } from './manufacturing-costing/hooks/use-manufacturing-calculations';
+import { ManufacturingProductTable } from './manufacturing-costing/components/manufacturing-product-table';
+import { ManufacturingSummaryCards } from './manufacturing-costing/components/manufacturing-summary-cards';
 
 export function ManufacturingCosting() {
     const [buyingRate, setBuyingRate] = useState<number>(0);
@@ -49,403 +42,27 @@ export function ManufacturingCosting() {
         return products.reduce((sum, p) => sum + p.percentage, 0);
     }, [products]);
 
-    // Calculate product breakdowns
-    const productCalculations = useMemo(() => {
-        if (quantity <= 0 || totalPercentage <= 0) {
-            return products.map(p => ({
-                ...p,
-                weight: 0,
-                allocatedCost: 0,
-                costPerQtl: 0,
-                profit: 0,
-                profitMargin: 0,
-                sellingPoint: 0
-            }));
-        }
+    // Use calculation hook
+    const {
+        productCalculations,
+        totalRevenue,
+        totalProfit,
+        overallProfitMargin,
+        remainingStockProfit,
+        soldItemsProfit,
+        totalProjectedProfit,
+        targetProfitStatus,
+    } = useManufacturingCalculations({
+        products,
+        quantity,
+        totalCost,
+        expense,
+        totalPercentage,
+        costAllocationMethod,
+        overallTargetProfit,
+    });
 
-        // Calculate weights first
-        const productsWithWeights = products.map(product => ({
-            ...product,
-            weight: (quantity * product.percentage) / 100,
-            sellingPrice: product.sellingPrice || 0
-        }));
-
-        // Calculate cost allocation based on method
-        let productsWithCost: typeof productsWithWeights;
-        
-        if (costAllocationMethod === 'value') {
-            // Value-based allocation: Based on selling price × weight ratio
-            const totalValue = productsWithWeights.reduce((sum, p) => {
-                return sum + (p.sellingPrice * p.weight);
-            }, 0);
-
-            productsWithCost = productsWithWeights.map(product => {
-                const productValue = product.sellingPrice * product.weight;
-                const valueRatio = totalValue > 0 ? productValue / totalValue : 0;
-                const allocatedCost = totalCost * valueRatio;
-                
-                return {
-                    ...product,
-                    allocatedCost
-                };
-            });
-        } else {
-            // Percentage-based allocation (original method)
-            productsWithCost = productsWithWeights.map(product => {
-                const allocatedCost = (totalCost * product.percentage) / 100;
-                return {
-                    ...product,
-                    allocatedCost
-                };
-            });
-        }
-
-        // Calculate expense allocation (same method as cost allocation)
-        let productsWithExpense: typeof productsWithCost;
-        if (costAllocationMethod === 'value') {
-            const totalValue = productsWithCost.reduce((sum, p) => {
-                const pWeight = (quantity * p.percentage) / 100;
-                return sum + ((p.sellingPrice || 0) * pWeight);
-            }, 0);
-            productsWithExpense = productsWithCost.map(product => {
-                const productValue = (product.sellingPrice || 0) * product.weight;
-                const valueRatio = totalValue > 0 ? productValue / totalValue : 0;
-                const allocatedExpense = expense * valueRatio;
-                return {
-                    ...product,
-                    allocatedExpense
-                };
-            });
-        } else {
-            // Percentage-based expense allocation
-            productsWithExpense = productsWithCost.map(product => {
-                const allocatedExpense = (expense * product.percentage) / 100;
-                return {
-                    ...product,
-                    allocatedExpense
-                };
-            });
-        }
-
-        // First pass: Calculate all products with initial suggested prices
-        const calculatedProducts = productsWithExpense.map(product => {
-            const weight = product.weight;
-            const allocatedCost = product.allocatedCost;
-            const allocatedExpense = product.allocatedExpense || 0;
-            const costPerQtl = weight > 0 ? allocatedCost / weight : 0;
-            const sellingPrice = product.sellingPrice || 0; // This is the price at which items were SOLD
-            
-            // Sold tracking calculations
-            const soldPercentage = product.soldPercentage || 0;
-            const soldWeight = (weight * soldPercentage) / 100;
-            const remainingWeight = weight - soldWeight;
-            const soldCost = (allocatedCost * soldPercentage) / 100;
-            const soldExpense = (allocatedExpense * soldPercentage) / 100;
-            const remainingCost = allocatedCost - soldCost;
-            const remainingExpense = allocatedExpense - soldExpense;
-            const nextCostPerQtl = remainingWeight > 0 ? remainingCost / remainingWeight : 0;
-            
-            // Calculate total investment per QTL (Cost + Expense) - Calculate once, use multiple times
-            const totalInvestmentPerQtl = weight > 0 ? (allocatedCost + allocatedExpense) / weight : 0;
-            
-            // Calculate profit from SOLD items (using selling price entered)
-            // Revenue from sold items
-            const soldRevenue = sellingPrice > 0 ? sellingPrice * soldWeight : 0;
-            
-            // Investment for sold items (cost + expense per QTL × sold weight)
-            const soldInvestment = totalInvestmentPerQtl * soldWeight;
-            
-            // Sold profit (this can be negative if sold at loss)
-            // Profit = Revenue - (Cost + Expense)
-            const soldProfit = soldRevenue - soldInvestment;
-            
-            // Note: Sold profit will change when sold % or sold price changes
-            // But we'll calculate total profit differently to keep it fixed
-            const soldProfitMargin = soldCost > 0 && sellingPrice > 0 
-                ? ((sellingPrice - (soldCost / soldWeight)) / (soldCost / soldWeight)) * 100 
-                : 0;
-            
-            // Calculate product value for cost allocation (using selling price)
-            const productValue = sellingPrice * weight;
-            
-            // Overall profit calculation (sold + remaining)
-            const totalProfit = soldProfit; // Will add remaining profit when we calculate next selling price
-            
-            // Target profit calculation for next selling price (for REMAINING stock)
-            // TARGET PROFIT MUST BE FIXED - it should NOT change when sold % changes
-            const targetProfit = product.targetProfit || 0;
-            
-            // Calculate overall target profit distribution (if overall target is set and individual target is not)
-            // IMPORTANT: Distribute based on INITIAL weight ratio, NOT remaining weight ratio
-            // This ensures target profit is FIXED and doesn't change when sold % changes
-            let finalTargetProfit = targetProfit;
-            if (overallTargetProfit > 0 && targetProfit === 0) {
-                // Distribute overall target profit based on INITIAL weight ratio (not remaining weight)
-                // This keeps target profit FIXED regardless of sold percentage
-                const totalInitialWeight = productsWithCost.reduce((sum, p) => {
-                    const pWeight = (quantity * p.percentage) / 100;
-                    return sum + pWeight;
-                }, 0);
-                
-                if (totalInitialWeight > 0 && weight > 0) {
-                    // Use INITIAL weight ratio, not remaining weight ratio
-                    const initialWeightRatio = weight / totalInitialWeight;
-                    finalTargetProfit = overallTargetProfit * initialWeightRatio;
-                } else {
-                    // If no weight, no target profit
-                    finalTargetProfit = 0;
-                }
-            } else if (overallTargetProfit > 0 && targetProfit > 0) {
-                // If both overall and individual target profit are set, use individual (it takes priority)
-                finalTargetProfit = targetProfit;
-            }
-            
-            // Calculate next selling price for REMAINING stock
-            // Formula: Next Selling Price = ((Total Investment - Sold Revenue) + Target Profit) / Remaining QTY
-            // Where Total Investment = (Cost + Expense) per QTL × Total QTL
-            // This ensures we cover: Cost + Expense + Loss (if any) + Target Profit
-            
-            // Note: totalInvestmentPerQtl and soldInvestment are already calculated above
-            
-            // Step 1: Calculate loss from sold items (if sold at lower price than cost+expense)
-            // soldRevenue and soldInvestment are already calculated above
-            const soldLoss = Math.max(0, soldInvestment - soldRevenue);
-            
-            // Step 2: Calculate remaining investment to recover (remaining cost + expense + loss)
-            const remainingInvestment = (totalInvestmentPerQtl * remainingWeight) + soldLoss;
-            
-            // Step 4: Calculate required revenue (to cover investment + target profit)
-            const totalRequiredForRemaining = remainingInvestment + finalTargetProfit;
-            
-            // Step 5: Calculate selling price
-            // Next Selling Price = (Remaining Investment + Target Profit) / Remaining QTY
-            const nextSellingPoint = remainingWeight > 0 ? totalRequiredForRemaining / remainingWeight : 0;
-            let nextSellingPointWithProfit = nextSellingPoint; // Suggested selling price for remaining stock
-            
-            // Calculate profit from remaining stock
-            // Revenue from remaining items at suggested price
-            const remainingRevenue = nextSellingPointWithProfit * remainingWeight;
-            
-            // Calculate Total Profit using the formula:
-            // PROFIT = Sold Profit + Remaining Profit
-            // Where:
-            // - Sold Profit = Sold Revenue - Sold Cost (can be negative if sold at loss)
-            // - Remaining Profit = Target Profit (fixed, based on costing and target profit)
-            
-            // Sold Profit = Sold Revenue - Sold Cost
-            // This is already calculated above as soldProfit
-            
-            // Remaining Profit will be calculated after shortfall distribution
-            // Initially, remaining profit should be target profit (will be adjusted later)
-            // But we need to ensure: Total Profit = Target Profit exactly
-            // So: Remaining Profit = Target Profit - Sold Profit (for this product)
-            // However, we'll adjust this after calculating total shortfall across all products
-            const remainingProfit = remainingWeight > 0 ? finalTargetProfit : 0;
-            
-            // Total Profit = Sold Profit + Remaining Profit
-            // This will be recalculated after shortfall distribution to ensure total = target
-            const totalProductProfit = soldProfit + remainingProfit;
-            
-            // This profit ONLY changes when:
-            // 1. Costing changes (if it affects target profit distribution)
-            // 2. Target Profit changes (individual or overall)
-            // It does NOT change when:
-            // - Sold % changes (profit stays fixed, only suggested price changes)
-            // - Sold Price changes (profit stays fixed, only suggested price changes)
-            
-            // Overall profit margin (based on total investment: cost + expense)
-            const totalInvestment = allocatedCost + allocatedExpense;
-            const overallProfitMargin = totalInvestment > 0
-                ? (totalProductProfit / totalInvestment) * 100
-                : 0;
-
-            return {
-                ...product,
-                weight,
-                allocatedCost,
-                allocatedExpense,
-                costPerQtl,
-                profit: totalProductProfit, // Total profit (sold + remaining) after all costs and expenses
-                profitMargin: overallProfitMargin, // Overall profit margin
-                sellingPoint: costPerQtl, // Initial cost per QTL
-                soldPercentage,
-                soldWeight,
-                remainingWeight,
-                soldCost,
-                soldExpense,
-                remainingCost,
-                remainingExpense,
-                nextCostPerQtl,
-                nextSellingPoint,
-                nextSellingPointWithProfit,
-                targetProfit: finalTargetProfit,
-                productValue,
-                soldRevenue,
-                soldProfit,
-                soldProfitMargin,
-                remainingRevenue,
-                remainingProfit
-            };
-        });
-        
-        // Calculate total loss/profit from sold items across all products
-        const totalSoldProfit = calculatedProducts.reduce((sum, product) => {
-            return sum + (product.soldProfit || 0);
-        }, 0);
-        
-        // Calculate total target profit
-        const totalTargetProfit = overallTargetProfit > 0 ? overallTargetProfit : 
-            calculatedProducts.reduce((sum, p) => sum + (p.targetProfit || 0), 0);
-        
-        // Calculate shortfall/excess: Target Profit - Sold Profit
-        // If shortfall is positive, we need to cover it from remaining products
-        // If excess is negative, we have extra profit
-        const profitShortfall = totalTargetProfit - totalSoldProfit;
-        
-        // The goal is: Total Profit = Target Profit exactly
-        // Formula: Total Profit = Sold Profit + Remaining Profit = Target Profit
-        // Therefore: Remaining Profit (total) = Target Profit - Sold Profit
-        
-        // Calculate total remaining profit needed
-        const totalRemainingProfitNeeded = totalTargetProfit - totalSoldProfit;
-        
-        // Calculate total target profit for remaining products (for distribution ratio)
-        const totalRemainingTargetProfit = calculatedProducts.reduce((sum, product) => {
-            if ((product.remainingWeight || 0) > 0) {
-                return sum + (product.targetProfit || 0);
-            }
-            return sum;
-        }, 0);
-        
-        // Distribute the total remaining profit needed among remaining products
-        // based on their target profit ratio
-        return calculatedProducts.map((product) => {
-            const remainingWeight = product.remainingWeight || 0;
-            
-            // If no remaining stock, profit = sold profit only
-            if (remainingWeight <= 0) {
-                return {
-                    ...product,
-                    remainingProfit: 0,
-                    profit: product.soldProfit || 0
-                };
-            }
-            
-            // Calculate this product's share of the total remaining profit needed
-            const productTargetProfit = product.targetProfit || 0;
-            let remainingProfitShare = 0;
-            
-            if (totalRemainingTargetProfit > 0 && productTargetProfit > 0) {
-                // Distribute based on target profit ratio
-                remainingProfitShare = (totalRemainingProfitNeeded * productTargetProfit) / totalRemainingTargetProfit;
-            } else if (overallTargetProfit > 0 && productTargetProfit === 0) {
-                // If using overall target profit and individual target is 0, distribute by initial weight ratio
-                const totalInitialWeight = calculatedProducts.reduce((sum, p) => {
-                    if ((p.remainingWeight || 0) > 0) {
-                        return sum + p.weight;
-                    }
-                    return sum;
-                }, 0);
-                
-                if (totalInitialWeight > 0) {
-                    const initialWeightRatio = product.weight / totalInitialWeight;
-                    remainingProfitShare = totalRemainingProfitNeeded * initialWeightRatio;
-                }
-            }
-            
-            // Ensure remaining profit is not negative
-            const adjustedRemainingProfit = Math.max(0, remainingProfitShare);
-            
-            // Total Profit = Sold Profit + Remaining Profit
-            // This should equal exactly: Target Profit (for this product's share)
-            const finalTotalProfit = (product.soldProfit || 0) + adjustedRemainingProfit;
-            
-            // Recalculate suggested price based on adjusted remaining profit
-            // Formula: Next Selling Price = (Remaining Investment + Remaining Profit) / Remaining QTY
-            // Where Remaining Investment = (Cost + Expense) per QTL × Remaining QTL + Loss from sold
-            // Use the values already calculated in the first pass
-            const remainingCost = product.remainingCost || 0;
-            const remainingExpense = product.remainingExpense || 0;
-            
-            // Calculate sold loss: if sold at lower price than cost+expense
-            // soldProfit is already calculated, so soldLoss = -soldProfit (if negative)
-            const soldLoss = Math.max(0, -(product.soldProfit || 0));
-            
-            const remainingInvestment = remainingCost + remainingExpense + soldLoss;
-            const adjustedSuggestedPrice = remainingWeight > 0
-                ? (remainingInvestment + adjustedRemainingProfit) / remainingWeight
-                : product.nextSellingPointWithProfit || 0;
-            
-            const adjustedRemainingRevenue = adjustedSuggestedPrice * remainingWeight;
-            
-            return {
-                ...product,
-                nextSellingPointWithProfit: adjustedSuggestedPrice,
-                remainingRevenue: adjustedRemainingRevenue,
-                remainingProfit: adjustedRemainingProfit,
-                profit: finalTotalProfit
-            };
-        });
-        
-        return calculatedProducts;
-    }, [products, quantity, totalCost, expense, totalPercentage, costAllocationMethod, overallTargetProfit]);
-
-    // Total revenue and profit
-    const totalRevenue = useMemo(() => {
-        // Revenue from sold items + projected revenue from remaining items at suggested prices
-        return productCalculations.reduce((sum, p) => {
-            const soldRevenue = (p.sellingPrice || 0) * (p.soldWeight || 0);
-            const remainingRevenue = (p.nextSellingPointWithProfit || 0) * (p.remainingWeight || 0);
-            return sum + soldRevenue + remainingRevenue;
-        }, 0);
-    }, [productCalculations]);
-
-    const totalProfit = useMemo(() => {
-        // Total profit = Sold profit + Remaining profit (at suggested prices)
-        return productCalculations.reduce((sum, p) => {
-            return sum + (p.profit || 0);
-        }, 0);
-    }, [productCalculations]);
-
-    const overallProfitMargin = useMemo(() => {
-        return totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
-    }, [totalProfit, totalCost]);
-
-    // Calculate total profit from remaining stock at suggested prices
-    const remainingStockProfit = useMemo(() => {
-        return productCalculations.reduce((sum, product) => {
-            const remainingProfit = product.remainingProfit || 0;
-            return sum + remainingProfit;
-        }, 0);
-    }, [productCalculations]);
-
-    // Calculate total profit from sold items
-    const soldItemsProfit = useMemo(() => {
-        return productCalculations.reduce((sum, product) => {
-            const soldProfit = product.soldProfit || 0;
-            return sum + soldProfit;
-        }, 0);
-    }, [productCalculations]);
-
-    // Total profit if remaining stock sold at suggested prices
-    const totalProjectedProfit = useMemo(() => {
-        return soldItemsProfit + remainingStockProfit;
-    }, [soldItemsProfit, remainingStockProfit]);
-
-    // Check if target profit will be achieved
-    const targetProfitStatus = useMemo(() => {
-        const target = overallTargetProfit > 0 ? overallTargetProfit : 
-            productCalculations.reduce((sum, p) => sum + (p.targetProfit || 0), 0);
-        
-        if (target === 0) return null;
-        
-        return {
-            target,
-            projected: remainingStockProfit,
-            achieved: remainingStockProfit >= target,
-            difference: remainingStockProfit - target
-        };
-    }, [remainingStockProfit, overallTargetProfit, productCalculations]);
+    // Calculations are now from useManufacturingCalculations hook
 
 
     const updateProduct = (id: string, field: keyof Product, value: string | number) => {
@@ -834,156 +451,14 @@ export function ManufacturingCosting() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {/* Products Table */}
-                            <div className="border rounded-lg overflow-x-auto">
-                                <Table className="min-w-full">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="min-w-[180px]">Product Name</TableHead>
-                                            <TableHead className="min-w-[100px]">Percentage (%)</TableHead>
-                                            <TableHead className="min-w-[110px]">Weight (QTL)</TableHead>
-                                            <TableHead className="min-w-[130px]">Allocated Cost</TableHead>
-                                            <TableHead className="min-w-[130px]">Cost per QTL</TableHead>
-                                            <TableHead className="min-w-[130px]">Selling Price</TableHead>
-                                            <TableHead className="min-w-[100px]">Sold %</TableHead>
-                                            <TableHead className="min-w-[130px]">Remaining (QTL)</TableHead>
-                                            <TableHead className="min-w-[130px]">Target Profit</TableHead>
-                                            <TableHead className="min-w-[150px]">Next Selling Price</TableHead>
-                                            <TableHead className="min-w-[120px]">Profit</TableHead>
-                                            <TableHead className="min-w-[100px]">Margin %</TableHead>
-                                            <TableHead className="min-w-[80px] w-[80px]">Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {productCalculations.map((product, index) => (
-                                            <TableRow key={product.id}>
-                                                <TableCell className="p-3">
-                                                    <Input
-                                                        value={product.name}
-                                                        onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                                                        placeholder="Product name"
-                                                        className="w-full min-w-[150px]"
-                                                        disabled={isLoading}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        value={product.percentage || ''}
-                                                        onChange={(e) => updateProduct(product.id, 'percentage', parseFloat(e.target.value) || 0)}
-                                                        placeholder="%"
-                                                        className="w-full min-w-[80px]"
-                                                        disabled={isLoading}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-medium whitespace-nowrap">
-                                                        {product.weight.toFixed(2)} QTL
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-medium whitespace-nowrap">
-                                                        {formatCurrency(product.allocatedCost)}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-semibold text-primary whitespace-nowrap">
-                                                        {formatCurrency(product.costPerQtl)}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={product.sellingPrice || ''}
-                                                        onChange={(e) => updateProduct(product.id, 'sellingPrice', parseFloat(e.target.value) || 0)}
-                                                        placeholder="Sold Price"
-                                                        className="w-full min-w-[100px]"
-                                                        disabled={isLoading}
-                                                    />
-                                                    {product.soldWeight && product.soldWeight > 0 && product.sellingPrice && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Sold at: {formatCurrency(product.sellingPrice)}/QTL
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        value={product.soldPercentage || ''}
-                                                        onChange={(e) => updateProduct(product.id, 'soldPercentage', parseFloat(e.target.value) || 0)}
-                                                        placeholder="%"
-                                                        className="w-full min-w-[80px]"
-                                                        disabled={isLoading}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-medium whitespace-nowrap">
-                                                        {product.remainingWeight?.toFixed(2) || '0.00'} QTL
-                                                        {product.soldWeight && product.soldWeight > 0 && (
-                                                            <div className="text-xs text-muted-foreground mt-1">
-                                                                Sold: {product.soldWeight.toFixed(2)}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-semibold text-primary whitespace-nowrap text-lg">
-                                                        {formatCurrency(product.targetProfit || 0)}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        {overallTargetProfit > 0 ? 'Distributed from overall target' : 'Set overall target profit'}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className="font-semibold text-primary whitespace-nowrap text-lg">
-                                                        {formatCurrency(product.nextSellingPointWithProfit || product.nextSellingPoint || 0)} / QTL
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        Suggested for remaining stock
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className={`font-semibold whitespace-nowrap text-lg ${product.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {formatCurrency(product.profit)}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        Net profit after all costs & expenses
-                                                    </div>
-                                                    {product.soldProfit !== undefined && product.remainingProfit !== undefined && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Sold: {formatCurrency(product.soldProfit || 0)} | Remaining: {formatCurrency(product.remainingProfit || 0)}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <div className={`font-semibold whitespace-nowrap ${product.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {product.profitMargin.toFixed(2)}%
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="p-3">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleRemoveProduct(product.id)}
-                                                        disabled={products.length === 1 || isLoading}
-                                                        className="text-destructive hover:text-destructive w-full"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            <ManufacturingProductTable
+                                products={productCalculations}
+                                overallTargetProfit={overallTargetProfit}
+                                isLoading={isLoading}
+                                onUpdateProduct={updateProduct}
+                                onRemoveProduct={handleRemoveProduct}
+                                canRemove={products.length > 1}
+                            />
 
                             {/* Percentage Warning */}
                             {totalPercentage !== 100 && (
@@ -1005,49 +480,13 @@ export function ManufacturingCosting() {
                                 </div>
                             )}
 
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                                <Card className="bg-muted/50">
-                                    <CardContent className="pt-4">
-                                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                                            Total Revenue
-                                        </div>
-                                        <div className="text-xl font-bold">
-                                            {formatCurrency(totalRevenue)}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="bg-muted/50">
-                                    <CardContent className="pt-4">
-                                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                                            Total Profit
-                                        </div>
-                                        <div className={`text-xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {formatCurrency(totalProfit)}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="bg-muted/50">
-                                    <CardContent className="pt-4">
-                                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                                            Profit Margin
-                                        </div>
-                                        <div className={`text-xl font-bold ${overallProfitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {overallProfitMargin.toFixed(2)}%
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="bg-primary/5 border-primary/20">
-                                    <CardContent className="pt-4">
-                                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                                            Total Output
-                                        </div>
-                                        <div className="text-xl font-bold text-primary">
-                                            {productCalculations.reduce((sum, p) => sum + p.weight, 0).toFixed(2)} QTL
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                            <ManufacturingSummaryCards
+                                totalRevenue={totalRevenue}
+                                totalProfit={totalProfit}
+                                overallProfitMargin={overallProfitMargin}
+                                totalOutput={productCalculations.reduce((sum, p) => sum + p.weight, 0)}
+                                targetProfitStatus={targetProfitStatus}
+                            />
                         </div>
                     </CardContent>
                 </Card>
@@ -1057,4 +496,3 @@ export function ManufacturingCosting() {
         </Card>
     );
 }
-

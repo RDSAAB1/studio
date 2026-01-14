@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useState, useRef, useTransition, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import { Loader2 } from 'lucide-react';
@@ -56,6 +56,16 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const pathname = usePathname();
   const lastPathnameRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
+  const isProcessingRef = useRef(false);
+  const activeTabIdRef = useRef(activeTabId);
+  const openTabsRef = useRef(openTabs);
+  const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+    openTabsRef.current = openTabs;
+  }, [activeTabId, openTabs]);
 
   // Initialize tabs on mount
   useEffect(() => {
@@ -72,10 +82,62 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
   }, []);
 
-  useEffect(() => {
-    // Skip if pathname hasn't changed
-    if (lastPathnameRef.current === pathname) return;
+  // Track pathname changes using useMemo to avoid unnecessary re-runs
+  const pathnameChanged = useMemo(() => {
+    if (lastPathnameRef.current === pathname) {
+      return false;
+    }
+    const changed = lastPathnameRef.current !== null; // Only true if not initial mount
     lastPathnameRef.current = pathname;
+    return changed;
+  }, [pathname]);
+
+  useEffect(() => {
+    // Skip if pathname hasn't actually changed (initial mount is handled separately)
+    if (!pathnameChanged) {
+      // On initial mount, still need to set up tabs
+      if (lastPathnameRef.current === null) {
+        lastPathnameRef.current = pathname;
+      } else {
+        return;
+      }
+    }
+    
+    // Prevent infinite loops by checking if we're already processing
+    if (isProcessingRef.current) {
+      return;
+    }
+    
+    // Clear any existing reset timeout
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = null;
+    }
+    
+    // Mark as processing BEFORE any state updates
+    isProcessingRef.current = true;
+    const processingPathname = pathname;
+    
+    // Schedule flag reset AFTER all synchronous code completes
+    // Use queueMicrotask to ensure it runs after current execution but before next render
+    queueMicrotask(() => {
+      // Then use setTimeout to ensure it runs after all state updates and re-renders
+      resetTimeoutRef.current = setTimeout(() => {
+        // Only reset if we're still processing the same pathname
+        if (lastPathnameRef.current === processingPathname && isProcessingRef.current) {
+          isProcessingRef.current = false;
+        }
+        resetTimeoutRef.current = null;
+      }, 1000); // Increased to 1 second to be absolutely sure
+    });
+    
+    // Cleanup function to clear timeout if effect re-runs or component unmounts
+    return () => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+        resetTimeoutRef.current = null;
+      }
+    };
     
     // Handle direct payment paths - map to menu item IDs
     let currentPathId = pathname === '/' ? 'dashboard-overview' : pathname.substring(1);
@@ -104,26 +166,40 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const subTabs = createSubTabs('entry');
       const activeSubTabId = `entry-${tabParam}`;
       
-      setOpenTabs(prev => {
-        // Remove old parent tab and other entry tabs if exist
-        const filtered = prev.filter(tab => 
-          tab.id !== 'entry' && 
-          tab.id !== 'sales/entry' &&
-          !tab.id.startsWith('entry-')
-        );
-        
-        // Add sub-tabs if they don't exist
-        const newTabs = [...filtered];
-        subTabs.forEach(subTab => {
-          if (!newTabs.some(t => t.id === subTab.id)) {
-            newTabs.push(subTab);
+      // Batch state updates in a transition to prevent infinite loops
+      startTransition(() => {
+        setOpenTabs(prev => {
+          // Remove old parent tab and other entry tabs if exist
+          const filtered = prev.filter(tab => 
+            tab.id !== 'entry' && 
+            tab.id !== 'sales/entry' &&
+            !tab.id.startsWith('entry-')
+          );
+          
+          // Add sub-tabs if they don't exist
+          const newTabs = [...filtered];
+          let hasChanges = false;
+          subTabs.forEach(subTab => {
+            if (!newTabs.some(t => t.id === subTab.id)) {
+              newTabs.push(subTab);
+              hasChanges = true;
+            }
+          });
+          
+          // Only return new array if there were actual changes
+          if (!hasChanges && filtered.length === prev.length) {
+            return prev; // Return same reference to avoid re-render
           }
+          
+          return newTabs;
         });
         
-        return newTabs;
+        // Only update activeTabId if it actually changed
+        if (activeTabIdRef.current !== activeSubTabId) {
+          setActiveTabId(activeSubTabId);
+        }
       });
       
-      setActiveTabId(activeSubTabId);
       return;
     }
     
@@ -133,26 +209,39 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const menuItem = allMenuItems.find(item => item.id === menuItemId);
       
       if (menuItem) {
-        setOpenTabs(prev => {
-          // Remove old entry/payment tabs
-          const filtered = prev.filter(tab => 
-            tab.id !== 'sales-entry' &&
-            tab.id !== 'sales-payments' &&
-            !tab.id.startsWith('entry-') &&
-            !tab.id.startsWith('payments-')
-          );
+        // Batch state updates in a transition
+        startTransition(() => {
+          setOpenTabs(prev => {
+            // Remove old entry/payment tabs
+            const filtered = prev.filter(tab => 
+              tab.id !== 'sales-entry' &&
+              tab.id !== 'sales-payments' &&
+              !tab.id.startsWith('entry-') &&
+              !tab.id.startsWith('payments-')
+            );
+            
+            // Add current menu item
+            const newTabs = [...filtered];
+            const tabExists = newTabs.some((t: MenuItem) => t.id === menuItemId);
+            if (!tabExists) {
+              newTabs.push(menuItem);
+            } else {
+              // Tab already exists, check if array actually changed
+              if (filtered.length === prev.length && filtered.every((t, i) => t.id === prev[i]?.id)) {
+                return prev; // Return same reference to avoid re-render
+              }
+            }
+            
+            return newTabs;
+          });
           
-          // Add current menu item
-          const newTabs = [...filtered];
-          if (!newTabs.some((t: MenuItem) => t.id === menuItemId)) {
-            newTabs.push(menuItem);
+          // Only update activeTabId if it actually changed
+          if (activeTabIdRef.current !== menuItemId) {
+            setActiveTabId(menuItemId);
           }
-          
-          return newTabs;
         });
-        
-        setActiveTabId(menuItemId);
       }
+      
       return;
     }
     
@@ -160,26 +249,40 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const subTabs = createSubTabs('sales/payments');
       const activeSubTabId = `payments-${tabParam}`;
       
-      setOpenTabs(prev => {
-        // Remove old parent tab and other payment tabs if exist
-        const filtered = prev.filter(tab => 
-          tab.id !== 'sales/payments' && 
-          tab.id !== 'payments' &&
-          !tab.id.startsWith('payments-')
-        );
-        
-        // Add sub-tabs if they don't exist
-        const newTabs = [...filtered];
-        subTabs.forEach(subTab => {
-          if (!newTabs.some((t: MenuItem) => t.id === subTab.id)) {
-            newTabs.push(subTab);
+      // Batch state updates in a transition
+      startTransition(() => {
+        setOpenTabs(prev => {
+          // Remove old parent tab and other payment tabs if exist
+          const filtered = prev.filter(tab => 
+            tab.id !== 'sales/payments' && 
+            tab.id !== 'payments' &&
+            !tab.id.startsWith('payments-')
+          );
+          
+          // Add sub-tabs if they don't exist
+          const newTabs = [...filtered];
+          let hasChanges = false;
+          subTabs.forEach(subTab => {
+            if (!newTabs.some((t: MenuItem) => t.id === subTab.id)) {
+              newTabs.push(subTab);
+              hasChanges = true;
+            }
+          });
+          
+          // Only return new array if there were actual changes
+          if (!hasChanges && filtered.length === prev.length) {
+            return prev; // Return same reference to avoid re-render
           }
+          
+          return newTabs;
         });
         
-        return newTabs;
+        // Only update activeTabId if it actually changed
+        if (activeTabIdRef.current !== activeSubTabId) {
+          setActiveTabId(activeSubTabId);
+        }
       });
       
-      setActiveTabId(activeSubTabId);
       return;
     }
     
@@ -200,52 +303,72 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const subTabs = createSubTabs('sales/payments');
       const activeSubTabId = `payments-${tabType}`;
       
-      setOpenTabs(prev => {
-        // Remove old parent tab and other payment tabs if exist
-        const filtered = prev.filter(tab => 
-          tab.id !== 'sales/payments' && 
-          tab.id !== 'payments' &&
-          !tab.id.startsWith('payments-')
-        );
-        
-        // Add sub-tabs if they don't exist
-        const newTabs = [...filtered];
-        subTabs.forEach(subTab => {
-          if (!newTabs.some(t => t.id === subTab.id)) {
-            newTabs.push(subTab);
+      // Batch state updates in a transition
+      startTransition(() => {
+        setOpenTabs(prev => {
+          // Remove old parent tab and other payment tabs if exist
+          const filtered = prev.filter(tab => 
+            tab.id !== 'sales/payments' && 
+            tab.id !== 'payments' &&
+            !tab.id.startsWith('payments-')
+          );
+          
+          // Add sub-tabs if they don't exist
+          const newTabs = [...filtered];
+          let hasChanges = false;
+          subTabs.forEach(subTab => {
+            if (!newTabs.some(t => t.id === subTab.id)) {
+              newTabs.push(subTab);
+              hasChanges = true;
+            }
+          });
+          
+          // Only return new array if there were actual changes
+          if (!hasChanges && filtered.length === prev.length) {
+            return prev; // Return same reference to avoid re-render
           }
+          
+          return newTabs;
         });
         
-        return newTabs;
+        // Only update activeTabId if it actually changed
+        if (activeTabIdRef.current !== activeSubTabId) {
+          setActiveTabId(activeSubTabId);
+        }
       });
       
-      setActiveTabId(activeSubTabId);
       return;
     }
     
     if (menuItem) {
-      // Use callback form to avoid race conditions
-      setOpenTabs(prev => {
-        const tabExists = prev.some(tab => tab.id === currentPathId);
-        if (tabExists) {
-          return prev; // No change needed
+      // Batch state updates in a transition
+      startTransition(() => {
+        setOpenTabs(prev => {
+          const tabExists = prev.some(tab => tab.id === currentPathId);
+          if (tabExists) {
+            return prev; // No change needed
+          }
+          return [...prev, menuItem]; // Add new tab
+        });
+        
+        // Set as active
+        if (activeTabIdRef.current !== currentPathId) {
+          setActiveTabId(currentPathId);
         }
-        return [...prev, menuItem]; // Add new tab
       });
-      
-      // Set as active
-      if (activeTabId !== currentPathId) {
-        setActiveTabId(currentPathId);
-      }
-    } else if (openTabs.length === 0) {
+    } else if (openTabsRef.current.length === 0) {
       // Fallback: If no tabs and current page not in menu, open dashboard
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
       if (dashboardTab) {
-        setOpenTabs([dashboardTab]);
-        setActiveTabId('dashboard-overview');
+        startTransition(() => {
+          setOpenTabs([dashboardTab]);
+          setActiveTabId('dashboard-overview');
+        });
       }
     }
-  }, [pathname]);
+    // Note: Flag reset is handled by the cleanup function above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathnameChanged]);
 
   const handleTabSelect = (tabIdOrMenuItem: string | MenuItem) => {
     // Handle both string (tabId from TabBar) and MenuItem (from CustomSidebar)
@@ -457,14 +580,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       if (typeof window !== 'undefined') {
         // For cash-bank route, always use window.location to avoid prefetch errors
         if (targetMenu.id === 'cash-bank' || path.includes('/cash-bank')) {
-          console.log('Navigating to cash-bank via window.location:', path);
           window.location.href = path;
         } else {
           // For other routes, use Next.js router
           try {
             router.push(path);
           } catch (error) {
-            console.warn('Router.push failed, using window.location:', error);
             // Fallback to window.location if router fails
             window.location.href = path;
           }
@@ -500,3 +621,4 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     </div>
   );
 }
+

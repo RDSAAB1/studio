@@ -584,11 +584,11 @@ export default function SettingsPage() {
                                         <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode')} onChange={handleStateCodeChange} placeholder="Select Code"/>
                                     </div>
                                     <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
-                                        <Label className="font-semibold">BANK LOGO</Label>
+                                        <Label htmlFor="bankHeaderLine1" className="font-semibold">BANK LOGO</Label>
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                        <Input {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
-                                        <Input {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
-                                        <Input {...companyForm.register("bankHeaderLine3")} placeholder="Header Line 3" />
+                                        <Input id="bankHeaderLine1" {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
+                                        <Input id="bankHeaderLine2" {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
+                                        <Input id="bankHeaderLine3" {...companyForm.register("bankHeaderLine3")} placeholder="Header Line 3" />
                                         </div>
                                     </div>
                                </div>
@@ -735,16 +735,20 @@ export default function SettingsPage() {
                                         <h4 className="font-medium text-sm mb-2">{label}</h4>
                                         <div className="flex items-center gap-2">
                                             <div className="flex-1 space-y-1">
-                                                <Label className="text-xs">Prefix</Label>
+                                                <Label htmlFor={`formatPrefix-${key}`} className="text-xs">Prefix</Label>
                                                 <Input 
+                                                    id={`formatPrefix-${key}`}
+                                                    name={`formatPrefix-${key}`}
                                                     value={formatSettings[key as keyof FormatSettings]?.prefix || ''}
                                                     onChange={e => handleFormatChange(key, 'prefix', e.target.value)}
                                                     className="h-8 text-sm"
                                                 />
                                             </div>
                                             <div className="w-24 space-y-1">
-                                                <Label className="text-xs">Padding</Label>
+                                                <Label htmlFor={`formatPadding-${key}`} className="text-xs">Padding</Label>
                                                 <Input 
+                                                    id={`formatPadding-${key}`}
+                                                    name={`formatPadding-${key}`}
                                                     type="number"
                                                     value={formatSettings[key as keyof FormatSettings]?.padding || 0}
                                                     onChange={e => handleFormatChange(key, 'padding', e.target.value)}

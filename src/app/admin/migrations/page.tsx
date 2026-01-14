@@ -32,8 +32,8 @@ import { fixTransactionIdMismatch } from '@/scripts/fix-transaction-id-mismatch'
 import { checkSupplierSerialDuplicates } from '@/scripts/check-supplier-serial-duplicates';
 import { fixSupplierSerialDuplicates } from '@/scripts/fix-supplier-serial-duplicates';
 
-const serializeRecord = (record: Record<string, any>) => {
-    const result: Record<string, any> = {};
+const serializeRecord = (record: Record<string, unknown>) => {
+    const result: Record<string, unknown> = {};
     Object.entries(record).forEach(([key, value]) => {
         if (value === undefined) {
             return;
@@ -51,7 +51,7 @@ const serializeRecord = (record: Record<string, any>) => {
     return result;
 };
 
-const parseMaybeJson = (value: any) => {
+const parseMaybeJson = (value: unknown) => {
     if (typeof value !== 'string') {
         return value;
     }
@@ -69,15 +69,15 @@ const parseMaybeJson = (value: any) => {
     return value;
 };
 
-const deserializeRow = (row: Record<string, any>) => {
-    const result: Record<string, any> = {};
+const deserializeRow = (row: Record<string, unknown>) => {
+    const result: Record<string, unknown> = {};
     Object.entries(row).forEach(([key, value]) => {
         result[key] = parseMaybeJson(value);
     });
     return result;
 };
 
-const toNumber = (value: any): number => {
+const toNumber = (value: unknown): number => {
     if (typeof value === 'number') {
         return Number.isFinite(value) ? value : 0;
     }
@@ -88,7 +88,7 @@ const toNumber = (value: any): number => {
     return 0;
 };
 
-const ensureId = (value: any) => {
+const ensureId = (value: unknown): string => {
     if (typeof value === 'string' && value.trim().length > 0) {
         return value.trim();
     }
@@ -255,16 +255,16 @@ export default function MigrationsPage() {
     const [importSummary, setImportSummary] = useState<string | null>(null);
     const [importErrors, setImportErrors] = useState<string[]>([]);
     const [isRunning1, setIsRunning1] = useState(false);
-    const [result1, setResult1] = useState<{ success: boolean; count?: number; renamed?: number; duplicatesFixed?: number; skipped?: number; error?: any } | null>(null);
+    const [result1, setResult1] = useState<{ success: boolean; count?: number; renamed?: number; duplicatesFixed?: number; skipped?: number; error?: string } | null>(null);
     
     const [isRunning2, setIsRunning2] = useState(false);
-    const [result2, setResult2] = useState<{ success: boolean; count?: number; error?: any } | null>(null);
+    const [result2, setResult2] = useState<{ success: boolean; count?: number; error?: string } | null>(null);
     
     const [isRunning3, setIsRunning3] = useState(false);
-    const [result3, setResult3] = useState<{ success: boolean; analysis?: any; error?: any } | null>(null);
+    const [result3, setResult3] = useState<{ success: boolean; analysis?: Record<string, unknown>; error?: string } | null>(null);
     
     const [isRunning4, setIsRunning4] = useState(false);
-    const [result4, setResult4] = useState<{ success: boolean; fixedSrNos?: number; fixedIds?: number; errors?: string[]; summary?: string; error?: any } | null>(null);
+    const [result4, setResult4] = useState<{ success: boolean; fixedSrNos?: number; fixedIds?: number; errors?: string[]; summary?: string; error?: string } | null>(null);
 
     const appendSheet = (workbook: XLSX.WorkBook, name: string, data: Record<string, any>[]) => {
         if (!data.length) return;
@@ -321,11 +321,11 @@ export default function MigrationsPage() {
                     description: `Saved ${workbook.SheetNames.length} sheets to ${filename}.`,
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
 
             toast({
                 title: 'Export failed',
-                description: error?.message || 'Unable to export data.',
+                description: (error instanceof Error ? error.message : 'Unable to export data.'),
                 variant: 'destructive',
             });
         } finally {
@@ -365,7 +365,7 @@ export default function MigrationsPage() {
                     const suppliers = supplierRows.map(normalizeSupplier);
                     await bulkUpsertSuppliers(suppliers);
                     summaryParts.push(`${suppliers.length} suppliers`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Suppliers: ${error?.message || 'Unknown error'}`);
                 }
@@ -376,7 +376,7 @@ export default function MigrationsPage() {
                     const customers = customerRows.map((row) => normalizeSupplier(row) as unknown as Customer);
                     await bulkUpsertCustomers(customers);
                     summaryParts.push(`${customers.length} customers`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Customers: ${error?.message || 'Unknown error'}`);
                 }
@@ -387,7 +387,7 @@ export default function MigrationsPage() {
                     const payments = supplierPaymentRows.map(normalizePayment);
                     await bulkUpsertPayments(payments);
                     summaryParts.push(`${payments.length} supplier payments`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Supplier payments: ${error?.message || 'Unknown error'}`);
                 }
@@ -398,7 +398,7 @@ export default function MigrationsPage() {
                     const payments = customerPaymentRows.map(normalizeCustomerPayment);
                     await bulkUpsertCustomerPayments(payments);
                     summaryParts.push(`${payments.length} customer payments`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Customer payments: ${error?.message || 'Unknown error'}`);
                 }
@@ -409,7 +409,7 @@ export default function MigrationsPage() {
                     const accounts = ledgerAccountRows.map(normalizeLedgerAccount);
                     await bulkUpsertLedgerAccounts(accounts);
                     summaryParts.push(`${accounts.length} ledger accounts`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Ledger accounts: ${error?.message || 'Unknown error'}`);
                 }
@@ -421,7 +421,7 @@ export default function MigrationsPage() {
                     const recalculated = recalculateLedgerBalances(entries);
                     await bulkUpsertLedgerEntries(recalculated);
                     summaryParts.push(`${recalculated.length} ledger entries`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Ledger entries: ${error?.message || 'Unknown error'}`);
                 }
@@ -432,7 +432,7 @@ export default function MigrationsPage() {
                     const cashAccounts = ledgerCashAccountRows.map(normalizeLedgerCashAccount);
                     await bulkUpsertLedgerCashAccounts(cashAccounts);
                     summaryParts.push(`${cashAccounts.length} ledger cash accounts`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Ledger cash accounts: ${error?.message || 'Unknown error'}`);
                 }
@@ -443,7 +443,7 @@ export default function MigrationsPage() {
                     const reports = mandiReportRows.map(normalizeMandiReport);
                     await bulkUpsertMandiReports(reports);
                     summaryParts.push(`${reports.length} mandi reports`);
-                } catch (error: any) {
+                } catch (error: unknown) {
 
                     errors.push(`Mandi reports: ${error?.message || 'Unknown error'}`);
                 }
@@ -463,7 +463,7 @@ export default function MigrationsPage() {
             if (errors.length) {
                 setImportErrors(errors);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
 
             setImportSummary(null);
             setImportErrors([error?.message || 'Unknown import error.']);

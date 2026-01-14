@@ -1,0 +1,12 @@
+version: '3'
+tasks:
+  lint:
+    cmds:
+      - npm run lint
+  typecheck:
+    cmds:
+      - npm run typecheck
+  check:
+    cmds:
+      - task: lint
+      - task: typecheck

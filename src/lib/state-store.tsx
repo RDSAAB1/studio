@@ -51,7 +51,7 @@ const initialSupplierFormState: Customer = {
     id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 2, labouryAmount: 0, brokerageRate: 0, brokerageAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: ''
 };
 
@@ -59,7 +59,7 @@ const initialCustomerFormState: Customer = {
     id: "", srNo: 'C----', date: format(new Date(), 'yyyy-MM-dd'), term: '0', dueDate: format(new Date(), 'yyyy-MM-dd'),
     name: '', companyName: '', address: '', contact: '', gstin: '', stateName: '', stateCode: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
-    kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
+    kanta: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
 };

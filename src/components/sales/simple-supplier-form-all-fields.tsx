@@ -186,6 +186,8 @@ const SimpleSupplierFormAllFields = ({
                                     control={form.control}
                                     render={({ field }) => (
                                         <AutoUppercaseInput
+                                            id="vehicleNo"
+                                            name="vehicleNo"
                                             {...field}
                                             className="h-8 text-sm pl-10"
                                         />
@@ -206,6 +208,8 @@ const SimpleSupplierFormAllFields = ({
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
                                        <Input 
+                                           id="contact"
+                                           name="contact"
                                            {...form.register('contact')} 
                                            type="tel" 
                                            maxLength={10} 
@@ -222,6 +226,8 @@ const SimpleSupplierFormAllFields = ({
                                             control={form.control}
                                             render={({ field }) => (
                                                 <AutoCapitalizeInput
+                                                    id="name"
+                                                    name="name"
                                                     {...field}
                                                     className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")}
                                                 />
@@ -238,6 +244,8 @@ const SimpleSupplierFormAllFields = ({
                                         control={form.control}
                                         render={({ field }) => (
                                             <AutoCapitalizeInput
+                                                id="so"
+                                                name="so"
                                                 {...field}
                                                 className="h-8 text-sm pl-10"
                                             />
@@ -253,6 +261,8 @@ const SimpleSupplierFormAllFields = ({
                                         control={form.control}
                                         render={({ field }) => (
                                             <AutoCapitalizeInput
+                                                id="address"
+                                                name="address"
                                                 {...field}
                                                 className="h-8 text-sm pl-10"
                                             />
@@ -327,8 +337,9 @@ const SimpleSupplierFormAllFields = ({
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
                                 <div className="space-y-1">
-                                    <Label className="text-xs">Date</Label>
+                                    <Label htmlFor={`simpleSupplierDate-${field.name}`} className="text-xs">Date</Label>
                                     <SmartDatePicker
+                                        id={`simpleSupplierDate-${field.name}`}
                                         value={field.value}
                                         onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                         placeholder="Pick a date"

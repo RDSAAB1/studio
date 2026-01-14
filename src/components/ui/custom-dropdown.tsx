@@ -36,6 +36,7 @@ interface CustomDropdownProps {
     showScrollbar?: boolean;
     searchType?: SearchType; // Search by specific field: name, fatherName, address, contact, or all
     onSearchTypeChange?: (type: SearchType) => void; // Callback when search type changes
+    id?: string; // ID for accessibility
 }
 
 export const CustomDropdown: React.FC<CustomDropdownProps> = ({
@@ -55,12 +56,16 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     showScrollbar = false,
     searchType = 'name',
     onSearchTypeChange,
+    id,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [scrollTop, setScrollTop] = useState(0);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0, openAbove: false });
+    const prevSearchTermRef = useRef<string>('');
+    const prevSelectedItemRef = useRef<CustomDropdownOption | undefined>(undefined);
+    const isUpdatingSearchTermRef = useRef(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [currentSearchType, setCurrentSearchType] = useState<SearchType>(searchType);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -153,25 +158,59 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     // Clear search term when dropdown opens to show all options
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !isUpdatingSearchTermRef.current) {
             // When dropdown opens, always clear search term to show all options
             // This ensures users can see all available options when they click
+            isUpdatingSearchTermRef.current = true;
             setSearchTerm('');
+            prevSearchTermRef.current = '';
             // Debounced search term will be cleared by the debounce effect
             setHighlightedIndex(-1); // Reset highlighted index when opening
+            // Reset flag after state update
+            setTimeout(() => {
+                isUpdatingSearchTermRef.current = false;
+            }, 0);
         }
     }, [isOpen]);
 
     useEffect(() => {
-        // Only update search term if a valid selection is made and user is not actively typing
-        // This prevents overwriting user's typing
-        if (selectedItem && !isOpen) {
-            // Use displayValue if available, otherwise use label
-            setSearchTerm(selectedItem.displayValue || selectedItem.label);
-        } else if (!value && !isOpen) {
-            setSearchTerm('');
+        // Prevent infinite loops by checking if we're already updating
+        if (isUpdatingSearchTermRef.current) return;
+        
+        // Only update search term if dropdown is closed (when open, user is typing)
+        if (isOpen) {
+            prevSelectedItemRef.current = selectedItem;
+            return;
         }
-    }, [value, selectedItem, isOpen]);
+        
+        // Only update search term if a valid selection is made
+        const newSearchTerm = selectedItem 
+            ? (selectedItem.displayValue || selectedItem.label)
+            : (!value ? '' : prevSearchTermRef.current); // Keep current search term if value exists but no selectedItem
+        
+        // Only update if the search term actually changed
+        if (newSearchTerm !== prevSearchTermRef.current) {
+            // Check if selectedItem or value actually changed
+            const selectedItemChanged = selectedItem !== prevSelectedItemRef.current;
+            const selectedItemValueChanged = selectedItem?.value !== prevSelectedItemRef.current?.value;
+            const valueChanged = value !== (prevSelectedItemRef.current?.value ?? null);
+            
+            if (selectedItemChanged || selectedItemValueChanged || valueChanged) {
+                isUpdatingSearchTermRef.current = true;
+                setSearchTerm(newSearchTerm);
+                prevSearchTermRef.current = newSearchTerm;
+                prevSelectedItemRef.current = selectedItem;
+                
+                // Reset flag after state update
+                setTimeout(() => {
+                    isUpdatingSearchTermRef.current = false;
+                }, 0);
+            }
+        } else {
+            // Update refs even if we don't update state
+            prevSelectedItemRef.current = selectedItem;
+        }
+    }, [value, selectedItem, isOpen]); // Removed searchTerm from dependencies to break circular dependency
     
     // Optimized filtering with early exit for large datasets
     const filteredItems = useMemo(() => {
@@ -393,16 +432,29 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
-            // Only reset search term if we have a valid selection
-            if (selectedItem) {
-                setSearchTerm(selectedItem.displayValue || selectedItem.label);
-            } else if (value) {
-                 const matchingOption = options.find(opt => opt.value === value || opt.label === value);
-                 if (matchingOption) {
-                    setSearchTerm(matchingOption.displayValue || matchingOption.label);
-                 } else {
-                    setSearchTerm(value);
-                 }
+            // Only reset search term if we have a valid selection and we're not already updating
+            if (!isUpdatingSearchTermRef.current) {
+                const newSearchTerm = selectedItem
+                    ? (selectedItem.displayValue || selectedItem.label)
+                    : value
+                        ? (() => {
+                            const matchingOption = options.find(opt => opt.value === value || opt.label === value);
+                            return matchingOption ? (matchingOption.displayValue || matchingOption.label) : value;
+                        })()
+                        : prevSearchTermRef.current;
+                
+                // Only update if it actually changed
+                if (newSearchTerm !== prevSearchTermRef.current) {
+                    isUpdatingSearchTermRef.current = true;
+                    setSearchTerm(newSearchTerm);
+                    prevSearchTermRef.current = newSearchTerm;
+                    prevSelectedItemRef.current = selectedItem;
+                    
+                    // Reset flag after state update
+                    setTimeout(() => {
+                        isUpdatingSearchTermRef.current = false;
+                    }, 0);
+                }
             }
             // Don't clear the value automatically - let user decide
         }
@@ -495,6 +547,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
                     ref={inputRef}
+                    id={id}
                     type="text"
                     data-custom-dropdown="true"
                     placeholder={placeholder}

@@ -40,6 +40,7 @@ export function useInfiniteScroll<T>(
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const observerRef = useRef<IntersectionObserver | null>(null);
+    const prevTotalItemsRef = useRef(totalItems);
 
     const hasMore = visibleItems < totalItems;
 
@@ -61,9 +62,13 @@ export function useInfiniteScroll<T>(
     }, [initialLoad]);
 
     useEffect(() => {
-        // Reset when items change
-        reset();
-    }, [items.length, reset]);
+        // Reset when totalItems changes (not on every render)
+        // Only reset if the total actually changed to avoid infinite loops
+        if (prevTotalItemsRef.current !== totalItems) {
+            prevTotalItemsRef.current = totalItems;
+            reset();
+        }
+    }, [totalItems, reset]);
 
     useEffect(() => {
         if (!enabled || !hasMore) return;
@@ -90,7 +95,7 @@ export function useInfiniteScroll<T>(
         return () => {
             viewport.removeEventListener('scroll', handleScroll);
         };
-    }, [enabled, hasMore, isLoading, loadMore, visibleItems]);
+    }, [enabled, hasMore, isLoading, loadMore]);
 
     // Also use Intersection Observer as a fallback for better detection
     useEffect(() => {
@@ -143,7 +148,7 @@ export function useInfiniteScroll<T>(
                 observerRef.current.disconnect();
             }
         };
-    }, [enabled, hasMore, isLoading, threshold, loadMore, visibleItems]);
+    }, [enabled, hasMore, isLoading, threshold, loadMore]);
 
     return {
         visibleItems,

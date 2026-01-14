@@ -16,6 +16,16 @@ import { Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { getUserFriendlyErrorMessage } from "@/lib/utils";
+
+// Helper function to handle errors with logging
+function handleError(error: unknown, context: string): void {
+  // Log error for debugging
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.error(`[Purchase Orders] Error in ${context}:`, error);
+  }
+}
 
 export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -111,9 +121,10 @@ export default function PurchaseOrdersPage() {
         totalAmount: 0,
       }); // Reset form
     } catch (error) {
-
+      handleError(error, 'handleAddOrder');
       toast({
         title: "Failed to add purchase order",
+        description: getUserFriendlyErrorMessage(error, 'adding the purchase order'),
         variant: "destructive",
       });
     }
@@ -131,9 +142,10 @@ export default function PurchaseOrdersPage() {
       setIsEditing(false);
       setEditingOrder(null);
     } catch (error) {
-
+      handleError(error, 'handleUpdateOrder');
       toast({
         title: "Failed to update purchase order",
+        description: getUserFriendlyErrorMessage(error, 'updating the purchase order'),
         variant: "destructive",
       });
     }
@@ -147,9 +159,10 @@ export default function PurchaseOrdersPage() {
         variant: "success",
       });
     } catch (error) {
-
+      handleError(error, 'handleDeleteOrder');
       toast({
         title: "Failed to delete purchase order",
+        description: getUserFriendlyErrorMessage(error, 'deleting the purchase order'),
         variant: "destructive",
       });
     }
@@ -223,7 +236,7 @@ export default function PurchaseOrdersPage() {
                 <Label htmlFor="supplierId" className="text-right">
                   Supplier ID
                 </Label>
-                <Input id="supplierId" value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="col-span-3" />
+                <Input id="supplierId" name="supplierId" value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="col-span-3" />
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="orderDate" className="text-right">
@@ -257,7 +270,7 @@ export default function PurchaseOrdersPage() {
                 <Label htmlFor="totalAmount" className="text-right">
                   Total Amount
                 </Label>
-                <Input id="totalAmount" type="number" value={newOrder.totalAmount} onChange={(e) => setNewOrder({ ...newOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
+                <Input id="totalAmount" name="totalAmount" type="number" value={newOrder.totalAmount} onChange={(e) => setNewOrder({ ...newOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
               </div>
                {/* Items management would need more complex UI (e.g., list of items with quantity, price) */}
                <div className="col-span-4 text-center text-sm text-muted-foreground">
@@ -286,7 +299,7 @@ export default function PurchaseOrdersPage() {
                   <Label htmlFor="edit-supplierId" className="text-right">
                       Supplier ID
                   </Label>
-                  <Input id="edit-supplierId" value={editingOrder.supplierId} onChange={(e) => setEditingOrder({ ...editingOrder, supplierId: e.target.value })} className="col-span-3" />
+                  <Input id="edit-supplierId" name="edit-supplierId" value={editingOrder.supplierId} onChange={(e) => setEditingOrder({ ...editingOrder, supplierId: e.target.value })} className="col-span-3" />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-orderDate" className="text-right">Order Date</Label>
@@ -312,11 +325,11 @@ export default function PurchaseOrdersPage() {
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-status" className="text-right">Status</Label>
-                       <Input id="edit-status" value={editingOrder.status} onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })} className="col-span-3" />
+                       <Input id="edit-status" name="edit-status" value={editingOrder.status} onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })} className="col-span-3" />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-totalAmount" className="text-right">Total Amount</Label>
-                       <Input id="edit-totalAmount" type="number" value={editingOrder.totalAmount} onChange={(e) => setEditingOrder({ ...editingOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
+                       <Input id="edit-totalAmount" name="edit-totalAmount" type="number" value={editingOrder.totalAmount} onChange={(e) => setEditingOrder({ ...editingOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
                   </div>
                </div>
             )}

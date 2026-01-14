@@ -10,8 +10,24 @@ import { Settings, Loader2 } from "lucide-react";
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { addBank } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
+import type { Bank, BankBranch, BankAccount } from '@/lib/definitions';
 
-export const RtgsFormOutsider = (props: any) => {
+interface RtgsFormOutsiderProps {
+    bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
+    setBankDetails: React.Dispatch<React.SetStateAction<{ bank?: string; branch?: string; ifscCode?: string; acNo?: string }>>;
+    setIsBankSettingsOpen: (open: boolean) => void;
+    supplierDetails?: { name?: string; [key: string]: unknown };
+    setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
+    rtgsAmount?: number;
+    setRtgsAmount?: (amount: number) => void;
+    handleProcessPayment: () => void;
+    isProcessing?: boolean;
+    bankAccounts?: BankAccount[];
+    banks?: Bank[];
+    bankBranches?: BankBranch[];
+}
+
+export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
     const { toast } = useToast();
     const {
         bankDetails, setBankDetails,
@@ -32,7 +48,7 @@ export const RtgsFormOutsider = (props: any) => {
         if (!Array.isArray(banks)) return [];
         return banks
             .filter(bank => bank && (bank.name || bank.id))
-            .map((bank: any) => ({
+            .map((bank: Bank) => ({
                 value: bank.name || bank.id || '',
                 label: toTitleCase(bank.name || bank.id || '')
             }))
@@ -47,8 +63,8 @@ export const RtgsFormOutsider = (props: any) => {
         const seen = new Set<string>();
 
         return bankAccounts
-            .filter((acc: any) => acc && (acc.accountHolderName || acc.accountNumber))
-            .map((acc: any) => {
+            .filter((acc: BankAccount) => acc && (acc.accountHolderName || acc.accountNumber))
+            .map((acc: BankAccount) => {
                 const holderName = acc.accountHolderName || '';
                 const bankName = acc.bankName || '';
                 const branchName = acc.branchName || '';
@@ -80,7 +96,7 @@ export const RtgsFormOutsider = (props: any) => {
                 value: string;
                 label: string;
                 displayValue: string;
-                account: any;
+                account: BankAccount;
             }[];
     }, [bankAccounts]);
 
@@ -89,11 +105,11 @@ export const RtgsFormOutsider = (props: any) => {
         if (!Array.isArray(bankBranches)) return [];
         const uniqueBranches = new Map<string, { value: string; label: string }>();
         const selectedBankName = (bankDetails.bank || '').trim().toLowerCase();
-        const matchingBranches = bankBranches.filter((branch: any) => {
+        const matchingBranches = bankBranches.filter((branch: BankBranch) => {
             const branchBankName = (branch.bankName || '').trim().toLowerCase();
             return branchBankName === selectedBankName;
         });
-        matchingBranches.forEach((branch: any) => {
+        matchingBranches.forEach((branch: BankBranch) => {
             const branchName = branch.branchName?.trim();
             if (branchName && !uniqueBranches.has(branchName)) {
                 uniqueBranches.set(branchName, { 
@@ -112,7 +128,7 @@ export const RtgsFormOutsider = (props: any) => {
         
         if (bankDetails.bank) {
             const selectedBank = bankDetails.bank.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBankName = (acc.bankName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 return accBankName === selectedBank;
             });
@@ -120,7 +136,7 @@ export const RtgsFormOutsider = (props: any) => {
         
         if (bankDetails.branch) {
             const selectedBranch = bankDetails.branch.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: any) => {
+            filtered = filtered.filter((acc: BankAccount) => {
                 const accBranchName = (acc.branchName || '').trim().toLowerCase().replace(/\s+/g, ' ');
                 return accBranchName === selectedBranch;
             });
@@ -140,8 +156,8 @@ export const RtgsFormOutsider = (props: any) => {
     };
 
     const handleBranchSelect = (branchName: string | null) => {
-        const selectedBranch = bankBranches.find((b: any) => b.bankName === bankDetails.bank && b.branchName === branchName);
-        setBankDetails((prev: any) => ({
+        const selectedBranch = bankBranches.find((b: BankBranch) => b.bankName === bankDetails.bank && b.branchName === branchName);
+        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
             ...prev,
             branch: branchName || '',
             ifscCode: selectedBranch ? selectedBranch.ifscCode : prev.ifscCode,
@@ -151,10 +167,10 @@ export const RtgsFormOutsider = (props: any) => {
     
     const handleIfscBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         const ifsc = e.target.value.toUpperCase();
-        setBankDetails((prev: any) => ({...prev, ifscCode: ifsc}));
-        const matchingBranch = bankBranches.find((b: any) => b.ifscCode === ifsc);
+        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({...prev, ifscCode: ifsc}));
+        const matchingBranch = bankBranches.find((b: BankBranch) => b.ifscCode === ifsc);
         if (matchingBranch) {
-            setBankDetails((prev: any) => ({
+            setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
                 ...prev,
                 bank: matchingBranch.bankName,
                 branch: matchingBranch.branchName,
@@ -172,7 +188,7 @@ export const RtgsFormOutsider = (props: any) => {
 
     const handleAccountSelect = (accountNumber: string | null) => {
         if (accountNumber) {
-            const selectedAccount = filteredBankAccounts.find((acc: any) => acc.accountNumber === accountNumber);
+            const selectedAccount = filteredBankAccounts.find((acc: BankAccount) => acc.accountNumber === accountNumber);
             if (selectedAccount) {
                 setBankDetails({
                     ...bankDetails,
@@ -208,8 +224,9 @@ export const RtgsFormOutsider = (props: any) => {
                     {/* Row 1: A/C Holder, Bank, Branch */}
                     <div className="grid grid-cols-3 gap-2 items-end">
                         <div className="space-y-0.5">
-                            <Label className="text-[10px]">A/C Holder</Label>
+                            <Label htmlFor="rtgsOutsiderAccountHolder" className="text-[10px]">A/C Holder</Label>
                             <CustomDropdown
+                                id="rtgsOutsiderAccountHolder"
                                 options={nameOptions.map(opt => ({
                                     value: opt.value,
                                     label: opt.label,
@@ -254,14 +271,14 @@ export const RtgsFormOutsider = (props: any) => {
                                     }
                                 }}
                                 placeholder="Select or enter name"
-                                allowCustomInput={true}
                             />
                         </div>
                         <div className="space-y-0.5">
-                            <Label className="text-[10px]">Bank</Label>
+                            <Label htmlFor="rtgsOutsiderBank" className="text-[10px]">Bank</Label>
                             <CustomDropdown
+                                id="rtgsOutsiderBank"
                                 options={bankOptions}
-                                value={bankDetails.bank}
+                                value={bankDetails.bank || null}
                                 onChange={handleBankSelect}
                                 onAdd={(newBank) => {
                                     addBank(newBank);
@@ -271,10 +288,11 @@ export const RtgsFormOutsider = (props: any) => {
                             />
                         </div>
                         <div className="space-y-0.5">
-                            <Label className="text-[10px]">Branch</Label>
+                            <Label htmlFor="rtgsOutsiderBranch" className="text-[10px]">Branch</Label>
                             <CustomDropdown
+                                id="rtgsOutsiderBranch"
                                 options={availableBranchOptions}
-                                value={bankDetails.branch}
+                                value={bankDetails.branch || null}
                                 onChange={handleBranchSelect}
                                 onAdd={handleAddBranch}
                                 placeholder="Select or add branch"
@@ -284,8 +302,10 @@ export const RtgsFormOutsider = (props: any) => {
                     {/* Row 2: IFSC, A/C No., Amount */}
                     <div className="grid grid-cols-3 gap-2 items-end">
                         <div className="space-y-0.5">
-                            <Label className="text-[10px]">IFSC</Label>
+                            <Label htmlFor="rtgsOutsiderIfsc" className="text-[10px]">IFSC</Label>
                             <Input
+                                id="rtgsOutsiderIfsc"
+                                name="rtgsOutsiderIfsc"
                                 value={bankDetails.ifscCode || ''}
                                 onChange={e => setBankDetails({ ...bankDetails, ifscCode: e.target.value.toUpperCase() })}
                                 onBlur={handleIfscBlur}
@@ -294,11 +314,12 @@ export const RtgsFormOutsider = (props: any) => {
                             />
                         </div>
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">A/C No.</Label>
+                        <Label htmlFor="rtgsOutsiderAccountNumber" className="text-[10px]">A/C No.</Label>
                         <CustomDropdown
+                            id="rtgsOutsiderAccountNumber"
                             options={React.useMemo(() => {
                                 if (!Array.isArray(filteredBankAccounts)) return [];
-                                return filteredBankAccounts.map((acc: any) => ({
+                                return filteredBankAccounts.map((acc: BankAccount) => ({
                                     value: acc.accountNumber,
                                     label: acc.accountNumber
                                 }));
@@ -306,12 +327,13 @@ export const RtgsFormOutsider = (props: any) => {
                             value={bankDetails.acNo || ''}
                             onChange={handleAccountSelect}
                             placeholder="Select or enter account number"
-                            allowCustomInput={true}
                         />
                     </div>
                     <div className="space-y-0.5">
-                        <Label className="text-[10px]">Amount</Label>
+                        <Label htmlFor="rtgsOutsiderAmount" className="text-[10px]">Amount</Label>
                         <Input
+                            id="rtgsOutsiderAmount"
+                            name="rtgsOutsiderAmount"
                             type="number"
                             value={rtgsAmount || ''}
                             onChange={(e) => setRtgsAmount?.(Number(e.target.value) || 0)}

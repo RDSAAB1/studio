@@ -99,7 +99,7 @@ const sortPaymentByIdAscending = (a: Payment, b: Payment): number => {
     // If numbers are same, compare decimal parts (ascending)
     return parsedA.decimalValue - parsedB.decimalValue;
   } catch (error) {
-    console.error('Error sorting payment:', error, a, b);
+    // Error sorting payment - return 0 for safe fallback
     return 0;
   }
 };
@@ -131,7 +131,7 @@ const sortPaymentByIdDescending = (a: Payment, b: Payment): number => {
     // If numbers are same, compare decimal parts (descending)
     return parsedB.decimalValue - parsedA.decimalValue;
   } catch (error) {
-    console.error('Error sorting payment:', error, a, b);
+    // Error sorting payment - return 0 for safe fallback
     return 0;
   }
 };

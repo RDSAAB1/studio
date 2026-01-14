@@ -30,8 +30,29 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [refreshKey, setRefreshKey] = useState(0);
     const [error, setError] = useState<string | null>(null);
-    
-    console.log('GovHistoryTableDirect: Component rendered, refreshKey:', refreshKey);
+
+    const unsubscribeRef = React.useRef<(() => void) | null>(null);
+    React.useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const { getPaymentsRealtime } = await import('@/lib/firestore');
+                const unsubscribe = getPaymentsRealtime(() => {
+                    if (!mounted) return;
+                    setRefreshKey(prev => prev + 1);
+                }, () => {});
+                unsubscribeRef.current = unsubscribe;
+            } catch {}
+        })();
+        return () => {
+            mounted = false;
+            const fn = unsubscribeRef.current;
+            if (fn) {
+                try { fn(); } catch {}
+                unsubscribeRef.current = null;
+            }
+        };
+    }, []);
 
     // Load directly from IndexedDB
     useEffect(() => {
@@ -42,7 +63,6 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                 
                 if (!db) {
                     const errorMsg = 'Database not available';
-                    console.warn(errorMsg);
                     setError(errorMsg);
                     setIsLoading(false);
                     return;
@@ -50,7 +70,6 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                 
                 if (!db.governmentFinalizedPayments) {
                     const errorMsg = 'governmentFinalizedPayments table not found';
-                    console.warn(errorMsg);
                     setError(errorMsg);
                     setIsLoading(false);
                     return;
@@ -58,59 +77,10 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                 
                 setError(null);
                 
-                // Check all payment tables to find where RT00393 is
-                console.log('Checking all payment tables...');
-                
-                // Check governmentFinalizedPayments
-                try {
-                    const testPayment = await db.governmentFinalizedPayments.get('RT00393');
-                    console.log('RT00393 in governmentFinalizedPayments:', testPayment);
-                } catch (testError) {
-                    console.warn('RT00393 not in governmentFinalizedPayments:', testError);
-                }
-                
-                // Check regular payments table
-                try {
-                    const testPayment2 = await db.payments.get('RT00393');
-                    console.log('RT00393 in payments table:', testPayment2);
-                } catch (testError2) {
-                    console.warn('RT00393 not in payments table:', testError2);
-                }
-                
-                // Check customerPayments table
-                try {
-                    const testPayment3 = await (db as any).customerPayments?.get('RT00393');
-                    console.log('RT00393 in customerPayments table:', testPayment3);
-                } catch (testError3) {
-                    console.warn('RT00393 not in customerPayments table:', testError3);
-                }
-                
                 // Get counts from all tables
                 const govCount = await db.governmentFinalizedPayments.count();
                 const regularCount = await db.payments.count();
                 const customerCount = await (db as any).customerPayments?.count() || 0;
-                
-                console.log('Counts - Gov:', govCount, 'Regular:', regularCount, 'Customer:', customerCount);
-                
-                // Get all payments from governmentFinalizedPayments (no ordering)
-                const allGovPayments = await db.governmentFinalizedPayments.toArray();
-                console.log('All gov payments (no ordering):', allGovPayments.length);
-                if (allGovPayments.length > 0) {
-                    console.log('First gov payment:', allGovPayments[0]);
-                    console.log('All gov payment IDs:', allGovPayments.map(p => p.id || p.paymentId));
-                }
-                
-                // Also check regular payments for gov payments
-                const allRegularPayments = await db.payments.toArray();
-                const govInRegular = allRegularPayments.filter(p => 
-                    (p.receiptType || '').toLowerCase() === 'gov.' ||
-                    (p as any).govQuantity !== undefined ||
-                    (p as any).govRate !== undefined
-                );
-                console.log('Gov payments found in regular payments table:', govInRegular.length);
-                if (govInRegular.length > 0) {
-                    console.log('First gov payment in regular table:', govInRegular[0]);
-                }
                 
                 // Load ALL payments from governmentFinalizedPayments table - NO FILTERING
                 // Show all entries regardless of any conditions
@@ -119,52 +89,11 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                 try {
                     // Get all without any ordering - we'll sort by ID in component
                     payments = await db.governmentFinalizedPayments.toArray();
-                    console.log('Loaded ALL gov payments from IndexedDB (will sort by ID in component):', payments.length);
                 } catch (error) {
-                    console.error('Error loading gov payments from IndexedDB:', error);
                     payments = [];
                 }
                 
-                // If IndexedDB is empty, load from Firestore as fallback
                 if (payments.length === 0) {
-                    console.log('IndexedDB is empty, loading from Firestore...');
-                    try {
-                        const { collection, getDocs, query, orderBy: firestoreOrderBy } = await import('firebase/firestore');
-                        const { firestoreDB } = await import('@/lib/firebase');
-                        const governmentFinalizedPaymentsCollection = collection(firestoreDB, 'governmentFinalizedPayments');
-                        
-                        // Get all payments from Firestore
-                        // Load all - will be sorted by ID in component (ONLY ID sorting, no date sorting)
-                        const firestoreQuery = query(
-                            governmentFinalizedPaymentsCollection
-                            // No orderBy - we'll sort by ID in component to match Firebase lexicographic sorting
-                        );
-                        const snapshot = await getDocs(firestoreQuery);
-                        payments = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        })) as Payment[];
-                        
-                        console.log('Loaded ALL gov payments from Firestore:', payments.length);
-                        
-                        // Save to IndexedDB for future use
-                        if (payments.length > 0 && db.governmentFinalizedPayments) {
-                            try {
-                                await db.governmentFinalizedPayments.bulkPut(payments);
-                                console.log('Saved payments to IndexedDB');
-                            } catch (saveError) {
-                                console.warn('Failed to save to IndexedDB:', saveError);
-                            }
-                        }
-                    } catch (firestoreError) {
-                        console.error('Error loading from Firestore:', firestoreError);
-                    }
-                }
-                
-                console.log('Total gov payments loaded (IndexedDB + Firestore):', payments.length);
-                if (payments.length > 0) {
-                    console.log('Sample payment:', payments[0]);
-                    console.log('Payment IDs:', payments.map(p => p.id || p.paymentId).slice(0, 10));
                 }
                 
                 // Show ALL payments from governmentFinalizedPayments - NO FILTERING
@@ -174,17 +103,9 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                     receiptType: 'Gov.' as const
                 })) as Payment[];
                 
-                console.log('Setting ALL gov payments (no filtering):', paymentsWithType.length);
-                if (paymentsWithType.length > 0) {
-                    console.log('First payment:', paymentsWithType[0]);
-                    console.log('All payment IDs:', paymentsWithType.map(p => p.id || p.paymentId));
-                }
-                
                 setGovPayments(paymentsWithType);
-                console.log('Set gov payments state:', paymentsWithType.length);
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : 'Unknown error loading gov payments';
-                console.error('Error loading gov payments from IndexedDB:', error);
                 setError(errorMsg);
             } finally {
                 setIsLoading(false);
@@ -263,7 +184,7 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                 // If numbers are same, compare decimal parts
                 return parsedA.decimal - parsedB.decimal;
             } catch (error) {
-                console.error('Error sorting payment:', error, a, b);
+                // Error sorting payment - return 0 for safe fallback
                 return 0;
             }
         });
@@ -281,8 +202,6 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
     });
 
     const visiblePayments = sortedPayments.slice(0, visibleItems);
-    
-    console.log('Rendering - govPayments:', govPayments.length, 'sortedPayments:', sortedPayments.length, 'visibleItems:', visibleItems, 'visiblePayments:', visiblePayments.length);
 
     // Helper function to get receipt holder name
     const getReceiptHolderName = useMemo(() => {
@@ -328,8 +247,6 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
             </Card>
         );
     }
-
-    console.log('Final render - govPayments.length:', govPayments.length, 'sortedPayments.length:', sortedPayments.length, 'visiblePayments.length:', visiblePayments.length, 'visibleItems:', visibleItems);
     
     return (
         <Card>

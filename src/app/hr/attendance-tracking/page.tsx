@@ -53,7 +53,7 @@ export default function AttendanceTrackingPage() {
                 setAttendanceRecordsToday(filtered);
             },
             (error) => {
-                console.error('Error fetching attendance:', error);
+                // Error fetching attendance
             },
             dateStr // Filter by specific date
         );

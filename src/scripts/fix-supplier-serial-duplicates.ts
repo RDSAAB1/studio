@@ -24,13 +24,14 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         const suppliersRef = collection(firestoreDB, 'suppliers');
         const snapshot = await getDocs(suppliersRef);
         
-        const suppliers: any[] = [];
+        type SupplierRecord = { id: string; srNo?: string } & Record<string, any>;
+        const suppliers: SupplierRecord[] = [];
         const srNoMap = new Map<string, any[]>();
         const idMap = new Map<string, any[]>();
         
         // Process all suppliers
         snapshot.forEach((doc) => {
-            const supplier = { id: doc.id, ...doc.data() };
+            const supplier: SupplierRecord = { id: doc.id, ...(doc.data() as Record<string, any>) };
             suppliers.push(supplier);
             
             // Track srNo
@@ -169,7 +170,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
             fixedSrNos: 0,
             fixedIds: 0,
             skipped: 0,
-            errors: [error.toString()],
+            errors: [String(error)],
             summary: 'Fix failed due to error'
         };
     }

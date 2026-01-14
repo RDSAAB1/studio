@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useId } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ export const CollapsibleField = ({
     inputClassName
 }: CollapsibleFieldProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const inputId = useId();
 
     const handleClick = () => {
         setIsExpanded(!isExpanded);
@@ -62,6 +63,8 @@ export const CollapsibleField = ({
                     </span>
                 ) : (
                     <Input
+                        id={inputId}
+                        name={inputId}
                         type={type}
                         value={value || ''}
                         onChange={(e) => onChange(e.target.value)}
@@ -89,7 +92,7 @@ export const CollapsibleField = ({
                     ) : (
                         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
-                    <Label className="text-xs font-medium text-muted-foreground shrink-0">{label}:</Label>
+                    <Label htmlFor={inputId} className="text-xs font-medium text-muted-foreground shrink-0">{label}:</Label>
                     {!isExpanded && (
                         <span className="text-sm text-foreground truncate ml-2">{display}</span>
                     )}
@@ -106,6 +109,8 @@ export const CollapsibleField = ({
                                 {icon}
                             </div>
                             <Input
+                                id={inputId}
+                                name={inputId}
                                 type={type}
                                 value={value || ''}
                                 onChange={(e) => onChange(e.target.value)}
@@ -119,6 +124,8 @@ export const CollapsibleField = ({
                     )}
                     {!icon && (
                         <Input
+                            id={inputId}
+                            name={inputId}
                             type={type}
                             value={value || ''}
                             onChange={(e) => onChange(e.target.value)}

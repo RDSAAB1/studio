@@ -2,6 +2,16 @@
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
 import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
+import { logError } from './error-logger';
+import { firestoreDB } from './firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { chunkedBulkPut } from './chunked-operations';
+
+// Helper function to handle errors silently (for sync fallback scenarios)
+function handleSilentError(error: unknown, context: string): void {
+  // Log error using error logging service
+  logError(error, context, 'low');
+}
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -171,8 +181,8 @@ export async function syncAllData() {
         await forceSyncFromFirestore();
 
     } catch (error) {
-
         // Fallback to old method if local-first-sync fails (only for first time)
+        handleSilentError(error, 'initializeDatabase - local-first-sync fallback');
 
         // First sync - get all (only once)
         getSuppliersRealtime(async (suppliers) => {
@@ -184,8 +194,8 @@ export async function syncAllData() {
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('lastSync:suppliers', String(Date.now()));
                     }
-                } catch (error: any) {
-
+                } catch (error: unknown) {
+                    handleSilentError(error, 'initializeDatabase - suppliers bulkPut fallback');
                 }
             }
         }, (error) => {});
@@ -199,8 +209,8 @@ export async function syncAllData() {
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('lastSync:payments', String(Date.now()));
                     }
-                } catch (error: any) {
-
+                } catch (error: unknown) {
+                    handleSilentError(error, 'initializeDatabase - suppliers bulkPut fallback');
                 }
             }
         }, (error) => {});
@@ -311,7 +321,7 @@ export async function syncAllDataWithDetails(
             updateProgress();
             try {
               const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, any[]>();
+              const ifscMap = new Map<string, BankBranch[]>();
               
               // Group existing branches by IFSC code
               existingBranches.forEach((branch: any) => {
@@ -329,14 +339,14 @@ export async function syncAllDataWithDetails(
                 if (branches.length > 1) {
                   // Sort by updatedAt/createdAt, keep the most recent
                   branches.sort((a, b) => {
-                    const timeA = a.updatedAt || a.createdAt || '';
-                    const timeB = b.updatedAt || b.createdAt || '';
-                    return timeB.localeCompare(timeA);
+                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
+                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
+                    return String(timeB).localeCompare(String(timeA));
                   });
                   
                   // Delete all except the first (most recent)
                   const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
 
@@ -350,10 +360,10 @@ export async function syncAllDataWithDetails(
             // Remove duplicates from incoming data, keep the most recent one
             info.error = `Removing duplicates from ${config.displayName}...`;
             updateProgress();
-            const uniqueMap = new Map<string, any>();
-            const itemsWithoutIfsc: any[] = [];
+            const uniqueMap = new Map<string, BankBranch>();
+            const itemsWithoutIfsc: BankBranch[] = [];
             
-            allData.forEach((item: any) => {
+            allData.forEach((item: BankBranch) => {
               const ifscCode = item.ifscCode?.toUpperCase()?.trim() || '';
               if (ifscCode) {
                 const existing = uniqueMap.get(ifscCode);
@@ -361,8 +371,8 @@ export async function syncAllDataWithDetails(
                   uniqueMap.set(ifscCode, item);
                 } else {
                   // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = existing.updatedAt || existing.createdAt || '';
-                  const currentTime = item.updatedAt || item.createdAt || '';
+                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
                   if (currentTime > existingTime) {
                     uniqueMap.set(ifscCode, item);
                   }
@@ -381,7 +391,7 @@ export async function syncAllDataWithDetails(
             // First, clean up existing duplicates in local database
             try {
               const existingAccounts = await localTable.toArray();
-              const accountMap = new Map<string, any[]>();
+              const accountMap = new Map<string, BankAccount[]>();
               
               // Group existing accounts by account number
               existingAccounts.forEach((account: any) => {
@@ -399,14 +409,14 @@ export async function syncAllDataWithDetails(
                 if (accounts.length > 1) {
                   // Sort by updatedAt/createdAt, keep the most recent
                   accounts.sort((a, b) => {
-                    const timeA = a.updatedAt || a.createdAt || '';
-                    const timeB = b.updatedAt || b.createdAt || '';
-                    return timeB.localeCompare(timeA);
+                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
+                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
+                    return String(timeB).localeCompare(String(timeA));
                   });
                   
                   // Delete all except the first (most recent)
                   const toDelete = accounts.slice(1);
-                  const deleteIds = toDelete.map((a: any) => a.id).filter((id: any) => id !== undefined);
+                  const deleteIds = toDelete.map((a: BankAccount) => a.id).filter((id: string | undefined): id is string => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
 
@@ -420,7 +430,7 @@ export async function syncAllDataWithDetails(
             // First, clean up existing duplicates in local database
             try {
               const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, any[]>();
+              const ifscMap = new Map<string, BankBranch[]>();
               
               // Group existing branches by IFSC code
               existingBranches.forEach((branch: any) => {
@@ -438,14 +448,14 @@ export async function syncAllDataWithDetails(
                 if (branches.length > 1) {
                   // Sort by updatedAt/createdAt, keep the most recent
                   branches.sort((a, b) => {
-                    const timeA = a.updatedAt || a.createdAt || '';
-                    const timeB = b.updatedAt || b.createdAt || '';
-                    return timeB.localeCompare(timeA);
+                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
+                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
+                    return String(timeB).localeCompare(String(timeA));
                   });
                   
                   // Delete all except the first (most recent)
                   const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
 
@@ -457,10 +467,10 @@ export async function syncAllDataWithDetails(
             }
             
             // Remove duplicates from incoming data, keep the most recent one
-            const uniqueMap = new Map<string, any>();
-            const itemsWithoutAccount: any[] = [];
+            const uniqueMap = new Map<string, BankAccount>();
+            const itemsWithoutAccount: BankAccount[] = [];
             
-            allData.forEach((item: any) => {
+            allData.forEach((item: BankAccount) => {
               const accountNumber = item.accountNumber?.trim() || '';
               if (accountNumber) {
                 const existing = uniqueMap.get(accountNumber);
@@ -468,8 +478,8 @@ export async function syncAllDataWithDetails(
                   uniqueMap.set(accountNumber, item);
                 } else {
                   // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = existing.updatedAt || existing.createdAt || '';
-                  const currentTime = item.updatedAt || item.createdAt || '';
+                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
                   if (currentTime > existingTime) {
                     uniqueMap.set(accountNumber, item);
                   }
@@ -488,7 +498,7 @@ export async function syncAllDataWithDetails(
             // First, clean up existing duplicates in local database
             try {
               const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, any[]>();
+              const ifscMap = new Map<string, BankBranch[]>();
               
               // Group existing branches by IFSC code
               existingBranches.forEach((branch: any) => {
@@ -506,14 +516,14 @@ export async function syncAllDataWithDetails(
                 if (branches.length > 1) {
                   // Sort by updatedAt/createdAt, keep the most recent
                   branches.sort((a, b) => {
-                    const timeA = a.updatedAt || a.createdAt || '';
-                    const timeB = b.updatedAt || b.createdAt || '';
-                    return timeB.localeCompare(timeA);
+                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
+                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
+                    return String(timeB).localeCompare(String(timeA));
                   });
                   
                   // Delete all except the first (most recent)
                   const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: any) => b.id).filter((id: any) => id !== undefined);
+                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
                   if (deleteIds.length > 0) {
                     await localTable.bulkDelete(deleteIds);
 
@@ -525,9 +535,9 @@ export async function syncAllDataWithDetails(
             }
             
             // Remove duplicates from incoming data, keep the most recent one
-            const uniqueMap = new Map<string, any>();
+            const uniqueMap = new Map<string, BankBranch>();
             
-            allData.forEach((item: any) => {
+            allData.forEach((item: BankBranch) => {
               const ifscCode = item.ifscCode?.trim() || '';
               if (ifscCode) {
                 const existing = uniqueMap.get(ifscCode);
@@ -535,8 +545,8 @@ export async function syncAllDataWithDetails(
                   uniqueMap.set(ifscCode, item);
                 } else {
                   // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = existing.updatedAt || existing.createdAt || '';
-                  const currentTime = item.updatedAt || item.createdAt || '';
+                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
+                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
                   if (currentTime > existingTime) {
                     uniqueMap.set(ifscCode, item);
                   }
@@ -570,11 +580,12 @@ export async function syncAllDataWithDetails(
           info.error = `Syncing ${dataToSync.length} ${config.displayName} records...`;
           updateProgress();
           try {
-            await localTable.bulkPut(dataToSync);
+            await chunkedBulkPut(localTable, dataToSync as any[], 100);
             info.error = undefined;
-          } catch (bulkError: any) {
+          } catch (bulkError: unknown) {
             // If bulkPut fails, try individual puts to identify problematic records
-            if (bulkError.name === 'BulkError' || bulkError.failures) {
+            const error = bulkError as { name?: string; failures?: unknown };
+            if (error.name === 'BulkError' || error.failures) {
 
               let successCount = 0;
               let failureCount = 0;
@@ -584,9 +595,9 @@ export async function syncAllDataWithDetails(
                 try {
                   await localTable.put(item);
                   successCount++;
-                } catch (itemError: any) {
+                } catch (itemError: unknown) {
                   failureCount++;
-                  const itemId = item.id || item.ifscCode || item.accountNumber || 'unknown';
+                  const itemId = (item as { id?: string; ifscCode?: string; accountNumber?: string }).id || (item as { ifscCode?: string }).ifscCode || (item as { accountNumber?: string }).accountNumber || 'unknown';
                   failedItems.push(itemId);
 
                 }
@@ -660,9 +671,10 @@ export async function syncAllDataWithDetails(
         }
         info.status = 'success';
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       info.status = 'error';
-      info.error = error.message || 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      info.error = errorMessage;
 
     }
   }
@@ -725,7 +737,7 @@ export async function hardSyncAllData() {
         ]);
         
         // ✅ Update IndexedDB with fresh data
-        await db.transaction('rw', db.suppliers, db.customers, db.payments, db.customerPayments, db.transactions, async () => {
+        await db.transaction('rw', [db.suppliers, db.customers, db.payments, db.customerPayments, db.transactions], async () => {
             // Clear existing data
             await db.suppliers.clear();
             await db.customers.clear();
@@ -751,19 +763,14 @@ export async function hardSyncAllData() {
             }
             
             // Handle incomes and expenses (stored in transactions table)
+            // ✅ Standardize type casing and use bulkPut to avoid ConstraintError on existing keys
             if (incomes?.length || expenses?.length) {
                 const allTransactions: Transaction[] = [
-                    ...(incomes?.map(inc => ({ ...inc, type: 'income' } as Transaction)) || []),
-                    ...(expenses?.map(exp => ({ ...exp, type: 'expense' } as Transaction)) || [])
+                    ...(incomes?.map(inc => ({ ...inc, type: 'Income', transactionType: 'Income' } as Transaction)) || []),
+                    ...(expenses?.map(exp => ({ ...exp, type: 'Expense', transactionType: 'Expense' } as Transaction)) || [])
                 ];
                 if (allTransactions.length > 0) {
-                    // Clear only income/expense transactions
-                    const existing = await db.transactions.where('type').anyOf(['income', 'expense']).toArray();
-                    if (existing.length > 0) {
-                        await db.transactions.bulkDelete(existing.map(t => t.id!));
-                    }
-                    await db.transactions.bulkAdd(allTransactions);
-
+                    await db.transactions.bulkPut(allTransactions);
                 }
             }
         });
@@ -783,6 +790,50 @@ export async function hardSyncAllData() {
 
         throw e;
     }
+}
+
+export async function ensureFirstFullSync() {
+    if (typeof window === 'undefined') return;
+    const flag = localStorage.getItem('firstFullSyncDone');
+    if (flag === 'true') return;
+    await hardSyncAllData();
+    localStorage.setItem('firstFullSyncDone', 'true');
+    localStorage.setItem('firstFullSyncAt', String(Date.now()));
+}
+
+export interface SyncCountRow {
+    collection: string;
+    indexeddb: number;
+    firestore: number;
+}
+
+export async function getSyncCounts(): Promise<SyncCountRow[]> {
+    if (!db) return [];
+    const rows: SyncCountRow[] = [];
+    const suppliersIndexed = await db.suppliers.count().catch(() => 0);
+    const customersIndexed = await db.customers.count().catch(() => 0);
+    const paymentsIndexed = await db.payments.count().catch(() => 0);
+    const govPaymentsIndexed = await db.governmentFinalizedPayments.count().catch(() => 0);
+    const customerPaymentsIndexed = await db.customerPayments.count().catch(() => 0);
+    const incomesIndexed = await db.transactions.where('type').equals('Income').count().catch(() => 0);
+    const expensesIndexed = await db.transactions.where('type').equals('Expense').count().catch(() => 0);
+    const fundTransactionsIndexed = await db.fundTransactions.count().catch(() => 0);
+    const suppliersFirestore = (await getDocs(collection(firestoreDB, 'suppliers'))).size;
+    const customersFirestore = (await getDocs(collection(firestoreDB, 'customers'))).size;
+    const paymentsFirestore = (await getDocs(collection(firestoreDB, 'payments'))).size;
+    const govPaymentsFirestore = (await getDocs(collection(firestoreDB, 'governmentFinalizedPayments'))).size;
+    const customerPaymentsFirestore = (await getDocs(collection(firestoreDB, 'customer_payments'))).size;
+    const incomesFirestore = (await getDocs(collection(firestoreDB, 'incomes'))).size;
+    const expensesFirestore = (await getDocs(collection(firestoreDB, 'expenses'))).size;
+    const fundTransactionsFirestore = (await getDocs(collection(firestoreDB, 'fundTransactions'))).size;
+    rows.push({ collection: 'suppliers', indexeddb: suppliersIndexed, firestore: suppliersFirestore });
+    rows.push({ collection: 'customers', indexeddb: customersIndexed, firestore: customersFirestore });
+    rows.push({ collection: 'payments', indexeddb: paymentsIndexed + govPaymentsIndexed, firestore: paymentsFirestore + govPaymentsFirestore });
+    rows.push({ collection: 'customerPayments', indexeddb: customerPaymentsIndexed, firestore: customerPaymentsFirestore });
+    rows.push({ collection: 'incomes', indexeddb: incomesIndexed, firestore: incomesFirestore });
+    rows.push({ collection: 'expenses', indexeddb: expensesIndexed, firestore: expensesFirestore });
+    rows.push({ collection: 'fundTransactions', indexeddb: fundTransactionsIndexed, firestore: fundTransactionsFirestore });
+    return rows;
 }
 
 

@@ -15,6 +15,16 @@ import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
 import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getUserFriendlyErrorMessage } from "@/lib/utils";
+
+// Helper function to handle errors with logging
+function handleError(error: unknown, context: string): void {
+  // Log error for debugging
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.error(`[Payroll Management] Error in ${context}:`, error);
+  }
+}
 
 type AttendanceSummary = {
     present: number;
@@ -92,9 +102,14 @@ export default function PayrollManagementPage() {
         setAttendanceSummary({ present, absent, leave, halfDay, totalDays: daysInMonth, payableDays });
         setCurrentEntry(prev => ({...prev, amount: Math.round(payableSalary)}));
     } catch(err) {
-
-        setError("Failed to calculate salary due to a database error.");
-        toast({ title: "Error calculating salary", variant: "destructive" });
+        handleError(err, 'handleCalculateSalary');
+        const errorMessage = getUserFriendlyErrorMessage(err, 'calculating salary');
+        setError(errorMessage);
+        toast({ 
+          title: "Error calculating salary", 
+          description: errorMessage,
+          variant: "destructive" 
+        });
     }
   };
 
@@ -120,8 +135,12 @@ export default function PayrollManagementPage() {
       setAttendanceSummary(null);
       toast({ title: "Payroll entry saved.", variant: "success" });
     } catch (e) {
-
-      toast({ title: "Failed to save entry.", variant: "destructive" });
+      handleError(e, 'handleSaveEntry');
+      toast({ 
+        title: "Failed to save entry", 
+        description: getUserFriendlyErrorMessage(e, 'saving the payroll entry'),
+        variant: "destructive" 
+      });
     }
   };
 
@@ -148,8 +167,12 @@ export default function PayrollManagementPage() {
         await deletePayrollEntry(id);
         toast({ title: "Entry deleted.", variant: "success" });
       } catch (e) {
-
-        toast({ title: "Failed to delete entry.", variant: "destructive" });
+        handleError(e, 'handleDeleteEntry');
+        toast({ 
+          title: "Failed to delete entry", 
+          description: getUserFriendlyErrorMessage(e, 'deleting the payroll entry'),
+          variant: "destructive" 
+        });
       }
     }
   };
@@ -234,7 +257,7 @@ export default function PayrollManagementPage() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="employeeId" className="text-right">Employee</Label>
               <Select value={currentEntry.employeeId || ""} onValueChange={(value) => setCurrentEntry({ ...currentEntry, employeeId: value })}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger id="employeeId" className="col-span-3">
                   <SelectValue placeholder="Select Employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -246,6 +269,7 @@ export default function PayrollManagementPage() {
                 <Label htmlFor="payPeriod" className="text-right">Pay Period</Label>
                 <Input 
                     id="payPeriod"
+                    name="payPeriod"
                     type="month"
                     value={currentEntry.payPeriod || ''}
                     onChange={(e) => setCurrentEntry({ ...currentEntry, payPeriod: e.target.value })}
@@ -270,7 +294,7 @@ export default function PayrollManagementPage() {
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">Payable Salary</Label>
                <div className="col-span-3 flex items-center gap-2">
-                <Input id="amount" type="number" value={currentEntry.amount || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, amount: parseFloat(e.target.value) })} />
+                <Input id="amount" name="amount" type="number" value={currentEntry.amount || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, amount: parseFloat(e.target.value) })} />
                 <Button variant="secondary" size="icon" onClick={calculateSalary}><Calculator className="h-4 w-4"/></Button>
                </div>
             </div>
