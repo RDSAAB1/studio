@@ -7,7 +7,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment, Account } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency, generateReadableId } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, generateReadableId, getUserFriendlyErrorMessage } from "@/lib/utils";
+import { logError } from "@/lib/error-logger";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -533,8 +534,12 @@ export default function IncomeExpenseClient() {
           handleNew();
       }
     } catch (error) {
-      console.error("Error deleting transaction:", error);
-      toast({ title: "Error deleting transaction", variant: "destructive" });
+      logError(error, "expense-tracker-client: deleteTransaction", "medium");
+      toast({
+        title: "Error deleting transaction",
+        description: getUserFriendlyErrorMessage(error, "transaction"),
+        variant: "destructive",
+      });
     }
   }, [editingTransaction, handleNew, toast]);
 

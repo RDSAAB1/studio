@@ -164,8 +164,23 @@ export default function CashBankClient() {
         );
         
         // ✅ Listen for payment updates to refresh immediately when payment is finalized
-        const handlePaymentUpdate = async (event: CustomEvent) => {
-            const { payment, paymentMethod, isCustomer } = event.detail;
+        type PaymentUpdateEventDetail = {
+            payment?: Payment | CustomerPayment;
+            paymentMethod?: string;
+            isCustomer?: boolean;
+        };
+
+        type PaymentDeleteEventDetail = {
+            payment?: Payment | CustomerPayment;
+            receiptType?: string;
+            paymentMethod?: string;
+            isCustomer?: boolean;
+        };
+
+        const isCustomEvent = <T,>(evt: Event): evt is CustomEvent<T> => evt instanceof CustomEvent;
+
+        const handlePaymentUpdate = async (event: CustomEvent<PaymentUpdateEventDetail>) => {
+            const { payment, paymentMethod, isCustomer } = event.detail || {};
             // Only refresh if it's a Cash payment (affects Cash in Hand balance)
             if (paymentMethod === 'Cash' || payment?.receiptType === 'Cash' || payment?.paymentMethod === 'Cash') {
                 // Force refresh by re-reading from IndexedDB
@@ -188,8 +203,8 @@ export default function CashBankClient() {
         };
         
         // ✅ Listen for payment deletions to refresh immediately when payment is deleted
-        const handlePaymentDelete = async (event: CustomEvent) => {
-            const { payment, receiptType, paymentMethod, isCustomer } = event.detail;
+        const handlePaymentDelete = async (event: CustomEvent<PaymentDeleteEventDetail>) => {
+            const { payment, receiptType, paymentMethod, isCustomer } = event.detail || {};
             // Only refresh if it's a Cash payment (affects Cash in Hand balance)
             if (receiptType === 'Cash' || paymentMethod === 'Cash' || payment?.receiptType === 'Cash' || payment?.paymentMethod === 'Cash') {
                 // Force refresh by re-reading from IndexedDB
@@ -211,11 +226,14 @@ export default function CashBankClient() {
             }
         };
         
-        const handlePaymentUpdateListener: EventListener = (evt) => {
-            void handlePaymentUpdate(evt as unknown as CustomEvent);
+        const handlePaymentUpdateListener = (evt: Event) => {
+            if (!isCustomEvent<PaymentUpdateEventDetail>(evt)) return;
+            void handlePaymentUpdate(evt);
         };
-        const handlePaymentDeleteListener: EventListener = (evt) => {
-            void handlePaymentDelete(evt as unknown as CustomEvent);
+
+        const handlePaymentDeleteListener = (evt: Event) => {
+            if (!isCustomEvent<PaymentDeleteEventDetail>(evt)) return;
+            void handlePaymentDelete(evt);
         };
 
         window.addEventListener('indexeddb:payment:updated', handlePaymentUpdateListener);

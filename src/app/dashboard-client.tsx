@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi, PaidFor } from '@/lib/definitions';
 import { getLoansRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
-import { formatCurrency, toTitleCase } from "@/lib/utils";
+import { formatCurrency, toTitleCase, getUserFriendlyErrorMessage } from "@/lib/utils";
 import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ManufacturingCosting } from '@/components/dashboard/manufacturing-costing';
@@ -25,10 +25,14 @@ import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { FinancialBreakdown } from '@/components/dashboard/financial-breakdown';
 import { SyncCountsTable, SoftwareCountsTable } from '@/components/dashboard/dashboard-tables';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
+import { useToast } from '@/hooks/use-toast';
+import { retry } from '@/lib/retry-utils';
+import { Button } from '@/components/ui/button';
 
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
+    const { toast } = useToast();
     
     // ✅ Use global data context - NO duplicate listeners
     const globalData = useGlobalData();
@@ -49,6 +53,8 @@ export default function DashboardClient() {
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
     const [isLoading, setIsLoading] = useState(false);
     const [syncCounts, setSyncCounts] = useState<{ collection: string; indexeddb: number; firestore: number }[]>([]);
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [syncRunId, setSyncRunId] = useState(0);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
@@ -124,25 +130,46 @@ export default function DashboardClient() {
     useEffect(() => {
         let isMounted = true;
         setIsLoading(true);
+        setSyncError(null);
+
         (async () => {
             try {
-                await ensureFirstFullSync();
-                const rows = await getSyncCounts();
+                const rows = await retry(
+                    async () => {
+                        await ensureFirstFullSync();
+                        return await getSyncCounts();
+                    },
+                    {
+                        maxAttempts: 3,
+                        initialDelayMs: 1000,
+                        maxDelayMs: 8000,
+                        onRetry: (attempt, error) => {
+                            logError(error, `dashboard-client: sync retry attempt ${attempt}`, "low");
+                        },
+                    }
+                );
+
                 if (isMounted) {
                     setSyncCounts(rows);
                 }
             } catch (error) {
                 logError(error, "dashboard-client: ensureFirstFullSync/getSyncCounts", "medium");
+                const message = getUserFriendlyErrorMessage(error, "sync");
+                if (isMounted) {
+                    setSyncError(message);
+                    toast({ title: "Sync failed", description: message, variant: "destructive" });
+                }
             } finally {
                 if (isMounted) {
                     setIsLoading(false);
                 }
             }
         })();
+
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [syncRunId, toast]);
     
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
@@ -521,6 +548,15 @@ export default function DashboardClient() {
                 incomeExpenseChartData={incomeExpenseChartData}
             />
             
+            {syncError && (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                    <div className="text-sm text-destructive">{syncError}</div>
+                    <Button variant="outline" size="sm" onClick={() => setSyncRunId(v => v + 1)}>
+                        Retry sync
+                    </Button>
+                </div>
+            )}
+
             <SyncCountsTable syncCounts={syncCounts} appCountsMap={appCountsMap as Record<string, number>} />
             
             <SoftwareCountsTable softwareCounts={softwareCounts} />
