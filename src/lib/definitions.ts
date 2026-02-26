@@ -58,6 +58,7 @@ export type Customer = {
   brokerage?: number;
   cd?: number;
   cdRate?: number;
+  cdAmount?: number;
   isBrokerageIncluded?: boolean;
   bagWeightKg?: number;
   bagRate?: number;
@@ -66,6 +67,8 @@ export type Customer = {
   transportationRate?: number; // Transportation rate per QTL
   transportAmount?: number; // Transport Amount = Transportation Rate × Final Weight
   isGstIncluded?: boolean;
+  hsnCode?: string;
+  taxRate?: number;
   gstin?: string;
   
   // Shipping details
@@ -95,10 +98,30 @@ export type Customer = {
   baseReport?: number; // Base report for rate calculation
   collectedReport?: number; // Collected report for rate calculation
   riceBranGst?: number; // GST amount to add to calculated rate
-  calculatedRate?: number; // Final calculated rate (rate / baseReport * collectedReport + riceBranGst)
-  createdAt?: unknown;
-  updatedAt?: unknown;
+  calculatedRate?: number; // Final calculated rate for RICE BRAN entries
 };
+
+export type Supplier = Customer;
+
+export interface ManufacturingCostingData {
+    id: string;
+    buyingRate: number;
+    expense: number;
+    quantity: number;
+    extraCost?: number; // Extra cost for waste products (products that cannot be sold)
+    products: Array<{
+        id: string;
+        name: string;
+        percentage: number;
+        sellingPrice?: number;
+        soldPercentage?: number;
+        targetProfit?: number;
+    }>;
+    costAllocationMethod?: 'percentage' | 'value';
+    overallTargetProfit?: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
 
 // Kanta Parchi - Separate collection for weight/calculation entries
 export type KantaParchi = {
@@ -205,26 +228,22 @@ export type Transaction = {
   taxAmount?: number;
   cdAmount?: number;
   expenseType?: 'Personal' | 'Business';
-  isRecurring: boolean;
-  recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  nextDueDate?: string;
   mill?: string;
   expenseNature?: 'Permanent' | 'Seasonal';
-  isCalculated?: boolean;
-  quantity?: number;
-  rate?: number;
   projectId?: string; 
   loanId?: string; 
   bankAccountId?: string;
+  isRecurring?: boolean;
   isDeleted?: boolean;
   createdAt?: string; // ISO timestamp for sorting/ordering
+  updatedAt?: string;
 };
 
 export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
 export type Expense = Omit<Transaction, 'transactionType'> & { transactionType: 'Expense' };
 
 export type Account = {
-  id?: string;
+  id: string;
   name: string;
   contact?: string;
   address?: string;
@@ -262,13 +281,25 @@ export type PaidFor = {
     srNo: string;
     amount: number;
     cdAmount?: number; // CD amount allocated to this specific entry
-    // Gov. payment extra amount tracking fields
+    parchiNo?: string; // Parchi No (SR#) of the payment (for tracking extra amount reference)
     receiptOutstanding?: number; // Current receipt outstanding before payment
-    extraAmount?: number; // Extra amount for this receipt (Gov. Required - Receipt Outstanding)
-    adjustedOriginal?: number; // Original Amount + Extra Amount
-    adjustedOutstanding?: number; // Outstanding + Extra Amount
-    govRequired?: number; // Gov. Required amount for this receipt (if per-receipt)
-}
+    extraAmount?: number; // Extra amount allocated to this specific entry (Gov. Bonus etc)
+    adjustedOriginal?: number;
+    adjustedOutstanding?: number;
+    
+    // Additional fields for extended tracking
+    paymentId?: string;
+    receiptType?: string;
+    sixRDate?: string;
+    supplierId?: string;
+    supplierName?: string;
+    supplierContact?: string;
+    supplierFatherName?: string;
+    supplierAddress?: string;
+    type?: string;
+    updatedAt?: unknown;
+    utrNo?: string;
+};
 
 export type SupplierPayment = {
     id: string; // Firestore unique ID
@@ -276,36 +307,45 @@ export type SupplierPayment = {
     customerId: string; 
     date: string;
     amount: number;
+    drCr?: 'Debit' | 'Credit';
+    advanceAmount?: number;
     createdAt?: unknown;
     updatedAt?: unknown;
     cdAmount?: number;
     cdApplied?: boolean;
     type: string; 
     receiptType: string; 
+    paymentMethod?: string;
+    supplierId?: string;
     notes?: string;
     paidFor?: PaidFor[];
     nineRNo?: string;
     sixRDate?: string;
     parchiNo?: string;
+    parchiName?: string;
     checkNo?: string;
     utrNo?: string;
+    sixRNo?: string;
     quantity?: number;
     rate?: number;
     rtgsAmount?: number;
     supplierName?: string;
     supplierFatherName?: string;
     supplierAddress?: string;
+    rtgsFor?: string;
     bankName?: string;
     bankBranch?: string;
     bankAcNo?: string;
     bankIfsc?: string;
+    bankDetails?: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
+    supplierDetails?: { name?: string; fatherName?: string; address?: string; contact?: string; [key: string]: unknown };
     rtgsSrNo?: string; 
     // Gov. payment specific fields
     govQuantity?: number;
     govRate?: number;
     govAmount?: number;
-    govRequiredAmount?: number; // Total Gov. Required amount (all receipts combined)
-    extraAmount?: number; // Total Extra Amount (Gov. Required - Receipt Outstanding)
+    govExtraAmount?: number;
+    centerName?: string;
     expenseTransactionId?: string;
     bankAccountId?: string; 
     isDeleted?: boolean;
@@ -418,6 +458,8 @@ export type CustomerSummary = {
     transactionsByVariety: { [key: string]: number };
     totalBrokerage?: number;
     totalCd?: number;
+    totalGovExtraAmount?: number; // Total Gov Extra Amount
+    totalBaseOriginalAmount?: number; // Base Original Amount (without Extra)
 }
 
 export type OptionItem = {
@@ -472,6 +514,8 @@ export type InventoryItem = {
     sellingPrice?: number;
     supplierId?: string;
     category?: string;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
 export type LedgerAccount = {
@@ -488,10 +532,10 @@ export type LedgerEntry = {
   accountId: string;
   date: string;
   particulars: string;
+  remarks?: string;
   debit: number;
   credit: number;
   balance: number;
-  remarks?: string;
   createdAt: string;
   updatedAt: string;
   linkGroupId?: string;
@@ -618,6 +662,11 @@ export type ReceiptSettings = {
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
     defaultBank?: BankAccount;
+    type?: string;
+    bankName?: string;
+    accountNo?: string;
+    branchName?: string;
+    ifscCode?: string;
     bankHeaderLine1?: string;
     bankHeaderLine2?: string;
     bankHeaderLine3?: string;
@@ -637,7 +686,7 @@ export type ConsolidatedReceiptData = {
     receiptCount: number;
 };
 
-export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt';
+export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan' | 'receipt' | 'rtgs-receipt';
 
 export type Project = {
     id: string;
@@ -648,6 +697,8 @@ export type Project = {
     endDate?: string;
     totalCost?: number;
     totalBilled?: number;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
 export type Task = {

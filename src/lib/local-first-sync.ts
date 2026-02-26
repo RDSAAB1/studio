@@ -131,6 +131,9 @@ export async function writeLocalFirst<T extends { id: string }>(
                     createdAt: (data as any).createdAt || now.toISOString()
                 };
                 await localTable.put(dataWithTimestamp as any);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
+                }
                 pendingChanges.set(`${collectionName}:${id}`, {
                     id,
                     type: 'create',
@@ -155,6 +158,9 @@ export async function writeLocalFirst<T extends { id: string }>(
                     };
 
                     await localTable.put(updated as any);
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
+                    }
                     
                     // Verify the update
                     const verify = await localTable.get(id);
@@ -186,6 +192,9 @@ export async function writeLocalFirst<T extends { id: string }>(
                             createdAt: (data as any).createdAt || now.toISOString()
                         };
                         await localTable.put(dataWithTimestamp as any);
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
+                        }
                         pendingChanges.set(`${collectionName}:${id}`, {
                             id,
                             type: 'create',
@@ -205,6 +214,9 @@ export async function writeLocalFirst<T extends { id: string }>(
 
             case 'delete':
                 await localTable.delete(id);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
+                }
                 pendingChanges.set(`${collectionName}:${id}`, {
                     id,
                     type: 'delete',

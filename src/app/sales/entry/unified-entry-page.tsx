@@ -1,11 +1,26 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs } from "@/components/ui/tabs";
-import SimpleSupplierEntryAllFields from "@/app/sales/supplier-entry/simple-supplier-entry-all-fields";
-import CustomerEntryClient from "@/components/sales/customer-entry/customer-entry-client";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2 } from "lucide-react";
+
+const SimpleSupplierEntryAllFields = dynamic(
+  () => import("@/app/sales/supplier-entry/simple-supplier-entry-all-fields"),
+  { 
+    loading: () => <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>,
+    ssr: false 
+  }
+);
+const CustomerEntryClient = dynamic(
+  () => import("@/components/sales/customer-entry/customer-entry-client"),
+  { 
+    loading: () => <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>,
+    ssr: false
+  }
+);
 
 export default function UnifiedEntryPage({ defaultTab = "supplier" }: { defaultTab?: "supplier" | "customer" }) {
   const router = useRouter();

@@ -19,6 +19,10 @@ interface UseManufacturingCalculationsProps {
   overallTargetProfit: number;
 }
 
+type ProductWithWeight = Product & { weight: number; sellingPrice: number };
+type ProductWithCost = ProductWithWeight & { allocatedCost: number };
+type ProductWithExpense = ProductWithCost & { allocatedExpense: number };
+
 export interface CalculatedProduct extends Product {
   weight: number;
   allocatedCost: number;
@@ -88,14 +92,14 @@ export function useManufacturingCalculations({
     }
 
     // Calculate weights first
-    const productsWithWeights = products.map(product => ({
+    const productsWithWeights: ProductWithWeight[] = products.map(product => ({
       ...product,
       weight: (quantity * product.percentage) / 100,
       sellingPrice: product.sellingPrice || 0
     }));
 
     // Calculate cost allocation based on method
-    let productsWithCost: typeof productsWithWeights;
+    let productsWithCost: ProductWithCost[];
     
     if (costAllocationMethod === 'value') {
       // Value-based allocation: Based on selling price × weight ratio
@@ -125,7 +129,7 @@ export function useManufacturingCalculations({
     }
 
     // Calculate expense allocation (same method as cost allocation)
-    let productsWithExpense: typeof productsWithCost;
+    let productsWithExpense: ProductWithExpense[];
     if (costAllocationMethod === 'value') {
       const totalValue = productsWithCost.reduce((sum, p) => {
         const pWeight = (quantity * p.percentage) / 100;

@@ -74,7 +74,7 @@ export const useSupplierFiltering = (
     );
     
     // Always add Mill Overview if MILL_OVERVIEW_KEY is provided
-    const millOverviewData = supplierSummaryMap.get(MILL_OVERVIEW_KEY);
+    const millOverviewData = MILL_OVERVIEW_KEY ? supplierSummaryMap.get(MILL_OVERVIEW_KEY) : undefined;
     let optionsWithMillOverview = filteredOptions;
     
     if (MILL_OVERVIEW_KEY && millOverviewData) {
@@ -96,7 +96,7 @@ export const useSupplierFiltering = (
       // Always include Mill Overview
       if (value === MILL_OVERVIEW_KEY) return true;
 
-      const hasTransactionsInRange = data.allTransactions?.some(t => {
+      const hasTransactionsInRange = data.allTransactions?.some((t: any) => {
         if (!t.date) return false;
         const transactionDate = new Date(t.date);
         

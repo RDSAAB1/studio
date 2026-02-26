@@ -1,4 +1,4 @@
-import type { Customer, ConsolidatedReceiptData, ReceiptSettings } from "@/lib/definitions";
+import type { Customer, ConsolidatedReceiptData, ReceiptSettings, DocumentType } from "@/lib/definitions";
 import { CombinedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
 import { DetailsDialog } from "@/components/sales/details-dialog";
@@ -21,8 +21,8 @@ interface SupplierEntryDialogsProps {
   isDocumentPreviewOpen: boolean;
   setIsDocumentPreviewOpen: (open: boolean) => void;
   documentPreviewCustomer: Customer | null;
-  documentType: 'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt';
-  setDocumentType: (type: 'tax-invoice' | 'bill-of-supply' | 'challan' | 'rtgs-receipt') => void;
+  documentType: DocumentType;
+  setDocumentType: (type: DocumentType) => void;
 }
 
 export function SupplierEntryDialogs({

@@ -6,35 +6,35 @@ export const initialCustomers: Customer[] = [
     {
         id: "1", srNo: 'S00001', date: '2025-07-01', term: '30', dueDate: '2025-07-31', name: 'Rahul Sharma', so: 'Suresh Sharma', address: '123, Gandhi Nagar', contact: '9876543210',
         vehicleNo: 'DL12AB3456', variety: 'Wheat', grossWeight: 1000, teirWeight: 50, weight: 950, kartaPercentage: 1, kartaWeight: 9.5, kartaAmount: 95,
-        netWeight: 940.5, rate: 10, labouryRate: 0.5, labouryAmount: 475, kanta: 10, amount: 9405, netAmount: 8920,
+        netWeight: 940.5, rate: 10, labouryRate: 0.5, labouryAmount: 475, brokerageRate: 0, brokerageAmount: 0, kanta: 10, amount: 9405, netAmount: 8920,
         barcode: 'BAR001', receiptType: 'Cash', paymentType: 'Partial', customerId: 'rahul sharma|9876543210', originalNetAmount: 8920
     },
     {
         id: "2", srNo: 'S00002', date: '2025-07-10', term: '15', dueDate: '2025-07-25', name: 'Priya Singh', so: 'Anil Singh', address: '456, Nehru Colony', contact: '9988776655',
         vehicleNo: 'UP78CD9012', variety: 'Rice', grossWeight: 1500, teirWeight: 70, weight: 1430, kartaPercentage: 0.5, kartaWeight: 7.15, kartaAmount: 71.5,
-        netWeight: 1422.85, rate: 12, labouryRate: 0.6, labouryAmount: 858, kanta: 15, amount: 17074.2, netAmount: 16201.2,
+        netWeight: 1422.85, rate: 12, labouryRate: 0.6, labouryAmount: 858, brokerageRate: 0, brokerageAmount: 0, kanta: 15, amount: 17074.2, netAmount: 16201.2,
         barcode: 'BAR002', receiptType: 'Online', paymentType: 'Full', customerId: 'priya singh|9988776655', originalNetAmount: 16201.2
     },
     {
         id: "3", srNo: 'S00003', date: '2025-07-15', term: '0', dueDate: '2025-07-15', name: 'Rahul Sharma', so: 'Suresh Sharma', address: '123, Gandhi Nagar', contact: '9876543210',
         vehicleNo: 'RJ01EF2345', variety: 'Corn', grossWeight: 800, teirWeight: 40, weight: 760, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0,
-        netWeight: 760, rate: 8, labouryRate: 0.4, labouryAmount: 304, kanta: 5, amount: 6080, netAmount: 5771,
+        netWeight: 760, rate: 8, labouryRate: 0.4, labouryAmount: 304, brokerageRate: 0, brokerageAmount: 0, kanta: 5, amount: 6080, netAmount: 5771,
         barcode: 'BAR003', receiptType: 'Cash', paymentType: 'Partial', customerId: 'rahul sharma|9876543210', originalNetAmount: 5771
     },
     {
         id: "4", srNo: 'S00004', date: '2025-07-20', term: '60', dueDate: '2025-09-18', name: 'Amit Kumar', so: 'Rajesh Kumar', address: '789, Patel Chowk', contact: '9123456789',
         vehicleNo: 'HR56GH7890', variety: 'Barley', grossWeight: 1200, teirWeight: 60, weight: 1140, kartaPercentage: 0.8, kartaWeight: 9.12, kartaAmount: 91.2,
-        netWeight: 1130.88, rate: 9, labouryRate: 0.45, labouryAmount: 513, kanta: 12, amount: 10177.92, netAmount: 9652.92,
+        netWeight: 1130.88, rate: 9, labouryRate: 0.45, labouryAmount: 513, brokerageRate: 0, brokerageAmount: 0, kanta: 12, amount: 10177.92, netAmount: 9652.92,
         barcode: 'BAR004', receiptType: 'Online', paymentType: 'Full', customerId: 'amit kumar|9123456789', originalNetAmount: 9652.92
     }
 ];
 
 export const initialTransactions: Transaction[] = [
-    { id: '1', date: '2025-07-20', transactionType: 'Expense', category: 'Staff & Administrative Costs', subCategory: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-001', taxAmount: 75, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Permanent' },
-    { id: '2', date: '2025-07-19', transactionType: 'Expense', category: 'Production & Operational Costs', subCategory: 'Electricity & Fuel', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-002', taxAmount: 225, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Seasonal' },
-    { id: '3', date: '2025-07-25', transactionType: 'Income', category: 'Sales of Goods', subCategory: 'Rice Sales', amount: 500000, payee: 'Local Distributor', description: 'Bulk rice sale', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'SALE-001', taxAmount: 25000, isRecurring: false, mill: 'Main Mill' },
-    { id: '4', date: '2025-07-18', transactionType: 'Expense', category: 'Repairs & Maintenance', subCategory: 'Annual Maintenance Contracts', amount: 25000, payee: 'Agro Repairs Co.', description: 'Tractor maintenance', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 1250, expenseType: 'Business', isRecurring: false, mill: 'Main Mill', expenseNature: 'Permanent' },
-    { id: '5', date: '2025-07-26', transactionType: 'Income', category: 'Service Income', subCategory: 'Milling Services', amount: 5000, payee: 'Local Farmer', description: 'Paddy milling service', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'SERV-001', taxAmount: 250, isRecurring: false, mill: 'Service Unit' },
+    { id: '1', transactionId: 'EX00001', date: '2025-07-20', transactionType: 'Expense', category: 'Staff & Administrative Costs', subCategory: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Online', status: 'Paid', taxAmount: 75, expenseType: 'Business', mill: 'Main Mill', expenseNature: 'Permanent' },
+    { id: '2', transactionId: 'EX00002', date: '2025-07-19', transactionType: 'Expense', category: 'Production & Operational Costs', subCategory: 'Electricity & Fuel', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', taxAmount: 225, expenseType: 'Business', mill: 'Main Mill', expenseNature: 'Seasonal' },
+    { id: '3', transactionId: 'IN00001', date: '2025-07-25', transactionType: 'Income', category: 'Sales of Goods', subCategory: 'Rice Sales', amount: 500000, payee: 'Local Distributor', description: 'Bulk rice sale', paymentMethod: 'Online', status: 'Paid', taxAmount: 25000, mill: 'Main Mill' },
+    { id: '4', transactionId: 'EX00003', date: '2025-07-18', transactionType: 'Expense', category: 'Repairs & Maintenance', subCategory: 'Annual Maintenance Contracts', amount: 25000, payee: 'Agro Repairs Co.', description: 'Tractor maintenance', paymentMethod: 'Cheque', status: 'Pending', taxAmount: 1250, expenseType: 'Business', mill: 'Main Mill', expenseNature: 'Permanent' },
+    { id: '5', transactionId: 'IN00002', date: '2025-07-26', transactionType: 'Income', category: 'Service Income', subCategory: 'Milling Services', amount: 5000, payee: 'Local Farmer', description: 'Paddy milling service', paymentMethod: 'Cash', status: 'Paid', taxAmount: 250, mill: 'Service Unit' },
 ];
 
 export const initialFundTransactions: FundTransaction[] = [

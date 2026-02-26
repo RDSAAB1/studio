@@ -38,13 +38,19 @@ export const CollapsibleField = ({
     };
 
     const handleBlur = () => {
-        // Small delay to allow for clicks
         setTimeout(() => setIsExpanded(false), 200);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter" || e.key === "Escape") {
             setIsExpanded(false);
+        }
+    };
+
+    const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded(prev => !prev);
         }
     };
 
@@ -85,6 +91,9 @@ export const CollapsibleField = ({
             <div 
                 className="flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2"
                 onClick={handleClick}
+                onKeyDown={handleHeaderKeyDown}
+                role="button"
+                tabIndex={0}
             >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     {isExpanded ? (
@@ -141,4 +150,3 @@ export const CollapsibleField = ({
         </div>
     );
 };
-

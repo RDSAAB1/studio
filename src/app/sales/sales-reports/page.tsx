@@ -3,7 +3,7 @@
 
 import PlaceholderPage from "@/components/placeholder-page";
 import { useEffect, useState } from "react";
-import { collection, query, onSnapshot, orderBy, Timestamp } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, Timestamp, where } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase.ts
 import { Customer } from "@/lib/definitions"; // Assuming Customer type includes relevant fields for reports
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,6 +74,8 @@ export default function SalesReportsPage() {
           rate: docData.rate,
           labouryRate: docData.labouryRate,
           labouryAmount: docData.labouryAmount,
+          brokerageRate: Number(docData.brokerageRate ?? docData.brokerage ?? 0),
+          brokerageAmount: Number(docData.brokerageAmount ?? 0),
           kanta: docData.kanta,
           amount: docData.amount,
           netAmount: docData.netAmount,
@@ -85,7 +87,7 @@ export default function SalesReportsPage() {
           payments: docData.payments || [], // Assuming payments might be stored here
         };
         data.push(customer);
-        totalAmount += customer.netAmount || 0;
+        totalAmount += Number(customer.netAmount || 0);
       });
       setSalesData(data);
       setTotalSalesAmount(totalAmount);
@@ -110,7 +112,7 @@ export default function SalesReportsPage() {
   }
 
   if (salesData.length === 0) {
-    return <PlaceholderPage title="Sales Reports" description="No sales data available to generate reports." />;
+    return <PlaceholderPage title="Sales Reports" message="No sales data available to generate reports." />;
   }
 
   return (

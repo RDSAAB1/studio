@@ -237,7 +237,7 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
 
     if (isLoading) {
         return (
-            <Card>
+            <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                 <CardHeader>
                     <CardTitle className="text-base">Gov. History (Direct from IndexedDB)</CardTitle>
                 </CardHeader>
@@ -249,7 +249,7 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
     }
     
     return (
-        <Card>
+        <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">
                     Gov. History (Direct from IndexedDB)
@@ -279,7 +279,7 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
-                                <TableRow>
+                                <TableRow className="bg-primary/20 border-b border-primary/30">
                                     <TableHead className="w-[100px]">ID</TableHead>
                                     <TableHead className="w-[200px]">Supplier</TableHead>
                                     <TableHead className="w-[150px]">Receipt No.</TableHead>
@@ -306,14 +306,14 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    visiblePayments.map((payment) => {
+                                    visiblePayments.map((payment, index) => {
                                         const receiptHolderName = getReceiptHolderName(payment);
                                         const receiptNumbers = getReceiptNumbers(payment);
                                         const govQuantity = (payment as any).govQuantity || 0;
                                         const govRate = (payment as any).govRate || 0;
 
                                         return (
-                                            <TableRow key={payment.id || payment.paymentId}>
+                                            <TableRow key={`${payment.id || payment.paymentId || 'gov'}-${index}`}>
                                                 <TableCell className="font-mono text-xs">
                                                     {payment.id || payment.paymentId || '-'}
                                                 </TableCell>
@@ -397,4 +397,3 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
         </Card>
     );
 };
-

@@ -15,6 +15,7 @@ export interface FixResult {
     skipped: number;
     errors: string[];
     summary: string;
+    error?: string;
 }
 
 export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
@@ -165,13 +166,15 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
         
     } catch (error) {
 
+        const message = String(error);
         return {
             success: false,
             fixedSrNos: 0,
             fixedIds: 0,
             skipped: 0,
-            errors: [String(error)],
-            summary: 'Fix failed due to error'
+            errors: [message],
+            summary: 'Fix failed due to error',
+            error: message
         };
     }
 }

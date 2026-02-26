@@ -168,6 +168,10 @@ export default function SettingsPage() {
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
     
     const gstinValue = companyForm.watch("companyGstin");
+    
+    const handleRealtimeError = (error: Error) => {
+        toast({ title: 'Sync error', description: error.message, variant: 'destructive' });
+    };
 
     useEffect(() => {
         if (gstinValue && gstinValue.length === 15) {
@@ -227,12 +231,12 @@ export default function SettingsPage() {
                 const fetchedHolidays = await getHolidays();
                 setHolidays(fetchedHolidays);
 
-                const unsubVariety = getOptionsRealtime('varieties', setVarietyOptions, );
-                const unsubPayment = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, );
-                const unsubCenterName = getOptionsRealtime('centerNames', setCenterNameOptions, );
-                const unsubAccounts = getBankAccountsRealtime(setBankAccounts, );
-                const unsubBanks = getBanksRealtime(setBanks, );
-                const unsubBranches = getBankBranchesRealtime(setBankBranches, );
+                const unsubVariety = getOptionsRealtime('varieties', setVarietyOptions, handleRealtimeError);
+                const unsubPayment = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, handleRealtimeError);
+                const unsubCenterName = getOptionsRealtime('centerNames', setCenterNameOptions, handleRealtimeError);
+                const unsubAccounts = getBankAccountsRealtime(setBankAccounts, handleRealtimeError);
+                const unsubBanks = getBanksRealtime(setBanks, handleRealtimeError);
+                const unsubBranches = getBankBranchesRealtime(setBankBranches, handleRealtimeError);
                 
                 navigator.serviceWorker.ready.then(async (registration) => {
                     if ('periodicSync' in registration) {
@@ -262,31 +266,34 @@ export default function SettingsPage() {
         return () => unsubscribeAuth();
     }, [router, companyForm, emailForm]);
 
-    const handleAutoSyncChange = async (value: string) => {
-        setAutoSyncInterval(value);
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            if ('periodicSync' in registration) {
-                await (registration as any).periodicSync.unregister('periodic-sync-6h');
-                await (registration as any).periodicSync.unregister('periodic-sync-12h');
-                await (registration as any).periodicSync.unregister('periodic-sync-24h');
+    const handleAutoSyncChange = (value: string | null) => {
+        const nextValue = value ?? 'never';
+        setAutoSyncInterval(nextValue);
 
-                if (value !== 'never') {
-                    const hours = parseInt(value.replace('h', ''));
-                    await (registration as any).periodicSync.register(`periodic-sync-${value}`, {
-                        minInterval: hours * 60 * 60 * 1000,
-                    });
-                    toast({ title: 'Auto-Sync Enabled', description: `Data will now sync automatically every ${hours} hours.`, variant: 'success' });
+        void (async () => {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                if ('periodicSync' in registration) {
+                    await (registration as any).periodicSync.unregister('periodic-sync-6h');
+                    await (registration as any).periodicSync.unregister('periodic-sync-12h');
+                    await (registration as any).periodicSync.unregister('periodic-sync-24h');
+
+                    if (nextValue !== 'never') {
+                        const hours = parseInt(nextValue.replace('h', ''));
+                        await (registration as any).periodicSync.register(`periodic-sync-${nextValue}`, {
+                            minInterval: hours * 60 * 60 * 1000,
+                        });
+                        toast({ title: 'Auto-Sync Enabled', description: `Data will now sync automatically every ${hours} hours.`, variant: 'success' });
+                    } else {
+                        toast({ title: 'Auto-Sync Disabled', description: 'Periodic background sync has been turned off.', variant: 'success' });
+                    }
                 } else {
-                    toast({ title: 'Auto-Sync Disabled', description: 'Periodic background sync has been turned off.', variant: 'success' });
+                    toast({ title: 'Not Supported', description: 'Your browser does not support periodic background sync.', variant: 'destructive' });
                 }
-            } else {
-                 toast({ title: 'Not Supported', description: 'Your browser does not support periodic background sync.', variant: 'destructive' });
+            } catch (error) {
+                toast({ title: 'Error', description: 'Could not update auto-sync settings.', variant: 'destructive' });
             }
-        } catch (error) {
-
-            toast({ title: 'Error', description: 'Could not update auto-sync settings.', variant: 'destructive' });
-        }
+        })();
     };
 
     
@@ -334,7 +341,7 @@ export default function SettingsPage() {
         if(receiptSettings) {
             setSaving(true);
             try {
-                await updateReceiptSettings(receiptSettings);
+                await updateRtgsSettings(receiptSettings);
                 toast({ title: "Receipt settings saved", variant: "success" });
             } catch(e) { toast({ title: "Failed to save receipt settings", variant: "destructive" }); }
             finally { setSaving(false); }
@@ -412,11 +419,11 @@ export default function SettingsPage() {
         toast({ title: "Bank account deleted", variant: "success" });
     }
 
-    const handleFormatChange = (key: string, field: 'prefix' | 'padding', value: string | number) => {
+    const handleFormatChange = (key: keyof FormatSettings, field: 'prefix' | 'padding', value: string | number) => {
         setFormatSettings(prev => ({
             ...prev,
             [key]: {
-                ...(prev[key as keyof FormatSettings] || { prefix: '', padding: 0 }),
+                ...(prev[key] || { prefix: '', padding: 0 }),
                 [field]: field === 'padding' ? Number(value) : value
             }
         }));
@@ -577,11 +584,11 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <Label>State Name</Label>
-                                        <CustomDropdown options={stateNameOptions} value={companyForm.watch('companyStateName')} onChange={handleStateNameChange} placeholder="Select State"/>
+                                        <CustomDropdown options={stateNameOptions} value={companyForm.watch('companyStateName') ?? null} onChange={handleStateNameChange} placeholder="Select State"/>
                                     </div>
                                     <div className="space-y-1">
                                         <Label>State Code</Label>
-                                        <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode')} onChange={handleStateCodeChange} placeholder="Select Code"/>
+                                        <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode') ?? null} onChange={handleStateCodeChange} placeholder="Select Code"/>
                                     </div>
                                     <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
                                         <Label htmlFor="bankHeaderLine1" className="font-semibold">BANK LOGO</Label>
@@ -872,4 +879,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-

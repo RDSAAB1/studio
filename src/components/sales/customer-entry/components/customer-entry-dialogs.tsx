@@ -20,7 +20,7 @@ interface CustomerEntryDialogsProps {
   documentPreviewCustomer: Customer | null;
   documentType: DocumentType;
   setDocumentType: (type: DocumentType) => void;
-  receiptSettings: ReceiptSettings;
+  receiptSettings: ReceiptSettings | null;
   
   // Receipt print dialogs
   receiptsToPrint: Customer[];

@@ -14,10 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import type { Bank, BankBranch, BankAccount, Payment } from '@/lib/definitions';
 
 interface RtgsFormProps {
-    bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
-    setBankDetails: (details: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => void;
+    bankDetails?: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
+    setBankDetails: React.Dispatch<React.SetStateAction<{ bank?: string; branch?: string; ifscCode?: string; acNo?: string }>>;
     editingPayment?: Payment;
-    setIsBankSettingsOpen: (open: boolean) => void;
+    setIsBankSettingsOpen?: (open: boolean) => void;
     supplierDetails?: { name?: string; [key: string]: unknown };
     setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
     bankAccounts?: BankAccount[];
@@ -28,7 +28,7 @@ interface RtgsFormProps {
 export const RtgsForm = (props: RtgsFormProps) => {
     const { toast } = useToast();
     const {
-        bankDetails, setBankDetails,
+        bankDetails = {}, setBankDetails,
         editingPayment, setIsBankSettingsOpen,
         supplierDetails = {},
         setSupplierDetails,
@@ -200,7 +200,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
         <div className="space-y-2 text-[10px]">
             <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-muted-foreground">Bank Details</p>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen(true)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen?.(true)}>
                     <Settings className="h-3.5 w-3.5" />
                 </Button>
             </div>
@@ -254,19 +254,32 @@ export const RtgsForm = (props: RtgsFormProps) => {
                                 }
                             }}
                             placeholder="Select or enter name"
-                            allowCustomInput={true}
                         />
                     </div>
                     <div className="space-y-0.5">
                         <Label htmlFor="rtgsBank" className="text-[10px]">Bank</Label>
-                        <CustomDropdown id="rtgsBank" options={bankOptions} value={bankDetails.bank} onChange={handleBankSelect} onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }} placeholder="Select or add bank" />
+                        <CustomDropdown
+                            id="rtgsBank"
+                            options={bankOptions}
+                            value={bankDetails.bank ?? null}
+                            onChange={handleBankSelect}
+                            onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }}
+                            placeholder="Select or add bank"
+                        />
                     </div>
                 </div>
                 {/* Row 2 */}
                 <div className="grid grid-cols-2 gap-2 items-end">
                     <div className="space-y-0.5">
                         <Label htmlFor="rtgsBranch" className="text-[10px]">Branch</Label>
-                        <CustomDropdown id="rtgsBranch" options={availableBranchOptions} value={bankDetails.branch} onChange={handleBranchSelect} onAdd={handleAddBranch} placeholder="Select or add branch"/>
+                        <CustomDropdown
+                            id="rtgsBranch"
+                            options={availableBranchOptions}
+                            value={bankDetails.branch ?? null}
+                            onChange={handleBranchSelect}
+                            onAdd={handleAddBranch}
+                            placeholder="Select or add branch"
+                        />
                     </div>
                     <div className="space-y-0.5">
                         <Label htmlFor="rtgsIfsc" className="text-[10px]">IFSC</Label>
@@ -337,7 +350,6 @@ export const RtgsForm = (props: RtgsFormProps) => {
                                 }
                             }}
                             placeholder="Select or enter account number"
-                            allowCustomInput={true}
                         />
                     </div>
                     {/* Check No. field removed - will be filled from RTGS Report */}

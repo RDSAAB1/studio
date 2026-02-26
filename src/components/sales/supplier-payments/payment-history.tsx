@@ -147,7 +147,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
     }, [getReceiptNumbers]);
     
     return (
-        <Card>
+        <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                 <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">
                     {title || 'Payment History'} 
@@ -157,26 +157,35 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
             </CardHeader>
             <CardContent className="p-0">
                 <ScrollArea ref={scrollRef} className="h-96">
-                    <div className="overflow-x-auto">
-                        <div className="min-w-[1000px]">
-                            <Table className="w-full">
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="p-1 text-xs w-24 font-bold text-foreground">ID</TableHead>
-                                        <TableHead className="p-1 text-xs w-20 font-bold text-foreground">Method</TableHead>
-                                        <TableHead className="p-1 text-xs w-40 font-bold text-foreground">Payee & Receipt</TableHead>
-                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Bank / Gov. Required</TableHead>
-                                        <TableHead className="p-1 text-xs w-36 font-bold text-foreground">Branch & Details / Extra</TableHead>
-                                        <TableHead className="p-1 text-xs w-28 font-bold text-foreground">Weight & Rate / Gov. Qty & Rate</TableHead>
-                                        <TableHead className="text-right p-1 text-xs w-24 font-bold text-foreground">Amount</TableHead>
-                                        <TableHead className="text-right p-1 text-xs w-20 font-bold text-foreground">CD</TableHead>
-                                        <TableHead className="text-center p-1 text-xs w-24 font-bold text-foreground">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                    <Table className="w-full table-fixed">
+                        <colgroup>
+                            <col className="w-[9%]" />
+                            <col className="w-[8%]" />
+                            <col className="w-[21%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[16%]" />
+                            <col className="w-[8%]" />
+                            <col className="w-[5%]" />
+                            <col className="w-[5%]" />
+                        </colgroup>
+                        <TableHeader>
+                            <TableRow className="bg-primary/20 border-b border-primary/30">
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">ID</TableHead>
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Method</TableHead>
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Payee & Receipt</TableHead>
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Bank / Gov. Base</TableHead>
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Branch & Details</TableHead>
+                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Weight & Rate / Gov. Details</TableHead>
+                                <TableHead className="text-right p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Amount</TableHead>
+                                <TableHead className="text-right p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">CD</TableHead>
+                                <TableHead className="text-center p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                                     {visiblePayments.map((p: any, index: number) => (
                                     <TableRow 
-                                        key={`${p.id || p.paymentId || p.rtgsSrNo || index}-${p.date || ''}`} 
+                                        key={`${p.id || p.paymentId || p.rtgsSrNo || 'idx'}-${p.date || ''}-${index}`} 
                                         className="hover:bg-muted/50"
                                         onClick={(e) => {
                                             // Prevent row click from interfering with button click
@@ -186,16 +195,16 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             }
                                         }}
                                     >
-                                        <TableCell className="p-1 text-[11px] w-24" title={`ID: ${p.paymentId || p.rtgsSrNo}`}>
+                                        <TableCell className="p-1 text-[11px] overflow-hidden" title={`ID: ${p.paymentId || p.rtgsSrNo}`}>
                                             <div className="text-foreground font-semibold text-[11px] break-words">
                                                 {p.paymentId || p.rtgsSrNo}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-1 text-[11px] w-20">
+                                        <TableCell className="p-1 text-[11px] overflow-hidden">
                                             <Badge variant={p.receiptType === 'RTGS' ? 'default' : p.receiptType === 'Gov.' ? 'default' : 'secondary'} className="text-[11px] font-medium">{p.receiptType}</Badge>
                                         </TableCell>
                                         <TableCell 
-                                            className="p-1 text-[11px] w-40 cursor-pointer" 
+                                            className="p-1 text-[11px] cursor-pointer overflow-hidden" 
                                             title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)} | Click receipt number to use as reference`}
                                             onClick={(e) => {
                                                 // Make the entire cell clickable for receipt numbers
@@ -252,23 +261,17 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                         </TableCell>
                                         {p.receiptType === 'Gov.' ? (
                                             <>
-                                                <TableCell className="p-1 text-[11px] w-28" title="Gov. Required Amount">
+                                                <TableCell className="p-1 text-[11px] overflow-hidden">
                                                     <div className="break-words text-foreground font-bold text-[11px]">
-                                                        {formatCurrency((p as any).govRequiredAmount || 0)}
-                                                    </div>
-                                                    <div className="text-muted-foreground text-[10px] mt-0.5">
-                                                        Required
+                                                        -
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-1 text-[11px] w-36" title={`Extra Amount: ${formatCurrency((p as any).extraAmount || 0)}`}>
-                                                    <div className="text-foreground text-[11px] font-bold break-words">
-                                                        {formatCurrency((p as any).extraAmount || 0)}
-                                                    </div>
-                                                    <div className="text-muted-foreground text-[10px] mt-0.5">
-                                                        Extra
-                                                    </div>
+
+                                                <TableCell className="p-1 text-[11px] overflow-hidden">
+                                                    {/* Empty cell for alignment */}
                                                 </TableCell>
-                                                <TableCell className="p-1 text-[11px] w-28" title={`Gov. Quantity: ${(p as any).govQuantity || 0} | Gov. Rate: ${(p as any).govRate || 0} | Gov. Amount: ${formatCurrency((p as any).govAmount || 0)}`}>
+
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={`Gov. Quantity: ${(p as any).govQuantity || 0} | Gov. Rate: ${(p as any).govRate || 0} | Gov. Amount: ${formatCurrency((p as any).govAmount || 0)}`}>
                                                     <div className="text-foreground text-[11px] font-bold break-words">
                                                         {(p as any).govQuantity || 0}
                                                     </div>
@@ -282,12 +285,12 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             </>
                                         ) : (
                                             <>
-                                                <TableCell className="p-1 text-[11px] w-28" title={(p.bankName || '').toString()}>
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={(p.bankName || '').toString()}>
                                                     <div className="break-words text-foreground font-bold text-[11px]">
                                                         {p.bankName || ''}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-1 text-[11px] w-36" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
                                                     <div className="text-foreground text-[11px] font-bold break-words">
                                                         {p.bankAcNo || ''}
                                                     </div>
@@ -298,7 +301,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                         {p.bankIfsc || ''}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-1 text-[11px] w-28" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
                                                     <div className="text-foreground text-[11px] font-bold break-words">
                                                         {p.quantity || 0}
                                                     </div>
@@ -308,13 +311,19 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                                 </TableCell>
                                             </>
                                         )}
-                                        <TableCell className="text-right p-1 text-[11px] w-24 font-mono">
-                                            <div className="break-words text-foreground font-bold">{formatCurrency(p.amount)}</div>
+                                        <TableCell className="text-right p-1 text-[11px] font-mono overflow-hidden">
+                                            <div
+                                                className={`break-words font-bold ${
+                                                    Number(p.amount || 0) < 0 ? "text-red-600" : "text-foreground"
+                                                }`}
+                                            >
+                                                {formatCurrency(Math.abs(Number(p.amount || 0)))}
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="text-right p-1 text-[11px] w-20 font-mono">
+                                        <TableCell className="text-right p-1 text-[11px] font-mono overflow-hidden">
                                             <div className="break-words text-foreground font-semibold">{formatCurrency(p.cdAmount)}</div>
                                         </TableCell>
-                                        <TableCell className="text-center p-0 w-24">
+                                        <TableCell className="text-center p-0 overflow-hidden">
                                             <div className="flex justify-center items-center gap-0">
                                                 {p.receiptType === 'RTGS' && (
                                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRtgs(p)}>
@@ -369,8 +378,6 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                     )}
                                 </TableBody>
                             </Table>
-                        </div>
-                    </div>
                 </ScrollArea>
             </CardContent>
         </Card>

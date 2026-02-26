@@ -1,20 +1,19 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import type { LedgerAccount } from "@/lib/definitions";
+import { format } from "date-fns";
 
 interface EntryFormData {
   date: string;
   particulars: string;
   debit: string;
   credit: string;
-  remarks: string;
 }
 
 interface EntryFormProps {
@@ -45,17 +44,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onLinkModeChange,
 }) => {
   return (
-    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <form onSubmit={onSubmit} className="flex flex-col gap-3">
       <div className="space-y-1">
         <Label htmlFor="entryDate" className="text-[11px] font-medium">Date</Label>
         <SmartDatePicker
           id="entryDate"
           value={entryForm.date}
-          onChange={(next) => onEntryFormChange({ ...entryForm, date: next })}
+          onChange={(next) => onEntryFormChange({ ...entryForm, date: typeof next === 'string' ? next : next ? format(next, 'yyyy-MM-dd') : entryForm.date })}
           disabled={!activeAccount || saving}
         />
       </div>
-      <div className="space-y-1 md:col-span-2">
+      <div className="space-y-1">
         <Label htmlFor="entryParticulars" className="text-[11px] font-medium">Particulars</Label>
         <Input
           id="entryParticulars"
@@ -64,12 +63,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           onChange={(event) =>
             onEntryFormChange({
               ...entryForm,
-              particulars: event.target.value,
+              particulars: event.target.value.toUpperCase(),
             })
           }
           placeholder="Narration"
           disabled={!activeAccount || saving}
-          className="h-8 text-sm"
+          className="h-7 text-[11px] uppercase"
         />
       </div>
       <div className="space-y-1">
@@ -102,30 +101,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           className="h-8 text-sm"
         />
       </div>
-      <div className="space-y-1 md:col-span-2">
-        <Label htmlFor="entryRemarks" className="text-[11px] font-medium">Remarks</Label>
-        <Textarea
-          id="entryRemarks"
-          name="entryRemarks"
-          value={entryForm.remarks}
-          onChange={(event) =>
-            onEntryFormChange({ ...entryForm, remarks: event.target.value })
-          }
-          placeholder="Optional notes"
-          className="h-8 min-h-[32px] text-sm leading-tight resize-none"
-          disabled={!activeAccount || saving}
-        />
-      </div>
-      <div className="space-y-1 md:col-span-2">
+
+      <div className="space-y-1">
         <Label htmlFor="linkAccountId" className="text-[11px] font-medium">Linked Account (optional)</Label>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+        <div className="flex flex-col gap-2">
           <select
             id="linkAccountId"
             name="linkAccountId"
             value={linkAccountId}
             onChange={(event) => onLinkAccountChange(event.target.value)}
             disabled={!activeAccount || saving || accounts.length <= 1}
-            className="w-full md:w-56 rounded border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full rounded border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">None</option>
             {accounts
@@ -138,7 +124,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </select>
 
           {linkAccountId && (
-            <div className="flex flex-1 items-center justify-center gap-2 rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px]">
+            <div className="flex items-center justify-center gap-2 rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px]">
               <SegmentedSwitch
                 checked={linkMode === "same"}
                 onCheckedChange={(checked) => onLinkModeChange(checked ? "same" : "mirror")}
@@ -150,7 +136,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           )}
         </div>
       </div>
-      <div className="md:col-span-2 flex justify-end">
+      <div className="flex justify-end pt-2">
         <Button type="submit" disabled={!activeAccount || saving} className="h-8 px-4 text-sm disabled:opacity-60">
           Add Entry
         </Button>
@@ -158,4 +144,3 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     </form>
   );
 };
-

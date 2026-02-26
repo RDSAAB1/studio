@@ -32,6 +32,11 @@ export default function EmailMarketingPage() {
   const [currentCampaign, setCurrentCampaign] = useState<EmailCampaign | null>(null);
   const [formData, setFormData] = useState({ name: "", subject: "", body: "" });
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (!isClient) return;

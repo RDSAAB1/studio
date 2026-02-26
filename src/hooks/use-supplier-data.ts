@@ -70,6 +70,7 @@ export const useSupplierData = () => {
                 averageKartaPercentage: 0, averageLabouryRate: 0,
                 totalTransactions: 0, totalOutstandingTransactions: 0,
                 totalBrokerage: 0, totalCd: 0,
+                minRate: 0, maxRate: 0,
             };
             byKey.set(key, newSummary);
             summaryList.push(newSummary);
@@ -86,7 +87,14 @@ export const useSupplierData = () => {
                         const matchingTransaction = summary.allTransactions?.find(t => t.srNo === pf.srNo);
                         if (matchingTransaction) {
                             // Found the supplier with this srNo - add payment to their allPayments
-                            if (!summary.allPayments!.some(existingP => existingP.id === p.id)) {
+                            // Check for duplicates by ID OR Payment ID (to handle double-submission data)
+                            const isDuplicate = summary.allPayments!.some(existingP => 
+                                existingP.id === p.id || 
+                                (p.paymentId && existingP.paymentId === p.paymentId) ||
+                                ((p as any).rtgsSrNo && (existingP as any).rtgsSrNo === (p as any).rtgsSrNo)
+                            );
+                            
+                            if (!isDuplicate) {
                                 summary.allPayments!.push(p);
                             }
                             break; // Found match, no need to check other summaries
@@ -110,8 +118,18 @@ export const useSupplierData = () => {
                 }
 
                 if (matched) {
-                    matched.allPayments!.push(p);
-                } else if (p.rtgsFor === 'Outsider') {
+                    // Prevent duplicates in fallback matching
+                    // Check for duplicates by ID OR Payment ID (to handle double-submission data)
+                    const isDuplicate = matched.allPayments!.some(existingP => 
+                        existingP.id === p.id || 
+                        (p.paymentId && existingP.paymentId === p.paymentId) ||
+                        ((p as any).rtgsSrNo && (existingP as any).rtgsSrNo === (p as any).rtgsSrNo)
+                    );
+
+                    if (!isDuplicate) {
+                        matched.allPayments!.push(p);
+                    }
+                } else if ((p as any).rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
                         name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
                         contact: '', 
@@ -127,6 +145,7 @@ export const useSupplierData = () => {
                         averageKartaPercentage: 0, averageLabouryRate: 0,
                         totalTransactions: 0, totalOutstandingTransactions: 0,
                         totalBrokerage: 0, totalCd: 0,
+                        minRate: 0, maxRate: 0,
                     };
                     summaryList.push(newSummary);
                 }
@@ -136,27 +155,67 @@ export const useSupplierData = () => {
         const finalSummaryMap = new Map<string, CustomerSummary>();
 
         summaryList.forEach((data, index) => {
-            // Use the same composite key (name|father|address) for final map to ensure proper grouping
-            const uniqueKey = makeKey(data.name || '', data.so || '', data.address || '') + `_${index}`;
+            // Use the same composite key (name|father|address) for final map
+            const uniqueKey = makeKey(data.name || '', data.so || '', data.address || '');
             const allContacts = new Set(data.allTransactions!.map(t => t.contact));
             data.contact = Array.from(allContacts).join(', ');
 
             data.allTransactions!.forEach(transaction => {
-                // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
-                const paymentsForThisEntry = data.allPayments!.filter(p => p.paidFor?.some(pf => pf.srNo === transaction.srNo));
+                const entrySrNo = String(transaction.srNo || '').trim().toLowerCase();
+                const paymentsForThisEntry = data.allPayments!.filter(p => {
+                    const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
+                    const parchiMatch = String((p as any).parchiNo || '').trim().toLowerCase() === entrySrNo;
+                    return Boolean(paidForMatch || parchiMatch);
+                });
             
                 let totalPaidForEntry = 0;
                 let totalCdForEntry = 0;
+                let totalGovExtraForEntry = 0;
+                let totalExtraForEntry = 0;
                 const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string }> = [];
 
                 // Simply sum all amounts directly from database without any calculation or normalization
                 paymentsForThisEntry.forEach(p => {
-                    const paidForThisDetail = p.paidFor!.find(pf => pf.srNo === transaction.srNo);
+                    const paidForThisDetail = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
+                    const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+                    const paidForExtraForThisEntry = Number((paidForThisDetail as any)?.extraAmount || 0);
+                    const paymentLevelExtraRawFromFields =
+                        (Number((p as any).extraAmount) || 0) + (Number((p as any).advanceAmount) || 0);
+                    const ledgerAmountFallback =
+                        receiptType === 'ledger' &&
+                        (p.paidFor?.length || 0) === 0 &&
+                        paymentLevelExtraRawFromFields === 0
+                            ? Math.abs(Number((p as any).amount || 0))
+                            : 0;
+                    const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
+                    const paymentLevelExtraSign =
+                        receiptType === 'ledger' && String((p as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
+                    const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
+                    const shouldAttachPaymentLevelExtra =
+                        paymentLevelExtraRaw !== 0 &&
+                        (receiptType === 'ledger' || receiptType === 'online') &&
+                        String((p as any).parchiNo || '').trim().toLowerCase() === entrySrNo &&
+                        paidForExtraForThisEntry === 0;
+
+                    if (shouldAttachPaymentLevelExtra) {
+                        totalExtraForEntry += paymentLevelExtra;
+                    }
+
                     if (!paidForThisDetail) return;
                 
                     // Direct database value - no calculation
                     const paidAmount = Number(paidForThisDetail.amount || 0);
                     totalPaidForEntry += paidAmount;
+
+                    if (paidForExtraForThisEntry > 0) {
+                        totalGovExtraForEntry += paidForExtraForThisEntry;
+                    } else if ((p as any).govExtraAmount && Number((p as any).govExtraAmount) > 0 && p.paidFor && p.paidFor.length > 0) {
+                        const totalPaidInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                        if (totalPaidInPayment > 0) {
+                            const proportion = paidAmount / totalPaidInPayment;
+                            totalGovExtraForEntry += Number((p as any).govExtraAmount) * proportion;
+                        }
+                    }
 
                     let cdForThisDetail = 0;
                     if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
@@ -178,45 +237,17 @@ export const useSupplierData = () => {
                         date: p.date,
                     });
                 });
+
+                totalExtraForEntry += totalGovExtraForEntry;
             
                 // Store direct values (round only for display precision)
                 transaction.totalPaid = Math.round(totalPaidForEntry * 100) / 100;
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                // Check for Gov. payment extra amount
-                let adjustedOriginal = transaction.originalNetAmount || 0;
-                let totalExtraAmount = 0;
-                
-                // Find Gov. payment for this entry
-                const govPayment = paymentsForThisEntry.find(p => 
-                    (p as any).receiptType === 'Gov.' && 
-                    p.paidFor?.some(pf => pf.srNo === transaction.srNo)
-                );
-                
-                if (govPayment) {
-                    const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === transaction.srNo);
-                    // IMPORTANT: Check for adjustedOriginal first (most reliable)
-                    // If adjustedOriginal is available, use it directly
-                    if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
-                        adjustedOriginal = paidForThisEntry.adjustedOriginal;
-                        totalExtraAmount = adjustedOriginal - (transaction.originalNetAmount || 0);
-                    } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
-                        // Fallback: Use extraAmount to calculate adjustedOriginal
-                        // IMPORTANT: Check for extraAmount even if it's 0 (use !== undefined, not truthy check)
-                        // extraAmount can be 0 if Gov. Required = Receipt Outstanding
-                        totalExtraAmount = paidForThisEntry.extraAmount || 0;
-                        adjustedOriginal = (transaction.originalNetAmount || 0) + totalExtraAmount;
-                    } else if (paidForThisEntry && (govPayment as any).extraAmount !== undefined) {
-                        // Fallback: Check payment-level extraAmount if paidFor doesn't have it
-                        totalExtraAmount = (govPayment as any).extraAmount || 0;
-                        adjustedOriginal = (transaction.originalNetAmount || 0) + totalExtraAmount;
-                    }
-                }
-                
-                // Outstanding: Adjusted Original - (Payment + CD)
-                // Adjusted Original = Original + Extra Amount (from Gov. payment)
-                const calculatedNetAmount = adjustedOriginal - totalPaidForEntry - totalCdForEntry;
+                const baseOutstanding = Number(transaction.originalNetAmount || 0);
+                const totalPayableAmount = baseOutstanding + totalExtraForEntry;
+                const calculatedNetAmount = totalPayableAmount - totalPaidForEntry - totalCdForEntry;
                 
                 // Handle very small negative amounts due to rounding - treat as zero
                 if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
@@ -224,10 +255,10 @@ export const useSupplierData = () => {
                 } else {
                     transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
-                
-                // Store extra amount and adjusted original for reference
-                (transaction as any).extraAmount = totalExtraAmount;
-                (transaction as any).adjustedOriginal = adjustedOriginal;
+
+                (transaction as any).outstandingForEntry = Number(transaction.netAmount || 0);
+                (transaction as any).totalGovExtraForEntry = Math.round(totalGovExtraForEntry * 100) / 100;
+                (transaction as any).totalExtraForEntry = Math.round(totalExtraForEntry * 100) / 100;
         });
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -243,21 +274,54 @@ export const useSupplierData = () => {
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
         
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
-        data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        data.totalPaid = data.allTransactions!.reduce((sum, t) => sum + Number((t as any).totalPaid || 0), 0);
+        data.totalCdAmount = data.allTransactions!.reduce((sum, t) => sum + Number((t as any).totalCd || 0), 0);
         
-        // Calculate totalOutstanding as sum of individual transaction netAmount values
-        // This ensures CD fix is properly applied (each transaction's netAmount has CD fix)
         const netAmountSum = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
+
+        const ledgerAdjustment = (data.allPayments || []).reduce(
+            (acc, p) => {
+                const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();
+                if (receiptType !== 'ledger') return acc;
+
+                const amountRaw = Number((p as any).amount || 0);
+                const amountAbs = Math.abs(amountRaw);
+                const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+                const isLedgerCredit = drCrLower === 'credit' || amountRaw < 0;
+                const linkedPaid = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
+                const unlinked = Math.max(0, amountAbs - linkedPaid);
+
+                if (unlinked > 0) {
+                    if (isLedgerCredit) {
+                        acc.credit += unlinked;
+                    } else {
+                        acc.debit += unlinked;
+                    }
+                }
+
+                return acc;
+            },
+            { debit: 0, credit: 0 }
+        );
+
+        data.totalOutstanding = Math.round((netAmountSum + ledgerAdjustment.debit - ledgerAdjustment.credit) * 100) / 100;
+
+        data.totalCashPaid = (data.allPayments || []).reduce((sum, p) => {
+            const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+            if (receiptType !== 'cash') return sum;
+            const linkedPaid = p.paidFor?.reduce((innerSum: number, pf: any) => innerSum + Number(pf.amount || 0), 0) || 0;
+            return sum + linkedPaid;
+        }, 0);
+        data.totalRtgsPaid = (data.allPayments || []).reduce((sum, p) => {
+            const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+            if (receiptType !== 'rtgs') return sum;
+            const linkedPaid = p.paidFor?.reduce((innerSum: number, pf: any) => innerSum + Number(pf.amount || 0), 0) || 0;
+            return sum + linkedPaid;
+        }, 0);
+        (data as any).totalGovExtraAmount = data.allTransactions!.reduce((sum, t) => sum + Number((t as any).totalGovExtraForEntry || 0), 0);
+        data.outstandingEntryIds = (data.allTransactions || []).filter(t => Number((t as any).outstandingForEntry || t.netAmount || 0) > 0).map(t => String(t.srNo || '')).filter(Boolean);
         
-        // Calculate outstanding as sum of individual transaction netAmount (with CD fix applied)
-        // This matches exactly what's shown in transaction table and negative report
-        data.totalOutstanding = netAmountSum;
-        
-        data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        
-        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
+        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => Number(t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         data.paymentHistory = data.allPayments!;

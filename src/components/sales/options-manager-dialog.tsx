@@ -97,6 +97,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                             value={newOptionName}
                             onChange={(e) => setNewOptionName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                            autoFocus
                         />
                         <Button onClick={handleAdd} size="sm">Add</Button>
                     </div>
@@ -120,6 +121,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                         <Button 
                                             size="icon" 
                                             variant="ghost" 
+                                            aria-label={`Edit option "${String(option.name)}"`}
                                             onClick={() => {
                                                 setEditingOption({ id: option.id, name: String(option.name) });
                                             }}
@@ -128,7 +130,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                         </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                                <Button variant="ghost" size="icon" aria-label={`Delete option "${String(option.name)}"`}><Trash className="h-4 w-4 text-red-500" /></Button>
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>

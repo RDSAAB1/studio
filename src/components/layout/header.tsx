@@ -15,9 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter, usePathname } from "next/navigation";
-import { getDailyPaymentLimit, getHolidays } from '@/lib/firestore';
-import { getLoansRealtime } from '@/lib/firestore';
-import type { Loan } from '@/lib/definitions';
+import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { syncAllData, hardSyncAllData, syncAllDataWithDetails } from "@/lib/database";
 import { SyncDialog } from "@/components/sync-dialog";
@@ -78,7 +76,7 @@ const NotificationBell = () => {
     useEffect(() => {
         const unsubscribe = getLoansRealtime(
             (data) => setLoans(data),
-            (error) => ('Error fetching loans:', error)
+            (error) => { console.error('Error fetching loans:', error); }
         );
         return () => unsubscribe();
     }, []);
@@ -109,8 +107,12 @@ const NotificationBell = () => {
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-8 w-8">
-                    <Bell className="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+                >
+                    <Bell className="h-5 w-5" />
                     {pendingNotifications.length > 0 && (
                         <span className="absolute top-1.5 right-1.5 block h-1.5 w-1.5 rounded-full bg-destructive" />
                     )}
@@ -192,8 +194,8 @@ const DraggableCalculator = () => {
     return (
         <Dialog modal={false}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Calculator className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white">
+                    <Calculator className="h-5 w-5" />
                     <span className="sr-only">Calculator</span>
                 </Button>
             </DialogTrigger>
@@ -284,10 +286,10 @@ export function Header({ toggleSidebar }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-10 items-center gap-2 border-b bg-card px-4 sm:px-6 flex-shrink-0 -mt-px">
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-white/18 bg-[linear-gradient(180deg,hsl(var(--primary)/0.42),hsl(var(--primary)/0.28))] px-4 sm:px-6 flex-shrink-0 -mt-px text-white backdrop-blur-[20px] shadow-[0_18px_50px_rgba(2,6,23,0.24)]">
         {/* Left Aligned Items */}
         <div className="flex flex-1 items-center gap-2">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleSidebar}>
+            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white" onClick={toggleSidebar}>
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
@@ -306,7 +308,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8" 
+            className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white" 
             onClick={handleSyncClick}
             disabled={isSyncing}
             title="Sync all data from Firestore"
@@ -321,14 +323,19 @@ export function Header({ toggleSidebar }: HeaderProps) {
           />
           <NotificationBell />
           <DraggableCalculator />
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/settings')}>
-            <Settings className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+            onClick={() => router.push('/settings')}
+          >
+            <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <UserCircle className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white">
+                <UserCircle className="h-5 w-5" />
                 <span className="sr-only">Profile</span>
               </Button>
             </DropdownMenuTrigger>

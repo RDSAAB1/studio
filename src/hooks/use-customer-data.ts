@@ -71,6 +71,7 @@ export const useCustomerData = () => {
                 averageKartaPercentage: 0, averageLabouryRate: 0,
                 totalTransactions: 0, totalOutstandingTransactions: 0,
                 totalBrokerage: 0, totalCd: 0,
+                minRate: 0, maxRate: 0,
             };
             byKey.set(key, newSummary);
             summaryList.push(newSummary);
@@ -111,8 +112,18 @@ export const useCustomerData = () => {
                 }
 
                 if (matched) {
-                    matched.allPayments!.push(p);
-                } else if (p.rtgsFor === 'Outsider') {
+                    // Prevent duplicates in fallback matching
+                    // Check for duplicates by ID OR Payment ID (to handle double-submission data)
+                    const isDuplicate = matched.allPayments!.some(existingP => 
+                        existingP.id === p.id || 
+                        (p.paymentId && existingP.paymentId === p.paymentId) ||
+                        ((p as any).rtgsSrNo && (existingP as any).rtgsSrNo === (p as any).rtgsSrNo)
+                    );
+
+                    if (!isDuplicate) {
+                        matched.allPayments!.push(p);
+                    }
+                } else if ((p as any).rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
                         name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
                         contact: '', 
@@ -128,6 +139,7 @@ export const useCustomerData = () => {
                         averageKartaPercentage: 0, averageLabouryRate: 0,
                         totalTransactions: 0, totalOutstandingTransactions: 0,
                         totalBrokerage: 0, totalCd: 0,
+                        minRate: 0, maxRate: 0,
                     };
                     summaryList.push(newSummary);
                 }
@@ -219,7 +231,7 @@ export const useCustomerData = () => {
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
         
-        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => (t.netAmount || 0) >= 1).length;
+        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => Number(t.netAmount || 0) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         data.paymentHistory = data.allPayments!;

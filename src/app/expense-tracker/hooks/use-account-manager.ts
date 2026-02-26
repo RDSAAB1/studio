@@ -158,7 +158,7 @@ export function useAccountManager({
     }
     try {
       setIsSubmitting(true);
-      const accountData: Account = {
+      const accountData: Omit<Account, 'id'> = {
         name: newAccount.name.trim(),
         contact: (newAccount.contact?.trim() || "").length > 0 ? newAccount.contact.trim() : undefined,
         address: (newAccount.address?.trim() || "").length > 0 ? newAccount.address.trim() : undefined,
@@ -216,7 +216,7 @@ export function useAccountManager({
 
     try {
       setIsSubmitting(true);
-      const accountData: Account = {
+      const accountData: Omit<Account, 'id'> = {
         name: newName,
         contact: editAccount.contact.trim() || undefined,
         address: editAccount.address.trim() || undefined,
@@ -289,4 +289,3 @@ export function useAccountManager({
     handleDeleteAccount,
   };
 }
-

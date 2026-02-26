@@ -7,11 +7,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import type { Customer, OptionItem, Payment, Holiday } from "@/lib/definitions";
-import { calculateSupplierEntry, toTitleCase } from "@/lib/utils";
+import { calculateSupplierEntry, calculateSupplierEntryWithValidation, toTitleCase } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
-import { updateSupplier, getOptionsRealtime, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
+import { updateSupplier, getOptionsRealtime, getHolidays, getDailyPaymentLimit, addOption, updateOption, deleteOption } from "@/lib/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -21,16 +21,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { Loader2, Percent } from "lucide-react";
+import { logError } from "@/lib/error-logger";
 
 // Helper function to handle errors silently (for non-critical lookup operations)
 function handleSilentError(error: unknown, context: string): void {
-  // Error is intentionally handled silently for non-critical lookup operations
-  // In production, this could be sent to an error tracking service
-  if (process.env.NODE_ENV === 'development') {
-    // Only log in development for debugging
-    // eslint-disable-next-line no-console
-    console.debug(`[Supplier Entry Edit] Silent error in ${context}:`, error);
-  }
+  logError(error, `[Supplier Entry Edit] ${context}`, 'low');
 }
 
 const formSchema = z.object({
@@ -81,6 +76,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
 
     const [currentSupplier, setCurrentSupplier] = useState<Customer | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
     const loadedEntryIdRef = useRef<string | null>(null);
@@ -116,9 +112,19 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     });
 
     const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-        const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+        const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntryWithValidation(
+            data,
+            safePaymentHistory,
+            holidays,
+            dailyPaymentLimit,
+            safeSuppliers
+        );
         if (currentSupplier) {
-            setCurrentSupplier(prev => prev ? ({...prev, ...calculatedState}) : null);
+            setCurrentSupplier(prev => {
+                if (!prev) return null;
+                const merged = { ...prev, ...calculatedState } as Customer;
+                return merged;
+            });
         }
         if (showWarning && warning) {
             let title = 'Date Warning';
@@ -263,8 +269,12 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
         };
         fetchSettings();
 
-        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => ("Error fetching varieties:", err));
-        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => ("Error fetching payment types:", err));
+        const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => {
+            logError(err, '[Supplier Entry Edit] Error fetching varieties', 'low');
+        });
+        const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => {
+            logError(err, '[Supplier Entry Edit] Error fetching payment types', 'low');
+        });
 
         return () => {
             unsubVarieties();
@@ -291,131 +301,132 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     }, []);
 
     const handleAddOption = useCallback(async (type: 'variety' | 'paymentType', value: string) => {
-        // Handle add option if needed
+        await addOption(type, { name: value });
     }, []);
 
     const handleUpdateOption = useCallback(async (type: 'variety' | 'paymentType', id: string, value: string) => {
-        // Handle update option if needed
+        await updateOption(type, id, { name: value });
     }, []);
 
-    const handleDeleteOption = useCallback(async (type: 'variety' | 'paymentType', id: string) => {
-        // Handle delete option if needed
+    const handleDeleteOption = useCallback(async (type: 'variety' | 'paymentType', id: string, name: string) => {
+        await deleteOption(type, id, name);
     }, []);
 
     const onSubmit = async (values: FormValues) => {
+        if (isSubmitting) return;
+
         if (!currentSupplier) {
             toast({ title: "Error", description: "Invalid entry data", variant: "destructive" });
             return;
         }
 
-        // Get supplier ID from cache (no DB lookup)
-        const supplierId = currentSupplier.id || entry?.id || values.srNo || currentSupplier.srNo;
-        
-        if (!supplierId) {
-            toast({ title: "Error", description: "Supplier ID not found", variant: "destructive" });
-            return;
-        }
+        setIsSubmitting(true);
 
-        // Optimistic update - close dialog IMMEDIATELY (no blocking operations)
-        // Don't set isSubmitting to true at all - just close immediately
-        onSuccess?.();
-        onOpenChange(false);
-        
-        // Perform ALL heavy operations in background (non-blocking)
-        (async () => {
-            try {
-                // Find supplier ID if needed (background lookup)
-                let finalSupplierId = supplierId;
-                
-                if (!finalSupplierId && values.srNo && db) {
-                    try {
-                        const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
-                        if (foundSupplier?.id) {
-                            finalSupplierId = foundSupplier.id;
-                        }
-                    } catch (error) {
-                        // Ignore lookup errors
-                        handleSilentError(error, 'handleSave - supplier lookup by id');
-                    }
-                }
-                
-                if (!finalSupplierId && currentSupplier.srNo && db) {
-                    try {
-                        const foundSupplier = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
-                        if (foundSupplier?.id) {
-                            finalSupplierId = foundSupplier.id;
-                        }
-                    } catch (error) {
-                        // Ignore lookup errors
-                        handleSilentError(error, 'handleSave - supplier lookup by id');
-                    }
-                }
-
-                if (!finalSupplierId) {
-                    throw new Error('Cannot update: Supplier ID not found.');
-                }
-
-                // Recalculate all fields using calculateSupplierEntry (in background)
-                const entryDataForCalculation = {
-                    ...currentSupplier,
-                    ...values,
-                    date: format(values.date, 'yyyy-MM-dd'),
-                    name: toTitleCase(values.name),
-                    so: toTitleCase(values.so),
-                    address: toTitleCase(values.address),
-                    variety: toTitleCase(values.variety),
-                    vehicleNo: toTitleCase(values.vehicleNo),
-                    brokerageRate: values.brokerageRate || 0,
-                    brokerageAddSubtract: values.brokerageAddSubtract ?? true,
-                };
-                
-                const { warning, suggestedTerm, ...calculatedFields } = calculateSupplierEntry(
-                    entryDataForCalculation,
-                    safePaymentHistory,
-                    holidays,
-                    dailyPaymentLimit,
-                    safeSuppliers || []
-                );
-
-                const completeEntry: Customer = {
-                    ...currentSupplier,
-                    ...values,
-                    ...calculatedFields,
-                    id: finalSupplierId,
-                    customerId: currentSupplier.customerId || '',
-                    date: format(values.date, 'yyyy-MM-dd'),
-                    dueDate: format(new Date(values.date.getTime() + (values.term * 24 * 60 * 60 * 1000)), 'yyyy-MM-dd'),
-                    name: toTitleCase(values.name),
-                    so: toTitleCase(values.so),
-                    address: toTitleCase(values.address),
-                    variety: toTitleCase(values.variety),
-                    vehicleNo: toTitleCase(values.vehicleNo),
-                    brokerageRate: values.brokerageRate || 0,
-                    brokerageAddSubtract: values.brokerageAddSubtract ?? true,
-                    forceUnique: values.forceUnique || false,
-                };
-
-                const { id, ...updateData } = completeEntry as any;
-                
-                // Ensure srNo is included in updateData
-                if (!updateData.srNo) {
-                    updateData.srNo = values.srNo || currentSupplier.srNo;
-                }
-                
-                // Perform database update
-                const success = await updateSupplier(id, updateData);
-                if (!success) {
-                    toast({ title: "Update failed", description: "Failed to update entry in database", variant: "destructive" });
-                    return;
-                }
-                
-                // Sync to Firestore
-                const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
-                await forceSyncToFirestore();
-            } catch (error) {
-                toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+        try {
+            // Get supplier ID from cache (no DB lookup)
+            const supplierId = currentSupplier.id || entry?.id || values.srNo || currentSupplier.srNo;
+            
+            if (!supplierId) {
+                throw new Error("Supplier ID not found");
             }
-        })();
+
+            // Find supplier ID if needed (background lookup)
+            let finalSupplierId = supplierId;
+            
+            if (!finalSupplierId && values.srNo && db) {
+                try {
+                    const foundSupplier = await db.suppliers.where('srNo').equals(values.srNo).first();
+                    if (foundSupplier?.id) {
+                        finalSupplierId = foundSupplier.id;
+                    }
+                } catch (error) {
+                    // Ignore lookup errors
+                    handleSilentError(error, 'handleSave - supplier lookup by id');
+                }
+            }
+            
+            if (!finalSupplierId && currentSupplier.srNo && db) {
+                try {
+                    const foundSupplier = await db.suppliers.where('srNo').equals(currentSupplier.srNo).first();
+                    if (foundSupplier?.id) {
+                        finalSupplierId = foundSupplier.id;
+                    }
+                } catch (error) {
+                    // Ignore lookup errors
+                    handleSilentError(error, 'handleSave - supplier lookup by id');
+                }
+            }
+
+            if (!finalSupplierId) {
+                throw new Error('Cannot update: Supplier ID not found.');
+            }
+
+            // Recalculate all fields using calculateSupplierEntry
+            const entryDataForCalculation = {
+                ...currentSupplier,
+                ...values,
+                date: format(values.date, 'yyyy-MM-dd'),
+                name: toTitleCase(values.name),
+                so: toTitleCase(values.so),
+                address: toTitleCase(values.address),
+                variety: toTitleCase(values.variety),
+                vehicleNo: toTitleCase(values.vehicleNo),
+                brokerageRate: values.brokerageRate || 0,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+            };
+            
+            const calculatedFields = calculateSupplierEntry(
+                entryDataForCalculation,
+                safePaymentHistory,
+                holidays,
+                dailyPaymentLimit,
+                safeSuppliers || []
+            );
+
+            const completeEntry: Customer = {
+                ...currentSupplier,
+                ...values,
+                ...calculatedFields,
+                id: finalSupplierId,
+                customerId: currentSupplier.customerId || '',
+                date: format(values.date, 'yyyy-MM-dd'),
+                dueDate: format(new Date(values.date.getTime() + (values.term * 24 * 60 * 60 * 1000)), 'yyyy-MM-dd'),
+                term: String(values.term ?? (calculatedFields as any).term ?? currentSupplier.term ?? ''),
+                name: toTitleCase(values.name),
+                so: toTitleCase(values.so),
+                address: toTitleCase(values.address),
+                variety: toTitleCase(values.variety),
+                vehicleNo: toTitleCase(values.vehicleNo),
+                brokerageRate: values.brokerageRate || 0,
+                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                forceUnique: values.forceUnique || false,
+            };
+
+            const { id, ...updateData } = completeEntry as any;
+            
+            // Ensure srNo is included in updateData
+            if (!updateData.srNo) {
+                updateData.srNo = values.srNo || currentSupplier.srNo;
+            }
+            
+            // Perform database update
+            const success = await updateSupplier(id, updateData);
+            if (!success) {
+                throw new Error("Failed to update entry in database");
+            }
+            
+            toast({ title: "Entry updated successfully!", description: "Outstanding updated in database", variant: "success" });
+            onSuccess?.();
+            onOpenChange(false);
+
+            // Sync to Firestore
+            const { forceSyncToFirestore } = await import('@/lib/local-first-sync');
+            await forceSyncToFirestore();
+        } catch (error) {
+            toast({ title: "Failed to update entry.", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!entry) return null;
@@ -431,13 +442,16 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                                 type="button"
                                 variant="outline"
                                 onClick={() => onOpenChange(false)}
+                                disabled={isSubmitting}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 form="supplier-entry-edit-form"
+                                disabled={isSubmitting}
                             >
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Update Entry
                             </Button>
                         </div>
@@ -464,7 +478,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                             />
                             
                             {/* Brokerage Field */}
-                            <Card>
+                            <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                                 <CardContent className="p-3 space-y-2">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
@@ -541,4 +555,3 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
         </Dialog>
     );
 };
-

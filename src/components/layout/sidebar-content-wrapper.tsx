@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Header } from "./header";
 import type { PageLayoutProps } from "@/app/types";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +23,7 @@ import {
   PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database,
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Mail,
   LineChart, ClipboardCheck, Users2, UserPlus, Landmark, Truck,
-  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings, BookOpen, Activity
+  Scale, Rocket, TrendingUp, Sparkles, ChevronRight, Settings, BookOpen, Activity, Menu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -33,15 +32,15 @@ const menuItems = [
     id: "MainDashboard",
     name: "Dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
-    href: "/sales/dashboard-overview",
+    href: "/sales?menu=dashboard&tab=dashboard",
   },
   {
     id: "MainEntry",
     name: "Entry",
     icon: <FilePlus className="h-5 w-5" />,
     subMenus: [
-      { id: "entry-supplier", name: "Supplier Entry", href: "/sales/entry?tab=supplier", icon: <Truck className="h-5 w-5" /> },
-      { id: "entry-customer", name: "Customer Entry", href: "/sales/entry?tab=customer", icon: <Users className="h-5 w-5" /> },
+      { id: "entry-supplier", name: "Supplier Entry", href: "/sales?menu=entry&tab=supplier-entry", icon: <Truck className="h-5 w-5" /> },
+      { id: "entry-customer", name: "Customer Entry", href: "/sales?menu=entry&tab=customer-entry", icon: <Users className="h-5 w-5" /> },
     ],
   },
   {
@@ -49,11 +48,11 @@ const menuItems = [
     name: "Payments",
     icon: <Wallet className="h-5 w-5" />,
     subMenus: [
-      { id: "payments-supplier", name: "Supplier Payments", href: "/sales/payments-supplier", icon: <Truck className="h-5 w-5" /> },
-      { id: "payments-customer", name: "Customer Payments", href: "/sales/payments-customer", icon: <Users className="h-5 w-5" /> },
-      { id: "payments-outsider", name: "RTGS Outsider", href: "/sales/payments-outsider", icon: <Banknote className="h-5 w-5" /> },
-      { id: "Sub6-1", name: "Income & Expense", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
-      { id: "Sub6-2", name: "Ledger Accounting", href: "/sales/ledger", icon: <BookOpen className="h-5 w-5" /> },
+      { id: "payments-supplier", name: "Supplier Payments", href: "/sales?menu=payments&tab=supplier-payments", icon: <Truck className="h-5 w-5" /> },
+      { id: "payments-customer", name: "Customer Payments", href: "/sales?menu=payments&tab=customer-payments", icon: <Users className="h-5 w-5" /> },
+      { id: "payments-outsider", name: "RTGS Outsider", href: "/sales?menu=payments&tab=rtgs-outsider", icon: <Banknote className="h-5 w-5" /> },
+      { id: "Sub6-1", name: "Income & Expense", href: "/sales?menu=payments&tab=income-expense", icon: <Calculator className="h-5 w-5" /> },
+      { id: "Sub6-2", name: "Ledger Accounting", href: "/sales?menu=payments&tab=ledger", icon: <BookOpen className="h-5 w-5" /> },
     ],
   },
   {
@@ -61,10 +60,10 @@ const menuItems = [
     name: "Reports",
     icon: <BarChart3 className="h-5 w-5" />,
     subMenus: [
-      { id: "Reports-Sales", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
-      { id: "Reports-OrderTracking", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
-      { id: "Reports-ProductCatalog", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
-      { id: "Reports-FirestoreMonitor", name: "Firestore Monitor", href: "/admin/firestore-monitor", icon: <Activity className="h-5 w-5" /> },
+      { id: "Reports-Sales", name: "Sales Reports", href: "/sales?menu=reports&tab=sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
+      { id: "Reports-OrderTracking", name: "Order Tracking", href: "/sales?menu=reports&tab=order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
+      { id: "Reports-ProductCatalog", name: "Product Catalog", href: "/sales?menu=reports&tab=product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
+      { id: "Reports-FirestoreMonitor", name: "Firestore Monitor", href: "/sales?menu=reports&tab=firestore-monitor", icon: <Activity className="h-5 w-5" /> },
       { id: "Reports-TasksFile", name: "Taskfile (TASKS.md)", href: "/admin/tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
     ],
   },
@@ -73,56 +72,59 @@ const menuItems = [
     name: "Cash & Bank",
     icon: <Landmark className="h-5 w-5" />,
     subMenus: [
-      { id: "CashBank-Management", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
-      { id: "CashBank-RTGS", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
+      { id: "CashBank-Management", name: "Cash & Bank Management", href: "/sales?menu=cash-bank&tab=cash-bank-management", icon: <Landmark className="h-5 w-5" /> },
     ],
   },
   {
-    id: "Main7",
-    name: "Cash & Bank",
-    icon: <Landmark className="h-5 w-5" />,
-    subMenus: [
-      { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
-    ],
-  },
-  {
-    id: "Main2",
+    id: "MainHR",
     name: "HR & Payroll",
     icon: <Users2 className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-5 w-5" /> },
-      { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-5 w-5" /> },
-      { id: "Sub2-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: <CalendarCheck className="h-5 w-5" /> },
+      { id: "Sub2-1", name: "Employee Database", href: "/sales?menu=hr&tab=hr-employee-database", icon: <Database className="h-5 w-5" /> },
+      { id: "Sub2-2", name: "Payroll Management", href: "/sales?menu=hr&tab=hr-payroll-management", icon: <Calculator className="h-5 w-5" /> },
+      { id: "Sub2-3", name: "Attendance Tracking", href: "/sales?menu=hr&tab=hr-attendance-tracking", icon: <CalendarCheck className="h-5 w-5" /> },
+      { id: "Sub2-4", name: "Contract Payments", href: "/sales?menu=hr&tab=hr-contract-payments", icon: <Banknote className="h-5 w-5" /> },
     ],
   },
   {
-    id: "Main3",
+    id: "MainInventory",
     name: "Inventory",
     icon: <Package className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-5 w-5" /> },
-      { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-5 w-5" /> },
-      { id: "Sub3-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: <ShoppingCart className="h-5 w-5" /> },
+      { id: "Sub3-1", name: "Inventory Management", href: "/sales?menu=inventory&tab=inventory-management", icon: <Boxes className="h-5 w-5" /> },
+      { id: "Sub3-2", name: "Supplier Information", href: "/sales?menu=inventory&tab=inventory-supplier-info", icon: <Building2 className="h-5 w-5" /> },
+      { id: "Sub3-3", name: "Purchase Orders", href: "/sales?menu=inventory&tab=inventory-purchase-orders", icon: <ShoppingCart className="h-5 w-5" /> },
     ],
   },
   {
-    id: "Main4",
+    id: "MainMarketing",
     name: "Marketing",
     icon: <Sparkles className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Rocket className="h-5 w-5" /> },
-      { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-5 w-5" /> },
-      { id: "Sub4-3", name: "Analytics", href: "/marketing/analytics", icon: <LineChart className="h-5 w-5" /> },
+      { id: "Sub4-1", name: "Campaigns", href: "/sales?menu=marketing&tab=marketing-campaigns", icon: <Rocket className="h-5 w-5" /> },
+      { id: "Sub4-2", name: "Email Marketing", href: "/sales?menu=marketing&tab=marketing-email", icon: <Mail className="h-5 w-5" /> },
+      { id: "Sub4-3", name: "Analytics", href: "/sales?menu=marketing&tab=marketing-analytics", icon: <LineChart className="h-5 w-5" /> },
     ],
   },
   {
-    id: "Main5",
+    id: "MainProjects",
     name: "Project Management",
     icon: <Briefcase className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
-      { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
-      { id: "Sub5-3", name: "Team Collaboration", href: "/projects/collaboration", icon: <Users2 className="h-5 w-5" /> },
+      { id: "Sub5-1", name: "Project Dashboard", href: "/sales?menu=projects&tab=project-dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
+      { id: "Sub5-2", name: "Task Management", href: "/sales?menu=projects&tab=project-tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
+      { id: "Sub5-3", name: "Team Collaboration", href: "/sales?menu=projects&tab=project-collaboration", icon: <Users2 className="h-5 w-5" /> },
+    ],
+  },
+  {
+    id: "MainSettings",
+    name: "Settings",
+    icon: <Settings className="h-5 w-5" />,
+    subMenus: [
+      { id: "Settings-Bank", name: "Bank Accounts", href: "/sales?menu=settings&tab=settings-bank-accounts", icon: <Landmark className="h-5 w-5" /> },
+      { id: "Settings-BankMgmt", name: "Bank Management", href: "/sales?menu=settings&tab=settings-bank-management", icon: <Banknote className="h-5 w-5" /> },
+      { id: "Settings-Printer", name: "Printer", href: "/sales?menu=settings&tab=settings-printer", icon: <Scale className="h-5 w-5" /> },
+      { id: "Settings-Theme", name: "Theme", href: "/sales?menu=settings&tab=settings-theme", icon: <Sparkles className="h-5 w-5" /> },
     ],
   },
 ];
@@ -197,7 +199,7 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton 
                       asChild 
-                      isActive={pathname === item.href || pathname?.startsWith(item.href)}
+                      isActive={isMenuItemActive(item.href!)}
                     >
                       <Link href={item.href} prefetch={true} scroll={true}>
                         {item.icon}
@@ -252,7 +254,7 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="flex items-center justify-center p-2">
-          <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Settings">
             <Settings className="h-4 w-4" />
           </Button>
           <span className="ml-2 text-sm group-data-[state=collapsed]:hidden">
@@ -261,7 +263,14 @@ export default function SidebarContentWrapper({ children, pageMeta }: PageLayout
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <Header toggleSidebar={toggleSidebar} />
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="lg:hidden fixed top-2 left-2 z-40 inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-border/50 bg-background/80 text-foreground shadow-sm backdrop-blur-[18px]"
+          aria-label="Toggle Sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <main className="flex-1 container mx-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>

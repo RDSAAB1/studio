@@ -4,73 +4,67 @@
 @tailwind utilities;
 
 :root {
-  /* Light Theme - White Background with Dark Text */
-  --background: 0 0% 100%; /* Pure White - Main background */
-  --foreground: 180 60% 8%; /* Dark teal - Main text */
-  --card: 0 0% 98%; /* Very light gray - Card background */
-  --card-foreground: 180 60% 8%; /* Dark teal - Card text */
-  --popover: 0 0% 100%; /* Pure White - Popover background */
-  --popover-foreground: 180 60% 8%; /* Dark teal - Popover text */
-  --primary: 160 40% 30%; /* Teal-green - Primary buttons */
-  --primary-foreground: 0 0% 100%; /* White - Text on primary */
-  --secondary: 0 0% 96%; /* Light gray - Secondary backgrounds */
-  --secondary-foreground: 180 60% 10%; /* Dark teal - Text on secondary */
-  --muted: 0 0% 94%; /* Light gray - Muted backgrounds */
-  --muted-foreground: 180 60% 20%; /* Medium dark teal - Muted text */
-  --accent: 140 30% 70%; /* Sage green - Accent elements */
-  --accent-foreground: 180 60% 10%; /* Dark teal - Text on accent */
-  --destructive: 0 84% 60%; /* Red - Error states */
-  --destructive-foreground: 0 0% 100%; /* Pure White - Text on destructive */
-  --border: 0 0% 90%; /* Light gray - Borders */
-  --input: 0 0% 98%; /* Very light gray - Input backgrounds */
-  --ring: 160 40% 30%; /* Teal-green - Focus rings */
+  --background: 0 0% 80%;
+  --foreground: 210 12% 19%;
+  --card: 0 0% 94%;
+  --card-top: 0 0% 92%;
+  --card-bottom: 0 0% 92%;
+  --card-foreground: 210 12% 19%;
+  --popover: 0 0% 92%;
+  --popover-foreground: 210 12% 19%;
+  --primary: 270 38% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 90%;
+  --secondary-foreground: 210 12% 19%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 215 14% 34%;
+  --accent: 270 22% 82%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 72%;
+  --input: 0 0% 90%;
+  --ring: 270 38% 32%;
   --radius: 0.75rem;
-  --chart-1: 140 25% 65%; /* #8EB69B - Light sage green */
-  --chart-2: 160 35% 25%; /* #235347 - Medium-dark teal-green */
-  --chart-3: 160 40% 18%; /* #163832 - Dark muted green */
-  --chart-4: 170 50% 11%; /* #0B2B26 - Dark teal-green */
-  --chart-5: 130 50% 92%; /* #DAF1DE - Very light mint */
+  --chart-1: 262 83% 52%;
+  --chart-2: 293 84% 60%;
+  --chart-3: 230 92% 60%;
+  --chart-4: 270 100% 80%;
+  --chart-5: 210 95% 75%;
 }
 
 .dark {
-  /* Professional Teal/Green Theme - Enhanced Dark Mode with 3D Look */
-  /* Color Palette from Image - Deeper Variants */
-  /* #051F20 = 180 60% 8% - Very dark teal */
-  /* #0B2B26 = 170 50% 11% - Dark teal-green */
-  /* #163832 = 160 40% 18% - Dark muted green */
-  /* #235347 = 160 35% 25% - Medium-dark teal-green */
-  /* #8EB69B = 140 25% 65% - Light sage green */
-  /* #DAF1DE = 130 50% 92% - Very light mint */
-  
-  --background: 160 30% 20%; /* Slightly darker than cards - Main background */
-  --foreground: 130 50% 96%; /* Very light mint - Main text (maximum contrast) */
-  --card: 160 30% 26%; /* Dark muted green - Card background (lighter than background for 3D effect) */
-  --card-foreground: 130 50% 96%; /* Very light mint - Card text */
-  --popover: 160 35% 25% / 0.85; /* Transparent medium-dark teal-green - Popover */
-  --popover-foreground: 130 50% 96%; /* Very light mint - Popover text */
-  --primary: 160 40% 30%; /* Enhanced teal-green - Primary (more visible) */
-  --primary-foreground: 130 50% 98%; /* Brighter mint - Text on primary (better contrast) */
-  --secondary: 140 30% 70%; /* Enhanced sage green - Secondary (more vibrant) */
-  --secondary-foreground: 180 60% 10%; /* Darker teal - Text on secondary (better contrast) */
-  --muted: 170 50% 13%; /* Slightly lighter teal-green - Muted backgrounds */
-  --muted-foreground: 140 25% 75%; /* Brighter sage green - Muted text (more readable) */
-  --accent: 140 30% 70%; /* Enhanced sage green - Accent elements (more vibrant) */
-  --accent-foreground: 180 60% 10%; /* Darker teal - Text on accent (better contrast) */
-  --destructive: 0 84% 60%; /* Bright Red - Error states */
-  --destructive-foreground: 0 0% 100%; /* Pure White - Text on destructive */
-  --border: 170 50% 18%; /* Lighter teal-green - Borders (more visible) */
-  --input: 160 40% 20%; /* Slightly lighter green - Input backgrounds (better visibility) */
-  --ring: 140 30% 70%; /* Enhanced sage green - Focus rings (more visible) */
-  --chart-1: 140 25% 65%; /* #8EB69B - Light sage green */
-  --chart-2: 160 35% 25%; /* #235347 - Medium-dark teal-green */
-  --chart-3: 160 40% 18%; /* #163832 - Dark muted green */
-  --chart-4: 170 50% 11%; /* #0B2B26 - Dark teal-green */
-  --chart-5: 130 50% 92%; /* #DAF1DE - Very light mint */
+  --background: 0 0% 80%;
+  --foreground: 210 12% 19%;
+  --card: 0 0% 94%;
+  --card-top: 0 0% 92%;
+  --card-bottom: 0 0% 92%;
+  --card-foreground: 210 12% 19%;
+  --popover: 0 0% 92% / 0.88;
+  --popover-foreground: 210 12% 19%;
+  --primary: 270 38% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 90%;
+  --secondary-foreground: 210 12% 19%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 215 14% 34%;
+  --accent: 270 22% 82%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 72%;
+  --input: 0 0% 90%;
+  --ring: 270 38% 32%;
+  --chart-1: 262 72% 50%;
+  --chart-2: 285 78% 56%;
+  --chart-3: 230 92% 60%;
+  --chart-4: 270 100% 80%;
+  --chart-5: 210 95% 75%;
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: hsl(var(--background));
+  background: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
@@ -80,51 +74,37 @@ body {
   }
   body {
     @apply bg-background text-foreground font-sans;
-    background-color: hsl(var(--background));
+    background: hsl(var(--background));
     color: hsl(var(--foreground));
   }
   
   /* Professional Dark Theme - Clean & Modern */
-  h1, h2, h3, h4, h5, h6 {
+  :where(h1, h2, h3, h4, h5, h6) {
     color: hsl(var(--foreground));
     font-weight: 600;
   }
   
-  /* Light text on dark backgrounds */
-  p, span, div, label {
-    color: hsl(var(--foreground));
-  }
-  
   /* Inputs with optimized blurry glass effect - no outer borders */
   input, textarea, select {
-    background-color: hsl(var(--input));
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    background-color: hsl(var(--background) / 0.35);
     color: hsl(var(--foreground));
     border: 1px solid hsl(var(--border));
-    border-radius: calc(var(--radius) - 2px);
-    box-shadow: inset 0 1px 2px hsl(var(--foreground) / 0.05);
-    will-change: backdrop-filter;
+    border-radius: 0.5rem;
+    box-shadow: none;
   }
   
-  /* Cards with 3D look - raised appearance with shadows */
-  .card, [class*="card"] {
-    background-color: hsl(var(--card));
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    color: hsl(var(--card-foreground));
-    border-radius: var(--radius);
-    border: none;
-    box-shadow: 
-      0 10px 30px hsl(var(--background) / 0.8),
-      0 5px 15px hsl(var(--background) / 0.6),
-      0 2px 8px hsl(var(--background) / 0.4),
-      0 1px 3px hsl(var(--background) / 0.3),
-      inset 0 1px 0 0 hsl(var(--foreground) / 0.05);
-    will-change: transform, backdrop-filter;
-    transform: translateZ(0);
+  .ui-field {
+    background-color: hsl(var(--background) / 0.35);
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    box-shadow: none;
   }
-  
+
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
   /* Dark theme specific styles */
   .dark body {
     background-color: hsl(var(--background)) !important;
@@ -139,83 +119,24 @@ body {
     background-color: hsl(var(--background)) !important;
   }
   
-  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  .dark :where(h1, h2, h3, h4, h5, h6) {
     color: hsl(var(--foreground));
     font-weight: 600;
   }
   
-  .dark p, .dark span, .dark div, .dark label {
-    color: hsl(var(--foreground));
-  }
-  
   .dark input, .dark textarea, .dark select {
-    background-color: hsl(var(--input));
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    background-color: hsl(var(--background) / 0.35);
     color: hsl(var(--foreground));
-    border: none;
+    border: 1px solid hsl(var(--border));
     border-radius: calc(var(--radius) - 2px);
-    box-shadow: inset 0 1px 2px hsl(var(--background) / 0.3);
-    will-change: backdrop-filter;
+    box-shadow: none;
   }
-  
-  .dark .card, .dark [class*="card"] {
-    background-color: hsl(var(--card));
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    color: hsl(var(--card-foreground));
-    border-radius: var(--radius);
-    border: none;
-    box-shadow: 
-      0 15px 45px hsl(var(--background) / 0.8),
-      0 8px 25px hsl(var(--background) / 0.6),
-      0 4px 12px hsl(var(--background) / 0.4),
-      inset 0 1px 2px hsl(var(--foreground) / 0.1);
-    will-change: transform, backdrop-filter;
-    transform: translateZ(0);
-  }
-  
-  /* Enhanced Teal/Green Theme Styling with Optimized Blur */
-  button {
-    border-radius: calc(var(--radius) - 2px);
-    transition: none;
-    font-weight: 500;
-    position: relative;
-    overflow: hidden;
-    backdrop-filter: blur(10px) saturate(140%);
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
-    will-change: transform;
-    transform: translateZ(0);
-  }
-  
-  button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.3), transparent);
-    transition: none;
-  }
-  
-  button:hover::before {
-    left: 100%;
-  }
-  
-  button:hover {
-    transform: translateY(-2px) translateZ(0);
-    box-shadow: 0 6px 20px hsl(var(--primary) / 0.4),
-                0 3px 10px hsl(var(--primary) / 0.3),
-                0 0 0 1px hsl(var(--primary) / 0.3),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.2);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-  }
-  
-  button:active {
-    transform: translateY(0) translateZ(0);
-    box-shadow: 0 2px 8px hsl(var(--primary) / 0.3);
+
+  .dark .ui-field {
+    background-color: hsl(var(--background) / 0.35);
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    box-shadow: none;
   }
   
   /* Enhanced table styling with teal theme - no borders for 3D look */
@@ -245,158 +166,101 @@ body {
     -webkit-backdrop-filter: none;
   }
   
-  /* Remove all table borders and outlines - comprehensive */
-  table, thead, tbody, tr, th, td,
-  table *, thead *, tbody *, tr *, th *, td * {
+  table, thead, tbody, tr, th, td {
     border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
     outline: none !important;
-    outline-width: 0 !important;
-    box-shadow: none !important;
-    border-collapse: collapse;
   }
-  
-  /* Remove borders from all table cells specifically */
-  td, th {
-    border: 0 !important;
-    border-top: 0 !important;
-    border-bottom: 0 !important;
-    border-left: 0 !important;
-    border-right: 0 !important;
-    outline: 0 !important;
-    box-shadow: none !important;
-  }
-  
-  /* Override Tailwind border classes on table components */
-  [class*="border-b"],
-  [class*="border-t"],
-  [class*="border-l"],
-  [class*="border-r"],
-  thead [class*="border"],
-  tbody [class*="border"],
-  tr[class*="border"],
-  th[class*="border"],
-  td[class*="border"] {
+
+  table [class*="border-"],
+  table thead [class*="border"],
+  table tbody [class*="border"],
+  table tr[class*="border"],
+  table th[class*="border"],
+  table td[class*="border"] {
     border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    border-width: 0 !important;
-  }
-  
-  /* Remove borders from TableRow, TableHeader, TableBody components */
-  [class*="TableRow"],
-  [class*="TableHeader"],
-  [class*="TableBody"],
-  [class*="TableHead"],
-  [class*="TableCell"] {
-    border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    border-width: 0 !important;
-  }
-  
-  /* Remove white/light colored borders specifically */
-  table,
-  table *,
-  thead,
-  thead *,
-  tbody,
-  tbody *,
-  tr,
-  tr *,
-  th,
-  th *,
-  td,
-  td * {
-    border-color: transparent !important;
-    border-style: none !important;
     border-width: 0 !important;
   }
   
   /* Enhanced table row hover - more visible, no borders */
-  tr:hover td,
-  tr:hover th {
-    background-color: hsl(var(--accent) / 0.4) !important;
-    backdrop-filter: blur(12px) saturate(150%) !important;
-    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
-    border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-  }
-  
-  /* Table row hover with better contrast */
-  tbody tr:hover {
-    background-color: hsl(var(--accent) / 0.4) !important;
-  }
-  
-  /* Specific hover for table rows */
-  [role="row"]:hover,
-  [role="row"]:hover td,
-  [role="row"]:hover th,
   tbody tr:hover td,
   tbody tr:hover th {
-    background-color: hsl(var(--accent) / 0.4) !important;
-    backdrop-filter: blur(12px) saturate(150%) !important;
-    -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
-    border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    outline: none !important;
-    box-shadow: none !important;
+    background-color: hsl(var(--primary) / 0.06) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
   
-  /* 3D card shadows - soft rounded appearance */
-  .card, [class*="Card"] {
-    box-shadow: 
-      0 15px 45px hsl(var(--background) / 0.8),
-      0 8px 25px hsl(var(--background) / 0.6),
-      0 4px 12px hsl(var(--background) / 0.4),
-      inset 0 1px 2px hsl(var(--foreground) / 0.1);
+  .ui-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(0, 0, 0, 0.06)), hsl(var(--card)) !important;
     transition: none;
-    border: none;
-    background-color: hsl(var(--card));
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    position: relative;
     will-change: transform;
     transform: translateZ(0);
+    box-shadow:
+      28px 28px 56px rgba(0, 0, 0, 0.18),
+      -28px -28px 56px rgba(255, 255, 255, 0.92),
+      10px 10px 20px rgba(0, 0, 0, 0.10),
+      -10px -10px 20px rgba(255, 255, 255, 0.60) !important;
+  }
+
+  .ui-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      inset 2px 2px 4px rgba(255, 255, 255, 0.80),
+      inset -2px -2px 4px rgba(0, 0, 0, 0.10),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    pointer-events: none;
+  }
+
+  .ui-summary-card {
+    background-color: hsl(var(--card) / 0.86) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+      32px 32px 64px rgba(0, 0, 0, 0.18),
+      -32px -32px 64px rgba(255, 255, 255, 0.92),
+      10px 10px 20px rgba(0, 0, 0, 0.10),
+      -10px -10px 20px rgba(255, 255, 255, 0.60) !important;
   }
   
-  .card:hover, [class*="Card"]:hover {
-    box-shadow: 
-      0 18px 50px hsl(var(--background) / 0.85),
-      0 10px 28px hsl(var(--background) / 0.65),
-      0 5px 14px hsl(var(--background) / 0.45),
-      inset 0 1px 3px hsl(var(--foreground) / 0.12);
+  .ui-card:hover {
+    box-shadow:
+      32px 32px 64px rgba(0, 0, 0, 0.20),
+      -32px -32px 64px rgba(255, 255, 255, 0.95),
+      12px 12px 24px rgba(0, 0, 0, 0.12),
+      -12px -12px 24px rgba(255, 255, 255, 0.65) !important;
     transform: translateY(-2px) translateZ(0);
-    border-color: hsl(var(--primary) / 0.5);
+  }
+
+  .dark .ui-card {
+    border: none !important;
+    box-shadow:
+      28px 28px 56px rgba(0, 0, 0, 0.18),
+      -28px -28px 56px rgba(255, 255, 255, 0.92),
+      10px 10px 20px rgba(0, 0, 0, 0.10),
+      -10px -10px 20px rgba(255, 255, 255, 0.60) !important;
+  }
+
+  .dark .ui-card:hover {
+    box-shadow:
+      32px 32px 64px rgba(0, 0, 0, 0.20),
+      -32px -32px 64px rgba(255, 255, 255, 0.95),
+      12px 12px 24px rgba(0, 0, 0, 0.12),
+      -12px -12px 24px rgba(255, 255, 255, 0.65) !important;
   }
   
   /* Optimized input focus states */
   input:focus, textarea:focus, select:focus {
     outline: none;
-    ring: 1px;
-    ring-color: hsl(var(--ring));
-    ring-offset: 1px;
-    ring-offset-color: hsl(var(--background));
-    border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 1.5px hsl(var(--ring) / 0.2),
-                0 0 0 0.5px hsl(var(--ring));
-    background-color: hsl(var(--input));
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.18);
+    border-color: hsl(var(--ring) / 0.45);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
   
   /* Enhanced scrollbar styling with teal theme */
@@ -420,7 +284,7 @@ body {
   }
   
   /* Hardware acceleration for better performance */
-  .card, button, input, textarea, select, th, td {
+  .ui-card, button, input, textarea, select, th, td {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     -webkit-backface-visibility: hidden;
@@ -487,14 +351,12 @@ body {
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
     background-color: hsl(var(--popover)) !important;
-    border: none !important;
-    box-shadow: 
-      0 8px 24px rgba(0, 0, 0, 0.3),
-      0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid hsl(var(--border) / 0.8) !important;
+    box-shadow: 0 18px 50px rgba(2, 6, 23, 0.18) !important;
     will-change: backdrop-filter;
     transform: translateZ(0);
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
+    border-radius: 12px !important;
+    -webkit-border-radius: 12px !important;
   }
 
   /* 3D effect for popovers, dropdowns, menus, lists, tables */
@@ -508,18 +370,12 @@ body {
     backdrop-filter: blur(12px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
     background-color: hsl(var(--popover)) !important;
-    border: none !important;
-    box-shadow: 
-      0 12px 30px rgba(0, 0, 0, 0.4),
-      0 6px 15px rgba(0, 0, 0, 0.3),
-      0 3px 8px rgba(0, 0, 0, 0.25),
-      inset 0 2px 3px rgba(255, 255, 255, 0.2),
-      inset 0 -2px 3px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+    border: 1px solid hsl(var(--border) / 0.8) !important;
+    box-shadow: 0 18px 50px rgba(2, 6, 23, 0.18) !important;
     will-change: backdrop-filter;
     transform: translateZ(0);
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
+    border-radius: 12px !important;
+    -webkit-border-radius: 12px !important;
   }
   
   /* Text color adjustments for popovers to ensure visibility */
@@ -644,33 +500,11 @@ body {
   }
   
   /* Enhanced visibility for calculation fields and value boxes */
-  .bg-secondary,
-  .bg-accent\/40,
-  .bg-primary\/30,
-  .bg-primary\/10,
-  .bg-muted {
-    color: hsl(var(--foreground)) !important;
-  }
-  
-  /* Ensure labels are visible */
-  label.text-muted-foreground,
-  .text-muted-foreground {
-    color: hsl(var(--foreground)) !important;
-    opacity: 0.9;
-  }
-  
   /* Calculation field boxes - enhanced visibility */
   div[class*="bg-secondary"],
   div[class*="bg-accent"],
-  div[class*="bg-primary"] {
+  div[class*="bg-primary/"] {
     color: hsl(var(--foreground)) !important;
-    font-weight: 600 !important;
-  }
-  
-  /* Ensure text in value boxes is bold and visible */
-  .h-8, .h-9 {
-    font-weight: 700 !important;
-    letter-spacing: 0.01em;
   }
 }
 
@@ -690,12 +524,12 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 60px; /* Always collapsed */
+    width: 52px; /* Always collapsed */
     height: 100%;
-    background: hsl(var(--card));
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    border-right: 1px solid hsl(var(--border));
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.52), hsl(var(--primary) / 0.36));
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-right: 1px solid hsl(0 0% 100% / 0.12);
     padding: 10px 0;
     transition: none !important;
     animation: none !important;
@@ -704,8 +538,7 @@ body {
     z-index: 50;
     overflow-y: auto;
     overflow-x: hidden;
-    box-shadow: 4px 0 16px hsl(var(--background) / 0.5),
-                inset -1px 0 0 hsl(var(--border) / 0.3);
+    box-shadow: 0 18px 50px rgba(2, 6, 23, 0.35);
     transform: translateZ(0);
     will-change: backdrop-filter;
 }
@@ -720,27 +553,9 @@ body {
 
 /* Remove button boxes from sidebar icons - icons directly on bar */
 .side_bar_bottom button {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-}
-
-.side_bar_bottom button:hover {
-    background: transparent !important;
-    box-shadow: none !important;
-}
-
-.side_bar_bottom button:active {
-    background: hsl(var(--accent) / 0.5) !important;
-    box-shadow: none !important;
-}
-
-/* Keep selected icon highlighted */
-.side_bar_bottom button.bg-accent\/60 {
-    background: hsl(var(--accent) / 0.6) !important;
+    border: none;
+    padding: 0;
+    margin: 0;
 }
 
 .side_bar_top{
@@ -750,7 +565,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding-left: 10px;
-    padding-right: 20px; 
+    padding-right: 10px; 
 }
 
 .logo_wrap{
@@ -760,7 +575,7 @@ body {
 }
 
 .logo_wrap button{
-    color: hsl(var(--primary-foreground));
+    color: hsl(0 0% 100% / 0.92);
     font-weight: 700;
     letter-spacing: 1px;
     font-size: 20px;
@@ -791,7 +606,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
-    color: hsl(var(--muted-foreground));
+    color: hsl(0 0% 100% / 0.80);
     margin-bottom: 5px;
     white-space: nowrap;
     border-radius: calc(var(--radius) - 4px);
@@ -806,11 +621,9 @@ body {
 .side_bar_bottom .item .link:hover,
 .side_bar_bottom .item.active > .link,
 .side_bar_bottom .item .link.active{
-    background: hsl(var(--accent) / 0.6) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    color: hsl(var(--accent-foreground));
-    box-shadow: none;
+    background: hsl(0 0% 100% / 0.16) !important;
+    color: hsl(0 0% 100% / 0.92);
+    box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.14), 0 18px 40px rgba(2, 6, 23, 0.28);
 }
 
 /* Prevent button inside link from having separate hover effect */
@@ -825,17 +638,16 @@ body {
 }
 
 .side_bar_bottom .item .sub_menu{
-    background: hsl(var(--muted) / 0.6);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    background: hsl(0 0% 100% / 0.10);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     padding-left: 20px;
     display: none;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border: 1px solid hsl(var(--border) / 0.3);
+    border-radius: 12px;
+    -webkit-border-radius: 12px;
+    border: 1px solid hsl(0 0% 100% / 0.14);
     border-top: none;
-    box-shadow: 0 4px 12px hsl(var(--background) / 0.5),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.1);
+    box-shadow: 0 18px 50px rgba(2, 6, 23, 0.25);
     margin: 0 10px 5px 10px;
     transform: translateZ(0);
     will-change: backdrop-filter;
@@ -854,9 +666,9 @@ body {
 }
 
 .side_bar_bottom .item .sub_menu .link:hover {
-    background: hsl(var(--accent) / 0.3);
-    backdrop-filter: blur(8px) saturate(140%);
-    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    background: hsl(0 0% 100% / 0.12);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
 
 
@@ -870,18 +682,18 @@ body {
     flex-direction: column;
     flex-grow: 1;
     min-width: 0; 
-    margin-left: 60px; /* Always use collapsed sidebar width */
+    margin-left: 52px; /* Always use collapsed sidebar width */
     transition: none;
     position: relative;
     z-index: 40;
-    background-color: hsl(var(--background)); /* Dark green background for 3D look */
+    background-color: hsl(var(--background));
 }
 
 
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar {
-        left: -250px;
-        width: 250px; 
+        left: -220px;
+        width: 220px; 
     }
     
     .wrapper.active .side_bar{
@@ -944,139 +756,22 @@ body {
 
 .tab-bar-container {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
     backdrop-filter: blur(12px) saturate(150%);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
-    background-color: hsl(var(--card)) !important;
-    border-bottom: 1px solid hsl(var(--border));
-    box-shadow: 0 2px 8px hsl(var(--background) / 0.4),
-                inset 0 1px 0 0 hsl(var(--accent) / 0.05);
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.10), hsl(var(--primary) / 0.06)) !important;
+    border-bottom: 1px solid hsl(var(--primary) / 0.18);
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.10);
     transform: translateZ(0);
     will-change: backdrop-filter;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
+    border-radius: 0;
+    -webkit-border-radius: 0;
 }
 .tab-bar-container::-webkit-scrollbar {
   display: none;
-}
-
-/* Force rectangular tabs - override all rounded corners */
-.tab-bar-container * {
-  border-radius: 0 !important;
-  -webkit-border-radius: 0 !important;
-}
-
-.tab-bar-container .relative.flex-1,
-.tab-bar-container .relative.flex-1 > div,
-.tab-bar-container .relative.flex-1 > div > div {
-  border-radius: 0 !important;
-  -webkit-border-radius: 0 !important;
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-
-/* Remove middle layer background and effects - keep only outer layer */
-.tab-bar-container .relative.flex-1 {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-}
-
-/* Tab styling - clean single layer */
-.tab-bar-container .relative.flex-1 > div {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    transition: none;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
-}
-
-/* Remove any nested div backgrounds - keep transparent */
-.tab-bar-container .relative.flex-1 > div > div {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-}
-
-/* Remove background from text elements and spans inside tabs */
-.tab-bar-container .relative.flex-1 > div > div > span,
-.tab-bar-container .relative.flex-1 > div > div span,
-.tab-bar-container .relative.flex-1 span {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-}
-
-/* Hover effect for inactive tabs - single layer highlight on area only */
-.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) {
-    background-color: hsl(var(--accent) / 0.6) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    color: hsl(var(--foreground)) !important;
-    box-shadow: none !important;
-    transform: none;
-}
-
-/* Ensure text elements don't get background on hover */
-.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) > div,
-.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) > div > div,
-.tab-bar-container .relative.flex-1 > div:hover:not(.bg-primary) span {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-/* Active/Selected tab styling - single layer highlight (same as hover) */
-.tab-bar-container .relative.flex-1 > div.bg-primary {
-    background-color: hsl(var(--accent) / 0.6) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-}
-
-/* Ensure active tab inner elements don't have background */
-.tab-bar-container .relative.flex-1 > div.bg-primary > div,
-.tab-bar-container .relative.flex-1 > div.bg-primary > div > div,
-.tab-bar-container .relative.flex-1 > div.bg-primary span {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-/* Active tab hover effect - single layer highlight (same color) */
-.tab-bar-container .relative.flex-1 > div.bg-primary:hover {
-    background-color: hsl(var(--accent) / 0.6) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-    transform: none;
-}
-
-/* Ensure active tab hover inner elements don't have background */
-.tab-bar-container .relative.flex-1 > div.bg-primary:hover > div,
-.tab-bar-container .relative.flex-1 > div.bg-primary:hover > div > div,
-.tab-bar-container .relative.flex-1 > div.bg-primary:hover span {
-    background-color: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
 }
 
 /* Header bar glass effect - rectangular corners */
@@ -1091,87 +786,16 @@ header.bg-card,
                 inset 0 1px 0 0 hsl(var(--accent) / 0.05);
     transform: translateZ(0);
     will-change: backdrop-filter;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
+    border-radius: var(--radius);
+    -webkit-border-radius: var(--radius);
 }
 
-/* TabsList - remove border and background, rectangular corners */
-[role="tablist"],
-[class*="TabsList"] {
-    background-color: transparent !important;
-    border: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-}
-
-/* TabsTrigger - input field background, no outer border, rectangular corners */
-[role="tab"],
-[class*="TabsTrigger"] {
-    background-color: hsl(var(--input)) !important;
-    border: none !important;
-    box-shadow: none !important;
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    transform: none !important;
-    transition: none !important;
-}
-
-/* TabsTrigger hover - light color, no movement */
-[role="tab"]:hover,
-[class*="TabsTrigger"]:hover {
-    background-color: hsl(var(--input)) !important;
-    transform: none !important;
-    transition: none !important;
-}
-
-/* TabsTrigger active - same input background, rectangular corners */
-[role="tab"][data-state="active"],
-[class*="TabsTrigger"][data-state="active"] {
-    background-color: hsl(var(--input)) !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    -webkit-border-radius: 0 !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    transform: none !important;
-    transition: none !important;
-}
-
-/* TabsTrigger active hover - light color, no movement */
-[role="tab"][data-state="active"]:hover,
-[class*="TabsTrigger"][data-state="active"]:hover {
-    background-color: hsl(var(--input)) !important;
-    transform: none !important;
-    transition: none !important;
-}
-
-/* Clear and Filter buttons (outline variant) - primary color like Finalize */
-button[class*="outline"],
-button[class*="variant-outline"] {
-    background-color: hsl(var(--primary)) !important;
-    color: hsl(var(--primary-foreground)) !important;
-    border-color: hsl(var(--primary)) !important;
-}
-
-button[class*="outline"]:hover,
-button[class*="variant-outline"]:hover {
-    background-color: hsl(var(--primary)) !important;
-    color: hsl(var(--primary-foreground)) !important;
-    border-color: hsl(var(--primary)) !important;
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

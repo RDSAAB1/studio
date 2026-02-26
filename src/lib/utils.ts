@@ -1,7 +1,7 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Customer, Payment, Holiday } from './definitions';
+import type { Customer, SupplierPayment, CustomerPayment, Holiday, PaidFor } from './definitions';
 import { isSunday, addDays, differenceInCalendarDays, isValid, parseISO, format } from 'date-fns';
 
 interface SupplierFormValues {
@@ -41,11 +41,22 @@ interface CustomerFormValues {
 }
 
 
+/**
+ * Merges class names using clsx and tailwind-merge.
+ * Useful for conditionally applying Tailwind classes.
+ * @param inputs - Class values to merge
+ * @returns Merged class string
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function toTitleCase(str: any) {
+/**
+ * Converts a string to Title Case.
+ * @param str - The input string
+ * @returns The string in Title Case (e.g., "hello world" -> "Hello World")
+ */
+export function toTitleCase(str: unknown) {
   if (typeof str !== 'string' || !str) return '';
   return str.replace(
     /\w\S*/g,
@@ -53,6 +64,12 @@ export function toTitleCase(str: any) {
   );
 }
 
+/**
+ * Formats a date object to YYYY-MM-DD string in local timezone.
+ * Avoids UTC conversion issues.
+ * @param date - The Date object
+ * @returns Date string in YYYY-MM-DD format
+ */
 // Format date to YYYY-MM-DD in local timezone (no UTC conversion)
 export function formatDateLocal(date: Date): string {
   const year = date.getFullYear();
@@ -61,31 +78,62 @@ export function formatDateLocal(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Formats a serial number with a prefix and padding.
+ * @param num - The number to format
+ * @param prefix - The prefix (default: 'S')
+ * @returns Formatted string (e.g., "S00001")
+ */
 export function formatSrNo(num: number | string, prefix: 'S' | 'C' | 'R' = 'S') {
   return prefix + String(num).padStart(5, '0');
 }
 
+/**
+ * Formats a Kanta Parchi serial number.
+ * @param num - The number to format
+ * @returns Formatted string (e.g., "KP00001")
+ */
 export function formatKantaParchiSrNo(num: number | string): string {
   const numStr = String(num).replace(/[^0-9]/g, '');
   const numValue = numStr ? parseInt(numStr, 10) : (typeof num === 'number' ? num : 1);
   return 'KP' + String(numValue).padStart(5, '0');
 }
 
+/**
+ * Formats a Document serial number.
+ * @param num - The number to format
+ * @returns Formatted string (e.g., "DOC00001")
+ */
 export function formatDocumentSrNo(num: number | string): string {
   const numStr = String(num).replace(/[^0-9]/g, '');
   const numValue = numStr ? parseInt(numStr, 10) : (typeof num === 'number' ? num : 1);
   return 'DOC' + String(numValue).padStart(5, '0');
 }
 
+/**
+ * Formats a Transaction ID.
+ * @param num - The number to format
+ * @param prefix - The prefix (default: 'IN')
+ * @returns Formatted string (e.g., "IN00001")
+ */
 export function formatTransactionId(num: number | string, prefix: 'IN' | 'EX' = 'IN') {
   return prefix + String(num).padStart(5, '0');
 }
 
-
+/**
+ * Formats a Payment ID.
+ * @param num - The number to format
+ * @returns Formatted string (e.g., "P00001")
+ */
 export function formatPaymentId(num: number | string) {
   return 'P' + String(num).padStart(5, '0');
 }
 
+/**
+ * Formats a number as INR currency.
+ * @param amount - The amount to format
+ * @returns Formatted currency string (e.g., "₹1,000")
+ */
 export function formatCurrency(amount: number): string {
   if (isNaN(amount)) amount = 0;
   const options: Intl.NumberFormatOptions = {
@@ -104,7 +152,7 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
 };
 
 // Ultra-lightweight calculation function - only basic math, no heavy operations
-export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory?: any[], holidays?: Holiday[], dailyPaymentLimit?: number, allSuppliers?: Customer[]) => {
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory?: (SupplierPayment | CustomerPayment)[], holidays?: Holiday[], dailyPaymentLimit?: number, allSuppliers?: Customer[]) => {
     // Add null/undefined check to prevent runtime errors
     if (!values) {
         return {
@@ -165,8 +213,17 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     
     const netAmount = originalNetAmount;
 
+    const normalizedDate =
+        values.date
+            ? (typeof values.date === 'string' ? values.date : formatDateLocal(values.date))
+            : undefined;
+    const normalizedTerm = values.term !== undefined ? String(values.term) : undefined;
+    const { date: _ignoredDate, term: _ignoredTerm, ...restValues } = values;
+
     return {
-      ...values,
+      ...restValues,
+      ...(normalizedDate !== undefined ? { date: normalizedDate } : {}),
+      ...(normalizedTerm !== undefined ? { term: normalizedTerm } : {}),
       weight,
       kartaWeight,
       kartaAmount,
@@ -181,7 +238,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 };
 
 // Heavy calculations moved to background - only called when needed (onBlur, onSubmit)
-export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
+export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFormValues>, paymentHistory: (SupplierPayment | CustomerPayment)[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
     const termDays = Number(values.term) || 0;
     
     let entryDate: Date;
@@ -257,7 +314,7 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
     };
 };
 
-export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory?: any[]) => {
+export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory?: (SupplierPayment | CustomerPayment)[]) => {
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
@@ -365,8 +422,8 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         }
     }
 
-    const paymentsForThisEntry = (paymentHistory || []).filter((p: any) => p.paidFor?.some((pf: any) => pf.srNo === values.srNo));
-    const totalPaid = paymentsForThisEntry.reduce((acc: number, p: any) => acc + p.amount, 0);
+    const paymentsForThisEntry = (paymentHistory || []).filter((p: SupplierPayment | CustomerPayment) => p.paidFor?.some((pf: PaidFor) => pf.srNo === values.srNo));
+    const totalPaid = paymentsForThisEntry.reduce((acc: number, p: SupplierPayment | CustomerPayment) => acc + p.amount, 0);
     const netAmount = originalNetAmount - totalPaid;
 
     let entryDate: Date;

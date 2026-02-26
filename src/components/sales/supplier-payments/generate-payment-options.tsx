@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PaymentCombinationGenerator } from '@/components/sales/supplier-payments/payment-combination-generator';
-import type { PaymentCombination } from '@/hooks/use-payment-combination';
+import type { PaymentOption } from '@/hooks/use-payment-combination';
 
 interface GeneratePaymentOptionsProps {
   rtgsQuantity: number;
@@ -13,17 +13,26 @@ interface GeneratePaymentOptionsProps {
   setRtgsRate: (value: number) => void;
   rtgsAmount: number;
   setRtgsAmount: (value: number) => void;
-  calcTargetAmount: number;
-  setCalcTargetAmount: (value: number) => void;
   minRate: number;
   setMinRate: (value: number) => void;
   maxRate: number;
   setMaxRate: (value: number) => void;
-  rsValue: number;
-  setRsValue: (value: number) => void;
   selectPaymentAmount: (option: any) => void;
-  combination: PaymentCombination;
-  paymentMethod: string;
+  combination: {
+    paymentOptions: PaymentOption[];
+    sortedPaymentOptions: PaymentOption[];
+    roundFigureToggle: boolean;
+    setRoundFigureToggle: (value: boolean) => void;
+    allowPaiseAmount: boolean;
+    setAllowPaiseAmount: (value: boolean) => void;
+    bagSize?: number;
+    setBagSize: (value: number | undefined) => void;
+    rateStep: 1 | 5;
+    setRateStep: (value: 1 | 5) => void;
+    handleGeneratePaymentOptions: () => void;
+    requestSort: (key: keyof PaymentOption) => void;
+  };
+  paymentMethod: 'Cash' | 'Online' | 'RTGS' | 'Gov.';
 }
 
 export function GeneratePaymentOptions({
@@ -33,14 +42,10 @@ export function GeneratePaymentOptions({
   setRtgsRate,
   rtgsAmount,
   setRtgsAmount,
-  calcTargetAmount,
-  setCalcTargetAmount,
   minRate,
   setMinRate,
   maxRate,
   setMaxRate,
-  rsValue,
-  setRsValue,
   selectPaymentAmount,
   combination,
   paymentMethod,
@@ -90,14 +95,10 @@ export function GeneratePaymentOptions({
         </div>
         {/* Row 2 */}
         <PaymentCombinationGenerator
-          calcTargetAmount={calcTargetAmount}
-          setCalcTargetAmount={setCalcTargetAmount}
           minRate={minRate}
           setMinRate={setMinRate}
           maxRate={maxRate}
           setMaxRate={setMaxRate}
-          rsValue={rsValue}
-          setRsValue={setRsValue}
           selectPaymentAmount={selectPaymentAmount}
           combination={combination}
           showResults={false}

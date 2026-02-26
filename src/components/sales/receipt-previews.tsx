@@ -34,10 +34,10 @@ export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: C
                         {settings.companyName}
                     </div>
                     <div className="border-x border-b border-black p-1 text-sm">
-                        <p>{settings.address1}</p>
-                        <p>{settings.address2}</p>
+                        <p>{settings.companyAddress1}</p>
+                        <p>{settings.companyAddress2}</p>
                         <p>CONTACT NO:- {settings.contactNo}</p>
-                        <p>EMAIL:- {settings.email}</p>
+                        <p>EMAIL:- {settings.gmail}</p>
                         <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
                             <p className="text-xs text-gray-500">Barcode Placeholder</p>
                         </div>
@@ -143,10 +143,10 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
                         {settings.companyName}
                     </div>
                     <div className="border-x border-b border-black p-1 text-sm">
-                        <p>{settings.address1}</p>
-                        <p>{settings.address2}</p>
+                        <p>{settings.companyAddress1}</p>
+                        <p>{settings.companyAddress2}</p>
                         <p>CONTACT NO:- {settings.contactNo}</p>
-                        <p>EMAIL:- {settings.email}</p>
+                        <p>EMAIL:- {settings.gmail}</p>
                     </div>
                 </div>
 
@@ -156,7 +156,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
                         <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
                         <table className="w-full text-sm">
                             <tbody>
-                                <tr><td className="font-bold pr-2">DATE</td><td>{data.date}</td></tr>
+                                <tr><td className="font-bold pr-2">DATE</td><td>{data.customer?.date || data.receipts?.[0]?.date || ""}</td></tr>
                                 <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.customer?.name || '')}</td></tr>
                                 {data.customer?.so && !isCustomer && <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.customer.so)}</td></tr>}
                                 <tr><td className="font-bold pr-2">CONTACT</td><td>{data.customer?.contact || ''}</td></tr>

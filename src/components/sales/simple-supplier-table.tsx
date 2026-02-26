@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/database';
 import { deleteSupplier, updateSupplier } from "@/lib/firestore";
@@ -38,9 +38,10 @@ interface SimpleSupplierTableProps {
     isLoading?: boolean;
     varietyOptions: OptionItem[];
     paymentTypeOptions: OptionItem[];
+    highlightEntryId?: string;
 }
 
-export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions, highlightEntryId }: SimpleSupplierTableProps) => {
+const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions, highlightEntryId }: SimpleSupplierTableProps) => {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
@@ -922,8 +923,9 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                     <SmartDatePicker
                                         value={(multiEditData.date as string) || ''}
                                         onChange={(next) => {
-                                            setMultiEditData(prev => ({ ...prev, date: next || undefined }));
-                                            if (next) {
+                                            const nextValue = typeof next === "string" ? next : format(next, "yyyy-MM-dd");
+                                            setMultiEditData(prev => ({ ...prev, date: nextValue || undefined }));
+                                            if (nextValue) {
                                                 markMultiEditTouched('date');
                                             } else {
                                                 setMultiEditTouched(prev => {
@@ -943,7 +945,7 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
                                         value={multiEditData.term !== undefined ? String(multiEditData.term) : ''}
                                         onChange={(e) => {
                                             const value = e.target.value;
-                                            setMultiEditData(prev => ({ ...prev, term: value ? Number(value) : undefined }));
+                                            setMultiEditData(prev => ({ ...prev, term: value || undefined }));
                                             if (value) {
                                                 markMultiEditTouched('term');
                                             } else {
@@ -1320,3 +1322,5 @@ export const SimpleSupplierTable = ({ onBackToEntry, onEditSupplier, onViewDetai
         </div>
     );
 };
+
+export const SimpleSupplierTable = memo(SimpleSupplierTableComponent);

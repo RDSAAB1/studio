@@ -18,10 +18,10 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
   
   const tabClasses = cn(
-    "relative flex items-center justify-center cursor-pointer group text-sm px-4 h-[36px] flex-1 transition-all duration-300 ease-in-out",
+    "relative flex items-center justify-center cursor-pointer group text-[13px] px-3 h-[36px] flex-1 transition-colors rounded-[10px] border",
     {
-      'bg-primary text-primary-foreground font-semibold z-10 shadow-md scale-105': isActive,
-      'text-muted-foreground hover:text-foreground hover:bg-accent/30 hover:backdrop-blur-md': !isActive,
+      "bg-violet-950 border-violet-950 text-white font-semibold shadow-[0_12px_30px_rgba(2,6,23,0.22)]": isActive,
+      "bg-violet-100/70 border-violet-200/35 text-violet-950/80 hover:bg-violet-100/90": !isActive,
     }
   );
 
@@ -29,13 +29,12 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
     <div 
       className="relative flex-1"
       onClick={onClick}
-      style={{ borderRadius: 0 }}
     >
-      <div className={tabClasses} style={{ borderRadius: 0 }}>
-          <div className="flex items-center gap-2 z-10 overflow-hidden min-w-0 flex-1 justify-center">
-          {icon && <span className="shrink-0">{icon}</span>}
+      <div className={tabClasses}>
+        <div className="flex items-center gap-2 z-10 overflow-hidden min-w-0 flex-1 justify-center">
+          {icon && <span className={cn("shrink-0", isActive ? "text-white/85" : "text-violet-950/70")}>{icon}</span>}
           <span className="whitespace-nowrap truncate">{title}</span>
-          </div>
+        </div>
       </div>
     </div>
   );

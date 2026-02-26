@@ -136,8 +136,6 @@ export async function applyReconciliation(plans: PlannedChange[]): Promise<void>
 export async function runReconciliation(entries: ReportEntry[], options: ReconcileOptions) {
   const plans = await planReconciliation(entries, options);
   if (!options.apply) {
-    // eslint-disable-next-line no-console
-
     return { applied: false, count: plans.length };
   }
   await applyReconciliation(plans);

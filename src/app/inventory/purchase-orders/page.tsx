@@ -17,14 +17,12 @@ import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { getUserFriendlyErrorMessage } from "@/lib/utils";
+import { logError } from "@/lib/error-logger";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Helper function to handle errors with logging
+// Helper function to handle errors with centralized logging
 function handleError(error: unknown, context: string): void {
-  // Log error for debugging
-  if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
-    console.error(`[Purchase Orders] Error in ${context}:`, error);
-  }
+  logError(error, `[Purchase Orders] ${context}`, 'medium');
 }
 
 export default function PurchaseOrdersPage() {
@@ -246,7 +244,12 @@ export default function PurchaseOrdersPage() {
                   id="orderDate"
                   name="orderDate"
                   value={newOrder.orderDate || ""}
-                  onChange={(next) => setNewOrder({ ...newOrder, orderDate: next })}
+                  onChange={(next) =>
+                    setNewOrder({
+                      ...newOrder,
+                      orderDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                    })
+                  }
                   className="col-span-3"
                   inputClassName="h-9"
                 />
@@ -259,7 +262,12 @@ export default function PurchaseOrdersPage() {
                   id="deliveryDate"
                   name="deliveryDate"
                   value={newOrder.deliveryDate || ""}
-                  onChange={(next) => setNewOrder({ ...newOrder, deliveryDate: next })}
+                  onChange={(next) =>
+                    setNewOrder({
+                      ...newOrder,
+                      deliveryDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                    })
+                  }
                   className="col-span-3"
                   inputClassName="h-9"
                 />
@@ -307,7 +315,13 @@ export default function PurchaseOrdersPage() {
                         id="edit-orderDate"
                         name="edit-orderDate"
                         value={editingOrder.orderDate ? format(new Date(editingOrder.orderDate), 'yyyy-MM-dd') : ''}
-                        onChange={(next) => setEditingOrder(prev => prev ? { ...prev, orderDate: next } : prev)}
+                        onChange={(next) =>
+                          setEditingOrder(prev =>
+                            prev
+                              ? { ...prev, orderDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd') }
+                              : prev
+                          )
+                        }
                         className="col-span-3"
                         inputClassName="h-9"
                       />
@@ -318,14 +332,34 @@ export default function PurchaseOrdersPage() {
                         id="edit-deliveryDate"
                         name="edit-deliveryDate"
                         value={editingOrder.deliveryDate ? format(new Date(editingOrder.deliveryDate), 'yyyy-MM-dd') : ''}
-                        onChange={(next) => setEditingOrder(prev => prev ? { ...prev, deliveryDate: next } : prev)}
+                        onChange={(next) =>
+                          setEditingOrder(prev =>
+                            prev
+                              ? { ...prev, deliveryDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd') }
+                              : prev
+                          )
+                        }
                         className="col-span-3"
                         inputClassName="h-9"
                       />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-status" className="text-right">Status</Label>
-                       <Input id="edit-status" name="edit-status" value={editingOrder.status} onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })} className="col-span-3" />
+                      <Select
+                        value={editingOrder.status}
+                        onValueChange={(value) =>
+                          setEditingOrder({ ...editingOrder, status: value as PurchaseOrder['status'] })
+                        }
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="Received">Received</SelectItem>
+                          <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="edit-totalAmount" className="text-right">Total Amount</Label>

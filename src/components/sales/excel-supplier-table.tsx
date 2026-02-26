@@ -24,8 +24,7 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
     const [editValue, setEditValue] = useState("");
     const [localData, setLocalData] = useState<Customer[]>([]);
     
-    // Get all suppliers for Excel-like editing
-    const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
+    const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().limit(500).toArray(), []);
     const totalSuppliers = useLiveQuery(() => db.suppliers.count(), []);
 
     // Update local data when suppliers change
@@ -54,7 +53,7 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
             setLocalData(newData);
             
             // Update in database
-            await db.suppliers.update(supplier.id, { [field]: editValue });
+            await db.suppliers.update(supplier.id, { [field]: editValue } as any);
             
             setEditingCell(null);
             setEditValue("");
@@ -79,6 +78,17 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
     const handleCellCancel = () => {
         setEditingCell(null);
         setEditValue("");
+    };
+
+    const getDisplayValue = (supplier: Customer, key: string) => {
+        if (key === 'date') {
+            return format(new Date(supplier.date), 'dd/MM/yy');
+        }
+        const value = (supplier as any)[key];
+        if (value === 0) return '0';
+        if (Array.isArray(value)) return String(value.length);
+        if (typeof value === 'object' && value !== null) return '-';
+        return value || '-';
     };
 
     const handleDelete = async (id: string) => {
@@ -250,10 +260,7 @@ export const ExcelSupplierTable = ({ onBackToEntry }: ExcelSupplierTableProps) =
                                                     onClick={() => handleCellClick(rowIndex, field.key, supplier[field.key as keyof Customer])}
                                                 >
                                                     <span className="truncate">
-                                                        {field.key === 'date' ? 
-                                                            format(new Date(supplier.date), 'dd/MM/yy') :
-                                                            supplier[field.key as keyof Customer] || '-'
-                                                        }
+                                                        {getDisplayValue(supplier, field.key)}
                                                     </span>
                                                     <Edit3 className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-50 transition-opacity" />
                                                 </div>

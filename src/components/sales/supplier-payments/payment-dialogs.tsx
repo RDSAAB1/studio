@@ -19,8 +19,8 @@ interface PaymentDialogsProps {
   cashHistoryRows: Payment[];
   rtgsHistoryRows: Payment[];
   govHistoryRows: Payment[];
-  onEditPayment: (payment: Payment) => void;
-  onDeletePayment: (paymentId: string) => void;
+  onEditPayment?: (payment: Payment) => void;
+  onDeletePayment?: (payment: Payment) => void;
 }
 
 export function PaymentDialogs({

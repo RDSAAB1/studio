@@ -9,14 +9,6 @@
 import type { CustomerSummary } from "@/lib/definitions";
 import { parse, format } from 'date-fns';
 
-// Type declaration for requestIdleCallback
-declare global {
-    interface Window {
-        requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-        cancelIdleCallback?: (id: number) => void;
-    }
-}
-
 export interface StatementTransaction {
     date: string;
     dateValue: Date | null;
@@ -410,12 +402,40 @@ export const generateStatementTransactions = async (
                 ? format(paymentDateValue, 'dd-MM-yyyy')
                 : formatDisplayDate(p.date, parsedPurchaseReference || undefined);
 
+            const paymentType = (p.receiptType || p.type || '').toString();
+            const paymentTypeLower = paymentType.trim().toLowerCase();
+            const isLedger = paymentTypeLower === 'ledger';
+
+            const paymentAmountRaw = Number((p as any).amount || 0);
+            const paymentAmountAbs = Math.abs(paymentAmountRaw);
+            const paidForExtraAmount =
+                p.paidFor?.reduce((sum: number, pf: any) => sum + (Number(pf.extraAmount) || 0), 0) || 0;
+            const paymentLevelExtraFromFields =
+                Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
+            const includePaymentLevelExtra =
+                paidForExtraAmount === 0 || !(paymentTypeLower === 'ledger' || paymentTypeLower === 'online');
+
             // Calculate total paid amount from paidFor entries
             const totalPaidForPayment = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-            const actualPaymentAmount = totalPaidForPayment;
 
-            const paymentType = p.receiptType || p.type;
+            const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+            const isLedgerCreditAdjustment = isLedger && (drCrLower === 'credit' || paymentAmountRaw < 0);
+            const debitAmount = isLedger ? (isLedgerCreditAdjustment ? 0 : paymentAmountAbs) : 0;
+            const creditPaidAmount = isLedger
+                ? (isLedgerCreditAdjustment ? paymentAmountAbs : 0)
+                : (totalPaidForPayment > 0 ? totalPaidForPayment : paymentAmountAbs);
+            const creditCdAmount = isLedger ? 0 : Number((p as any).cdAmount || 0);
+            const ledgerAmountFallback =
+                isLedger &&
+                (p.paidFor?.length || 0) === 0 &&
+                paymentLevelExtraFromFields === 0
+                    ? paymentAmountAbs
+                    : 0;
+            const paymentLevelExtraAmount = paymentLevelExtraFromFields + ledgerAmountFallback;
+            const paymentAdvanceAmount =
+                paidForExtraAmount + ((includePaymentLevelExtra ? paymentLevelExtraAmount : 0) * (isLedgerCreditAdjustment ? -1 : 1));
             const paymentId = p.paymentId || p.id || '';
+
 
             // Create payment details
             const paymentHeaderSrNo = formatColumn('SR No', 6);
@@ -458,7 +478,21 @@ export const generateStatementTransactions = async (
                 return `${srNo}|${orig}|${prev}|${now}|${bal}`;
             }).join('\n') || '';
 
-            const particulars = `PAY: ${paymentType}\n${paymentHeaderRow}\n${paymentSeparatorRow}\n${paymentDetails}`;
+            const headerLines: string[] = [];
+            if (isLedger) {
+                headerLines.push(`PAY: ${paymentType} ${isLedgerCreditAdjustment ? '(Credit)' : '(Debit)'}`);
+            } else {
+                headerLines.push(`PAY: ${paymentType}`);
+            }
+            headerLines.push(`ID: ${paymentId}`);
+            if (paymentAdvanceAmount !== 0) {
+                const extraAbs = Math.round(Math.abs(paymentAdvanceAmount));
+                headerLines.push(`EXTRA: ${paymentAdvanceAmount < 0 ? '-' : ''}₹${extraAbs}`);
+            }
+
+            const particulars = p.paidFor && p.paidFor.length > 0
+                ? `${headerLines.join('\n')}\n${paymentHeaderRow}\n${paymentSeparatorRow}\n${paymentDetails}`
+                : `${headerLines.join('\n')}\nAMT: ₹${Math.round(paymentAmountAbs)}`;
 
             mappedPayments.push({
                 date: p.date,
@@ -466,10 +500,10 @@ export const generateStatementTransactions = async (
                 referenceDate: parsedPurchaseReference || undefined,
                 displayDate: paymentDisplayDate,
                 particulars: particulars as any,
-                debit: 0,
-                creditPaid: actualPaymentAmount,
-                creditCd: (p as any).cdAmount || 0,
-                credit: actualPaymentAmount + ((p as any).cdAmount || 0),
+                debit: debitAmount,
+                creditPaid: creditPaidAmount,
+                creditCd: creditCdAmount,
+                credit: creditPaidAmount + creditCdAmount,
             });
         }
         
@@ -559,8 +593,9 @@ export const calculateStatementTotals = (
         }
     });
     
-    const totalOriginal = data.totalOriginalAmount || 0;
-    const outstanding = Math.max(0, Math.round((totalOriginal - totalPaidFromTransactions - totalCdFromTransactions) * 100) / 100);
+    const outstanding = Math.round(
+        transactions.reduce((sum, t) => sum + (t.debit || 0) - (t.credit || 0), 0) * 100
+    ) / 100;
     
     return {
         totalPaid: totalPaidFromTransactions,

@@ -1,5 +1,6 @@
-﻿import type { LedgerEntry } from "@/lib/definitions";
+import type { LedgerEntry } from "@/lib/definitions";
 import { format } from "date-fns";
+import { formatCurrency as formatCurrencyGlobal } from "@/lib/utils";
 
 export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -74,9 +75,5 @@ export const formatStatementDate = (value: string) => {
 };
 
 export const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatCurrencyGlobal(value);
 };
-

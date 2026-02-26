@@ -46,8 +46,33 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 2, labouryAmount: 0, brokerageRate: 0, brokerageAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
+  };
+};
+
+const getInitialFormValues = (lastVariety?: string, lastPaymentType?: string): FormValues => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return {
+    srNo: 'S----',
+    date: today,
+    term: 20,
+    name: '',
+    so: '',
+    address: '',
+    contact: '',
+    vehicleNo: '',
+    variety: lastVariety || '',
+    grossWeight: 0,
+    teirWeight: 0,
+    rate: 0,
+    kartaPercentage: 1,
+    labouryRate: 2,
+    kanta: 50,
+    paymentType: lastPaymentType || 'Full',
+    forceUnique: false,
   };
 };
 
@@ -62,6 +87,7 @@ export const useSupplierEntry = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoFillData, setAutoFillData] = useState<Record<string, any> | null>(null);
   
   // Options and settings
@@ -76,7 +102,7 @@ export const useSupplierEntry = () => {
   // Form management
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: getInitialFormState(),
+    defaultValues: getInitialFormValues(),
   });
 
   // Load data once on mount
@@ -217,7 +243,11 @@ export const useSupplierEntry = () => {
   // Reset form to state
   const resetFormToState = useCallback((customerState: Customer) => {
     setCurrentSupplier(customerState);
-    form.reset(customerState);
+    form.reset({
+      ...customerState,
+      date: customerState.date ? new Date(customerState.date) : new Date(),
+      term: Number(customerState.term) || 0,
+    } as any);
   }, [form]);
 
 
@@ -258,12 +288,18 @@ export const useSupplierEntry = () => {
             allFields.forEach(field => {
                 const value = foundCustomer[field as keyof Customer];
                 if (value !== undefined && value !== null) {
-                    form.setValue(field as any, value);
+                    if (field === 'date') {
+                        form.setValue('date', new Date(String(value)));
+                    } else if (field === 'term') {
+                        form.setValue('term', Number(value) || 0);
+                    } else {
+                        form.setValue(field as any, value);
+                    }
                 }
             });
             
             // Run calculations with the filled data
-            performHeavyCalculations(foundCustomer, true);
+            performHeavyCalculations(form.getValues(), true);
         }, 10);
         
         // Removed unnecessary toast message
@@ -295,7 +331,9 @@ export const useSupplierEntry = () => {
 
   // Handle form submission
   const handleSubmit = useCallback(async (values: FormValues) => {
+    setIsSubmitting(true);
     try {
+      const { date, term, ...restValues } = values;
       // ✅ Use srNo as document ID if available (for consistent saving)
       const supplierId = values.srNo && values.srNo.trim() !== '' && values.srNo !== 'S----'
           ? values.srNo
@@ -303,8 +341,10 @@ export const useSupplierEntry = () => {
       
       const completeEntry: Customer = {
           ...currentSupplier,
-          ...values,
+          ...restValues,
           id: supplierId,
+          date: format(date, 'yyyy-MM-dd'),
+          term: String(term),
           customerId: currentSupplier.customerId || `customer_${Date.now()}`,
       };
 
@@ -330,6 +370,8 @@ export const useSupplierEntry = () => {
     } catch (error) {
 
       toast({ title: "Error saving supplier", description: "Please try again", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   }, [currentSupplier, isEditing, toast]);
 
@@ -340,6 +382,7 @@ export const useSupplierEntry = () => {
     currentSupplier,
     isEditing,
     isLoading,
+    isSubmitting,
     isClient,
     autoFillData,
     

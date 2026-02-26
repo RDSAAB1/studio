@@ -86,7 +86,7 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                 <ScrollArea className="max-h-[60vh]">
                     <Table>
                     <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-primary/20 border-b border-primary/30">
                         <TableHead><Checkbox onCheckedChange={onSelectAll} checked={entries.length > 0 && selectedIds.size === entries.length} /></TableHead>
                         <TableHead>SR No</TableHead>
                         <TableHead>Name</TableHead>

@@ -111,7 +111,7 @@ export default function ProjectDashboardPage() {
     let tasksSnapshot: any = null;
     
     const unsubscribeProjects = onSnapshot(projectsQuery, (projectSnapshot) => {
-      const projects = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      const projects = projectSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Project));
       const totalProjects = projects.length;
       const openProjects = projects.filter(p => p.status === 'Open').length;
       const completedProjects = projects.filter(p => p.status === 'Completed').length;
@@ -120,8 +120,8 @@ export default function ProjectDashboardPage() {
 
       // Dummy progress calculation for now, assuming progress is based on completed tasks
       const projectProgress = projects.map(project => {
-        const projectTasks = tasksSnapshot ? tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(task => task.projectId === project.id) : [];
-        const completedProjectTasks = projectTasks.filter(task => task.status === 'Completed').length;
+        const projectTasks = tasksSnapshot ? tasksSnapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Task)).filter((task: Task) => task.projectId === project.id) : [];
+        const completedProjectTasks = projectTasks.filter((task: Task) => task.status === 'Completed').length;
         const progress = projectTasks.length > 0 ? (completedProjectTasks / projectTasks.length) * 100 : 0;
         return { name: project.name, progress: Math.round(progress) };
       });
@@ -144,7 +144,7 @@ export default function ProjectDashboardPage() {
 
     const unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
         tasksSnapshot = snapshot;
-      const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+      const tasks = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Task));
       setDashboardData(prev => ({
         ...prev,
         totalTasks: tasks.length,

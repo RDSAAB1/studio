@@ -15,7 +15,7 @@ import type { Bank, BankBranch, BankAccount } from '@/lib/definitions';
 interface RtgsFormOutsiderProps {
     bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
     setBankDetails: React.Dispatch<React.SetStateAction<{ bank?: string; branch?: string; ifscCode?: string; acNo?: string }>>;
-    setIsBankSettingsOpen: (open: boolean) => void;
+    setIsBankSettingsOpen?: (open: boolean) => void;
     supplierDetails?: { name?: string; [key: string]: unknown };
     setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
     rtgsAmount?: number;
@@ -211,11 +211,11 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
 
     return (
         <div className="space-y-2 text-[10px]">
-            <Card>
+            <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                 <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-[11px] font-semibold">Bank Details</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen(true)}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen?.(true)}>
                             <Settings className="h-3.5 w-3.5" />
                         </Button>
                     </div>

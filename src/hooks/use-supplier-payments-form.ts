@@ -17,6 +17,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [paymentType, setPaymentType] = useState('Full');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [selectedAccountId, setSelectedAccountId] = useState<string>('CashInHand');
+    const [drCr, setDrCr] = useState<'Debit' | 'Credit'>('Debit');
+    const [extraAmount, setExtraAmount] = useState(0);
+    const [notes, setNotes] = useState('');
 
     const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
     const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -36,8 +39,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [govQuantity, setGovQuantity] = useState(0);
     const [govRate, setGovRate] = useState(0);
     const [govAmount, setGovAmount] = useState(0);
-    const [govRequiredAmount, setGovRequiredAmount] = useState(0);
-    const [extraAmount, setExtraAmount] = useState(0);
+    const [govExtraAmount, setGovExtraAmount] = useState(0);
 
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [isBeingEdited, setIsBeingEdited] = useState(false); // New state to track edit mode
@@ -48,8 +50,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             setIsPayeeEditing(true);
         }
     }, [editingPayment, isPayeeEditing]);
-    
-    const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
     const [minRate, setMinRate] = useState<number>(0);
     const [maxRate, setMaxRate] = useState<number>(0);
@@ -94,13 +94,22 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     };
     
-    const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
+    const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
         // Always allow switching to the selected method
         setPaymentMethod(method);
+
+        if (method === 'Ledger' || method === 'Gov.') {
+            setPaymentType('Partial');
+            setCdEnabled(false);
+        }
         
         if (method === 'Cash') {
             handleSetSelectedAccountId('CashInHand');
             return;
+        }
+
+        if ((method === 'Online' || method === 'Ledger') && parchiNo) {
+            setCheckNo(parchiNo);
         }
 
         // When switching to Online or RTGS, try to select a bank account
@@ -120,8 +129,15 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     };
 
+    useEffect(() => {
+        if (editingPayment) return;
+        if (paymentMethod !== 'Online' && paymentMethod !== 'Ledger') return;
+        if (!parchiNo) return;
+        setCheckNo(parchiNo);
+    }, [paymentMethod, parchiNo, editingPayment]);
 
-    const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
+
+    const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
         if (!paymentHistory || !expenses) return '';
     
         if (method === 'RTGS') {
@@ -158,6 +174,16 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                 return num > max ? num : max;
             }, 0);
             return generateReadableId('P', lastNum, 5);
+        }
+
+        if (method === 'Ledger') {
+            const ledgerPayments = paymentHistory.filter(p => p.receiptType === 'Ledger' && p.paymentId.startsWith('L'));
+            const lastNum = ledgerPayments.reduce((max, p) => {
+                const numMatch = p.paymentId.match(/^L(\d+)$/);
+                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+                return num > max ? num : max;
+            }, 0);
+            return generateReadableId('L', lastNum, 5);
         }
     
         // For Cash payment
@@ -202,7 +228,12 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const value = e.target.value.trim().toUpperCase();
         if (!value) return;
 
-        const prefix = paymentMethod === 'Cash' ? (paymentCategory === 'customer' ? 'IX' : 'EX') : 'P';
+        const prefix =
+            paymentMethod === 'Cash'
+                ? (paymentCategory === 'customer' ? 'IX' : 'EX')
+                : paymentMethod === 'Ledger'
+                    ? 'L'
+                    : 'P';
         let formattedId = value;
 
         // Auto-format if it's just a number
@@ -227,6 +258,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
              setRtgsSrNo(getNextPaymentId('RTGS'));
              if (paymentMethod === 'Online') {
                  setPaymentId(getNextPaymentId('Online'));
+             } else if (paymentMethod === 'Ledger') {
+                 setPaymentId(getNextPaymentId('Ledger'));
              } else if (paymentMethod === 'Gov.') {
                  setPaymentId(getNextPaymentId('Gov.'));
              } else {
@@ -237,26 +270,58 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     }, [paymentHistory, expenses, editingPayment, paymentMethod]);
     
 
-    const resetPaymentForm = useCallback(() => {
-        setSelectedEntryIds(new Set());
+    const resetPaymentForm = () => {
+        const nextRtgsSrNo = getNextPaymentId('RTGS');
+        const nextPaymentId =
+            paymentMethod === 'Online'
+                ? getNextPaymentId('Online')
+                : paymentMethod === 'Ledger'
+                    ? getNextPaymentId('Ledger')
+                : paymentMethod === 'Gov.'
+                    ? getNextPaymentId('Gov.')
+                    : getNextPaymentId('Cash');
+
+        setPaymentId(nextPaymentId);
+        setPaymentDate(new Date());
         setPaymentAmount(0);
-        setEditingPayment(null);
-        setIsBeingEdited(false); // Reset edit state
-        setIsPayeeEditing(false); // Reset payee editing state
-        setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
-        setCenterName('');
-        setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
-        setGovQuantity(0); setGovRate(0); setGovAmount(0);
-        setGovRequiredAmount(0);
+        setPaymentType('Full');
+        // Do NOT reset payment method to Cash - keep user's selection
+        // setPaymentMethod('Cash'); 
+        setSupplierDetails({ name: '', fatherName: '', address: '', contact: ''});
+        setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
+        setSelectedEntryIds(new Set());
+        setSerialNoSearch('');
+        // Do NOT reset selectedCustomerKey - keep the selected customer
+        // setSelectedCustomerKey(null);
+        setIsPayeeEditing(false);
+        setRtgsSrNo(nextRtgsSrNo);
+        setSixRNo('');
+        setSixRDate(new Date());
+        setParchiNo('');
+        setUtrNo('');
+        setCheckNo('');
+        setNotes('');
+        setRtgsQuantity(0);
+        setRtgsRate(0);
+        setRtgsAmount(0);
+        setGovQuantity(0);
+        setGovRate(0);
+        setGovAmount(0);
+        setGovExtraAmount(0);
+        setDrCr('Debit');
         setExtraAmount(0);
-        setRtgsSrNo(getNextPaymentId('RTGS'));
-        setPaymentId(paymentMethod === 'Online' ? getNextPaymentId('Online') : paymentMethod === 'Gov.' ? getNextPaymentId('Gov.') : getNextPaymentId('Cash'));
-    }, [getNextPaymentId, paymentMethod]);
-    
-    const handleFullReset = useCallback(() => {
-        setSelectedCustomerKey(null);
+        setEditingPayment(null);
+        setIsBeingEdited(false);
+        setOnEdit(null);
+        
+
+    };
+
+    const handleFullReset = () => {
         resetPaymentForm();
-    }, [resetPaymentForm]);
+        setSelectedCustomerKey(null);
+        setPaymentMethod('Cash');
+    };
 
     return {
         selectedCustomerKey, setSelectedCustomerKey,
@@ -269,6 +334,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         paymentType, setPaymentType,
         paymentMethod, setPaymentMethod: handleSetPaymentMethod,
         selectedAccountId, setSelectedAccountId: handleSetSelectedAccountId,
+        drCr, setDrCr,
+        extraAmount, setExtraAmount,
+        notes, setNotes,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
         isPayeeEditing, setIsPayeeEditing,
@@ -284,11 +352,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         govQuantity, setGovQuantity,
         govRate, setGovRate,
         govAmount, setGovAmount,
-        govRequiredAmount, setGovRequiredAmount,
-        extraAmount, setExtraAmount,
+        govExtraAmount, setGovExtraAmount,
         editingPayment, setEditingPayment,
         isBeingEdited, setIsBeingEdited,
-        calcTargetAmount, setCalcTargetAmount,
         minRate,
         setMinRate: handleSetMinRate,
         maxRate,

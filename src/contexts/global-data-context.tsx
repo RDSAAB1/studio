@@ -15,6 +15,7 @@ import {
     getBankBranchesRealtime,
     getReceiptSettings
 } from "@/lib/firestore";
+import { db } from "@/lib/database";
 import type { 
     Customer, 
     Payment, 
@@ -85,6 +86,113 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         });
     }, [startTransition]);
     
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const mergePayments = (regular: Payment[], gov: Payment[]) => {
+            const uniquePayments = new Map<string, Payment>();
+
+            const getPaymentKey = (p: Payment) => {
+                const key = String((p as any).paymentId || (p as any).id || '').trim();
+                return key || null;
+            };
+
+            const getPaymentTime = (p: Payment) => {
+                const updatedAt = (p as any).updatedAt;
+                const updatedAtMs =
+                    updatedAt && typeof updatedAt === 'object' && typeof (updatedAt as any).toMillis === 'function'
+                        ? (updatedAt as any).toMillis()
+                        : (updatedAt ? new Date(updatedAt as any).getTime() : 0);
+                const dateMs = p.date ? new Date(p.date).getTime() : 0;
+                return Math.max(updatedAtMs || 0, dateMs || 0);
+            };
+
+            [...regular, ...gov].forEach((p) => {
+                const key = getPaymentKey(p);
+                if (!key) return;
+
+                const existing = uniquePayments.get(key);
+                if (!existing) {
+                    uniquePayments.set(key, p);
+                    return;
+                }
+
+                if (getPaymentTime(p) >= getPaymentTime(existing)) {
+                    uniquePayments.set(key, p);
+                }
+            });
+
+            return Array.from(uniquePayments.values()).sort((a, b) => {
+                const dateA = a.date ? new Date(a.date).getTime() : 0;
+                const dateB = b.date ? new Date(b.date).getTime() : 0;
+                return dateB - dateA;
+            });
+        };
+
+        const refresh = async (collection: string) => {
+            if (!db) return;
+
+            if (collection === 'suppliers') {
+                const data = await db.suppliers.orderBy('srNo').reverse().toArray();
+                updateState(setSuppliers, data);
+                return;
+            }
+
+            if (collection === 'customers') {
+                const data = await db.customers.orderBy('srNo').reverse().toArray();
+                updateState(setCustomers, data);
+                return;
+            }
+
+            if (collection === 'customerPayments') {
+                const data = await db.customerPayments.orderBy('date').reverse().toArray();
+                updateState(setCustomerPayments, data);
+                return;
+            }
+
+            if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
+                const regularPayments = await db.payments.orderBy('date').reverse().toArray();
+                const govPayments = (await db.governmentFinalizedPayments.orderBy('date').reverse().toArray()).map((p: any) => ({
+                    ...p,
+                    receiptType: 'Gov.',
+                })) as Payment[];
+                updateState(setSupplierPayments, mergePayments(regularPayments as Payment[], govPayments));
+                return;
+            }
+        };
+
+        const onCollectionChanged = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
+            const collection = detail?.collection;
+            if (!collection) return;
+            void refresh(collection);
+        };
+
+        const onPaymentUpdated = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
+            const collection = detail?.collection;
+            if (!collection) return;
+            void refresh(collection);
+        };
+
+        const onPaymentDeleted = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
+            const collection = detail?.collection;
+            if (!collection) return;
+            void refresh(collection);
+        };
+
+        window.addEventListener('indexeddb:collection:changed', onCollectionChanged);
+        window.addEventListener('indexeddb:payment:updated', onPaymentUpdated);
+        window.addEventListener('indexeddb:payment:deleted', onPaymentDeleted);
+
+        return () => {
+            window.removeEventListener('indexeddb:collection:changed', onCollectionChanged);
+            window.removeEventListener('indexeddb:payment:updated', onPaymentUpdated);
+            window.removeEventListener('indexeddb:payment:deleted', onPaymentDeleted);
+        };
+    }, [updateState]);
+
     // NO LOADING STATES - Data loads initially, then only CRUD updates happen via realtime listeners
     
     // ✅ OPTIMIZED: Lazy load supplierBankAccounts listener only when needed
@@ -383,4 +491,3 @@ export const useGlobalData = (): GlobalDataContextType => {
     }
     return context;
 };
-

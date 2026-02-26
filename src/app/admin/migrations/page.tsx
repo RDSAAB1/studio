@@ -28,9 +28,15 @@ import { calculateSupplierEntry } from '@/lib/utils';
 import { syncAllData } from '@/lib/database';
 import type { Customer, Payment, CustomerPayment, LedgerAccount, LedgerEntry, LedgerCashAccount, MandiReport } from '@/lib/definitions';
 import { fixRtgsPaymentIds } from '@/scripts/fix-rtgs-payment-ids';
-import { fixTransactionIdMismatch } from '@/scripts/fix-transaction-id-mismatch';
-import { checkSupplierSerialDuplicates } from '@/scripts/check-supplier-serial-duplicates';
+import { fixTransactionIdMismatch, type FixTransactionIdMismatchResult } from '@/scripts/fix-transaction-id-mismatch';
+import { checkSupplierSerialDuplicates, type DuplicateAnalysis } from '@/scripts/check-supplier-serial-duplicates';
+import type { FixResult } from '@/scripts/fix-supplier-serial-duplicates';
 import { fixSupplierSerialDuplicates } from '@/scripts/fix-supplier-serial-duplicates';
+import { MigrationResult, migrateUpdatedAt } from '@/lib/migration-utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+
+type MigrationError = { message?: string } | string;
 
 const serializeRecord = (record: Record<string, unknown>) => {
     const result: Record<string, unknown> = {};
@@ -255,16 +261,34 @@ export default function MigrationsPage() {
     const [importSummary, setImportSummary] = useState<string | null>(null);
     const [importErrors, setImportErrors] = useState<string[]>([]);
     const [isRunning1, setIsRunning1] = useState(false);
-    const [result1, setResult1] = useState<{ success: boolean; count?: number; renamed?: number; duplicatesFixed?: number; skipped?: number; error?: string } | null>(null);
+    const [result1, setResult1] = useState<{ success: boolean; count?: number; renamed?: number; duplicatesFixed?: number; skipped?: number; error?: MigrationError } | null>(null);
     
     const [isRunning2, setIsRunning2] = useState(false);
-    const [result2, setResult2] = useState<{ success: boolean; count?: number; error?: string } | null>(null);
+    const [result2, setResult2] = useState<FixTransactionIdMismatchResult | null>(null);
     
     const [isRunning3, setIsRunning3] = useState(false);
-    const [result3, setResult3] = useState<{ success: boolean; analysis?: Record<string, unknown>; error?: string } | null>(null);
+    const [result3, setResult3] = useState<{ success: boolean; analysis?: DuplicateAnalysis; error?: MigrationError } | null>(null);
     
     const [isRunning4, setIsRunning4] = useState(false);
-    const [result4, setResult4] = useState<{ success: boolean; fixedSrNos?: number; fixedIds?: number; errors?: string[]; summary?: string; error?: string } | null>(null);
+    const [result4, setResult4] = useState<FixResult | null>(null);
+
+    const [isRunning5, setIsRunning5] = useState(false);
+    const [result5, setResult5] = useState<MigrationResult[] | null>(null);
+
+    const handleUpdatedAtMigration = async () => {
+        if (!confirm("This will update ALL documents in ALL collections with a new 'updatedAt' timestamp. This ensures all data syncs correctly but will cause a one-time re-download on other devices. Continue?")) return;
+        setIsRunning5(true);
+        setResult5(null);
+        try {
+            const results = await migrateUpdatedAt();
+            setResult5(results);
+            toast({ title: "Migration Complete", description: "Updated all documents." });
+        } catch (e) {
+            toast({ title: "Migration Failed", description: String(e), variant: "destructive" });
+        } finally {
+            setIsRunning5(false);
+        }
+    };
 
     const appendSheet = (workbook: XLSX.WorkBook, name: string, data: Record<string, any>[]) => {
         if (!data.length) return;
@@ -366,8 +390,8 @@ export default function MigrationsPage() {
                     await bulkUpsertSuppliers(suppliers);
                     summaryParts.push(`${suppliers.length} suppliers`);
                 } catch (error: unknown) {
-
-                    errors.push(`Suppliers: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Suppliers: ${message}`);
                 }
             }
 
@@ -377,8 +401,8 @@ export default function MigrationsPage() {
                     await bulkUpsertCustomers(customers);
                     summaryParts.push(`${customers.length} customers`);
                 } catch (error: unknown) {
-
-                    errors.push(`Customers: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Customers: ${message}`);
                 }
             }
 
@@ -388,8 +412,8 @@ export default function MigrationsPage() {
                     await bulkUpsertPayments(payments);
                     summaryParts.push(`${payments.length} supplier payments`);
                 } catch (error: unknown) {
-
-                    errors.push(`Supplier payments: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Supplier payments: ${message}`);
                 }
             }
 
@@ -399,8 +423,8 @@ export default function MigrationsPage() {
                     await bulkUpsertCustomerPayments(payments);
                     summaryParts.push(`${payments.length} customer payments`);
                 } catch (error: unknown) {
-
-                    errors.push(`Customer payments: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Customer payments: ${message}`);
                 }
             }
 
@@ -410,8 +434,8 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerAccounts(accounts);
                     summaryParts.push(`${accounts.length} ledger accounts`);
                 } catch (error: unknown) {
-
-                    errors.push(`Ledger accounts: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Ledger accounts: ${message}`);
                 }
             }
 
@@ -422,8 +446,8 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerEntries(recalculated);
                     summaryParts.push(`${recalculated.length} ledger entries`);
                 } catch (error: unknown) {
-
-                    errors.push(`Ledger entries: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Ledger entries: ${message}`);
                 }
             }
 
@@ -433,8 +457,8 @@ export default function MigrationsPage() {
                     await bulkUpsertLedgerCashAccounts(cashAccounts);
                     summaryParts.push(`${cashAccounts.length} ledger cash accounts`);
                 } catch (error: unknown) {
-
-                    errors.push(`Ledger cash accounts: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Ledger cash accounts: ${message}`);
                 }
             }
 
@@ -444,8 +468,8 @@ export default function MigrationsPage() {
                     await bulkUpsertMandiReports(reports);
                     summaryParts.push(`${reports.length} mandi reports`);
                 } catch (error: unknown) {
-
-                    errors.push(`Mandi reports: ${error?.message || 'Unknown error'}`);
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    errors.push(`Mandi reports: ${message}`);
                 }
             }
 
@@ -464,12 +488,12 @@ export default function MigrationsPage() {
                 setImportErrors(errors);
             }
         } catch (error: unknown) {
-
+            const message = error instanceof Error ? error.message : 'Unknown import error.';
             setImportSummary(null);
-            setImportErrors([error?.message || 'Unknown import error.']);
+            setImportErrors([message]);
             toast({
                 title: 'Import failed',
-                description: error?.message || 'Unable to import workbook.',
+                description: message || 'Unable to import workbook.',
                 variant: 'destructive',
             });
         } finally {
@@ -500,7 +524,8 @@ export default function MigrationsPage() {
             const res = await fixRtgsPaymentIds();
             setResult1(res);
         } catch (error) {
-            setResult1({ success: false, error });
+            const message = error instanceof Error ? error.message : String(error);
+            setResult1({ success: false, error: message });
         } finally {
             setIsRunning1(false);
         }
@@ -514,7 +539,8 @@ export default function MigrationsPage() {
             const res = await fixTransactionIdMismatch();
             setResult2(res);
         } catch (error) {
-            setResult2({ success: false, error });
+            const message = error instanceof Error ? error.message : String(error);
+            setResult2({ success: false, count: 0, errors: [message], error: message });
         } finally {
             setIsRunning2(false);
         }
@@ -528,7 +554,8 @@ export default function MigrationsPage() {
             const analysis = await checkSupplierSerialDuplicates();
             setResult3({ success: true, analysis });
         } catch (error) {
-            setResult3({ success: false, error });
+            const message = error instanceof Error ? error.message : String(error);
+            setResult3({ success: false, error: message });
         } finally {
             setIsRunning3(false);
         }
@@ -542,7 +569,8 @@ export default function MigrationsPage() {
             const result = await fixSupplierSerialDuplicates();
             setResult4(result);
         } catch (error) {
-            setResult4({ success: false, error });
+            const message = error instanceof Error ? error.message : String(error);
+            setResult4({ success: false, fixedSrNos: 0, fixedIds: 0, skipped: 0, errors: [message], summary: 'Fix failed due to error', error: message });
         } finally {
             setIsRunning4(false);
         }
@@ -674,7 +702,7 @@ export default function MigrationsPage() {
                                     )}
                                     {!result1.success && result1.error && (
                                         <p className="text-sm text-red-700 mt-1">
-                                            Error: {result1.error.message || 'Unknown error occurred'}
+                                            Error: {typeof result1.error === 'string' ? result1.error : result1.error.message || 'Unknown error occurred'}
                                         </p>
                                     )}
                                 </div>
@@ -735,9 +763,9 @@ export default function MigrationsPage() {
                                             )}
                                         </div>
                                     )}
-                                    {!result2.success && result2.error && (
+                                    {!result2.success && (result2.error || (result2.errors && result2.errors.length > 0)) && (
                                         <p className="text-sm text-red-700 mt-1">
-                                            Error: {result2.error.message || 'Unknown error occurred'}
+                                            Error: {result2.error || result2.errors?.[0] || 'Unknown error occurred'}
                                         </p>
                                     )}
                                 </div>
@@ -818,7 +846,7 @@ export default function MigrationsPage() {
                                     )}
                                     {!result3.success && result3.error && (
                                         <p className="text-sm text-red-700 mt-1">
-                                            Error: {result3.error.message || 'Unknown error occurred'}
+                                            Error: {typeof result3.error === 'string' ? result3.error : result3.error.message || 'Unknown error occurred'}
                                         </p>
                                     )}
                                 </div>
@@ -891,7 +919,7 @@ export default function MigrationsPage() {
                                     )}
                                     {!result4.success && result4.error && (
                                         <p className="text-sm text-red-700 mt-1">
-                                            Error: {result4.error.message || 'Unknown error occurred'}
+                                            Error: {result4.error || 'Unknown error occurred'}
                                         </p>
                                     )}
                                 </div>
@@ -907,6 +935,58 @@ export default function MigrationsPage() {
                             <li>Creates unique srNo/ID values for duplicates</li>
                             <li>Safe to run multiple times</li>
                             <li>Check browser console for detailed logs</li>
+                        </ul>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Data Integrity: UpdatedAt Migration</CardTitle>
+                    <CardDescription>
+                        Update all documents in all collections with an 'updatedAt' field. 
+                        This ensures efficient sync by enabling metadata-based filtering.
+                        Only use this if you are experiencing sync issues.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Button 
+                        onClick={handleUpdatedAtMigration} 
+                        disabled={isRunning5}
+                        className="w-full sm:w-auto"
+                        variant="default"
+                    >
+                        {isRunning5 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isRunning5 ? 'Migrating...' : 'Run Update Migration'}
+                    </Button>
+
+                    {result5 && (
+                        <div className="mt-4 border rounded-md overflow-hidden">
+                            <div className="bg-muted p-2 font-medium text-xs uppercase tracking-wider">Migration Results</div>
+                            <ScrollArea className="h-64">
+                                <div className="divide-y">
+                                    {result5.map((res, i) => (
+                                        <div key={i} className="p-2 text-sm flex justify-between items-center">
+                                            <div>
+                                                <span className="font-medium">{res.collection}</span>
+                                                <span className="text-muted-foreground ml-2">({res.total} docs)</span>
+                                            </div>
+                                            <div className={cn("text-xs px-2 py-0.5 rounded-full", res.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+                                                {res.status === 'success' ? `Updated ${res.updated}` : res.message}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <p className="text-sm text-amber-900 font-medium">⚠️ Impact:</p>
+                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
+                            <li>Updates every single document in the database</li>
+                            <li>Will trigger a full sync on all connected devices</li>
+                            <li>Use during off-hours to minimize disruption</li>
                         </ul>
                     </div>
                 </CardContent>

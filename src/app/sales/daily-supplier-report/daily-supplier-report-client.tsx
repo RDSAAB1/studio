@@ -20,6 +20,16 @@ import { Separator } from '@/components/ui/separator';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const escapeHtml = (value?: string | null) => {
+  if (!value) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
     <Card className="flex-1 bg-card/60 border-primary/30 shadow-md print:border print:shadow-none">
         <CardHeader className="p-2 flex flex-row items-center space-x-2">
@@ -205,7 +215,7 @@ export default function DailySupplierReportClient() {
         const printContent = `
             <div class="printable-area p-4">
                 <div class="hidden print:block print-header">
-                    <h2>${toTitleCase(settings.companyName)} - Daily Supplier Report</h2>
+                    <h2>${escapeHtml(toTitleCase(settings.companyName))} - Daily Supplier Report</h2>
                     <p>Date: ${format(selectedDate, "dd-MMM-yyyy")}</p>
                 </div>
                 ${node.innerHTML}

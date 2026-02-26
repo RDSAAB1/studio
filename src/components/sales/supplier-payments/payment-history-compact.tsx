@@ -15,12 +15,25 @@ interface PaymentHistoryCompactProps {
   onEdit?: (payment: Payment) => void;
   onDelete?: (payment: Payment) => void;
   historyType?: 'cash' | 'rtgs' | 'gov' | 'payment';
+  maxRows?: number;
 }
 
-export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType = 'payment' }: PaymentHistoryCompactProps) => {
+export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType = 'payment', maxRows }: PaymentHistoryCompactProps) => {
   // Sort payments by ID in descending order - prefix first, then number (highest first)
   const sortedPayments = React.useMemo(() => {
-    return [...payments].sort((a, b) => {
+    // Deduplicate payments to prevent key collisions
+    const seenKeys = new Set<string>();
+    const uniquePayments = payments.filter(p => {
+      // Prefer paymentId (e.g. RT001, C001) for deduplication as it's the logical ID
+      // p.id is the Firestore document ID, which will be different for duplicates
+      const key = p.paymentId || p.id;
+      if (!key) return true; // If no ID, keep it (though it might cause issues if multiple have no ID)
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
+
+    return [...uniquePayments].sort((a, b) => {
       const idA = String(a?.paymentId || a?.id || '').trim().replace(/\s+/g, '');
       const idB = String(b?.paymentId || b?.id || '').trim().replace(/\s+/g, '');
       
@@ -113,11 +126,6 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     };
   }, []);
 
-  // Get Extra Amount for Gov payments
-  const getExtraAmount = React.useCallback((payment: Payment) => {
-    return (payment as any).extraAmount || 0;
-  }, []);
-
   // Get Center Name for Gov payments
   const getCenterName = React.useCallback((payment: Payment) => {
     return (payment as any).centerName || '-';
@@ -159,57 +167,63 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     return 0;
   }, []);
 
+  const visiblePayments = React.useMemo(() => {
+    return maxRows ? sortedPayments.slice(0, maxRows) : sortedPayments;
+  }, [maxRows, sortedPayments]);
+
   return (
-    <Card className="text-[10px] flex flex-col h-full overflow-hidden border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+    <Card className="text-[9px] flex flex-col h-full overflow-hidden border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
       <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
           {/* Fixed Header */}
-          <div className="sticky top-0 z-30 bg-primary/20 border-b-2 border-primary/30 shadow-sm backdrop-blur-sm">
+          <div className="sticky top-0 z-30 bg-primary/20 border-b border-primary/30 shadow-sm backdrop-blur-sm">
             <Table className="table-fixed w-full">
               <TableHeader>
-                <TableRow className="h-4 border-b-0">
+                <TableRow className="h-1 border-b-0 overflow-hidden">
                   {historyType === 'cash' && (
                     <>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[12%] text-left align-middle">ID</TableHead>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[10%] text-left align-middle">Date</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[25%] text-left align-middle">Paid For</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[15%] text-right align-middle">Paid</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[15%] text-right align-middle">CD</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[13%] text-center align-middle">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[34%] text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-right align-middle overflow-hidden">Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-center align-middle overflow-hidden">Actions</TableHead>
                     </>
                   )}
                   {historyType === 'rtgs' && (
                     <>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[10%] text-left align-middle">ID & Date</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[15%] text-left align-middle">Account Holder & No.</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[18%] text-left align-middle">Bank, Branch/IFSC</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[6%] text-left align-middle">Check No.</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[28%] text-left align-middle">Paid For</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[10%] text-right align-middle">Paid</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[8%] text-right align-middle">CD</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[5%] text-center align-middle">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">Account Holder</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Bank / IFSC</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">Check</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[28%] text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden">Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[6%] text-center align-middle overflow-hidden">Actions</TableHead>
                     </>
                   )}
                   {historyType === 'gov' && (
                     <>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[10%] text-left align-middle">ID & Date</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[12%] text-left align-middle">Center Name</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[35%] text-left align-middle">Paid For</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[12%] text-right align-middle">Paid</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[8%] text-right align-middle">CD</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[12%] text-right align-middle">Extra Amount</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[11%] text-center align-middle">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[7%] text-left align-middle overflow-hidden">ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[7%] text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">Center</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[38%] text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-center align-middle overflow-hidden">Actions</TableHead>
                     </>
                   )}
                   {historyType === 'payment' && (
                     <>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[12%] text-left">ID</TableHead>
-                      <TableHead className="text-[11px] px-2 py-1 font-extrabold w-[10%] text-left">Date</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[20%] text-left">Account Holder</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[20%] text-left">Paid For</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[12%] text-right">Paid</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[10%] text-right">CD</TableHead>
-                      <TableHead className="text-[10px] px-2 py-1 font-extrabold w-[16%] text-center">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[8%] text-left align-middle overflow-hidden">ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[8%] text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Account Holder</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[26%] text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Extra</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-center align-middle overflow-hidden">Actions</TableHead>
                     </>
                   )}
                 </TableRow>
@@ -217,19 +231,36 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
             </Table>
           </div>
           {/* Scrollable Body */}
-          <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+          <div className={maxRows ? "overflow-x-hidden overflow-y-hidden flex-1 min-h-0" : "overflow-x-hidden overflow-y-auto flex-1 min-h-0"}>
             <Table className="table-fixed w-full">
               <TableBody>
-                {sortedPayments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 7 : historyType === 'gov' ? 6 : 7} className="text-center text-[10px] text-muted-foreground py-6">
+                {visiblePayments.length === 0 ? (
+                    <TableRow>
+                    <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-4">
                       No payments found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedPayments.map((payment) => {
+                  visiblePayments.map((payment, index) => {
                     const receiptNumbers = getReceiptNumbers(payment);
                     const cdAmount = getCdAmount(payment);
+                    const extraAmountFromPaidFor =
+                      payment.paidFor?.reduce((sum: number, pf: any) => sum + (Number((pf as any).extraAmount) || 0), 0) || 0;
+                    const paymentReceiptType = String((payment as any).receiptType || '').trim().toLowerCase();
+                    const extraAmountSign =
+                      paymentReceiptType === 'ledger' && String((payment as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
+                    const extraAmountFromPaymentFields =
+                      (Number((payment as any).extraAmount) || 0) + (Number((payment as any).advanceAmount) || 0);
+                    const ledgerAmountFallback =
+                      paymentReceiptType === 'ledger' &&
+                      (payment.paidFor?.length || 0) === 0 &&
+                      extraAmountFromPaymentFields === 0
+                        ? Math.abs(Number((payment as any).amount || 0))
+                        : 0;
+                    const extraAmountFromPayment = extraAmountFromPaymentFields + ledgerAmountFallback;
+                    const includePaymentLevelExtra =
+                      extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online');
+                    const extraAmount = extraAmountFromPaidFor + ((includePaymentLevelExtra ? extraAmountFromPayment : 0) * extraAmountSign);
                     const accountHolderName = getAccountHolderName(payment);
                     const bankDetails = getBankDetails(payment);
                     const centerName = getCenterName(payment);
@@ -238,46 +269,46 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                       : '-';
                     
                     return (
-                      <TableRow key={payment.id || payment.paymentId} className="h-6 border-b border-border/30 hover:bg-primary/10 transition-colors">
+                      <TableRow key={`${payment.id || payment.paymentId || 'pay'}-${index}`} className="h-5 border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-violet-50/60 transition-colors">
                         {historyType === 'cash' && (
                           <>
-                            <TableCell className="text-[11px] px-2 py-1 w-[12%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-0.5 w-[14%] text-left align-middle">
                               <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
                             </TableCell>
-                            <TableCell className="text-[11px] px-2 py-1 w-[10%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-0.5 w-[12%] text-left align-middle">
                               <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[25%] text-left align-middle">
+                            <TableCell className="text-[9px] px-2 py-0.5 w-[34%] text-left align-middle">
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[15%] text-right align-middle">
-                              <span className="font-extrabold text-green-600 dark:text-green-500 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                            <TableCell className="text-[9px] px-2 py-0.5 w-[16%] text-right align-middle">
+                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[15%] text-right align-middle">
-                              <span className="font-extrabold text-blue-600 dark:text-blue-500 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
+                            <TableCell className="text-[9px] px-2 py-0.5 w-[12%] text-right align-middle">
+                              <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
                             </TableCell>
-                            <TableCell className="px-2 py-1 w-[13%] text-center align-middle">
+                            <TableCell className="px-2 py-0.5 w-[12%] text-center align-middle">
                               <div className="flex items-center justify-center gap-1">
                                 {onEdit && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-5 w-5 hover:bg-primary/10 hover:text-primary"
+                                    className="h-4 w-4 hover:bg-primary/10 hover:text-primary"
                                     onClick={() => onEdit(payment)}
                                     title="Edit Payment"
                                   >
-                                    <Pencil className="h-3 w-3" />
+                                    <Pencil className="h-2.5 w-2.5" />
                                   </Button>
                                 )}
                                 {onDelete && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-5 w-5 hover:bg-red-500/10 hover:text-red-600"
+                                    className="h-4 w-4 hover:bg-red-500/10 hover:text-red-600"
                                     onClick={() => onDelete(payment)}
                                     title="Delete Payment"
                                   >
-                                    <Trash2 className="h-3 w-3" />
+                                    <Trash2 className="h-2.5 w-2.5" />
                                   </Button>
                                 )}
                               </div>
@@ -286,19 +317,19 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                         )}
                         {historyType === 'rtgs' && (
                           <>
-                            <TableCell className="text-[11px] px-2 py-1 w-[10%] text-left align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
-                                <span className="text-muted-foreground truncate block font-medium text-[10px]">{paymentDate}</span>
-                              </div>
+                            <TableCell className="text-[11px] px-2 py-1 w-[6%] text-left align-middle">
+                              <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[15%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-1 w-[6%] text-left align-middle">
+                              <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
+                            </TableCell>
+                            <TableCell className="text-[10px] px-2 py-1 w-[14%] text-left align-middle">
                               <div className="flex flex-col">
                                 <span className="text-muted-foreground truncate block font-medium">{accountHolderName}</span>
                                 <span className="truncate block font-mono text-[9px] text-muted-foreground/80">{bankDetails.accountNo}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[18%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-1 w-[16%] text-left align-middle">
                               <div className="flex flex-col">
                                 <span className="truncate block font-medium">{bankDetails.bankName}</span>
                                 <span className="truncate block text-[9px] text-muted-foreground/80">{bankDetails.bankBranch} / {bankDetails.bankIfsc}</span>
@@ -311,12 +342,12 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[10%] text-right align-middle">
-                              <span className="font-extrabold text-green-600 dark:text-green-500 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[8%] text-right align-middle">
-                              <span className="font-extrabold text-blue-600 dark:text-blue-500 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
+                              <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
                             </TableCell>
-                            <TableCell className="px-2 py-1 w-[5%] text-center align-middle">
+                            <TableCell className="px-2 py-1 w-[6%] text-center align-middle">
                               <div className="flex items-center justify-center gap-1">
                                 {onEdit && (
                                   <Button
@@ -346,28 +377,25 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                         )}
                         {historyType === 'gov' && (
                           <>
-                            <TableCell className="text-[11px] px-2 py-1 w-[10%] text-left align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
-                                <span className="text-muted-foreground truncate block font-medium text-[10px]">{paymentDate}</span>
-                              </div>
+                            <TableCell className="text-[11px] px-2 py-1 w-[7%] text-left align-middle">
+                              <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[12%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-1 w-[7%] text-left align-middle">
+                              <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
+                            </TableCell>
+                            <TableCell className="text-[10px] px-2 py-1 w-[14%] text-left align-middle">
                               <span className="truncate block font-medium">{centerName}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[35%] text-left align-middle">
+                            <TableCell className="text-[10px] px-2 py-1 w-[38%] text-left align-middle">
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[12%] text-right align-middle">
-                              <span className="font-extrabold text-green-600 dark:text-green-500 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[8%] text-right align-middle">
-                              <span className="font-extrabold text-blue-600 dark:text-blue-500 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
+                              <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[12%] text-right align-middle">
-                              <span className="font-extrabold text-purple-600 dark:text-purple-500 truncate block">{getExtraAmount(payment) > 0 ? formatCurrency(getExtraAmount(payment)) : '-'}</span>
-                            </TableCell>
-                            <TableCell className="px-2 py-1 w-[11%] text-center align-middle">
+                            <TableCell className="px-2 py-1 w-[14%] text-center align-middle">
                               <div className="flex items-center justify-center gap-1">
                                 {onEdit && (
                                   <Button
@@ -397,46 +425,57 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                         )}
                         {historyType === 'payment' && (
                           <>
-                            <TableCell className="text-[11px] px-2 py-0.5 w-[12%] text-left align-middle">
-                              <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
+                            <TableCell className="px-2 py-0.5 w-[8%] text-left align-top">
+                              <div className="font-mono font-bold text-[10px] leading-none truncate">{payment.paymentId || payment.id}</div>
                             </TableCell>
-                            <TableCell className="text-[11px] px-2 py-0.5 w-[10%] text-left align-middle">
-                              <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
+                            <TableCell className="px-2 py-0.5 w-[8%] text-left align-top">
+                              <div className="text-muted-foreground text-[9px] font-medium leading-none truncate">{paymentDate}</div>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-0.5 w-[20%] text-left align-middle">
-                              <span className="text-muted-foreground truncate block font-medium">{accountHolderName || '-'}</span>
+                            <TableCell className="px-2 py-0.5 w-[16%] text-left align-top">
+                              <div className="text-[9px] font-semibold leading-none truncate">{accountHolderName || '-'}</div>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-0.5 w-[20%] text-left align-middle">
-                              <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
+                            <TableCell className="px-2 py-0.5 w-[26%] text-left align-top">
+                              <div className="text-[9px] text-muted-foreground font-medium leading-none truncate">{receiptNumbers || '-'}</div>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-0.5 w-[12%] text-right align-middle">
-                              <span className="font-semibold text-green-600 dark:text-green-500 truncate block">{payment.amount > 0 ? formatCurrency(payment.amount) : '-'}</span>
+                            <TableCell className="px-2 py-0.5 w-[12%] text-right align-top">
+                              <div className="text-[9px] font-semibold text-slate-700 leading-tight truncate">{extraAmount !== 0 ? formatCurrency(extraAmount) : '-'}</div>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-0.5 w-[10%] text-right align-middle">
-                              <span className="font-semibold text-blue-600 dark:text-blue-500 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
+                            <TableCell className="px-2 py-0.5 w-[12%] text-right align-top">
+                              <div
+                                className={`text-[9px] font-semibold leading-tight truncate ${
+                                  Number(payment.amount || 0) < 0 ? 'text-rose-700' : 'text-slate-900'
+                                }`}
+                              >
+                                {Number(payment.amount || 0) !== 0 ? formatCurrency(Math.abs(Number(payment.amount || 0))) : '-'}
+                              </div>
                             </TableCell>
-                            <TableCell className="px-2 py-0.5 w-[16%] text-center align-middle">
-                              <div className="flex items-center justify-center gap-1.5">
+                            <TableCell className="px-2 py-0.5 w-[8%] text-right align-top">
+                              <div className="text-[9px] font-semibold text-slate-600 leading-tight truncate">
+                                {cdAmount > 0 ? formatCurrency(cdAmount) : '-'}
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-2 py-0.5 w-[10%] text-center align-top">
+                              <div className="flex items-center justify-center gap-1">
                                 {onEdit && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 hover:bg-primary/20 hover:text-primary"
+                                    className="h-4 w-4 hover:bg-primary/20 hover:text-primary"
                                     onClick={() => onEdit(payment)}
                                     title="Edit Payment"
                                   >
-                                    <Pencil className="h-3.5 w-3.5" />
+                                    <Pencil className="h-2.5 w-2.5" />
                                   </Button>
                                 )}
                                 {onDelete && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 hover:bg-red-500/20 hover:text-red-600"
+                                    className="h-4 w-4 hover:bg-red-500/20 hover:text-red-600"
                                     onClick={() => onDelete(payment)}
                                     title="Delete Payment"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-2.5 w-2.5" />
                                   </Button>
                                 )}
                               </div>
@@ -455,4 +494,3 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     </Card>
   );
 };
-

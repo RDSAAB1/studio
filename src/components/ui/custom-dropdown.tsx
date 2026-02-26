@@ -28,6 +28,7 @@ interface CustomDropdownProps {
     noItemsPlaceholder?: string;
     onAdd?: (newItem: string) => void;
     inputClassName?: string;
+    iconClassName?: string;
     showClearButton?: boolean;
     showArrow?: boolean;
     showGoButton?: boolean;
@@ -48,6 +49,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     noItemsPlaceholder = 'No item found.',
     onAdd,
     inputClassName,
+    iconClassName,
     showClearButton = true,
     showArrow = false,
     showGoButton = false,
@@ -544,7 +546,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 </div>
             )}
             <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Search className={cn("absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none", iconClassName)} />
                 <Input
                     ref={inputRef}
                     id={id}
@@ -659,7 +661,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
                         {showClearButton && value && (
                         <button type="button" onClick={handleClear} className="p-0.5 focus:outline-none rounded-full hover:bg-muted">
-                            <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                            <X className={cn("w-3 h-3 text-muted-foreground hover:text-destructive", iconClassName)} />
                         </button>
                     )}
                         {showArrow && (
@@ -669,9 +671,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         className="p-0.5 focus:outline-none"
                     >
                         {isOpen ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            <ChevronUp className={cn("w-3.5 h-3.5 text-muted-foreground", iconClassName)} />
                         ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground", iconClassName)} />
                         )}
                     </button>
                         )}

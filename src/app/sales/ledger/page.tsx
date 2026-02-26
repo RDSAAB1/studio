@@ -1,11 +1,10 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Pencil, Trash2, Check, X, Download, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -86,7 +85,6 @@ const LedgerPage: React.FC = () => {
     particulars: "",
     debit: "",
     credit: "",
-    remarks: "",
   });
 
   const [linkAccountId, setLinkAccountId] = useState<string>("");
@@ -100,7 +98,6 @@ const LedgerPage: React.FC = () => {
     particulars: "",
     debit: "",
     credit: "",
-    remarks: "",
   });
 
   const ledgerRef = useRef<HTMLDivElement>(null);
@@ -635,7 +632,6 @@ const LedgerPage: React.FC = () => {
         debit: sanitizedDebit,
         credit: sanitizedCredit,
       balance: 0,
-        remarks: entryForm.remarks.trim() || undefined,
       createdAt: nowIso,
       updatedAt: nowIso,
         linkGroupId,
@@ -667,7 +663,6 @@ const LedgerPage: React.FC = () => {
           debit: counterDebit,
           credit: counterCredit,
         balance: 0,
-          remarks: entryForm.remarks.trim() || undefined,
         createdAt: nowIso,
         updatedAt: nowIso,
           linkGroupId,
@@ -741,7 +736,6 @@ const LedgerPage: React.FC = () => {
         particulars: "",
         debit: "",
         credit: "",
-        remarks: "",
       });
       setLinkAccountId("");
       setLinkMode("mirror");
@@ -763,13 +757,12 @@ const LedgerPage: React.FC = () => {
       particulars: entry.particulars,
       debit: entry.debit ? entry.debit.toString() : "",
       credit: entry.credit ? entry.credit.toString() : "",
-      remarks: entry.remarks || "",
     });
   };
 
   const handleCancelEdit = () => {
     setEditingEntryId(null);
-    setEditForm({ date: "", particulars: "", debit: "", credit: "", remarks: "" });
+    setEditForm({ date: "", particulars: "", debit: "", credit: "" });
   };
 
   const handleSaveEdit = async (entryId: string) => {
@@ -791,7 +784,6 @@ const LedgerPage: React.FC = () => {
               particulars: editForm.particulars.trim() || "-",
               debit: Math.round(debitValue * 100) / 100,
               credit: Math.round(creditValue * 100) / 100,
-              remarks: editForm.remarks.trim() || undefined,
             }
           : entry
       );
@@ -811,7 +803,6 @@ const LedgerPage: React.FC = () => {
           entry.particulars !== previous.particulars ||
           entry.debit !== previous.debit ||
           entry.credit !== previous.credit ||
-          entry.remarks !== previous.remarks ||
           entry.balance !== previous.balance;
 
         if (hasChanged) {
@@ -858,7 +849,6 @@ const LedgerPage: React.FC = () => {
                     strategy === "same"
                       ? Math.round((Number(editForm.credit) || 0) * 100) / 100
                       : Math.round((Number(editForm.debit) || 0) * 100) / 100,
-                  remarks: editForm.remarks.trim() || entry.remarks,
                   linkStrategy: entry.linkStrategy || strategy || "mirror",
                 }
               : entry
@@ -876,7 +866,6 @@ const LedgerPage: React.FC = () => {
               entry.particulars !== previous.particulars ||
               entry.debit !== previous.debit ||
               entry.credit !== previous.credit ||
-              entry.remarks !== previous.remarks ||
               entry.balance !== previous.balance;
 
             if (hasChanged) {
@@ -990,8 +979,7 @@ const LedgerPage: React.FC = () => {
           entry.debit !== previous.debit ||
           entry.credit !== previous.credit ||
           entry.particulars !== previous.particulars ||
-          entry.date !== previous.date ||
-          entry.remarks !== previous.remarks;
+          entry.date !== previous.date;
 
         if (hasChanged) {
           const updatedEntry = { ...entry, updatedAt: timestamp };
@@ -1023,8 +1011,7 @@ const LedgerPage: React.FC = () => {
             entry.debit !== previous.debit ||
             entry.credit !== previous.credit ||
             entry.particulars !== previous.particulars ||
-            entry.date !== previous.date ||
-            entry.remarks !== previous.remarks;
+            entry.date !== previous.date;
           
           if (hasChanged) {
             changedEntries.push({ ...entry, updatedAt: timestamp });
@@ -1063,7 +1050,7 @@ const LedgerPage: React.FC = () => {
         return `
           <tr>
             <td>${formattedDate}</td>
-            <td>${entry.particulars || "-"}${entry.remarks ? `<div class="remarks">${entry.remarks}</div>` : ""}</td>
+            <td>${entry.particulars || "-"}</td>
             <td class="numeric debit">${entry.debit ? formatCurrency(entry.debit) : ""}</td>
             <td class="numeric credit">${entry.credit ? formatCurrency(entry.credit) : ""}</td>
             <td class="numeric balance">${formatCurrency((entry as any).runningBalance ?? entry.balance)}</td>
@@ -1094,7 +1081,6 @@ const LedgerPage: React.FC = () => {
             .debit { color: #047857; }
             .credit { color: #b91c1c; }
             .balance { font-weight: 600; }
-            .remarks { color: #6b7280; font-size: 11px; margin-top: 4px; }
             .summary { margin-top: 16px; display: flex; justify-content: flex-end; }
             .summary table { width: 320px; border: 1px solid #d1d5db; }
             .summary td { padding: 8px 10px; font-size: 12px; }
@@ -1671,15 +1657,15 @@ const LedgerPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-1 space-y-2">
       <style dangerouslySetInnerHTML={{ __html: STATEMENT_PRINT_STYLES }} />
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as "ledger" | "statement")}
-        className="space-y-6"
+        className="space-y-2"
       >
         {/* Header Section - All elements in a card */}
-        <Card className="p-3">
+        <Card className="p-2">
         <div className="flex items-center gap-3 flex-nowrap w-full overflow-x-auto">
             <TabsList className="flex-shrink-0 h-10">
               <TabsTrigger value="ledger" className="h-9">Ledger</TabsTrigger>
@@ -1722,7 +1708,7 @@ const LedgerPage: React.FC = () => {
             )}
           </div>
         </Card>
-        <TabsContent value="ledger" className="space-y-6">
+        <TabsContent value="ledger" className="space-y-2">
       {showAccountForm && (
         <AccountForm
           newAccount={newAccount}
@@ -1733,7 +1719,7 @@ const LedgerPage: React.FC = () => {
         />
       )}
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-3">
         <Card className="shadow-sm md:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border py-3">
           <div>
@@ -1902,12 +1888,12 @@ const LedgerPage: React.FC = () => {
                         const counts = activeCashAccount.noteGroups[key] || [0];
                         const summary = cashSummary.denominationTotals[key] || { totalNotes: 0, amount: 0 };
                         return (
-                          <tr key={denomination} className="border-t border-border">
-                            <td className="px-3 py-2 font-semibold text-foreground">₹{denomination}</td>
+                          <tr key={denomination} className="border-t border-border group hover:bg-muted/30 transition-colors">
+                            <td className="px-3 py-2 font-semibold text-foreground w-20">₹{denomination}</td>
                             <td className="px-3 py-2">
-                              <div className="flex flex-wrap items-center gap-1.5">
+                              <div className="flex flex-wrap items-center gap-2">
                                 {counts.map((count, index) => (
-                                  <div key={`${denomination}-${index}`} className="flex items-center gap-1.5">
+                                  <div key={`${denomination}-${index}`} className="relative flex items-center group/item">
                                     <Input
                                       type="number"
                                       min="0"
@@ -1915,27 +1901,27 @@ const LedgerPage: React.FC = () => {
                                       onChange={(event) =>
                                         handleUpdateCashCount(denomination, index, event.target.value)
                                       }
-                                      className="h-8 w-20 text-sm"
+                                      className="h-7 w-16 text-center text-sm px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     {counts.length > 1 && (
-                                      <Button
+                                      <button
                                         type="button"
-                                        size="icon"
-                                        variant="ghost"
                                         onClick={() => handleRemoveCashCountRow(denomination, index)}
-                                        className="h-7 w-7 text-red-500"
+                                        className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground opacity-0 shadow-sm transition-opacity group-hover/item:opacity-100"
+                                        title="Remove stack"
                                       >
-                                        <X className="h-3.5 w-3.5" />
-                                      </Button>
+                                        <X className="h-3 w-3" />
+                                      </button>
                                     )}
                                   </div>
                                 ))}
                                 <Button
                                   type="button"
                                   size="icon"
-                                  variant="outline"
+                                  variant="ghost"
                                   onClick={() => handleAddCashCountRow(denomination)}
-                                  className="h-7 w-7"
+                                  className="h-7 w-7 rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                  title="Add another stack"
                                 >
                                   +
                                 </Button>
@@ -1955,20 +1941,7 @@ const LedgerPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-xs font-medium text-muted-foreground">Total Notes</p>
-                  <p className="mt-1 text-xl font-bold text-foreground">
-                    {cashSummary.totalNotes.toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/20 p-3 md:col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground">Total Cash</p>
-                  <p className="mt-1 text-xl font-bold text-primary">
-                    ₹{formatCurrency(cashSummary.totalAmount)}
-                  </p>
-                </div>
-              </div>
+
             </>
           ) : cashAccounts.length === 0 && !showCashAccountForm ? (
             <p className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -2018,7 +1991,7 @@ const LedgerPage: React.FC = () => {
                             const isEditing = editingEntryId === entry.id;
                             return (
                               <tr key={entry.id} className="border-t border-border align-top">
-                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                <td className="px-3 py-1 whitespace-nowrap">
                                   {isEditing ? (
                                     <SmartDatePicker
                                       value={editForm.date}
@@ -2034,43 +2007,26 @@ const LedgerPage: React.FC = () => {
                                     new Date(entry.date).toLocaleDateString("en-IN")
                                   )}
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td className="px-3 py-1">
                                   {isEditing ? (
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-1">
                                       <Input
                                         value={editForm.particulars}
                                         onChange={(event) =>
                                           setEditForm((prev) => ({
                                             ...prev,
-                                            particulars: event.target.value,
+                                            particulars: event.target.value.toUpperCase(),
                                           }))
                                         }
                                         disabled={saving}
-                                        className="h-8"
-                                      />
-                                      <Textarea
-                                        value={editForm.remarks}
-                                        onChange={(event) =>
-                                          setEditForm((prev) => ({
-                                            ...prev,
-                                            remarks: event.target.value,
-                                          }))
-                                        }
-                                        placeholder="Remarks"
-                                        className="min-h-[48px]"
-                                        disabled={saving}
+                                        className="h-7 text-xs uppercase"
                                       />
                                     </div>
                                   ) : (
-                                    <div className="space-y-1">
-                                      <p className="leading-tight">{entry.particulars}</p>
-                                      {entry.remarks && (
-                                        <p className="text-[11px] text-muted-foreground leading-tight">{entry.remarks}</p>
-                                      )}
-                                    </div>
+                                    <p className="leading-tight">{entry.particulars}</p>
                                   )}
                                 </td>
-                                <td className="px-3 py-1.5 text-right text-emerald-600">
+                                <td className="px-3 py-1 text-right text-emerald-600">
                                   {isEditing ? (
                                     <Input
                                       type="number"
@@ -2087,7 +2043,7 @@ const LedgerPage: React.FC = () => {
                                     entry.debit ? formatCurrency(entry.debit) : "-"
                                   )}
                                 </td>
-                                <td className="px-3 py-1.5 text-right text-red-500">
+                                <td className="px-3 py-1 text-right text-red-500">
                                   {isEditing ? (
                                     <Input
                                       type="number"
@@ -2104,10 +2060,10 @@ const LedgerPage: React.FC = () => {
                                     entry.credit ? formatCurrency(entry.credit) : "-"
                                   )}
                                 </td>
-                                <td className="px-3 py-1.5 text-right font-semibold">
+                                <td className="px-3 py-1 text-right font-semibold">
                                   {formatCurrency((entry as any).runningBalance ?? entry.balance)}
                                 </td>
-                                <td className="px-3 py-1.5 text-right">
+                                <td className="px-3 py-1 text-right">
                                   {isEditing ? (
                                     <div className="flex items-center justify-end gap-1.5">
                                       <Button
@@ -2233,71 +2189,79 @@ const LedgerPage: React.FC = () => {
                                 </Button>
                               </div>
               </div>
-              <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Supplier Cash Payments
+              <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Supplier Cash Payments">
+                    Supplier Cash
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
+                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                     ₹{formatCurrency(statementTotals.supplierCash)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Supplier RTGS Payments
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Supplier RTGS Payments">
+                    Supplier RTGS
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
+                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                     ₹{formatCurrency(statementTotals.supplierRtgs)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Gov Distribution
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Gov Distribution">
+                    Gov Dist.
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
+                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                     ₹{formatCurrency(statementTotals.govDistribution)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Total Supplier Payments
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Supplier Payments">
+                    Total Payments
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
+                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                     ₹{formatCurrency(statementTotals.supplierPayments)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Total Expenses
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Expenses">
+                    Expenses
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-rose-600">
+                  <p className="mt-1 text-base font-bold tabular-nums text-red-600">
                     ₹{formatCurrency(statementTotals.expenses)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Total Incomes
+                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Incomes">
+                    Incomes
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-emerald-600">
+                  <p className="mt-1 text-base font-bold tabular-nums text-emerald-600">
                     ₹{formatCurrency(statementTotals.incomes)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                    S/E Cash (Supplier Cash + Expenses)
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-colors">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-primary truncate" title="S/E Cash (Supplier Cash + Expenses)">
+                    S/E Cash
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
+                  <p className="mt-1 text-base font-bold tabular-nums text-primary">
                     ₹{formatCurrency(statementTotals.seCash)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-primary/60 bg-gradient-to-r from-secondary/10 via-primary/5 to-secondary/5 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                    Net Total (Supplier Payments + Expenses - Income)
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
-                    ₹{formatCurrency(statementTotals.netTotal)}
-                  </p>
+              </div>
+              <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-primary rounded-full hidden sm:block"></div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-primary/80">
+                      Net Total Balance
+                    </p>
+                    <p className="text-[10px] text-muted-foreground hidden sm:block">
+                      (Supplier Payments + Expenses) - Income
+                    </p>
+                  </div>
                 </div>
+                <p className="text-2xl font-bold tabular-nums text-primary tracking-tight">
+                  ₹{formatCurrency(statementTotals.netTotal)}
+                </p>
               </div>
               <div className="print-only">
                 <table className="print-summary-table">
@@ -2339,52 +2303,55 @@ const LedgerPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/70 text-muted-foreground">
+              <div className="overflow-x-auto max-h-[600px] border rounded-md">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b shadow-sm">
                     <tr>
-                      <th className="px-4 py-2 text-left font-semibold">Date</th>
-                      <th className="px-4 py-2 text-right font-semibold">Supplier Cash (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Supplier RTGS (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Gov Distribution (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Supplier Payments (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Expenses (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Income (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">S/E Cash (₹)</th>
-                      <th className="px-4 py-2 text-right font-semibold">Net Total (₹)</th>
+                      <th className="px-3 py-2.5 text-left font-medium uppercase tracking-wider text-muted-foreground w-[100px]">Date</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supplier Cash</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supplier RTGS</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Gov Dist.</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supp. Payments</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Expenses</th>
+                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Income</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider text-foreground">S/E Cash</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider text-foreground bg-muted/50">Net Total</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/50">
                     {statementLoading ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
-                          Generating statement…
-                            </td>
+                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                            <span>Generating statement...</span>
+                          </div>
+                        </td>
                       </tr>
                     ) : statementData.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                           No data found for the selected range.
-                            </td>
-                          </tr>
+                        </td>
+                      </tr>
                     ) : (
                       statementData.map((row) => (
-                        <tr key={row.date} className="border-t border-border">
-                          <td className="px-4 py-2">{formatStatementDate(row.date)}</td>
-                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierCash)}</td>
-                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierRtgs)}</td>
-                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.govDistribution)}</td>
-                          <td className="px-4 py-2 text-right text-primary">{formatCurrency(row.supplierPayments)}</td>
-                          <td className="px-4 py-2 text-right text-red-500">{formatCurrency(row.expenses)}</td>
-                          <td className="px-4 py-2 text-right text-emerald-600">{formatCurrency(row.incomes)}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-primary">{formatCurrency(row.seCash)}</td>
-                          <td className="px-4 py-2 text-right font-semibold">{formatCurrency(row.netTotal)}</td>
+                        <tr key={row.date} className="group hover:bg-muted/40 transition-colors">
+                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{formatStatementDate(row.date)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">{formatCurrency(row.supplierCash)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">{formatCurrency(row.supplierRtgs)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">{formatCurrency(row.govDistribution)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground font-medium">{formatCurrency(row.supplierPayments)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-red-600 font-medium">{formatCurrency(row.expenses)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-600 font-medium">{formatCurrency(row.incomes)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground font-bold">{formatCurrency(row.seCash)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums font-bold bg-muted/30 group-hover:bg-muted/50 transition-colors">{formatCurrency(row.netTotal)}</td>
                         </tr>
                       ))
                     )}
-                    </tbody>
-                  </table>
-                </div>
+                  </tbody>
+                </table>
+              </div>
               <div className="px-4 pb-8 print-only">
                 <div className="print-footer">
                   <div>

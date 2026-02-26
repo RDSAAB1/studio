@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, Payment, ReceiptSettings } from "@/lib/definitions";
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import type { Customer, Payment, ReceiptSettings, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
@@ -76,11 +76,82 @@ const formatRate = (value: number | string | null | undefined) => {
   return `₹${numericValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+type UnifiedPaymentsHook = {
+  suppliers: Customer[];
+  paymentHistory: Payment[];
+  customerSummaryMap: Map<string, any>;
+  selectedCustomerKey: string | null;
+  selectedEntryIds: Set<string>;
+  selectedEntries: Customer[];
+  serialNoSearch: string;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  handleCustomerSelect: (key: string | null) => void;
+  handleEditPayment?: (p: Payment) => void;
+  handleDeletePayment?: (p: Payment) => void;
+  handleProcessPayment?: () => void | Promise<void>;
+  processPayment?: () => void | Promise<void>;
+  resetPaymentForm?: () => void;
+  isProcessing?: boolean;
+  setPaymentMethod?: (method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => void;
+  paymentMethod?: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.';
+  govRate?: number;
+  minRate?: number;
+  maxRate?: number;
+  banks?: any[];
+  bankBranches?: any[];
+  bankAccounts?: any[];
+  receiptSettings: ReceiptSettings | null;
+  detailsSupplierEntry?: any | null;
+  setDetailsSupplierEntry: (entry: any | null) => void;
+  setParchiNo?: (value: string) => void;
+  parchiNo?: string;
+  isBankSettingsOpen: boolean;
+  setIsBankSettingsOpen: (open: boolean) => void;
+  selectedPaymentForDetails?: any | null;
+  setSelectedPaymentForDetails: (p: any | null) => void;
+  rtgsReceiptData?: any | null;
+  setRtgsReceiptData: (p: any | null) => void;
+  bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
+  setBankDetails: React.Dispatch<React.SetStateAction<{ bank?: string; branch?: string; ifscCode?: string; acNo?: string }>>;
+  supplierDetails?: { name?: string; [key: string]: unknown };
+  setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
+  editingPayment?: Payment | null;
+  handleSerialNoSearch?: (value: string) => void;
+  handleSerialNoBlur?: () => void;
+  setSelectedEntryIds: (ids: Set<string>) => void;
+  centerName?: string;
+  setCenterName?: (value: string) => void;
+  centerNameOptions?: any[];
+  cdEnabled?: boolean;
+  cdAt?: string;
+  setCdAt?: (value: string) => void;
+  cdPercent?: number;
+  setCdPercent?: (value: number) => void;
+  calculatedCdAmount?: number;
+  setCdAmount?: (value: number) => void;
+  rtgsQuantity?: number;
+  setRtgsQuantity?: (value: number) => void;
+  rtgsRate?: number;
+  setRtgsRate?: (value: number) => void;
+  rtgsAmount?: number;
+  setRtgsAmount?: (value: number) => void;
+  setMinRate?: (value: number) => void;
+  setMaxRate?: (value: number) => void;
+  selectPaymentAmount?: (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; bags?: number | null }) => void;
+  govQuantity?: number;
+  setGovQuantity?: (value: number) => void;
+  govAmount?: number;
+  setGovAmount?: (value: number) => void;
+  setGovRate?: (value: number) => void;
+  selectedPaymentOption?: { quantity?: number; rate?: number; calculatedAmount?: number; amountRemaining?: number; bags?: number | null } | null;
+};
+
 interface UnifiedPaymentsClientProps {
   type?: 'supplier' | 'customer' | 'outsider';
 }
 
-export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProps = {}) {
+function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProps = {}) {
     const [searchType, setSearchType] = useState<'name' | 'fatherName' | 'address' | 'contact'>('name');
     const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
     const { toast } = useToast();
@@ -112,35 +183,41 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const outsiderHook = useOutsiderPayments(outsiderData);
   
   // Use appropriate hook based on type
-  const hook = type === 'supplier' ? supplierHook : 
-               type === 'customer' ? customerHook : 
-               type === 'outsider' ? outsiderHook : 
-               {
+  const rawHook = type === 'supplier' ? supplierHook : 
+                  type === 'customer' ? customerHook : 
+                  type === 'outsider' ? outsiderHook : 
+                  undefined;
+  const defaultHook: UnifiedPaymentsHook = {
     suppliers: [],
     paymentHistory: [],
     customerSummaryMap: new Map(),
     selectedCustomerKey: null,
     selectedEntryIds: new Set(),
-    handleCustomerSelect: () => {},
-    handleEditPayment: () => {},
-    calcTargetAmount: () => 0,
-    minRate: 0,
-    maxRate: 0,
+    selectedEntries: [],
     serialNoSearch: '',
     activeTab: 'process',
     setActiveTab: () => {},
-    selectedEntries: [],
-    setParchiNo: () => {},
+    handleCustomerSelect: () => {},
+    receiptSettings: null,
     setDetailsSupplierEntry: () => {},
-    detailsSupplierEntry: null,
+    isBankSettingsOpen: false,
+    setIsBankSettingsOpen: () => {},
+    setSelectedPaymentForDetails: () => {},
+    setRtgsReceiptData: () => {},
+    bankDetails: {},
+    setBankDetails: () => {},
+    setSelectedEntryIds: () => {},
   };
+  const hook: UnifiedPaymentsHook = { ...defaultHook, ...(rawHook as any) };
   
   // Get data based on type
   const dataSource = type === 'supplier' ? supplierData : 
                      type === 'customer' ? customerData : 
                      type === 'outsider' ? outsiderData : 
                      null;
-  const { supplierBankAccounts, banks, bankBranches } = dataSource || { supplierBankAccounts: [], banks: [], bankBranches: [] };
+  const supplierBankAccounts = type === 'supplier' ? supplierData.supplierBankAccounts : [];
+  const banks = (dataSource as any)?.banks ?? [];
+  const bankBranches = (dataSource as any)?.bankBranches ?? [];
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [supplierDataRefreshKey, setSupplierDataRefreshKey] = useState<number>(0);
   const [parchiNoRefreshKey, setParchiNoRefreshKey] = useState<number>(0);
@@ -150,15 +227,13 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [activeTransactionTab, setActiveTransactionTab] = useState<string>("all");
   const [historyTab, setHistoryTab] = useState<'cash' | 'gov' | 'rtgs'>('cash');
-  const [rsValue, setRsValue] = useState<number>(0);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedHistoryType, setSelectedHistoryType] = useState<'cash' | 'gov' | 'rtgs'>('cash');
 
   const paymentCombination = usePaymentCombination({
-    calcTargetAmount: hook?.calcTargetAmount || (() => 0),
+    targetAmount: hook?.rtgsAmount || 0,
     minRate: hook?.paymentMethod === 'Gov.' ? (hook?.govRate || 0) : (hook?.minRate || 0),
     maxRate: hook?.paymentMethod === 'Gov.' ? (hook?.govRate || 0) : (hook?.maxRate || 0),
-    rsValue: rsValue,
   });
 
   // Use the same supplier summary and filtering as supplier profile (skip for outsider)
@@ -205,7 +280,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     onSelectSupplierKey as (key: string | null) => void,
     filterStartDate,
     filterEndDate,
-    type === 'outsider' ? null : MILL_OVERVIEW_KEY
+    type === 'outsider' ? undefined : MILL_OVERVIEW_KEY
   );
 
   // Get filter logic from hook
@@ -259,6 +334,19 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     // Removed toast from dependencies - it's stable from useToast hook
     // eslint-disable-next-line react-hooks/exhaustive-deps
 
+  const handleEditEntry = useCallback((entry: any) => {
+    if (!entry) return;
+    setSelectedEntryForEdit(entry);
+    setEditEntryDialogOpen(true);
+  }, []);
+
+  const handleEditEntryDialogOpenChange = useCallback((nextOpen: boolean) => {
+    setEditEntryDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setSelectedEntryForEdit(null);
+    }
+  }, []);
+
   const selectedSupplierSummary = useMemo(() => {
     if (type === 'outsider') return null;
     if (!hook.selectedCustomerKey) return null;
@@ -306,8 +394,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     const totalKartaAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaAmount) || 0), 0);
     const totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryAmount) || 0), 0);
     const totalKanta = filteredTransactions.reduce((sum, t) => sum + (Number(t.kanta) || 0), 0);
-    const totalOther = filteredTransactions.reduce((sum, t) => sum + (Number(t.other) || 0), 0);
-    const totalOriginalAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.originalNetAmount) || 0), 0);
+    const totalOther = filteredTransactions.reduce((sum, t) => sum + (Number(t.otherCharges) || 0), 0);
+    const totalBaseOriginalAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.originalNetAmount) || 0), 0);
     
     // Calculate paid amounts from payment history for filtered transactions
     const filteredSrNosSet = new Set(filteredTransactions.map((t: Customer) => t.srNo?.toLowerCase()).filter(Boolean));
@@ -319,7 +407,7 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     let totalCd = 0;
     let totalCashPaid = 0;
     let totalRtgsPaid = 0;
-    let totalExtraAmount = 0; // Total extra amount from Gov. payments
+    let totalGovExtraAmount = 0;
     
     filteredTransactions.forEach((entry: Customer) => {
       const entrySrNo = (entry.srNo || "").toLowerCase();
@@ -327,41 +415,15 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
         p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
       );
       
-      // IMPORTANT: Find ALL Gov payments for this entry and sum ALL their extraAmounts
-      // If one receipt has multiple Gov payments, each payment's extraAmount is added separately
-      // Example: If receipt S001 has 3 Gov payments (RT001, RT002, RT003), all 3 extraAmounts will be summed
-      const allGovPayments = paymentsForEntry.filter(p => {
-        const receiptType = ((p as any).receiptType || '').trim().toLowerCase();
-        const isGovByType = receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov');
-        const hasGovFields = (p as any).govQuantity !== undefined || 
-                            (p as any).govRate !== undefined || 
-                            (p as any).govAmount !== undefined ||
-                            (p as any).extraAmount !== undefined ||
-                            (p as any).govRequiredAmount !== undefined;
-        return (isGovByType || hasGovFields) && p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-      });
-      
-      // Sum extraAmount from ALL Gov payments for this entry
-      allGovPayments.forEach(govPayment => {
-        const paidForThisEntry = govPayment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-        if (paidForThisEntry) {
-          // Get extra amount from paidFor entry - each payment contributes separately
-          if (paidForThisEntry.adjustedOriginal !== undefined) {
-            const extra = paidForThisEntry.adjustedOriginal - (Number(entry.originalNetAmount) || 0);
-            totalExtraAmount += extra;
-          } else if (paidForThisEntry.extraAmount !== undefined) {
-            // Add extraAmount from THIS payment (each payment counted separately)
-            totalExtraAmount += (paidForThisEntry.extraAmount || 0);
-          } else if ((govPayment as any).extraAmount !== undefined) {
-            totalExtraAmount += ((govPayment as any).extraAmount || 0);
-          }
-        }
-      });
-      
       paymentsForEntry.forEach((payment: Payment) => {
         const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
         if (paidForEntry) {
           totalPaid += Number(paidForEntry.amount || 0);
+          
+          // Accumulate Gov Extra Amount
+          if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
+            totalGovExtraAmount += Number(paidForEntry.extraAmount);
+          }
           
           // CD amount calculation
           if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
@@ -386,10 +448,70 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
     });
     
     // Calculate adjusted original (base original + extra amount from Gov. payments)
-    const totalAdjustedOriginal = totalOriginalAmount + totalExtraAmount;
+    const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount;
+    const totalAdjustedOriginal = totalOriginalAmount;
     
     // Outstanding = Adjusted Original - Paid - CD
-    const totalOutstanding = totalAdjustedOriginal - totalPaid - totalCd;
+    const baseOutstanding = totalAdjustedOriginal - totalPaid - totalCd;
+
+    const ledgerCandidatePayments = (hook.paymentHistory || []).filter((p: Payment) => {
+      const receiptType = ((p as any).receiptType || (p as any).type || "").toString().trim().toLowerCase();
+      if (receiptType !== "ledger") return false;
+
+      const paidForMatch = p.paidFor?.some((pf) => filteredSrNosSet.has((pf.srNo || "").toLowerCase())) || false;
+      const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
+      const parchiTokens = parchiNoRaw
+        .split(/[,\s]+/g)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const parchiMatch = parchiTokens.some((token) => filteredSrNosSet.has(token));
+      const supplierKey = hook.selectedCustomerKey || "";
+      const supplierMatch =
+        Boolean(supplierKey) &&
+        (String((p as any).supplierId || "") === supplierKey || String((p as any).customerId || "") === supplierKey);
+
+      const selectedName = String((selectedSupplierSummary as any)?.name || "").trim().toLowerCase();
+      const selectedFather = String(((selectedSupplierSummary as any)?.so || (selectedSupplierSummary as any)?.fatherName || "")).trim().toLowerCase();
+      const paymentName = String((p as any).supplierName || (p as any).parchiName || "").trim().toLowerCase();
+      const paymentFather = String((p as any).supplierFatherName || "").trim().toLowerCase();
+      const supplierDetailsMatch =
+        Boolean(selectedName) &&
+        Boolean(paymentName) &&
+        paymentName === selectedName &&
+        (!selectedFather || !paymentFather || paymentFather === selectedFather);
+
+      return paidForMatch || parchiMatch || supplierMatch || supplierDetailsMatch;
+    });
+
+    const uniqueLedgerPayments = Array.from(
+      new Map(
+        ledgerCandidatePayments.map((p: Payment) => [
+          String(p.paymentId || p.id || (p as any).rtgsSrNo || `${p.date}_${p.amount}`),
+          p,
+        ])
+      ).values()
+    );
+
+    const ledgerAdjustment = uniqueLedgerPayments.reduce(
+      (acc, p: Payment) => {
+        const amountRaw = Number((p as any).amount || 0);
+        const amountAbs = Math.abs(amountRaw);
+        const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
+        const isLedgerCredit = drCrLower === "credit" || amountRaw < 0;
+        const linkedPaid = p.paidFor?.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0) || 0;
+        const unlinked = Math.max(0, amountAbs - linkedPaid);
+
+        if (unlinked > 0) {
+          if (isLedgerCredit) acc.credit += unlinked;
+          else acc.debit += unlinked;
+        }
+
+        return acc;
+      },
+      { debit: 0, credit: 0 }
+    );
+
+    const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.debit - ledgerAdjustment.credit) * 100) / 100;
     
     // Calculate outstanding entry IDs (using adjusted original for Gov. payments)
     const outstandingEntryIds = filteredTransactions
@@ -401,47 +523,19 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
         let entryPaid = 0;
         let entryCd = 0;
         
-        // IMPORTANT: Check for ALL Gov payments' extra amounts for this entry
-        // If one receipt has multiple Gov payments, sum all their extraAmounts
+        // Base original amount (no extra amount)
         let adjustedOriginal = Number(t.originalNetAmount) || 0;
-        let totalExtraForEntry = 0;
-        
-        const allGovPaymentsForEntry = paymentsForEntry.filter(p => {
-          const receiptType = ((p as any).receiptType || '').trim().toLowerCase();
-          const isGovByType = receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov');
-          const hasGovFields = (p as any).govQuantity !== undefined || 
-                              (p as any).govRate !== undefined || 
-                              (p as any).govAmount !== undefined ||
-                              (p as any).extraAmount !== undefined ||
-                              (p as any).govRequiredAmount !== undefined;
-          return (isGovByType || hasGovFields) && p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-        });
-        
-        // Sum extraAmount from ALL Gov payments for this entry
-        allGovPaymentsForEntry.forEach(govPayment => {
-          const paidForThisEntry = govPayment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-          if (paidForThisEntry) {
-            if (paidForThisEntry.adjustedOriginal !== undefined) {
-              // Use adjustedOriginal from the first/latest Gov payment
-              adjustedOriginal = paidForThisEntry.adjustedOriginal;
-            } else if (paidForThisEntry.extraAmount !== undefined) {
-              // Sum all extraAmounts from all Gov payments
-              totalExtraForEntry += (paidForThisEntry.extraAmount || 0);
-            } else if ((govPayment as any).extraAmount !== undefined) {
-              totalExtraForEntry += ((govPayment as any).extraAmount || 0);
-            }
-          }
-        });
-        
-        // If we summed extraAmounts, add to original
-        if (totalExtraForEntry > 0 && adjustedOriginal === Number(t.originalNetAmount)) {
-          adjustedOriginal = (Number(t.originalNetAmount) || 0) + totalExtraForEntry;
-        }
         
         paymentsForEntry.forEach((payment: Payment) => {
           const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
           if (paidForEntry) {
             entryPaid += Number(paidForEntry.amount || 0);
+            
+            // Add extra amount to adjusted original for this entry
+            if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
+                adjustedOriginal += Number(paidForEntry.extraAmount);
+            }
+
             if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
               entryCd += Number(paidForEntry.cdAmount || 0);
             } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
@@ -503,12 +597,15 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       totalKanta,
       totalOther,
       totalOriginalAmount,
-      totalExtraAmount, // Add extra amount for display
+      totalBaseOriginalAmount,
+      totalGovExtraAmount,
       totalAdjustedOriginal, // Add adjusted original for display
       totalPaid,
       totalCdAmount: totalCd,
       totalCashPaid,
       totalRtgsPaid,
+      ledgerCreditAmount: Math.round(ledgerAdjustment.credit * 100) / 100,
+      ledgerDebitAmount: Math.round(ledgerAdjustment.debit * 100) / 100,
       totalOutstanding,
       outstandingEntryIds,
       averageRate,
@@ -519,52 +616,6 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       averageLabouryRate,
     };
   }, [selectedSupplierSummary, hook.selectedEntries, hook.paymentHistory, transactionsForSelectedSupplier]);
-
-  // Calculate transaction counts for status section (skip for outsider - no supplier data)
-  const transactionCounts = useMemo(() => {
-    // Skip calculation for outsider type - no supplier/outstanding data needed
-    if (type === 'outsider') {
-      return {
-        all: 0,
-        outstanding: 0,
-        running: 0,
-        profitable: 0,
-        paid: 0,
-        total: 0
-      };
-    }
-    
-    // If receipts are selected, use only selected receipts; otherwise use all transactions
-    const transactions = hook.selectedEntries && hook.selectedEntries.length > 0
-      ? hook.selectedEntries
-      : transactionsForSelectedSupplier;
-    
-    const outstanding = transactions.filter((t: Customer) => {
-      const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
-      return totalPaid === 0 && (t.originalNetAmount || 0) > 0;
-    });
-    const running = transactions.filter((t: Customer) => {
-      const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-      const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
-      return outstanding >= 200 && totalPaid > 0;
-    });
-    const profitable = transactions.filter((t: Customer) => {
-      const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-      return outstanding >= 1 && outstanding < 200;
-    });
-    const paid = transactions.filter((t: Customer) => {
-      const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-      return outstanding < 1;
-    });
-    return {
-      all: transactions.length,
-      outstanding: outstanding.length,
-      running: running.length,
-      profitable: profitable.length,
-      paid: paid.length,
-      total: transactions.length
-    };
-  }, [type, transactionsForSelectedSupplier, hook.selectedEntries]);
 
   const selectedSupplierSrNos = useMemo(() => {
     if (!selectedSupplierSummary?.allTransactions) return [];
@@ -599,21 +650,26 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
       const matchesSerial =
         !normalizedSerialFilter || paidSrNos.includes(normalizedSerialFilter);
       
-      // If receipts are selected, only show payments for those receipts
-      // Otherwise, show all payments for the selected supplier
-      const matchesReceipts = selectedReceiptSrNos.length === 0 
-        ? true // No receipts selected, show all payments for supplier
-        : paidSrNos.some((sr) => selectedReceiptSrNos.includes(sr)); // Receipts selected, filter by them
+      // If receipts are selected, do NOT filter history by them. 
+      // User wants to see all history for the supplier even when selecting bills to pay.
+      // const matchesReceipts = selectedReceiptSrNos.length === 0 
+      //   ? true // No receipts selected, show all payments for supplier
+      //   : paidSrNos.some((sr) => selectedReceiptSrNos.includes(sr)); // Receipts selected, filter by them
       
       const matchesSupplier =
-        !selectedSupplierSrNos.length ||
-        paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr));
+        !hook.selectedCustomerKey ||
+        (payment.supplierId === hook.selectedCustomerKey) ||
+        (!selectedSupplierSrNos.length ||
+        paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr)));
 
       const matchesDate = isWithinDateRange(payment.date);
 
-      return matchesSerial && matchesReceipts && matchesSupplier && matchesDate;
+      // We do NOT filter history by serial number search. 
+      // The search box is for finding bills to pay, not filtering history.
+      // If we filter history by serial search, advance payments (which have no bill number) disappear.
+      return matchesSupplier && matchesDate;
     },
-    [normalizedSerialFilter, selectedSupplierSrNos, selectedReceiptSrNos, isWithinDateRange]
+    [selectedSupplierSrNos, isWithinDateRange, hook.selectedCustomerKey]
   );
 
   // Helper: normalize payment id for sorting
@@ -694,11 +750,9 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
         const hasGovQuantity = (payment as any).govQuantity !== undefined && (payment as any).govQuantity !== null;
         const hasGovRate = (payment as any).govRate !== undefined && (payment as any).govRate !== null;
         const hasGovAmount = (payment as any).govAmount !== undefined && (payment as any).govAmount !== null;
-        const hasGovRequiredAmount = (payment as any).govRequiredAmount !== undefined && (payment as any).govRequiredAmount !== null;
-        const hasExtraAmount = (payment as any).extraAmount !== undefined && (payment as any).extraAmount !== null;
         
         // If ANY gov-specific field exists, show it
-        if (hasGovQuantity || hasGovRate || hasExtraAmount || hasGovAmount || hasGovRequiredAmount) {
+        if (hasGovQuantity || hasGovRate || hasGovAmount) {
           return true;
         }
         
@@ -805,28 +859,56 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
   }, [hook.paymentHistory, hook.selectedCustomerKey, paymentMatchesSelection]);
 
 
+    const { setSelectedEntryIds, setParchiNo, setPaymentMethod } = hook;
+    const handleSelectionChange = useCallback((newSelection: Set<string>) => {
+      if (setSelectedEntryIds) {
+          setSelectedEntryIds(newSelection);
+          // Auto-populate Parchi No if single entry selected
+          if (newSelection.size === 1 && setParchiNo) {
+              const selectedId = Array.from(newSelection)[0];
+              const entry = transactionsForSelectedSupplier?.find(t => t.id === selectedId);
+              if (entry && entry.srNo) {
+                  setParchiNo(entry.srNo);
+              }
+          }
+      }
+    }, [setSelectedEntryIds, setParchiNo, transactionsForSelectedSupplier]);
+
     const handlePaymentMethodChange = useCallback(
-      (method: 'Cash' | 'Online' | 'RTGS' | 'Gov.') => {
+      (method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
         // Call the setPaymentMethod directly from the hook
         // It's already handleSetPaymentMethod which has all the logic
-        if (hook.setPaymentMethod) {
-          hook.setPaymentMethod(method);
+        if (setPaymentMethod) {
+          setPaymentMethod(method);
         }
       },
-      [hook]
+      [setPaymentMethod]
     );
   
     return (
-        <div className="space-y-3 text-[12px]">
+        <div className="space-y-2 text-[12px]">
              {type === 'outsider' ? (
                 // For outsider: No tabs, just show payment content directly
                 <>
-                    <div className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 border-b">
-                        <div className="w-full px-3 md:px-5 py-1 flex flex-wrap gap-2 md:gap-3 items-center text-[12px]">
+                    <div className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <div className="w-full px-1.5 sm:px-2.5 py-0.5 flex flex-wrap gap-2 items-center text-[12px]">
                             <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                                 <div className="flex items-center gap-2 md:pl-3">
-                                    <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm} disabled={hook.isProcessing}>Clear</Button>
-                                    <Button size="sm" className="h-7 text-[11px]" onClick={hook.processPayment} disabled={hook.isProcessing}>
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-[11px]"
+                                      variant="outline"
+                                      onClick={hook.resetPaymentForm ?? (() => {})}
+                                      disabled={hook.isProcessing ?? false}
+                                    >
+                                      Clear
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-[11px]"
+                                      onClick={() => void hook.processPayment?.()}
+                                      disabled={hook.isProcessing ?? false}
+                                    >
                                         {hook.isProcessing ? (
                                             <>
                                                 <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -848,10 +930,23 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                         );
                         
                         return (
-                          <div className="w-full max-w-full overflow-hidden space-y-3">
-                            <div className="flex flex-col gap-3">
+                          <div className="w-full max-w-full overflow-hidden space-y-2">
+                            <div className="flex flex-col gap-2">
                               <div className="w-full">
-                                <RtgsFormOutsider {...hook} bankAccounts={outsiderData?.bankAccounts || []} banks={outsiderData?.banks || []} bankBranches={outsiderData?.bankBranches || []} />
+                                <RtgsFormOutsider
+                                  bankDetails={hook.bankDetails}
+                                  setBankDetails={hook.setBankDetails}
+                                  setIsBankSettingsOpen={hook.setIsBankSettingsOpen}
+                                  supplierDetails={hook.supplierDetails}
+                                  setSupplierDetails={hook.setSupplierDetails}
+                                  rtgsAmount={hook.rtgsAmount}
+                                  setRtgsAmount={hook.setRtgsAmount}
+                                  handleProcessPayment={() => void hook.processPayment?.()}
+                                  isProcessing={hook.isProcessing ?? false}
+                                  bankAccounts={outsiderData?.bankAccounts || []}
+                                  banks={outsiderData?.banks || []}
+                                  bankBranches={outsiderData?.bankBranches || []}
+                                />
                               </div>
                               <div className="w-full h-[310px] overflow-hidden">
                                 <PaymentHistoryCompact
@@ -868,15 +963,10 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
              ) : (
                 // For non-outsider: Show payment interface
                 <>
-                    <div className="sticky top-0 z-40 bg-card/98 backdrop-blur-md supports-[backdrop-filter]:bg-card/95 border-b-2 border-primary/20 shadow-lg">
-                        <div className="w-full px-3 md:px-4 py-1.5 space-y-1.5">
-                            {type !== 'outsider' && (
-                            <>
-                            {/* Two columns: Tabs/Filters (65%) and Supplier Details (35%) */}
-                            <div className="grid grid-cols-[65%_35%] gap-3">
-                                {/* Left Column: Tabs and Search/Filter Section (50%) */}
-                                <div className="flex flex-col gap-2">
-                                    {/* History Tabs - Cash, Gov, RTGS */}
+                    <div className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <div className="w-full px-2 md:px-2.5 py-0.5">
+                            <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)] gap-1 items-start">
+                                <div className="min-w-0 flex flex-col gap-1">
                                     <div className="flex items-center gap-1.5 w-full">
                                         <Button
                                             variant="outline"
@@ -885,10 +975,10 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                                 setSelectedHistoryType('cash');
                                                 setHistoryDialogOpen(true);
                                             }}
-                                            className="h-7 text-[10px] font-semibold flex-1 justify-between px-2"
+                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
                                         >
                                             <span>Cash History</span>
-                                            <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold">
+                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
                                                 {cashHistoryRows.length}
                                             </span>
                                         </Button>
@@ -899,10 +989,10 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                                 setSelectedHistoryType('gov');
                                                 setHistoryDialogOpen(true);
                                             }}
-                                            className="h-7 text-[10px] font-semibold flex-1 justify-between px-2"
+                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
                                         >
                                             <span>Gov History</span>
-                                            <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold">
+                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
                                                 {govHistoryRows.length}
                                             </span>
                                         </Button>
@@ -913,16 +1003,15 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                                 setSelectedHistoryType('rtgs');
                                                 setHistoryDialogOpen(true);
                                             }}
-                                            className="h-7 text-[10px] font-semibold flex-1 justify-between px-2"
+                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
                                         >
                                             <span>RTGS History</span>
-                                            <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold">
+                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
                                                 {rtgsHistoryRows.length}
                                             </span>
                                         </Button>
                                     </div>
-                                    
-                                    {/* Search and Filter Section */}
+
                                     <PaymentFilters
                                       searchType={searchType}
                                       onSearchTypeChange={setSearchType}
@@ -930,8 +1019,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                       selectedSupplierKey={hook.selectedCustomerKey}
                                       onSupplierSelect={onSelectSupplierKey}
                                       serialNoSearch={hook.serialNoSearch}
-                                      onSerialNoSearch={hook.handleSerialNoSearch}
-                                      onSerialNoBlur={hook.handleSerialNoBlur}
+                                      onSerialNoSearch={hook.handleSerialNoSearch ?? (() => {})}
+                                      onSerialNoBlur={hook.handleSerialNoBlur ?? (() => {})}
                                       filterStartDate={filterStartDate}
                                       filterEndDate={filterEndDate}
                                       filterVariety={filterVariety}
@@ -941,237 +1030,215 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                       onFilterEndDateChange={setFilterEndDate}
                                       onFilterVarietyChange={setFilterVariety}
                                       onClearFilters={handleClearSupplierFilters}
-                                      onClearPaymentForm={hook.resetPaymentForm}
-                                      onProcessPayment={hook.processPayment}
-                                      isProcessing={hook.isProcessing}
+                                      extraActions={
+                                        <Button
+                                          onClick={() => setIsStatementOpen(true)}
+                                          size="sm"
+                                          disabled={!hook.selectedCustomerKey}
+                                          className="h-6 px-2 py-0 text-[9px] font-bold bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 shadow-md hover:shadow-lg transition-all duration-300 border border-primary/40 hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <FileText className="h-2 w-2 mr-1" />
+                                          Generate Statement
+                                        </Button>
+                                      }
                                     />
-                                    
-                                    {/* Transaction Tabs: All, Outstanding, Running, Profitable, Paid + Generate Statement */}
-                                    {hook.selectedCustomerKey && selectedSupplierSummary && (
-                                        <div className="flex items-center gap-2">
-                                            {/* Transaction Tabs - Narrower width */}
-                                            <div className="flex items-center gap-1.5 flex-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveTransactionTab("all")}
-                                                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-xl transition-all duration-300 border shadow-md hover:shadow-lg hover:scale-[1.02] flex-1 ${
-                                                        activeTransactionTab === "all"
-                                                            ? "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-primary/40 text-primary shadow-lg scale-[1.02]"
-                                                            : "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-border/30 hover:bg-primary/10 hover:border-primary/25"
-                                                    }`}
-                                                >
-                                                    <span className="text-[9px] font-bold text-muted-foreground">All</span>
-                                                    <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold">{transactionCounts.all}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveTransactionTab("outstanding")}
-                                                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-xl transition-all duration-300 border shadow-md hover:shadow-lg hover:scale-[1.02] flex-1 ${
-                                                        activeTransactionTab === "outstanding"
-                                                            ? "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-primary/40 text-primary shadow-lg scale-[1.02]"
-                                                            : "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-border/30 hover:bg-primary/10 hover:border-primary/25"
-                                                    }`}
-                                                >
-                                                    <span className="text-[9px] font-bold text-muted-foreground">Outstanding</span>
-                                                    <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold">{transactionCounts.outstanding}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveTransactionTab("running")}
-                                                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-xl transition-all duration-300 border shadow-md hover:shadow-lg hover:scale-[1.02] flex-1 ${
-                                                        activeTransactionTab === "running"
-                                                            ? "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-primary/40 text-primary shadow-lg scale-[1.02]"
-                                                            : "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-border/30 hover:bg-primary/10 hover:border-primary/25"
-                                                    }`}
-                                                >
-                                                    <span className="text-[9px] font-bold text-muted-foreground">Running</span>
-                                                    <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold">{transactionCounts.running}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveTransactionTab("profitable")}
-                                                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-xl transition-all duration-300 border shadow-md hover:shadow-lg hover:scale-[1.02] flex-1 ${
-                                                        activeTransactionTab === "profitable"
-                                                            ? "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-primary/40 text-primary shadow-lg scale-[1.02]"
-                                                            : "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-border/30 hover:bg-primary/10 hover:border-primary/25"
-                                                    }`}
-                                                >
-                                                    <span className="text-[9px] font-bold text-muted-foreground">Profitable</span>
-                                                    <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold">{transactionCounts.profitable}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveTransactionTab("paid")}
-                                                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-xl transition-all duration-300 border shadow-md hover:shadow-lg hover:scale-[1.02] flex-1 ${
-                                                        activeTransactionTab === "paid"
-                                                            ? "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-primary/40 text-primary shadow-lg scale-[1.02]"
-                                                            : "bg-gradient-to-br from-background/60 via-background/50 to-background/40 border-border/30 hover:bg-primary/10 hover:border-primary/25"
-                                                    }`}
-                                                >
-                                                    <span className="text-[9px] font-bold text-muted-foreground">Paid</span>
-                                                    <span className="bg-gray-800 dark:bg-gray-700 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold">{transactionCounts.paid}</span>
-                                                </button>
-                                            </div>
+
+                                    {hook.selectedCustomerKey &&
+                                      transactionsForSelectedSupplier &&
+                                      Array.isArray(transactionsForSelectedSupplier) &&
+                                      transactionsForSelectedSupplier.length > 0 && (
+                                        <div className="hidden lg:block w-full h-[225px] overflow-auto">
+                                          <PaymentForm
+                                            {...hook}
+                                            bankAccounts={hook.bankAccounts}
+                                            bankBranches={hook.bankBranches}
+                                            onPaymentMethodChange={handlePaymentMethodChange}
+                                            hideRtgsToggle={false}
+                                            centerName={hook.centerName}
+                                            setCenterName={hook.setCenterName}
+                                            centerNameOptions={hook.centerNameOptions}
+                                            onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
+                                            onProcessPayment={() => void hook.processPayment?.()}
+                                            isProcessing={hook.isProcessing ?? false}
+                                          />
                                         </div>
-                                    )}
+                                      )}
                                 </div>
-                                
-                                {/* Right Column: Supplier Details Section (50%) */}
-                                <div className="flex flex-col gap-2">
-                                    {hook.selectedCustomerKey && selectedSupplierSummary && (
-                                        <div className="bg-gray-950 border-2 border-primary/20 rounded-lg p-2.5 space-y-1.5">
-                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-                                                {/* Left Column: Basic Info */}
-                                                <div className="space-y-1">
-                                                    <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-                                                        <span className="font-semibold text-gray-400">Name:</span>
-                                                        <span className="font-medium text-white">{toTitleCase(selectedSupplierSummary.name || '-')}</span>
-                                                        
-                                                        <span className="font-semibold text-gray-400">F:</span>
-                                                        <span className="font-medium text-white">{toTitleCase(selectedSupplierSummary.so || selectedSupplierSummary.fatherName || '-')}</span>
-                                                        
-                                                        <span className="font-semibold text-gray-400">Address:</span>
-                                                        <span className="font-medium text-white">{toTitleCase(selectedSupplierSummary.address || '-')}</span>
-                                                        
-                                                        <span className="font-semibold text-gray-400">Contact:</span>
-                                                        <span className="font-medium text-white">{selectedSupplierSummary.contact || '-'}</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Right Column: Figures */}
-                                                {filteredSupplierSummary && (
-                                                    <div className="space-y-1">
-                                                        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-                                                            <span className="font-semibold text-gray-400">Total Outstanding:</span>
-                                                            <span className="font-medium text-white">{formatDecimal(filteredSupplierSummary.totalOutstanding || 0)}</span>
-                                                            
-                                                            <span className="font-semibold text-gray-400">Total CD:</span>
-                                                            <span className="font-medium text-white">{formatDecimal(filteredSupplierSummary.totalCdAmount || 0)}</span>
-                                                            
-                                                            <span className="font-semibold text-gray-400">Total QTL:</span>
-                                                            <span className="font-medium text-white">{formatDecimal(filteredSupplierSummary.totalNetWeight || 0)}</span>
-                                                        </div>
-                                                        {/* Generate Statement Button */}
-                                                        <div className="-mt-1.5 pt-0.5 border-t border-primary/20">
-                                                            <Button 
-                                                                onClick={() => setIsStatementOpen(true)} 
-                                                                size="sm" 
-                                                                className="w-auto min-w-[140px] h-6 px-3 py-0.5 text-[9px] font-bold bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 shadow-md hover:shadow-lg transition-all duration-300 border border-primary/40 hover:border-primary/60"
-                                                            >
-                                                                <FileText className="h-2.5 w-2.5 mr-1" />
-                                                                Generate Statement
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+
+                                {hook.selectedCustomerKey &&
+                                  transactionsForSelectedSupplier &&
+                                  Array.isArray(transactionsForSelectedSupplier) &&
+                                  transactionsForSelectedSupplier.length > 0 && (
+                                    <div className="hidden lg:flex min-w-0 flex-col gap-2">
+                                      <div className="min-w-0 h-[170px] overflow-hidden">
+                                        <TransactionTable
+                                          suppliers={transactionsForSelectedSupplier}
+                                          onShowDetails={hook.setDetailsSupplierEntry}
+                                          selectedIds={hook.selectedEntryIds}
+                                          onSelectionChange={handleSelectionChange}
+                                          embed
+                                          compact
+                                          showTabsInHeader
+                                          activeTab={activeTransactionTab}
+                                          onTabChange={setActiveTransactionTab}
+                                          onEditEntry={handleEditEntry}
+                                          type={type}
+                                          highlightEntryId={highlightEntryId}
+                                        />
+                                      </div>
+                                      <div className="w-full h-[130px] overflow-hidden">
+                                        <PaymentHistoryCompact
+                                          payments={selectedSupplierPayments}
+                                          onEdit={hook.handleEditPayment}
+                                          onDelete={hook.handleDeletePayment}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
                             </div>
-                            </>
-                            )}
                         </div>
                     </div>
-                    <div className="space-y-2 mt-2 px-3 md:px-4">
+                    <div className="mt-0.5 px-1 sm:px-1.5 pb-1">
+                            {hook.selectedCustomerKey && (
+                              <div
+                                className={`w-full overflow-hidden mb-2 ${
+                                  transactionsForSelectedSupplier &&
+                                  Array.isArray(transactionsForSelectedSupplier) &&
+                                  transactionsForSelectedSupplier.length > 0
+                                    ? "lg:hidden"
+                                    : ""
+                                }`}
+                              >
+                                <PaymentForm
+                                  {...hook}
+                                  bankAccounts={hook.bankAccounts}
+                                  bankBranches={hook.bankBranches}
+                                  onPaymentMethodChange={handlePaymentMethodChange}
+                                  hideRtgsToggle={false}
+                                  centerName={hook.centerName}
+                                  setCenterName={hook.setCenterName}
+                                  centerNameOptions={hook.centerNameOptions}
+                                  onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
+                                  onProcessPayment={() => void hook.processPayment?.()}
+                                  isProcessing={hook.isProcessing ?? false}
+                                />
+                              </div>
+                            )}
                             
                             {/* TransactionTable - Only for supplier/customer, NOT for outsider - Outstanding entries table removed for outsider */}
                             {/* DO NOT RENDER TransactionTable for outsider type - it shows outstanding entries which we don't need */}
                             {/* EXPLICITLY CHECK: Never render this entire grid section for outsider type */}
                             {/* CRITICAL: This section is INSIDE the IIFE, so it will NOT execute for outsider type */}
                             {transactionsForSelectedSupplier && Array.isArray(transactionsForSelectedSupplier) && transactionsForSelectedSupplier.length > 0 && (
-                            <div className="flex gap-2 w-full">
-                              {/* Left Side: Tables (74% width) */}
-                              <div className="flex flex-col gap-2 w-[74%]">
-                                <div className="space-y-2 min-w-0 w-full h-[180px]">
-                                  {/* Never render TransactionTable for outsider - shows outstanding entries table */}
-                                  <TransactionTable
-                                    suppliers={transactionsForSelectedSupplier}
-                                    onShowDetails={hook.setDetailsSupplierEntry}
-                                    selectedIds={hook.selectedEntryIds}
-                                    onSelectionChange={hook.setSelectedEntryIds}
-                                    embed
-                                    activeTab={activeTransactionTab}
-                                    onTabChange={setActiveTransactionTab}
-                                    onEditEntry={(entry) => {
-                                      setSelectedEntryForEdit(entry);
-                                      setEditEntryDialogOpen(true);
-                                    }}
-                                    type={type}
-                                    highlightEntryId={highlightEntryId}
+                              <div className="space-y-2 w-full">
+                                {filteredSupplierSummary && (
+                                  <div className="w-full min-w-0">
+                                    <SupplierSummaryCards summary={filteredSupplierSummary as any} />
+                                  </div>
+                                )}
+
+                                <div className="w-full min-w-0">
+                                  <CdForm
+                                    cdEnabled={hook.cdEnabled ?? false}
+                                    cdAt={hook.cdAt ?? "partial_on_paid"}
+                                    setCdAt={hook.setCdAt ?? (() => {})}
+                                    cdPercent={hook.cdPercent ?? 0}
+                                    setCdPercent={hook.setCdPercent ?? (() => {})}
+                                    calculatedCdAmount={hook.calculatedCdAmount ?? 0}
+                                    setCdAmount={hook.setCdAmount ?? (() => {})}
                                   />
                                 </div>
-                                {/* Payment History - Below Outstanding Table */}
-                                {type !== 'outsider' && hook.selectedCustomerKey && (
-                                  <div className="space-y-2 min-w-0 w-full h-[180px]">
-                                    <PaymentHistoryCompact
-                                      payments={selectedSupplierPayments}
-                                      onEdit={hook.handleEditPayment}
-                                      onDelete={hook.handleDeletePayment}
-                                    />
-                                  </div>
-                                )}
                               </div>
-                              {/* Right Side: Payment Form (26% width, covers both tables height) */}
-                              <div className="w-[26%] flex-shrink-0">
-                                {hook.selectedCustomerKey && (
-                                  <div className="w-full h-full overflow-hidden">
-                                    <PaymentForm
-                                      key={`payment-form-${parchiNoRefreshKey}`}
-                                      {...hook}
-                                      bankAccounts={hook.bankAccounts}
-                                      bankBranches={hook.bankBranches}
-                                      onPaymentMethodChange={handlePaymentMethodChange}
-                                      hideRtgsToggle={type === 'outsider'}
-                                      centerName={hook.centerName}
-                                      setCenterName={hook.setCenterName}
-                                      centerNameOptions={hook.centerNameOptions}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
                             )}
                             
                             {/* CD Form - Full Width, Single Row (when CD is enabled) */}
-                            <CdForm
-                              cdEnabled={hook.cdEnabled}
-                              cdAt={hook.cdAt}
-                              setCdAt={hook.setCdAt}
-                              cdPercent={hook.cdPercent}
-                              setCdPercent={hook.setCdPercent}
-                              calculatedCdAmount={hook.calculatedCdAmount}
-                              setCdAmount={hook.setCdAmount}
-                            />
+                            {(!transactionsForSelectedSupplier ||
+                              !Array.isArray(transactionsForSelectedSupplier) ||
+                              transactionsForSelectedSupplier.length === 0) && (
+                              <div className="space-y-2 w-full">
+                                {filteredSupplierSummary ? (
+                                  <div className="w-full min-w-0">
+                                    <SupplierSummaryCards summary={filteredSupplierSummary as any} />
+                                  </div>
+                                ) : (
+                                  <div className="min-w-0">
+                                    <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
+                                      <CardContent className="p-3">
+                                        <div className="text-[11px] font-semibold text-slate-800">Summary</div>
+                                        <div className="mt-1 text-[11px] text-slate-600">
+                                          Supplier select karne par yahan statement metrics show honge.
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                )}
+
+                                {hook.selectedCustomerKey ? (
+                                  <div className="w-full min-w-0">
+                                    <CdForm
+                                      cdEnabled={hook.cdEnabled ?? false}
+                                      cdAt={hook.cdAt ?? "partial_on_paid"}
+                                      setCdAt={hook.setCdAt ?? (() => {})}
+                                      cdPercent={hook.cdPercent ?? 0}
+                                      setCdPercent={hook.setCdPercent ?? (() => {})}
+                                      calculatedCdAmount={hook.calculatedCdAmount ?? 0}
+                                      setCdAmount={hook.setCdAmount ?? (() => {})}
+                                    />
+                                  </div>
+                                ) : null}
+
+                                <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
+                                  <CardContent className="p-3">
+                                    <div className="flex items-start gap-3">
+                                      <div className="grid size-9 place-items-center rounded-[12px] bg-violet-50 text-violet-700 ring-1 ring-violet-900/[0.06]">
+                                        <FileText className="h-4 w-4" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="text-[12px] font-semibold text-slate-900">
+                                          {hook.selectedCustomerKey ? "No entries found" : "Supplier select karein"}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] text-slate-600">
+                                          {hook.selectedCustomerKey
+                                            ? "Is supplier ke liye abhi outstanding entries nahi hain."
+                                            : "Upar search se supplier choose karte hi form, table aur summary yahin dikh jayegi."}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            )}
                             
                             {/* Bank Details and Generate Options - Full Screen Half-Half (Only for Supplier Payments) */}
                                 {type === 'supplier' && hook.paymentMethod === 'RTGS' && (
-                              <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-2">
                                 {/* Bank Details Section - Left Half */}
-                                <Card className="text-[10px] border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+                                <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
                                   <CardContent className="p-2.5">
-                                    <RtgsForm {...hook} bankAccounts={supplierBankAccounts} banks={banks} bankBranches={bankBranches} />
+                                    <RtgsForm
+                                      {...hook}
+                                      editingPayment={hook.editingPayment ?? undefined}
+                                      bankAccounts={supplierBankAccounts}
+                                      banks={banks}
+                                      bankBranches={bankBranches}
+                                    />
                                   </CardContent>
                                 </Card>
                                 {/* Generate Payment Options Section - Right Half */}
                                 <GeneratePaymentOptions
-                                  rtgsQuantity={hook.rtgsQuantity}
-                                  setRtgsQuantity={hook.setRtgsQuantity}
-                                  rtgsRate={hook.rtgsRate}
-                                  setRtgsRate={hook.setRtgsRate}
-                                  rtgsAmount={hook.rtgsAmount}
-                                  setRtgsAmount={hook.setRtgsAmount}
-                                  calcTargetAmount={hook.calcTargetAmount}
-                                  setCalcTargetAmount={hook.setCalcTargetAmount}
-                                  minRate={hook.minRate}
-                                  setMinRate={hook.setMinRate}
-                                  maxRate={hook.maxRate}
-                                  setMaxRate={hook.setMaxRate}
-                                  rsValue={rsValue}
-                                  setRsValue={setRsValue}
-                                  selectPaymentAmount={hook.selectPaymentAmount}
+                                  rtgsQuantity={hook.rtgsQuantity || 0}
+                                  setRtgsQuantity={hook.setRtgsQuantity || (() => {})}
+                                  rtgsRate={hook.rtgsRate || 0}
+                                  setRtgsRate={hook.setRtgsRate || (() => {})}
+                                  rtgsAmount={hook.rtgsAmount || 0}
+                                  setRtgsAmount={hook.setRtgsAmount || (() => {})}
+                                  minRate={hook.minRate || 0}
+                                  setMinRate={hook.setMinRate || (() => {})}
+                                  maxRate={hook.maxRate || 0}
+                                  setMaxRate={hook.setMaxRate || (() => {})}
+                                  selectPaymentAmount={hook.selectPaymentAmount || (() => {})}
                                   combination={paymentCombination}
-                                  paymentMethod={hook.paymentMethod}
+                                  paymentMethod={hook.paymentMethod || 'RTGS'}
                                 />
                               </div>
                                 )}
@@ -1181,31 +1248,22 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                               <div className="space-y-2 mt-2">
                                 {/* Gov Receipt Selector Helper and Gov Details - Single Row */}
                                 {hook.selectedCustomerKey && transactionsForSelectedSupplier && transactionsForSelectedSupplier.length > 0 && (
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                                     {/* Gov Receipt Selector Helper - Left Half */}
                                     <GovReceiptSelector
                                       availableReceipts={transactionsForSelectedSupplier}
                                       govRate={hook.govRate || hook.minRate || 0}
-                                      extraAmountPerQuintal={
-                                        hook.govQuantity > 0 && hook.extraAmount > 0 
-                                          ? hook.extraAmount / hook.govQuantity 
-                                          : (hook.calcTargetAmount > 0 && hook.govQuantity > 0 && hook.govAmount > 0
-                                              ? (hook.govAmount + (hook.govRequiredAmount - hook.govAmount) - hook.calcTargetAmount) / hook.govQuantity
-                                              : 0)
-                                      }
                                       onSelectReceipts={(receiptIds) => {
                                         hook.setSelectedEntryIds(new Set(receiptIds));
                                       }}
                                       selectedReceiptIds={hook.selectedEntryIds}
                                       allowManualRsPerQtl={true}
                                       allowManualGovRate={true}
-                                      calcTargetAmount={hook.calcTargetAmount}
-                                      setCalcTargetAmount={hook.setCalcTargetAmount}
                                       combination={paymentCombination}
                                       selectPaymentAmount={hook.selectPaymentAmount}
                                     />
                                     {/* Gov. Details Section - Right Half */}
-                                    <Card className="text-[10px] border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+                                    <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
                                       <CardContent className="p-2.5">
                                         <GovForm 
                                           govQuantity={hook.govQuantity}
@@ -1214,15 +1272,9 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                                           setGovRate={hook.setGovRate}
                                           govAmount={hook.govAmount}
                                           setGovAmount={hook.setGovAmount}
-                                          govRequiredAmount={hook.govRequiredAmount}
-                                          setGovRequiredAmount={hook.setGovRequiredAmount}
-                                          extraAmount={hook.extraAmount}
-                                          setExtraAmount={hook.setExtraAmount}
-                                          calcTargetAmount={hook.calcTargetAmount}
+                                          targetAmount={hook.rtgsAmount || 0}
                                           minRate={hook.minRate}
                                           selectedPaymentOption={hook.selectedPaymentOption}
-                                          extraAmountBaseType={hook.extraAmountBaseType}
-                                          setExtraAmountBaseType={hook.setExtraAmountBaseType}
                                         />
                                       </CardContent>
                                     </Card>
@@ -1243,24 +1295,24 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
                 <PaymentCombinationResults
                   options={paymentCombination.sortedPaymentOptions}
                   requestSort={paymentCombination.requestSort}
-                  onSelect={hook.selectPaymentAmount}
+                  onSelect={hook.selectPaymentAmount || (() => {})}
                 />
               </div>
             )}
  
             <DetailsDialog
-                isOpen={!!hook.detailsSupplierEntry}
-                onOpenChange={() => hook.setDetailsSupplierEntry(null)}
-                customer={hook.detailsSupplierEntry}
-                paymentHistory={hook.paymentHistory}
-                entryType="Supplier"
+              isOpen={!!hook.detailsSupplierEntry}
+              onOpenChange={() => (hook.setDetailsSupplierEntry ? hook.setDetailsSupplierEntry(null) : void 0)}
+              customer={hook.detailsSupplierEntry}
+              paymentHistory={hook.paymentHistory}
+              entryType="Supplier"
             />
 
             <PaymentDetailsDialog
-                payment={hook.selectedPaymentForDetails}
-                suppliers={hook.suppliers}
-                onOpenChange={() => hook.setSelectedPaymentForDetails(null)}
-                onShowEntryDetails={hook.setDetailsSupplierEntry}
+              payment={hook.selectedPaymentForDetails}
+              suppliers={hook.suppliers}
+              onOpenChange={() => (hook.setSelectedPaymentForDetails ? hook.setSelectedPaymentForDetails(null) : void 0)}
+              onShowEntryDetails={hook.setDetailsSupplierEntry || (() => {})}
             />
             
            <RTGSReceiptDialog
@@ -1270,22 +1322,19 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
            />
 
           <BankSettingsDialog
-            isOpen={hook.isBankSettingsOpen}
-            onOpenChange={hook.setIsBankSettingsOpen}
+          isOpen={!!hook.isBankSettingsOpen}
+          onOpenChange={hook.setIsBankSettingsOpen || (() => {})}
           />
 
           {/* Outstanding selection dialog removed as requested */}
           
-          {/* Summary Sections at the bottom - same as supplier profile - HIDDEN for outsider (no supplier data, no outstanding entries) */}
-          {type !== 'outsider' && filteredSupplierSummary && (
-            <SupplierSummaryCards summary={filteredSupplierSummary as any} />
-          )}
+          {/* Summary moved next to PaymentForm */}
 
 
           {type === 'supplier' ? (
             <SupplierEntryEditDialog
-              open={editEntryDialogOpen}
-              onOpenChange={setEditEntryDialogOpen}
+              open={editEntryDialogOpen && !!selectedEntryForEdit}
+              onOpenChange={handleEditEntryDialogOpenChange}
               entry={selectedEntryForEdit}
               onSuccess={async () => {
                 // Highlight and scroll to entry in table
@@ -1315,8 +1364,8 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
             />
           ) : (
             <CustomerEntryEditDialog
-              open={editEntryDialogOpen}
-              onOpenChange={setEditEntryDialogOpen}
+              open={editEntryDialogOpen && !!selectedEntryForEdit}
+              onOpenChange={handleEditEntryDialogOpenChange}
               entry={selectedEntryForEdit}
               onSuccess={async () => {
                 // Force immediate refresh of customer data and summary for hand-to-hand update
@@ -1370,3 +1419,5 @@ export default function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPay
         </div>
     );
 }
+
+export default React.memo(SupplierPaymentsClient);

@@ -28,13 +28,13 @@ export function CdForm({
   if (!cdEnabled) return null;
 
   return (
-    <Card className="text-[10px] mt-2 border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
-      <CardContent className="p-2.5">
-        <div className="flex items-end gap-2.5">
+    <Card className="text-[9px] mt-1.5 border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+      <CardContent className="p-2">
+        <div className="flex items-end gap-2">
           <div className="space-y-1 flex-1">
-            <Label htmlFor="cdAt" className="text-[10px] font-bold">CD At</Label>
+            <Label htmlFor="cdAt" className="text-[9px] font-bold">CD At</Label>
             <Select value={cdAt} onValueChange={setCdAt}>
-              <SelectTrigger id="cdAt" className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary">
+              <SelectTrigger id="cdAt" className="h-7 text-[9px] border-2 border-primary/20 focus:border-primary">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -47,18 +47,18 @@ export function CdForm({
             </Select>
           </div>
           <div className="space-y-1 flex-1">
-            <Label htmlFor="cd-percent" className="text-[10px] font-bold">CD%</Label>
+            <Label htmlFor="cd-percent" className="text-[9px] font-bold">CD%</Label>
             <Input 
               id="cd-percent" 
               type="number" 
               value={cdPercent} 
               onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} 
-              className="h-8 text-[10px] border-2 border-primary/20 focus:border-primary" 
+              className="h-7 text-[9px] border-2 border-primary/20 focus:border-primary" 
             />
           </div>
           <div className="space-y-1 flex-1">
-            <Label htmlFor="cdAmount" className="text-[10px] font-bold">CD Amt</Label>
-            <div className="flex items-center gap-1.5">
+            <Label htmlFor="cdAmount" className="text-[9px] font-bold">CD Amt</Label>
+            <div className="flex items-center gap-1">
               <Input
                 id="cdAmount"
                 name="cdAmount"
@@ -67,9 +67,9 @@ export function CdForm({
                 step="0.01"
                 value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
                 onChange={e => setCdAmount(parseFloat(e.target.value) || 0)}
-                className="h-8 text-[10px] font-extrabold text-primary border-2 border-primary/30 bg-primary/10 focus:border-primary"
+                className="h-7 text-[9px] font-extrabold text-primary border-2 border-primary/30 bg-primary/10 focus:border-primary"
               />
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap font-bold px-2 py-1 rounded-md bg-background/60 border border-border/30">
+              <span className="text-[9px] text-muted-foreground whitespace-nowrap font-bold px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">
                 {formatCurrency(calculatedCdAmount)}
               </span>
             </div>

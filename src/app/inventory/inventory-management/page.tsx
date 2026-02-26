@@ -28,18 +28,18 @@ export default function InventoryManagementPage() {
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInventoryItem, setCurrentInventoryItem] = useState<Partial<InventoryItem>>({});
-  const [formData, setFormData] = useState<Omit<InventoryItem, 'id' | 'createdAt'>>({
+  const [formData, setFormData] = useState<Omit<InventoryItem, 'id'>>({
     name: '',
     sku: '',
-    stock: 0,
+    quantity: 0,
     unit: '',
-    purchasePrice: 0,
+    costPrice: 0,
     sellingPrice: 0,
   });
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = getInventoryItemsRealtime(setInventoryItems, );
+    const unsubscribe = getInventoryItemsRealtime(setInventoryItems, () => {});
     return () => unsubscribe();
   }, []);
 
@@ -48,7 +48,7 @@ export default function InventoryManagementPage() {
     if (name === 'name' || name === 'unit') {
       setFormData({ ...formData, [name]: toTitleCase(value) });
     } else {
-      setFormData({ ...formData, [name]: name === 'stock' || name === 'purchasePrice' || name === 'sellingPrice' ? Number(value) : value });
+      setFormData({ ...formData, [name]: name === 'quantity' || name === 'costPrice' || name === 'sellingPrice' ? Number(value) : value });
     }
   };
   
@@ -81,7 +81,7 @@ export default function InventoryManagementPage() {
         }
       setIsModalOpen(false);
       setCurrentInventoryItem({});
-      setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
+      setFormData({ name: '', sku: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0 });
     } catch (error) {
 
       toast({ title: "Failed to save item", variant: "destructive" });
@@ -114,7 +114,7 @@ export default function InventoryManagementPage() {
 
   const openAddModal = () => {
     setCurrentInventoryItem({});
-    setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
+    setFormData({ name: '', sku: '', quantity: 0, unit: '', costPrice: 0, sellingPrice: 0 });
     setIsModalOpen(true);
   };
 
@@ -123,9 +123,9 @@ export default function InventoryManagementPage() {
     setFormData({
       name: item.name,
       sku: item.sku,
-      stock: item.stock,
+      quantity: item.quantity,
       unit: item.unit,
-      purchasePrice: item.purchasePrice,
+      costPrice: item.costPrice,
       sellingPrice: item.sellingPrice,
     });
     setIsModalOpen(true);
@@ -162,10 +162,10 @@ export default function InventoryManagementPage() {
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.sku}</TableCell>
-                      <TableCell>{`${item.stock} ${item.unit}`}</TableCell>
+                      <TableCell>{`${item.quantity} ${item.unit || ''}`}</TableCell>
                       <TableCell>{item.unit}</TableCell>
-                      <TableCell>₹{item.purchasePrice.toFixed(2)}</TableCell>
-                      <TableCell>₹{item.sellingPrice.toFixed(2)}</TableCell>
+                      <TableCell>₹{Number(item.costPrice || 0).toFixed(2)}</TableCell>
+                      <TableCell>₹{Number(item.sellingPrice || 0).toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" className="mr-2 h-7 w-7" onClick={() => openEditModal(item)}>
                           <Edit className="h-4 w-4" />
@@ -200,16 +200,16 @@ export default function InventoryManagementPage() {
                 <Input id="sku" name="sku" value={formData.sku} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stock" className="text-right">Stock</Label>
-                <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleInputChange} className="col-span-3" />
+                <Label htmlFor="quantity" className="text-right">Quantity</Label>
+                <Input id="quantity" name="quantity" type="number" value={formData.quantity} onChange={handleInputChange} className="col-span-3" />
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="unit" className="text-right">Unit</Label>
                 <Input id="unit" name="unit" value={formData.unit} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchasePrice" className="text-right">Purchase Price</Label>
-                <Input id="purchasePrice" name="purchasePrice" type="number" value={formData.purchasePrice} onChange={handleInputChange} className="col-span-3" />
+                <Label htmlFor="costPrice" className="text-right">Cost Price</Label>
+                <Input id="costPrice" name="costPrice" type="number" value={formData.costPrice || 0} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="sellingPrice" className="text-right">Selling Price</Label>

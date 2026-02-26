@@ -37,7 +37,7 @@ export default function AttendanceTrackingPage() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribeEmployees = getEmployeesRealtime(setEmployees, );
+        const unsubscribeEmployees = getEmployeesRealtime(setEmployees, () => {});
         return () => unsubscribeEmployees();
     }, []);
 

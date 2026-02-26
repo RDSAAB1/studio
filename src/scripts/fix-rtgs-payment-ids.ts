@@ -265,7 +265,7 @@ export async function fixRtgsPaymentIds() {
         }
         
     } catch (error) {
-
-        return { success: false, error };
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message };
     }
 }

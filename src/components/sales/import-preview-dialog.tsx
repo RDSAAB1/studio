@@ -646,7 +646,7 @@ export const ImportPreviewDialog = ({
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {formatCurrency(row.mappedData.netAmount || row.mappedData.originalNetAmount || 0)}
+                        {formatCurrency(Number(row.mappedData.netAmount ?? row.mappedData.originalNetAmount ?? 0))}
                       </TableCell>
                       <TableCell>
                         {row.isValid ? (

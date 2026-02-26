@@ -7,11 +7,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { GlobalConfirmDialog } from "@/components/ui/global-confirm-dialog";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
-import { StateProvider } from '@/lib/state-store.tsx';
+import { StateProvider } from '@/lib/state-store';
 import { GlobalDataProvider } from '@/contexts/global-data-context';
 import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
-import { getFirebaseAuth, onAuthStateChanged, type User } from '@/lib/firebase';
+import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
+import type { User } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings } from "@/lib/firestore";
 import { syncAllData } from '@/lib/database';
@@ -49,8 +50,20 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const initializedRef = useRef(false); // ✅ FIX: Track if initialization has been done
     
     useEffect(() => {
-        const auth = getFirebaseAuth();
-		const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let unsubscribe: (() => void) | undefined;
+
+        try {
+            const auth = getFirebaseAuth();
+            timeoutId = setTimeout(() => {
+                setAuthChecked(true);
+            }, 8000);
+
+		    unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
             const wasLoggedIn = !!user;
             const isNowLoggedIn = !!currentUser;
             
@@ -185,16 +198,16 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 							};
 							
 							// Wait for first user interaction before syncing
-							const events = ['click', 'keydown', 'touchstart'];
+							const events = ['click', 'keydown', 'touchstart'] as const;
 							const onUserInteraction = () => {
 								events.forEach(e => {
-									document.removeEventListener(e, onUserInteraction, { passive: true });
+									document.removeEventListener(e, onUserInteraction);
 								});
 								scheduleSync();
 							};
 							
 							events.forEach(e => {
-								document.addEventListener(e, onUserInteraction, { passive: true, once: true });
+								document.addEventListener(e, onUserInteraction);
 							});
 							
 							// Fallback: sync after 3 seconds if no interaction
@@ -214,9 +227,18 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 				initializedRef.current = false;
 				setInitializationComplete(false);
 			}
-        });
+            });
+        } catch (e) {
+            setUser(null);
+            setAuthChecked(true);
+        }
 
-        return () => unsubscribe();
+        return () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+            unsubscribe?.();
+        };
     }, [user, isSetupComplete]); // Add dependencies to track user state changes
 
     useEffect(() => {
@@ -354,30 +376,39 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
     // ✅ OPTIMIZED: Combined service worker registration and message handling
     useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            // Register service worker
-            navigator.serviceWorker.register('/sw.js').then(registration => {
-                // Service worker registered successfully
-            }).catch(err => {
-                // Service worker registration failed (silent fail)
-            });
-            
-            // Handle service worker messages
-            const handleServiceWorkerMessage = (event: MessageEvent) => {
-                if (event.data && event.data.type === 'SW_ACTIVATED') {
-                    toast({
-                        title: "Application is ready for offline use.",
-                        variant: 'success',
+        if (process.env.NODE_ENV !== 'production') {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(registration => {
+                        registration.unregister();
                     });
-                }
-            };
-            
-            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-            
-            return () => {
-                navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-            };
+                });
+            }
+            return;
         }
+
+        if (!('serviceWorker' in navigator)) return;
+
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+            // Service worker registered successfully
+        }).catch(err => {
+            // Service worker registration failed (silent fail)
+        });
+        
+        const handleServiceWorkerMessage = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'SW_ACTIVATED') {
+                toast({
+                    title: "Application is ready for offline use.",
+                    variant: 'success',
+                });
+            }
+        };
+        
+        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        
+        return () => {
+            navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        };
         // Removed toast from dependencies - it's stable from useToast hook
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -385,6 +416,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html lang="en" suppressHydrationWarning className="dark">
             <head>
+                <title>JRMD Studio</title>
                 <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#000000" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />

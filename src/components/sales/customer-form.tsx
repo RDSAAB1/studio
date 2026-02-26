@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Controller, useWatch } from "react-hook-form";
+import { useState, useMemo, useEffect, memo } from "react";
+import { Controller, useWatch, type UseFormReturn } from "react-hook-form";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import type { Customer, OptionItem } from "@/lib/definitions";
@@ -22,11 +22,11 @@ import { User, Phone, Home, Truck, Wheat, Banknote, Landmark, Hash, Percent, Wei
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 
 const SectionCard = ({ icon, children, className }: { icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
-    <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
-        <CardContent className="pt-4">
+    <div className={cn("rounded-[12px] border border-border/90 bg-card/60", className)}>
+        <div className="p-6 pt-4">
             {children}
-        </CardContent>
-    </Card>
+        </div>
+    </div>
 );
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -38,7 +38,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: any) => {
+export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: { form: UseFormReturn<any>; handleSrNoBlur: (v: string) => void; handleContactBlur: (v: string) => void; varietyOptions: OptionItem[]; paymentTypeOptions: OptionItem[]; setLastVariety: (v: string | null) => void; setLastPaymentType: (v: string | null) => void; handleAddOption: (collectionName: string, optionData: { name: string }) => void; handleUpdateOption: (collectionName: string, id: string, optionData: { name: string }) => void; handleDeleteOption: (collectionName: string, id: string, name: string) => void; allCustomers: Customer[] }) {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -122,7 +122,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, selectionStart, selectionEnd } = e.target;
         const capitalizedValue = toTitleCase(value);
-        form.setValue(name as any, capitalizedValue, { shouldValidate: true });
+        form.setValue(name, capitalizedValue, { shouldValidate: true });
         
         // Use requestAnimationFrame to restore cursor position after the re-render
         requestAnimationFrame(() => {
@@ -485,7 +485,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                              <Controller name="variety" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                                    <Label className="text-xs flex items-center gap-1.5">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0" aria-label="Manage variety options"><Settings className="h-3 w-3"/></Button></Label>
                                     <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
@@ -497,7 +497,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             </div>
                              <Controller name="paymentType" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                                    <Label className="text-xs flex items-center gap-1.5">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0" aria-label="Manage payment types"><Settings className="h-3 w-3"/></Button></Label>
                                     <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
@@ -608,4 +608,4 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         />
         </>
     );
-};
+});

@@ -104,7 +104,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
     };
 
     return (
-        <Card variant="default-light" shape="organic-lg">
+        <Card>
             <CardContent className="p-0">
                 <ScrollArea ref={scrollRef} className="h-[60vh]">
                     <div className="overflow-x-auto">
@@ -152,18 +152,18 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                     <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)} aria-label="View entry details">
                                                 <Info className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry.id)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry.id)} aria-label="Edit entry">
                                                 <Pen className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRow && onPrintRow(entry)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRow && onPrintRow(entry)} aria-label="Print entry">
                                                 <Printer className="h-4 w-4" />
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isDeleting}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isDeleting} aria-label="Delete entry">
                                                     {isDeleting ? (
                                                         <Loader2 className="h-4 w-4 animate-spin text-destructive" />
                                                     ) : (

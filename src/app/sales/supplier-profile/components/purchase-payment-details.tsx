@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
-import type { CustomerSummary, Payment } from "@/lib/definitions";
+import type { CustomerSummary, CustomerPayment, SupplierPayment } from "@/lib/definitions";
 
 // Local formatSerialNumber function to avoid import issues
 const formatSerialNumber = (srNo: string | number): string => {
@@ -34,7 +34,7 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
       cashPaid: number;
       rtgsPaid: number;
       outstanding: number;
-      paymentDetails: Payment[];
+      paymentDetails: (SupplierPayment | CustomerPayment)[];
     }> = [];
 
     // Process each transaction/purchase
@@ -61,9 +61,10 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
           totalPaid += paidForThisPurchase.amount || 0;
           totalCd += paidForThisPurchase.cdAmount || 0;
           
-          if (payment.type === 'cash') {
+          const receiptType = String((payment as SupplierPayment).receiptType || (payment as CustomerPayment).paymentMethod || '').toLowerCase();
+          if (receiptType === 'cash') {
             cashPaid += paidForThisPurchase.amount || 0;
-          } else if (payment.type === 'rtgs') {
+          } else if (receiptType === 'rtgs' || receiptType === 'online') {
             rtgsPaid += paidForThisPurchase.amount || 0;
           }
         }
@@ -101,9 +102,7 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Purchase #</TableHead>
-                <TableHead>Base Original</TableHead>
-                <TableHead>Extra Amount</TableHead>
-                <TableHead>Adjusted Original</TableHead>
+                <TableHead>Original Amount</TableHead>
                 <TableHead>Total Paid</TableHead>
                 <TableHead>Cash Paid</TableHead>
                 <TableHead>RTGS Paid</TableHead>
@@ -113,18 +112,10 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
             </TableHeader>
             <TableBody>
               {purchasePaymentBreakdown.map((purchase, index) => {
-                // Get base original amount (without extra amount)
-                const baseOriginal = supplierData.allTransactions?.find(t => t.srNo === purchase.srNo)?.originalNetAmount || 0;
-                const extraAmount = purchase.originalAmount - baseOriginal;
-                
                 return (
                   <TableRow key={index}>
                     <TableCell className="font-medium">
                       {formatSerialNumber(purchase.srNo)}
-                    </TableCell>
-                    <TableCell>{formatCurrency(baseOriginal)}</TableCell>
-                    <TableCell className={extraAmount > 0 ? "text-green-600 font-semibold" : ""}>
-                      {extraAmount > 0 ? `+ ${formatCurrency(extraAmount)}` : '-'}
                     </TableCell>
                     <TableCell className="font-semibold">{formatCurrency(purchase.originalAmount)}</TableCell>
                     <TableCell>{formatCurrency(purchase.totalPaid)}</TableCell>
@@ -178,42 +169,14 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
             </div>
           </div>
           
-          {/* Extra Amount and Outstanding Summary */}
-          <div className="grid grid-cols-2 gap-4">
-            {(() => {
-              // Calculate total extra amount from Gov. payments
-              const totalExtraAmount = purchasePaymentBreakdown.reduce((sum, p) => {
-                // Find Gov. payment for this purchase
-                const govPayment = p.paymentDetails.find(payment => (payment as any).receiptType === 'Gov.');
-                if (govPayment) {
-                  const paidForThis = govPayment.paidFor?.find((pf: any) => pf.srNo === p.srNo);
-                  if (paidForThis) {
-                    const extraAmount = (paidForThis as any).extraAmount || 0;
-                    return sum + extraAmount;
-                  }
-                }
-                return sum;
-              }, 0);
-              
-              return (
-                <>
-                  {totalExtraAmount > 0 && (
-                    <div className="text-center p-4 bg-green-50 rounded border border-green-200">
-                      <div className="text-xl font-bold text-green-600">
-                        + {formatCurrency(totalExtraAmount)}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">Extra Amount (Gov. Payment)</div>
-                    </div>
-                  )}
-                  <div className="text-center p-4 bg-red-50 rounded border border-red-200">
-                    <div className="text-2xl font-bold text-red-600">
-                      {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.outstanding, 0))}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">Total Outstanding</div>
-                  </div>
-                </>
-              );
-            })()}
+          {/* Outstanding Summary */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="text-center p-4 bg-red-50 rounded border border-red-200">
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.outstanding, 0))}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Total Outstanding</div>
+            </div>
           </div>
         </div>
       </CardContent>

@@ -39,8 +39,8 @@ export default function BankManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const unsubBanks = getBanksRealtime(setBanks, );
-        const unsubBranches = getBankBranchesRealtime(setBranches, );
+        const unsubBanks = getBanksRealtime(setBanks, () => {});
+        const unsubBranches = getBankBranchesRealtime(setBranches, () => {});
 
         return () => {
             unsubBanks();
@@ -279,9 +279,9 @@ export default function BankManagementPage() {
                                                 <TableCell className="truncate">{branch.branchName}</TableCell>
                                                 <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }} aria-label={`Edit branch ${branch.branchName}`}><Edit className="h-4 w-4" /></Button>
                                                     <AlertDialog>
-                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Delete branch ${branch.branchName}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
                                                             <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
@@ -308,7 +308,7 @@ export default function BankManagementPage() {
                     <DialogHeader><DialogTitle>Add New Bank</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-2">
                         <Label>Bank Name</Label>
-                        <Input value={newBankName} onChange={(e) => setNewBankName(e.target.value)} placeholder="Enter full bank name" />
+                        <Input value={newBankName} onChange={(e) => setNewBankName(e.target.value)} placeholder="Enter full bank name" autoFocus />
                     </div>
                     <DialogFooter><Button variant="outline" onClick={() => setIsBankDialogOpen(false)}>Cancel</Button><Button onClick={handleAddBank}>Save Bank</Button></DialogFooter>
                 </DialogContent>

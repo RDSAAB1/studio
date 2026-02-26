@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,11 +35,7 @@ interface PaymentFiltersProps {
   onFilterEndDateChange: (date: Date | undefined) => void;
   onFilterVarietyChange: (value: string) => void;
   onClearFilters: () => void;
-  
-  // Actions
-  onClearPaymentForm: () => void;
-  onProcessPayment: () => void;
-  isProcessing: boolean;
+  extraActions?: ReactNode;
 }
 
 export function PaymentFilters({
@@ -59,106 +56,42 @@ export function PaymentFilters({
   onFilterEndDateChange,
   onFilterVarietyChange,
   onClearFilters,
-  onClearPaymentForm,
-  onProcessPayment,
-  isProcessing,
+  extraActions,
 }: PaymentFiltersProps) {
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Single Row: All elements in one row */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-        {/* Name Dropdown (Search Type) */}
-        <div className="w-full lg:w-[120px] flex-shrink-0">
-          <Select value={searchType} onValueChange={(value) => onSearchTypeChange(value as typeof searchType)}>
-            <SelectTrigger className="h-8 text-[11px] border-2 border-primary/20 focus:border-primary font-semibold">
-              <SelectValue placeholder="Name" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="fatherName">Father Name</SelectItem>
-              <SelectItem value="address">Address</SelectItem>
-              <SelectItem value="contact">Contact</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        {/* Search Supplier Input */}
-        <div className="flex-1 min-w-0">
-          <CustomDropdown
-            options={supplierOptions.map(({ value, data, label }) => {
-              // If label already exists (e.g., for Mill Overview), use it but still pass data
-              if (label) {
-                return { value, label, data: data || {} };
-              }
-              // Otherwise, create label from data
-              return {
-                value,
-                label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim(),
-                data: data || {}
-              };
-            })}
-            value={selectedSupplierKey}
-            onChange={onSupplierSelect}
-            placeholder="Search supplier..."
-            inputClassName="h-8 border-2 border-primary/20 focus:border-primary text-[11px] font-semibold"
-            searchType={searchType}
-            onSearchTypeChange={undefined}
-          />
-        </div>
-        
-        {/* Serial Number Search */}
-        <div className="w-full lg:w-[180px] flex-shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/70" />
-            <Input
-              placeholder="Serial No..."
-              value={serialNoSearch}
-              onChange={(e) => onSerialNoSearch(e.target.value)}
-              onBlur={onSerialNoBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  onSerialNoBlur();
-                  e.currentTarget.blur();
-                }
-              }}
-              className="pl-8 h-8 border-2 border-primary/20 focus:border-primary text-[11px] font-semibold"
-            />
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
                 className={cn(
-                  "h-8 w-8 border-2 transition-all",
+                  "h-6 w-6 border transition-colors flex-shrink-0",
                   hasActiveFilters 
-                    ? "text-primary border-primary bg-primary/10 shadow-md" 
-                    : "border-primary/20 hover:border-primary/30 hover:bg-primary/5"
+                    ? "border-slate-200/80 bg-white text-slate-900 shadow-[0_4px_20px_rgba(99,102,241,0.06)] ring-1 ring-violet-200/60" 
+                    : "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300"
                 )}
                 title="Filter suppliers"
               >
-                <Filter className="h-4 w-4" />
+                <Filter className="h-3 w-3" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 space-y-3 text-[11px] z-50 border-2 border-primary/20 shadow-xl" align="end">
+            <PopoverContent className="w-64 space-y-2.5 text-[10px] z-50 border border-slate-200 bg-white/90 shadow-[0_4px_20px_rgba(99,102,241,0.06)] backdrop-blur-[20px]" align="end">
               <div className="space-y-1.5">
-                <Label htmlFor="filterStartDate" className="text-[11px] font-semibold">Start Date</Label>
+                <Label htmlFor="filterStartDate" className="text-[10px] font-semibold">Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       id="filterStartDate"
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal h-8 text-[11px] border-2 border-primary/20 focus:border-primary",
+                        "w-full justify-start text-left font-normal h-7 text-[10px] border border-slate-200/80 bg-white/70",
                         !filterStartDate && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                      <CalendarIcon className="mr-2 h-3 w-3" />
                       {filterStartDate ? format(filterStartDate, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
@@ -173,18 +106,18 @@ export function PaymentFilters({
                 </Popover>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="filterEndDate" className="text-[11px] font-semibold">End Date</Label>
+                <Label htmlFor="filterEndDate" className="text-[10px] font-semibold">End Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       id="filterEndDate"
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal h-8 text-[11px] border-2 border-primary/20 focus:border-primary",
+                        "w-full justify-start text-left font-normal h-7 text-[10px] border border-slate-200/80 bg-white/70",
                         !filterEndDate && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                      <CalendarIcon className="mr-2 h-3 w-3" />
                       {filterEndDate ? format(filterEndDate, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
@@ -199,12 +132,12 @@ export function PaymentFilters({
                 </Popover>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="filterVariety" className="text-[11px] font-semibold">Variety</Label>
+                <Label htmlFor="filterVariety" className="text-[10px] font-semibold">Variety</Label>
                 <Select
                   value={filterVariety}
                   onValueChange={onFilterVarietyChange}
                 >
-                  <SelectTrigger id="filterVariety" className="h-8 text-[11px] border-2 border-primary/20 focus:border-primary">
+                  <SelectTrigger id="filterVariety" className="h-7 text-[10px] border border-slate-200/80 bg-white/70">
                     <SelectValue placeholder="All varieties" />
                   </SelectTrigger>
                   <SelectContent className="z-[60]">
@@ -217,11 +150,11 @@ export function PaymentFilters({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between pt-1 border-t border-border/30">
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200/80">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-[11px] font-semibold hover:bg-primary/10 hover:text-primary"
+                  className="h-6 text-[10px] font-semibold hover:bg-violet-50 hover:text-slate-900"
                   onClick={onClearFilters}
                 >
                   Reset
@@ -232,23 +165,67 @@ export function PaymentFilters({
               </div>
             </PopoverContent>
           </Popover>
-          <Button 
-            size="sm" 
-            className="h-8 text-[11px] font-semibold border-2 border-primary/20 hover:border-primary/30 hover:bg-primary/5" 
-            variant="outline" 
-            onClick={onClearPaymentForm} 
-            disabled={isProcessing}
-          >
-            Clear
-          </Button>
-          <Button 
-            size="sm" 
-            className="h-8 text-[11px] font-bold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg" 
-            onClick={onProcessPayment} 
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Processing..." : "Finalize"}
-          </Button>
+
+          <div className="w-full lg:w-[120px] flex-shrink-0">
+            <Select value={searchType} onValueChange={(value) => onSearchTypeChange(value as typeof searchType)}>
+              <SelectTrigger className="h-6 text-[9px] border border-slate-200/80 bg-white/70 backdrop-blur-[20px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15">
+                <SelectValue placeholder="Name" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="fatherName">Father Name</SelectItem>
+                <SelectItem value="address">Address</SelectItem>
+                <SelectItem value="contact">Contact</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-full lg:w-[180px] flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3 w-3 text-slate-500" />
+              <Input
+                placeholder="Serial No..."
+                value={serialNoSearch}
+                onChange={(e) => onSerialNoSearch(e.target.value)}
+                onBlur={onSerialNoBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onSerialNoBlur();
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="pl-7 h-6 border border-slate-200/80 bg-white/70 backdrop-blur-[20px] text-[9px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15"
+              />
+            </div>
+          </div>
+
+          {extraActions ? (
+            <div className="w-full lg:w-auto flex items-center justify-end">
+              {extraActions}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="min-w-0">
+          <CustomDropdown
+            options={supplierOptions.map(({ value, data, label }) => {
+              if (label) {
+                return { value, label, data: data || {} };
+              }
+              return {
+                value,
+                label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim(),
+                data: data || {}
+              };
+            })}
+            value={selectedSupplierKey}
+            onChange={onSupplierSelect}
+            placeholder="Search supplier..."
+            inputClassName="h-6 border border-slate-200/80 bg-white/70 backdrop-blur-[20px] text-[9px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15"
+            searchType={searchType}
+            onSearchTypeChange={undefined}
+          />
         </div>
       </div>
     </div>

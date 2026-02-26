@@ -9,7 +9,7 @@ export default function LoanManagementRedirectPage() {
     const router = useRouter();
 
     useEffect(() => {
-        router.replace('/cash-bank');
+        router.replace('/sales?menu=cash-bank&tab=cash-bank-management');
     }, [router]);
 
     return (

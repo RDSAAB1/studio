@@ -84,7 +84,7 @@ export default function SixRReportPage() {
                 supplierName: toTitleCase(p.supplierName || ''),
                 fatherName: toTitleCase(p.supplierFatherName || ''),
                 supplierAddress: toTitleCase(p.supplierAddress || ''),
-                supplierContact: p.supplierContact || '',
+                supplierContact: p.supplierDetails?.contact || p.paidFor?.[0]?.supplierContact || '',
                 amount: p.rtgsAmount || p.amount || 0,
                 rate: p.rate || 0,
                 quantity: p.quantity || 0,
@@ -340,7 +340,9 @@ export default function SixRReportPage() {
             // Also update local IndexedDB if available
             if (typeof window !== 'undefined' && db) {
                 try {
-                    const existing = await db.payments.get(paymentId);
+                    const existing =
+                        (await db.payments.get(paymentId as any)) ||
+                        (await db.payments.where('paymentId').equals(paymentId).first());
                     if (existing) {
                         await db.payments.put({ ...existing, sixRNo: trimmed6RNo || undefined });
                     }

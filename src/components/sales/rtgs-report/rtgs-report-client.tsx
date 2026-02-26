@@ -24,6 +24,15 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const escapeHtml = (value?: string | null) => {
+  if (!value) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
 
 interface RtgsReportRow {
     paymentId: string;
@@ -76,9 +85,11 @@ export default function RtgsReportClient() {
         };
         fetchSettings();
         
-        const unsubscribe = getPaymentsRealtime(setPayments, );
+        const unsubscribe = getPaymentsRealtime(setPayments, (error) => {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        });
         return () => unsubscribe();
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
         if (settings !== null && payments !== undefined) {
@@ -95,7 +106,7 @@ export default function RtgsReportClient() {
                 paymentId: p.paymentId,
                 date: p.date,
                 checkNo: p.checkNo || '',
-                type: p.type || (settings?.type || 'SB'),
+                type: p.type || 'SB',
                 srNo: srNo,
                 supplierName: toTitleCase(p.supplierName || ''),
                 fatherName: toTitleCase(p.supplierFatherName || ''),
@@ -246,7 +257,7 @@ export default function RtgsReportClient() {
         
         const printContent = `
             <div class="print-header">
-                <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
+                <h2>${escapeHtml(toTitleCase(settings.companyName))} - RTGS Payment Report</h2>
                 <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
             </div>
             ${node.outerHTML}

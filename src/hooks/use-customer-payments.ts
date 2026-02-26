@@ -25,6 +25,16 @@ export const useCustomerPayments = () => {
 
     // Use the same form hook but with customer payment history
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'customer');
+    const {
+        serialNoSearch,
+        setParchiNo,
+        parchiNo,
+        minRate: formMinRate,
+        maxRate: formMaxRate,
+        selectedCustomerKey,
+        selectedEntryIds,
+        ...formRest
+    } = form;
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [multiSupplierMode, setMultiSupplierMode] = useState(false);
@@ -37,15 +47,17 @@ export const useCustomerPayments = () => {
     
     const selectedEntries = useMemo(() => {
         if (!Array.isArray(data.suppliers)) return [];
+        const isEntrySelected = (entry: Customer) =>
+            form.selectedEntryIds.has(entry.id) || (!!entry.srNo && form.selectedEntryIds.has(entry.srNo));
         if (multiSupplierMode) {
-            return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+            return data.suppliers.filter(isEntrySelected);
         }
         
         // If selectedCustomerKey is set, use it
         if (form.selectedCustomerKey) {
             const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
             if (profile && Array.isArray(profile.allTransactions)) {
-                return profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                return profile.allTransactions.filter(isEntrySelected);
             }
         }
         
@@ -54,7 +66,7 @@ export const useCustomerPayments = () => {
             let foundEntries: Customer[] = [];
             for (const [key, profile] of data.customerSummaryMap.entries()) {
                 if (profile && Array.isArray(profile.allTransactions)) {
-                    const matchingEntries = profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                    const matchingEntries = profile.allTransactions.filter(isEntrySelected);
                     if (matchingEntries.length > 0) {
                         foundEntries = [...foundEntries, ...matchingEntries];
                     }
@@ -65,7 +77,7 @@ export const useCustomerPayments = () => {
                 return foundEntries;
             }
             
-            return data.suppliers.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+            return data.suppliers.filter(isEntrySelected);
         }
         
         return [];
@@ -146,22 +158,6 @@ export const useCustomerPayments = () => {
         return totalOutstanding;
     }, [selectedEntries, form.editingPayment, data.paymentHistory]);
 
-    const calcTargetAmount = useCallback(() => {
-        return totalOutstandingForSelected;
-    }, [totalOutstandingForSelected]);
-
-    const minRate = useMemo(() => {
-        if (selectedEntries.length === 0) return 0;
-        const rates = selectedEntries.map(e => Number(e.rate || 0)).filter(r => r > 0);
-        return rates.length > 0 ? Math.min(...rates) : 0;
-    }, [selectedEntries]);
-
-    const maxRate = useMemo(() => {
-        if (selectedEntries.length === 0) return 0;
-        const rates = selectedEntries.map(e => Number(e.rate || 0)).filter(r => r > 0);
-        return rates.length > 0 ? Math.max(...rates) : 0;
-    }, [selectedEntries]);
-
     // Use useMemo to derive values instead of useState to avoid infinite loops
     const settleAmountDerived = useMemo(() => {
         if (form.paymentType === 'Full') {
@@ -221,7 +217,6 @@ export const useCustomerPayments = () => {
 
     const handleToBePaidChange = (value: number) => {
         setToBePaidAmountManual(value);
-        form.setCalcTargetAmount(Math.round(value));
     };
 
     // Auto-calculate settle amount for Partial payment type
@@ -242,7 +237,7 @@ export const useCustomerPayments = () => {
     // Auto-update Target Amount when To Be Paid changes in Full mode
     useEffect(() => {
         if (form.paymentType === 'Full') {
-            form.setCalcTargetAmount(Math.round(finalToBePaid));
+            // form.setCalcTargetAmount(Math.round(finalToBePaid)); // Removed
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [finalToBePaid, form.paymentType]);
@@ -279,18 +274,20 @@ export const useCustomerPayments = () => {
     // Works for all payment methods: Cash, Online, RTGS
     useEffect(() => {
         if (form.selectedEntryIds.size > 0) {
+            const isEntrySelected = (entry: Customer) =>
+                form.selectedEntryIds.has(entry.id) || (!!entry.srNo && form.selectedEntryIds.has(entry.srNo));
             // Get selected entries based on current selectedEntryIds
             let entries: Customer[] = [];
             if (multiSupplierMode) {
-                entries = (data.suppliers || []).filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                entries = (data.suppliers || []).filter(isEntrySelected);
             } else if (form.selectedCustomerKey) {
                 const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
                 if (profile && Array.isArray(profile.allTransactions)) {
-                    entries = profile.allTransactions.filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                    entries = profile.allTransactions.filter(isEntrySelected);
                 }
             } else {
                 // Fallback: search in all suppliers if customerKey is not set
-                entries = (data.suppliers || []).filter((s: Customer) => form.selectedEntryIds.has(s.id));
+                entries = (data.suppliers || []).filter(isEntrySelected);
             }
             
             if (entries.length > 0) {
@@ -314,6 +311,8 @@ export const useCustomerPayments = () => {
     }, [form]);
 
     const handleProcessPayment = useCallback(async () => {
+        if (isProcessing) return;
+
         if (selectedEntries.length === 0) {
             toast({ title: "No entries selected", variant: "destructive" });
             return;
@@ -321,21 +320,16 @@ export const useCustomerPayments = () => {
 
         setIsProcessing(true);
         try {
-            // Use extra amount from form (manual or from entry selection)
-            const extraAmount = form.extraAmount || 0;
-            
             const result = await processPaymentLogic({ 
                 ...data, 
                 ...form, 
                 ...cdProps, 
                 calculatedCdAmount: effectiveCdAmount, 
                 selectedEntries, 
-                paymentAmount: toBePaidAmount, 
+                finalAmountToPay: toBePaidAmount, 
                 settleAmount, 
                 totalOutstandingForSelected,
                 isCustomer: true, // Mark as customer payment
-                extraAmount,
-                govRequiredAmount: form.govRequiredAmount
             });
 
             if (!result.success) {
@@ -412,15 +406,14 @@ export const useCustomerPayments = () => {
         suppliers: data.suppliers,
         paymentHistory: data.paymentHistory,
         customerSummaryMap: data.customerSummaryMap,
-        selectedCustomerKey: form.selectedCustomerKey,
-        selectedEntryIds: form.selectedEntryIds,
+        selectedCustomerKey,
+        selectedEntryIds,
         handleCustomerSelect,
         handleEditPayment,
         handleDeletePayment,
-        calcTargetAmount,
-        minRate,
-        maxRate,
-        serialNoSearch: form.serialNoSearch || '',
+        minRate: formMinRate,
+        maxRate: formMaxRate,
+        serialNoSearch: serialNoSearch || '',
         activeTab,
         setActiveTab,
         selectedEntries,
@@ -434,12 +427,11 @@ export const useCustomerPayments = () => {
         finalAmountToBePaid: toBePaidAmount,
         handleToBePaidChange,
         processPayment: handleProcessPayment,
-        ...form, // Spread form first to get all form properties
+        ...formRest,
         ...cdProps, // Spread CD props
         calculatedCdAmount: effectiveCdAmount,
         // Explicitly set these after spread to ensure they're available
-        setParchiNo: form.setParchiNo,
-        parchiNo: form.parchiNo,
+        setParchiNo,
+        parchiNo,
     };
 };
-

@@ -4,8 +4,8 @@ import type { Customer } from "@/lib/definitions";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Scale, FileText, Banknote } from "lucide-react";
-import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
+import { formatDate } from "@/lib/date-utils";
 
 interface SimpleCalculatedSummaryProps {
     customer: Customer;
@@ -69,7 +69,7 @@ export const SimpleCalculatedSummary = ({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Operational Summary Card */}
-            <Card className="border border-gray-400/50">
+            <Card className="ui-summary-card">
                 <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
                         <Scale size={16} className="text-muted-foreground"/>
@@ -107,14 +107,18 @@ export const SimpleCalculatedSummary = ({
                         </div>
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Due Date:</span>
-                            <span className="font-medium">{isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")}</span>
+                            <span className="font-medium">
+                                {isLoading
+                                    ? "-"
+                                    : formatDate(customer.dueDate, "dd-MMM-yy")}
+                            </span>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
             {/* Deduction Summary Card */}
-            <Card className="border border-gray-400/50">
+            <Card className="ui-summary-card">
                 <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
                         <FileText size={16} className="text-muted-foreground"/>
@@ -155,7 +159,7 @@ export const SimpleCalculatedSummary = ({
             </Card>
 
             {/* Financial Summary Card */}
-            <Card className="border border-gray-400/50">
+            <Card className="ui-summary-card">
                 <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
                         <Banknote size={16} className="text-muted-foreground"/>

@@ -2,45 +2,29 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi } from '@/lib/definitions';
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi, PaidFor } from '@/lib/definitions';
 import { getLoansRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
-import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency, toTitleCase } from "@/lib/utils";
+import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ManufacturingCosting } from '@/components/dashboard/manufacturing-costing';
-import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, HandCoins, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import { AreaChart, Area, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ensureFirstFullSync, getSyncCounts } from '@/lib/database';
+import { logError } from '@/lib/error-logger';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
-const StatCard = ({ title, value, icon, colorClass, isLoading, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, description?: string }) => (
-    <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            {icon}
-        </CardHeader>
-        <CardContent>
-            {isLoading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            ) : (
-                <>
-                <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
-                    {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
-                </>
-            )}
-        </CardContent>
-    </Card>
-);
-
-const PIE_COLORS = ['#22c55e', '#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5cf6', '#ec4899'];
+import { toStartOfDay, toEndOfDay } from "@/lib/date-utils";
+import { groupSumByKey } from "@/lib/calculation-helpers";
+import { StatCard } from '@/components/dashboard/stat-card';
+import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
+import { FinancialBreakdown } from '@/components/dashboard/financial-breakdown';
+import { SyncCountsTable, SoftwareCountsTable } from '@/components/dashboard/dashboard-tables';
+import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 
 export default function DashboardClient() {
     const router = useRouter();
@@ -89,9 +73,6 @@ export default function DashboardClient() {
     
     useEffect(() => {
         setIsClient(true);
-        
-        // ✅ FIX: Always sync from globalData on mount and when it changes
-        // This ensures data is available even after page navigation
         setSuppliers(globalData.suppliers);
         setCustomers(globalData.customers);
         setSupplierPayments(globalData.paymentHistory);
@@ -112,8 +93,6 @@ export default function DashboardClient() {
             fundTransactions: globalData.fundTransactions,
             bankAccounts: globalData.bankAccounts,
         };
-        
-        setIsLoading(false);
     }, [
         globalData.suppliers,
         globalData.customers,
@@ -143,11 +122,26 @@ export default function DashboardClient() {
     }, []); // Only run once on mount
     
     useEffect(() => {
+        let isMounted = true;
+        setIsLoading(true);
         (async () => {
-            await ensureFirstFullSync();
-            const rows = await getSyncCounts();
-            setSyncCounts(rows);
+            try {
+                await ensureFirstFullSync();
+                const rows = await getSyncCounts();
+                if (isMounted) {
+                    setSyncCounts(rows);
+                }
+            } catch (error) {
+                logError(error, "dashboard-client: ensureFirstFullSync/getSyncCounts", "medium");
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
         })();
+        return () => {
+            isMounted = false;
+        };
     }, []);
     
     const filteredData = useMemo(() => {
@@ -163,12 +157,13 @@ export default function DashboardClient() {
                 filteredCustomers: [],
             };
         }
-        
-        const interval = { 
-            start: startOfDay(date.from), 
-            end: endOfDay(date.to || date.from) 
+
+        const interval = {
+            start: toStartOfDay(date.from),
+            end: toEndOfDay(date.to || date.from)
         };
         const filterFn = (item: { date: string }) => isWithinInterval(new Date(item.date), interval);
+        const loanFilterFn = (item: { startDate: string }) => isWithinInterval(new Date(item.startDate), interval);
 
         return {
             filteredIncomes: incomes.filter(filterFn),
@@ -176,7 +171,7 @@ export default function DashboardClient() {
             filteredSupplierPayments: supplierPayments.filter(filterFn),
             filteredCustomerPayments: customerPayments.filter(filterFn),
             filteredFundTransactions: fundTransactions.filter(filterFn),
-            filteredLoans: loans.filter(filterFn),
+            filteredLoans: loans.filter(loanFilterFn),
             filteredSuppliers: suppliers.filter(filterFn),
             filteredCustomers: customers.filter(filterFn),
         };
@@ -195,7 +190,7 @@ export default function DashboardClient() {
             
             // First check if CD is stored in paidFor array (new format - more accurate)
             if (payment.paidFor && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
-                const totalCdFromPaidFor = payment.paidFor.reduce((cdSum: number, pf: any) => {
+                const totalCdFromPaidFor = payment.paidFor.reduce((cdSum: number, pf: PaidFor) => {
                     // Check if cdAmount is directly stored in paidFor (new format)
                     if ('cdAmount' in pf && pf.cdAmount !== undefined && pf.cdAmount !== null) {
                         return cdSum + Number(pf.cdAmount || 0);
@@ -251,7 +246,7 @@ export default function DashboardClient() {
         // Note: We use all customer payments (not filtered by date) because receivables are cumulative
         customerPayments.forEach(payment => {
             if (payment.paidFor && payment.paidFor.length > 0) {
-                payment.paidFor.forEach(paidFor => {
+                payment.paidFor.forEach((paidFor: PaidFor) => {
                     const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
                     const newReceivable = Math.max(0, currentReceivable - (Number(paidFor.amount) || 0));
                     customerReceivablesMap.set(paidFor.srNo, newReceivable);
@@ -311,19 +306,32 @@ export default function DashboardClient() {
         push('loans', appCountsMap.loans);
         return entries.filter(row => row.count > 0);
     }, [appCountsMap]);
-    
-    // ✅ OPTIMIZED: Memoize groupDataByField function to prevent recreation on every render
-    // Define before use to avoid "Cannot access before initialization" error
-    const groupDataByField = React.useCallback((data: any[], field: string) => {
-        const grouped = data.reduce((acc, item) => {
-            const key = item[field] || 'Uncategorized';
-            acc[key] = (acc[key] || 0) + item.amount;
-            return acc;
-        }, {} as { [key: string]: number });
 
-        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
-    }, []);
-    
+    const groupDataByField = React.useCallback(
+        <T extends { amount: number } & Record<string, unknown>>(
+            data: T[],
+            field: keyof T & string
+        ) => {
+            const grouped = groupSumByKey(
+                data,
+                (item) => {
+                    const rawKey = item[field];
+                    if (typeof rawKey === "string" && rawKey.trim() !== "") {
+                        return rawKey;
+                    }
+                    return "Uncategorized";
+                },
+                (item) => item.amount
+            );
+
+            return Object.entries(grouped).map(([name, value]) => ({
+                name: toTitleCase(name),
+                value,
+            }));
+        },
+        []
+    );
+
      const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
@@ -385,16 +393,17 @@ export default function DashboardClient() {
 
     const level3Data = useMemo(() => {
         if (!level1 || !level2) return [];
-        let sourceData: any[] = [];
         if (level1 === 'Expenses') {
-            if (level2 === 'Supplier Payments') return []; // No further breakdown
-            sourceData = filteredData.filteredExpenses.filter(e => e.expenseNature === level2);
-        } else if (level1 === 'Income') {
-             if (level2 === 'From Sales') return []; // No further breakdown
-             sourceData = filteredData.filteredIncomes.filter(i => i.category === level2);
-             return groupDataByField(sourceData, 'subCategory');
+            if (level2 === 'Supplier Payments') return [];
+            const sourceData = filteredData.filteredExpenses.filter(e => e.expenseNature === level2);
+            return groupDataByField(sourceData, 'category');
         }
-        return groupDataByField(sourceData, 'category');
+        if (level1 === 'Income') {
+            if (level2 === 'From Sales') return [];
+            const sourceData = filteredData.filteredIncomes.filter(i => i.category === level2);
+            return groupDataByField(sourceData, 'subCategory');
+        }
+        return [];
     }, [level1, level2, filteredData, groupDataByField]);
     
     const level4Data = useMemo(() => {
@@ -404,61 +413,75 @@ export default function DashboardClient() {
     }, [level1, level2, level3, filteredData, groupDataByField]);
     
     const incomeExpenseChartData = useMemo(() => {
-        const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
-            const day = format(new Date(t.date), 'MMM dd');
-            if (!acc[day]) acc[day] = { date: day, income: 0, expense: 0 };
-            
-            // Check if it's an income type from incomes collection
-            const isIncomeEntry = 'transactionType' in t && t.transactionType === 'Income';
-            // Check if it's a customer payment
-            const isCustomerPayment = 'customerId' in t && 'paymentId' in t && t.paymentId.startsWith('CP');
-
-            if (isIncomeEntry || isCustomerPayment) {
-                acc[day].income += t.amount;
-            } else {
-                 acc[day].expense += t.amount;
-            }
-            return acc;
-        }, {} as Record<string, { date: string, income: number, expense: number }>);
-
-        return Object.values(grouped).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        try {
+            const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
+                const day = format(new Date(t.date), 'MMM dd');
+                if (!acc[day]) acc[day] = { date: day, income: 0, expense: 0 };
+                const isIncomeEntry = 'transactionType' in t && t.transactionType === 'Income';
+                const isCustomerPayment = 'customerId' in t && 'paymentId' in t && t.paymentId.startsWith('CP');
+                if (isIncomeEntry || isCustomerPayment) {
+                    acc[day].income += t.amount;
+                } else {
+                    acc[day].expense += t.amount;
+                }
+                return acc;
+            }, {} as Record<string, { date: string; income: number; expense: number }>);
+            return Object.values(grouped).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        } catch (error) {
+            logError(error, "dashboard-client: incomeExpenseChartData", "medium");
+            return [];
+        }
     }, [allIncomes, allExpenses]);
     
     const assetsLiabilitiesData = useMemo(() => {
-        return [
-            { name: 'Total Assets', value: financialState.totalAssets },
-            { name: 'Total Liabilities', value: financialState.totalLiabilities }
-        ];
+        try {
+            return [
+                { name: 'Total Assets', value: financialState.totalAssets },
+                { name: 'Total Liabilities', value: financialState.totalLiabilities }
+            ];
+        } catch (error) {
+            logError(error, "dashboard-client: assetsLiabilitiesData", "medium");
+            return [];
+        }
     }, [financialState]);
     
     const fundSourcesData = useMemo(() => {
-         return Array.from(financialState.balances.entries()).map(([key, value]) => {
-            const account = bankAccounts.find(acc => acc.id === key);
-            let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
-            if (account) {
-                name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
-            }
-            return { name, value };
-        }).filter(item => item.value > 0);
+        try {
+            return Array.from(financialState.balances.entries()).map(([key, value]) => {
+                const account = bankAccounts.find(acc => acc.id === key);
+                let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
+                if (account) {
+                    name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
+                }
+                return { name, value };
+            }).filter(item => item.value > 0);
+        } catch (error) {
+            logError(error, "dashboard-client: fundSourcesData", "medium");
+            return [];
+        }
     }, [financialState.balances, bankAccounts]);
 
 
     const paymentMethodData = useMemo(() => {
-        const groupedBySource = [...allIncomes, ...allExpenses].reduce((acc, item) => {
-            let key = 'Other';
-            if(item.bankAccountId) {
-                 const bank = bankAccounts.find(b => b.id === item.bankAccountId);
-                 key = bank ? bank.accountHolderName : 'Other Bank';
-            } else if (('paymentMethod' in item && item.paymentMethod === 'Cash') || ('receiptType' in item && item.receiptType === 'Cash')) {
-                key = 'Cash in Hand';
-            } else if (('paymentMethod' in item && item.paymentMethod === 'RTGS') || ('receiptType' in item && item.receiptType === 'RTGS')) {
-                key = 'RTGS';
-            }
-            acc[key] = (acc[key] || 0) + item.amount;
-            return acc;
-        }, {} as { [key: string]: number });
-    
-        return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
+        try {
+            const groupedBySource = [...allIncomes, ...allExpenses].reduce((acc, item) => {
+                let key = 'Other';
+                if (item.bankAccountId) {
+                    const bank = bankAccounts.find(b => b.id === item.bankAccountId);
+                    key = bank ? bank.accountHolderName : 'Other Bank';
+                } else if (('paymentMethod' in item && item.paymentMethod === 'Cash') || ('receiptType' in item && item.receiptType === 'Cash')) {
+                    key = 'Cash in Hand';
+                } else if (('paymentMethod' in item && item.paymentMethod === 'RTGS') || ('receiptType' in item && item.receiptType === 'RTGS')) {
+                    key = 'RTGS';
+                }
+                acc[key] = (acc[key] || 0) + item.amount;
+                return acc;
+            }, {} as { [key: string]: number });
+            return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
+        } catch (error) {
+            logError(error, "dashboard-client: paymentMethodData", "medium");
+            return [];
+        }
     }, [allIncomes, allExpenses, bankAccounts]);
 
     // ✅ OPTIMIZED: Memoize breadcrumbs to prevent recreation on every render
@@ -469,125 +492,11 @@ export default function DashboardClient() {
         if (level3) crumbs.push(level3);
         return crumbs;
     }, [level1, level2, level3]);
-
-    const handleBreadcrumbClick = (index: number) => {
-        if (index < 3) setLevel3(null);
-        if (index < 2) setLevel2(null);
-        if (index < 1) setLevel1(null);
-    };
     
-    const customTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="p-2 border rounded-lg bg-background/80 backdrop-blur-sm shadow-md text-xs">
-                    <p className="label font-bold">{label}</p>
-                    {payload.map((p: any) => (
-                         <p key={p.dataKey} style={{ color: p.color }}>{`${p.name}: ${formatCurrency(p.value)}`}</p>
-                    ))}
-                </div>
-            );
-        }
-        return null;
-    };
-    
-     const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
-        if (percent < 0.02) return null; // Hide label for very small slices
-        const RADIAN = Math.PI / 180;
-        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-        const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-        return (
-            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-[10px] font-bold pointer-events-none">
-                 {`${(percent * 100).toFixed(0)}%`}
-            </text>
-        );
-    };
-
-    const DetailTree = () => {
-        const totalL1 = level1Data.reduce((sum, i) => sum + i.value, 0);
-        const totalL2 = level2Data.reduce((sum, i) => sum + i.value, 0);
-        const totalL3 = level3Data.reduce((sum, i) => sum + i.value, 0);
-        const totalL4 = level4Data.reduce((sum, i) => sum + i.value, 0);
-
-        const renderNode = (item: {name: string, value: number}, level: number, total: number, onClick: () => void, isSelected: boolean) => (
-            <div 
-                key={item.name} 
-                onClick={onClick} 
-                className={cn(
-                    "flex justify-between items-center text-sm p-2 rounded-md cursor-pointer hover:bg-accent/50", 
-                    isSelected && "bg-accent font-semibold",
-                    `pl-${level * 4}`
-                )}
-            >
-                <span>{toTitleCase(item.name)}</span>
-                <div className="text-right">
-                    <p>{formatCurrency(item.value)}</p>
-                    <p className="text-xs text-muted-foreground">{total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}%</p>
-                </div>
-            </div>
-        );
-
-        return (
-            <ScrollArea className="h-[400px]">
-                <div className="space-y-1 p-1">
-                    {level1Data.map(l1Item => (
-                        <div key={l1Item.name}>
-                            {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}
-                            {level1 === l1Item.name && level2Data.length > 0 && (
-                                <div className="ml-4 border-l border-primary/20">
-                                    {level2Data.map(l2Item => (
-                                        <div key={l2Item.name}>
-                                            {renderNode(l2Item, 1, totalL2, () => setLevel2(l2Item.name), level2 === l2Item.name)}
-                                            {level2 === l2Item.name && level3Data.length > 0 && (
-                                                <div className="ml-4 border-l border-green-500/20">
-                                                    {level3Data.map(l3Item => (
-                                                        <div key={l3Item.name}>
-                                                            {renderNode(l3Item, 2, totalL3, () => setLevel3(l3Item.name), level3 === l3Item.name)}
-                                                            {level3 === l3Item.name && level4Data.length > 0 && (
-                                                                <div className="ml-4 border-l border-red-500/20">
-                                                                    {level4Data.map(l4Item => renderNode(l4Item, 3, totalL4, () => {}, false))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-        )
-    }
-    
-    if (isLoading && isClient) {
-        return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-    }
-
-
     return (
         <ErrorBoundary>
             <div className="space-y-6">
-                <Card>
-                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">Dashboard</CardTitle>
-                        <CardDescription>Filter and view your business overview.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                        <DateRangePicker date={date} onDateChange={setDate} />
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Button variant="outline" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
-                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
-                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
-                            <Button variant="outline" size="sm" onClick={() => setDate({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 Days</Button>
-                            <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                <DashboardFilters date={date} setDate={setDate} />
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" isLoading={isLoading}/>
@@ -605,214 +514,29 @@ export default function DashboardClient() {
                 <StatCard title="Customer Receivables" value={formatCurrency(totalCustomerReceivables)} icon={<Users />} colorClass="text-blue-500" isLoading={isLoading}/>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="h-64">
-                    <CardHeader>
-                        <CardTitle>Assets vs. Liabilities</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-48 grid grid-cols-2 items-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Tooltip content={customTooltip} />
-                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
-                                    {assetsLiabilitiesData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-2">
-                             {assetsLiabilitiesData.map((entry, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'}}></div>
-                                    <div className="text-sm">
-                                        <p className="text-muted-foreground">{entry.name}</p>
-                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="h-64">
-                    <CardHeader>
-                        <CardTitle>Payment Methods</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Tooltip content={customTooltip}/>
-                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
-                                     {paymentMethodData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-2 overflow-y-auto max-h-full">
-                             {paymentMethodData.map((entry, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
-                                    <div className="text-sm">
-                                        <p className="text-muted-foreground truncate">{entry.name}</p>
-                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="h-auto md:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Fund Sources</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-auto grid grid-cols-2 items-center gap-4">
-                         <ResponsiveContainer width="100%" height={200}>
-                            <PieChart>
-                                <Tooltip content={customTooltip}/>
-                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5}>
-                                     {fundSourcesData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-2">
-                             {fundSourcesData.map((entry, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
-                                    <div className="text-sm overflow-hidden">
-                                        <p className="text-muted-foreground truncate" title={entry.name}>{entry.name}</p>
-                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-            <Card className="col-span-1 lg:col-span-2">
-                <CardHeader>
-                    <CardTitle>Income vs. Expense</CardTitle>
-                </CardHeader>
-                <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={incomeExpenseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip content={customTooltip} />
-                            <Legend />
-                            <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
-                            <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
+            <DashboardCharts
+                assetsLiabilitiesData={assetsLiabilitiesData}
+                paymentMethodData={paymentMethodData}
+                fundSourcesData={fundSourcesData}
+                incomeExpenseChartData={incomeExpenseChartData}
+            />
             
-            <Card>
-                <CardHeader>
-                    <CardTitle>Sync Counts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Collection</TableHead>
-                                <TableHead>In App</TableHead>
-                                <TableHead>IndexedDB</TableHead>
-                                <TableHead>Firestore</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {syncCounts.map((row) => {
-                                const inApp = (appCountsMap as any)[row.collection] ?? 0;
-                                return (
-                                    <TableRow key={row.collection}>
-                                        <TableCell className="font-medium">{row.collection}</TableCell>
-                                        <TableCell>{inApp}</TableCell>
-                                        <TableCell>{row.indexeddb}</TableCell>
-                                        <TableCell>{row.firestore}</TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <SyncCountsTable syncCounts={syncCounts} appCountsMap={appCountsMap as Record<string, number>} />
             
-            <Card>
-                <CardHeader>
-                    <CardTitle>Software Table Counts</CardTitle>
-                    <CardDescription>App ke andar loaded entries ka summary</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Table</TableHead>
-                                <TableHead>Total Entries (In App)</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {softwareCounts.map((row) => (
-                                <TableRow key={row.name}>
-                                    <TableCell className="font-medium">{row.name}</TableCell>
-                                    <TableCell>{row.count}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <SoftwareCountsTable softwareCounts={softwareCounts} />
             
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <PieChartIcon className="h-5 w-5 text-primary"/>
-                        Financial Breakdown
-                    </CardTitle>
-                     <div className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                        {breadcrumbs.map((crumb, index) => (
-                            <React.Fragment key={crumb}>
-                                <Button
-                                    variant="link"
-                                    onClick={() => handleBreadcrumbClick(index)}
-                                    className="p-0 h-auto text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
-                                    disabled={index === breadcrumbs.length - 1}
-                                >
-                                    {toTitleCase(crumb)}
-                                </Button>
-                                {index < breadcrumbs.length - 1 && <ChevronsRight size={14} />}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Tooltip content={customTooltip} />
-                                <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
-                                    {level1Data.map((entry, index) => ( <Cell key={`cell-0-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>
-                                {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={90} outerRadius={120} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
-                                    {level2Data.map((entry, index) => ( <Cell key={`cell-1-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                                {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={130} outerRadius={160} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
-                                    {level3Data.map((entry, index) => ( <Cell key={`cell-2-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                                {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={170} outerRadius={200} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
-                                    {level4Data.map((entry, index) => ( <Cell key={`cell-3-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div>
-                        <DetailTree />
-                    </div>
-                </CardContent>
-            </Card>
+            <FinancialBreakdown
+                level1Data={level1Data}
+                level2Data={level2Data}
+                level3Data={level3Data}
+                level4Data={level4Data}
+                level1={level1}
+                level2={level2}
+                level3={level3}
+                setLevel1={setLevel1}
+                setLevel2={setLevel2}
+                setLevel3={setLevel3}
+            />
 
             {/* Manufacturing Costing */}
             <ManufacturingCosting />

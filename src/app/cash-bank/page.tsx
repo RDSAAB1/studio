@@ -1,3 +1,5 @@
+"use client";
+
 import CashBankClient from "./cash-bank-client";
 import type { PageProps } from '@/app/types';
 import { Suspense } from 'react';

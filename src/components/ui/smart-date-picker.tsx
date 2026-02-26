@@ -468,8 +468,8 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="outline"
-            className={cn("h-9 w-9 px-2", buttonClassName)}
+            variant="ghost"
+            className={cn("ui-field h-9 w-9 px-2", buttonClassName)}
             disabled={disabled}
             aria-label="Open date picker"
           >
@@ -569,4 +569,3 @@ export const SmartDatePicker: React.FC<SmartDatePickerProps> = ({
     </div>
   );
 };
-

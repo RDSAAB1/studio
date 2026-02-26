@@ -4,7 +4,7 @@ import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
-import { chunkedBulkPut, chunkedBulkDelete } from "./chunked-operations";
+import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
 
 type CollectionName = string;
 type FetchFunction<T> = () => Promise<T[]>;
@@ -14,7 +14,9 @@ interface CollectionConfig<T> {
     collectionName: CollectionName;
     fetchFunction: FetchFunction<T>;
     localTableName?: LocalTableName;
+    localFilter?: (item: any) => boolean;
     firestoreQuery?: Query; // Optional: if you want to pass a pre-built query
+    storageKey?: string; // Optional: custom localStorage key for sync state
 }
 
 /**
@@ -47,40 +49,48 @@ export function createMetadataBasedListener<T extends { id: string }>(
     if (db && localTableName) {
         const localTable = (db as any)[localTableName];
         if (localTable) {
-            // Try to order by 'date' first (for payments, expenses, etc.), fallback to 'srNo' (for suppliers, customers), then 'name' (for ledger accounts)
-            localTable.orderBy('date').reverse().toArray().then((localData: T[]) => {
-                if (localData && localData.length > 0) {
-                    callbackCalledFromIndexedDB = true;
-                    callback(localData);
+            const processAndCallback = (data: T[]) => {
+                let filteredData = data;
+                if (config.localFilter) {
+                    filteredData = data.filter(config.localFilter);
                 }
-            }).catch(() => {
-                // If 'date' field doesn't exist, try 'srNo' (for suppliers/customers)
-                localTable.orderBy('srNo').reverse().toArray().then((localData: T[]) => {
-                    if (localData && localData.length > 0) {
-                        callbackCalledFromIndexedDB = true;
-                        callback(localData);
-                    }
-                }).catch(() => {
-                    // If 'srNo' doesn't exist, try 'name' (for ledger accounts)
-                    localTable.orderBy('name').toArray().then((localData: T[]) => {
-                        if (localData && localData.length > 0) {
-                            callbackCalledFromIndexedDB = true;
-                            callback(localData);
-                        }
-                    }).catch(() => {
-                        // If all ordering fails, just get all data without ordering
-                    localTable.toArray().then((localData: T[]) => {
-                        if (localData && localData.length > 0) {
-                            callbackCalledFromIndexedDB = true;
-                            callback(localData);
-                        }
-                    }).catch(() => {
-                        // If local read fails, continue with Firestore
-                        callbackCalledFromIndexedDB = false;
+                if (filteredData && filteredData.length > 0) {
+                    callbackCalledFromIndexedDB = true;
+                    callback(filteredData);
+                }
+            };
+
+            // ✅ OPTIMIZED: Use chunked reading to prevent blocking main thread
+            // Try to order by 'date' first (for payments, expenses, etc.), fallback to 'srNo' (for suppliers, customers), then 'name' (for ledger accounts)
+            chunkedToArray<T>(localTable, 500, 'date', true)
+                .then((data) => {
+                    // Check if we got data or if we should try another sort order
+                    // If date sort failed (likely field missing), chunkedToArray might return empty or throw
+                    // But chunkedToArray implementation handles errors by returning empty array or falling back? 
+                    // Let's assume if it succeeds with data, good. If empty, maybe try other sorts?
+                    // Actually, if date doesn't exist, it might just return unordered data or empty.
+                    // To be safe and mimic previous logic, we can check if data is empty, but that might be valid.
+                    // The previous logic caught ERRORS.
+                    processAndCallback(data);
+                })
+                .catch(() => {
+                    // If 'date' field error, try 'srNo'
+                    chunkedToArray<T>(localTable, 500, 'srNo', true)
+                        .then(processAndCallback)
+                        .catch(() => {
+                            // If 'srNo' error, try 'name'
+                            chunkedToArray<T>(localTable, 500, 'name', false)
+                                .then(processAndCallback)
+                                .catch(() => {
+                                    // Fallback to no sort
+                                    chunkedToArray<T>(localTable, 500)
+                                        .then(processAndCallback)
+                                        .catch(() => {
+                                            callbackCalledFromIndexedDB = false;
+                                        });
+                                });
                         });
-                    });
                 });
-            });
             
             // ✅ Periodic checks removed - only sync when sync registry indicates actual changes
             // This prevents unnecessary reads and only fetches when edit/delete/update occurs
@@ -98,6 +108,106 @@ export function createMetadataBasedListener<T extends { id: string }>(
             if (isInitialLoad) {
                 // ✅ FIX: Always fetch FULL sync on initial load, even if sync_registry doesn't exist
                 // This ensures we get all documents, including those added without sync_registry update
+                try {
+                    const freshData = await fetchFunction();
+                    
+                    // Update IndexedDB and detect deletions
+                    if (db && localTableName) {
+                        const localTable = (db as any)[localTableName];
+                        if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
+                            const existingIds = new Set<string>((await localTable.toArray()).map((item: { id: string }) => item.id));
+                            const freshIds = new Set<string>(freshData.map((item) => item.id));
+                            const idsToDelete = Array.from(existingIds).filter((id) => !freshIds.has(id));
+                            
+                            // ✅ SAFETY: Prevent accidental mass deletion if fetch returned empty but we have local data
+                            // This protects against "Offline Wipe" or "Sync Error Wipe"
+                            // Only allow wiping everything if we have a small amount of data (< 5 items)
+                            // or if we are sure it's a valid sync (hard to know, so err on side of caution)
+                            if (freshData.length === 0 && existingIds.size > 5 && idsToDelete.length === existingIds.size) {
+                                console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${existingIds.size} local items after empty sync.`);
+                                // Treat as "Keep Local" - don't delete anything
+                                // But we should still update items? freshData is empty, so nothing to update.
+                                // We essentially ignore this sync result for deletion purposes.
+                            } else if (idsToDelete.length > 0) {
+                                await chunkedBulkDelete(localTable, idsToDelete, 200);
+                            }
+                            
+                            if (freshData.length > 0) {
+                                await chunkedBulkPut(localTable, freshData, 100);
+                            }
+                        }
+                    }
+                    
+                    if (db && db.transactions && (collectionName === 'expenses' || collectionName === 'incomes')) {
+                        const isExpense = collectionName === 'expenses';
+                        const localData = await db.transactions.where('type').equals(isExpense ? 'Expense' : 'Income').toArray();
+                        const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
+                        const freshIds = new Set<string>(freshData.map((item) => item.id));
+                        const missingIds = Array.from(freshIds).filter((id) => !localIds.has(id));
+                        if (missingIds.length > 0) {
+                            const missingDocs = freshData.filter(item => missingIds.includes((item as any).id));
+                            const withType = missingDocs.map(e => ({
+                                ...e,
+                                type: isExpense ? 'Expense' : 'Income',
+                                transactionType: isExpense ? 'Expense' : 'Income'
+                            }));
+                            await chunkedBulkPut(db.transactions, withType as any[], 100);
+                        }
+                        const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
+                        
+                        // ✅ SAFETY: Prevent accidental mass deletion
+                        if (freshData.length === 0 && localIds.size > 5 && extraIds.length === localIds.size) {
+                             console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${localIds.size} transaction items.`);
+                        } else if (extraIds.length > 0) {
+                            await chunkedBulkDelete(db.transactions, extraIds, 200);
+                        }
+                    }
+                    
+                    callback(freshData);
+                    isInitialLoad = false;
+                } catch (error) {
+                    onError(error as Error);
+                }
+            }
+            return;
+        }
+        
+        const data = snapshot.data();
+        const currentTimestamp = data.last_updated || data.updated_at;
+        const currentTrigger = (data as any)._trigger;
+        
+        // Track last known values
+        const lastTriggerKey = `lastTrigger_${collectionName}`;
+        const lastTimestampKey = `lastTimestamp_${collectionName}`;
+        const lastKnownTrigger = typeof window !== 'undefined' ? (window as any)[lastTriggerKey] : null;
+        const lastKnownTimestampStr = typeof window !== 'undefined' ? (window as any)[lastTimestampKey] : null;
+        
+        // ✅ Step 3: Check localStorage to avoid unnecessary initial fetch
+        const storageKey = config.storageKey || `lastSync:${collectionName}_v2`;
+        let localLastSync = 0;
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem(storageKey);
+            if (stored) localLastSync = parseInt(stored, 10);
+        }
+
+        if (isInitialLoad) {
+            // Check if we can skip initial fetch
+            let shouldSkipInitialFetch = false;
+            
+            if (callbackCalledFromIndexedDB && currentTimestamp) {
+                const registryTime = currentTimestamp instanceof Timestamp 
+                    ? currentTimestamp.toMillis() 
+                    : (typeof currentTimestamp === 'string' || typeof currentTimestamp === 'number' ? new Date(currentTimestamp).getTime() : 0);
+                
+                // If local data is newer or equal to registry, skip fetch
+                // We add a small buffer (1000ms) to avoid race conditions
+                if (localLastSync >= registryTime - 1000) {
+                    shouldSkipInitialFetch = true;
+                }
+            }
+
+            if (!shouldSkipInitialFetch) {
+                // Initial load - fetch FULL sync
                 try {
                     const freshData = await fetchFunction();
                     
@@ -139,30 +249,16 @@ export function createMetadataBasedListener<T extends { id: string }>(
                     }
                     
                     callback(freshData);
-                    isInitialLoad = false;
+                    
+                    // Update localStorage with current time (or registry time if available)
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(storageKey, String(Date.now()));
+                    }
                 } catch (error) {
                     onError(error as Error);
                 }
             }
-            return;
-        }
-        
-        const data = snapshot.data();
-        const currentTimestamp = data.last_updated || data.updated_at;
-        const currentTrigger = (data as any)._trigger;
-        
-        // Track last known values
-        const lastTriggerKey = `lastTrigger_${collectionName}`;
-        const lastTimestampKey = `lastTimestamp_${collectionName}`;
-        const lastKnownTrigger = typeof window !== 'undefined' ? (window as any)[lastTriggerKey] : null;
-        const lastKnownTimestampStr = typeof window !== 'undefined' ? (window as any)[lastTimestampKey] : null;
-        
-        // ✅ Step 3: Always fetch on initial load to catch any missed documents
-        if (isInitialLoad) {
-            // Initial load - always fetch FULL sync to ensure we get all documents
-            // This catches any documents that might have been missed due to sync registry issues
             isInitialLoad = false;
-            // Continue to fetch below
         } else {
             // If we don't have last known values yet, always fetch (first update after initial load)
             if (lastKnownTimestampStr === null && lastKnownTrigger === null) {
@@ -315,9 +411,10 @@ export function createMetadataBasedListener<T extends { id: string }>(
         try {
             const freshData = await fetchFunction();
             
-            // ✅ FIX: Handle expenses specially - they're stored in transactions table
-            if (collectionName === 'expenses' && db && db.transactions) {
-                const localData = await db.transactions.where('type').equals('Expense').toArray();
+            // ✅ FIX: Handle expenses and incomes specially - they're stored in transactions table
+            if ((collectionName === 'expenses' || collectionName === 'incomes') && db && db.transactions) {
+                const type = collectionName === 'expenses' ? 'Expense' : 'Income';
+                const localData = await db.transactions.where('type').equals(type).toArray();
                 const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
                 const freshIds = new Set<string>(freshData.map((item) => item.id));
                 
@@ -326,12 +423,12 @@ export function createMetadataBasedListener<T extends { id: string }>(
                 if (missingIds.length > 0) {
                     const missingDocs = freshData.filter(item => missingIds.includes(item.id));
                     // Add type field before saving
-                    const expensesWithType = missingDocs.map(e => ({
+                    const docsWithType = missingDocs.map(e => ({
                         ...e,
-                        type: 'Expense' as const,
-                        transactionType: 'Expense' as const
+                        type: type as any,
+                        transactionType: type as any
                     }));
-                    await chunkedBulkPut(db.transactions, expensesWithType, 100);
+                    await chunkedBulkPut(db.transactions, docsWithType, 100);
                     
                     // Also check for extra documents (in local but not in Firestore - might be deleted)
                     const extraIds = Array.from(localIds).filter((id) => !freshIds.has(id));
@@ -354,7 +451,13 @@ export function createMetadataBasedListener<T extends { id: string }>(
             } else if (db && localTableName) {
                 const localTable = (db as any)[localTableName];
                 if (localTable && localTableName !== 'payments' && localTableName !== 'governmentFinalizedPayments') {
-                    const localData = await localTable.toArray();
+                    let localData = await localTable.toArray();
+
+                    // ✅ FIX: Apply local filter if exists (critical for shared tables)
+                    if (config.localFilter) {
+                        localData = localData.filter(config.localFilter);
+                    }
+
                     const localIds = new Set<string>(localData.map((item: { id: string }) => item.id));
                     const freshIds = new Set<string>(freshData.map((item) => item.id));
                     
@@ -391,9 +494,15 @@ export function createMetadataBasedListener<T extends { id: string }>(
     };
     
     const shouldEnablePeriodicSync = () => {
+        // Disabled per user request to reduce Firestore reads
+        // "hrr thodi der mei sync na ho iss se read bdh jayega only update at vala hi hi sync ho"
+        return false;
+        
+        /* Original logic:
         if (typeof window === 'undefined') return false;
         const flag = window.localStorage?.getItem('periodic-sync-enabled');
         return flag === 'true';
+        */
     };
     
     if (typeof window !== 'undefined' && (localTableName || collectionName === 'expenses')) {

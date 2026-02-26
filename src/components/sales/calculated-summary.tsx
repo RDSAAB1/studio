@@ -8,11 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw, X } from "lucide-react";
-import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
 import { SegmentedSwitch } from "../ui/segmented-switch";
 import { Label } from "../ui/label";
+import { formatDate } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
@@ -115,11 +115,11 @@ export const CalculatedSummary = ({
                             <SummaryItem label="Total Bag Wt" value={`${(totalBagWeight / 100).toFixed(2)} Qtl`} />
                             <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
                             <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
-                            <SummaryItem label="Bag Wt Deduction" value={formatCurrency((customer as any).bagWeightDeductionAmount || 0)} />
+                            <SummaryItem label="Bag Wt Deduction" value={formatCurrency(customer.bagWeightDeductionAmount || 0)} />
                             <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />
                             <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />
                             <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
-                            <SummaryItem label="Transport Amount" value={formatCurrency((customer as any).transportAmount || 0)} />
+                            <SummaryItem label="Transport Amount" value={formatCurrency(customer.transportAmount || 0)} />
                             <SummaryItem label="Kanta" value={formatCurrency(customer.kanta || 0)} />
                             <SummaryItem label="Net Receivable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
                         </>
@@ -128,7 +128,10 @@ export const CalculatedSummary = ({
                     {/* Supplier Summary */}
                     {showSupplierSummary && (
                         <>
-                            <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
+                            <SummaryItem
+                                label="Due Date"
+                                value={isLoading ? "-" : formatDate(customer.dueDate, "dd-MMM-yy")}
+                            />
                             <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
@@ -228,7 +231,7 @@ export const CalculatedSummary = ({
                             <div className="flex items-center space-x-2">
                                 <SegmentedSwitch 
                                     id="brokerage-toggle" 
-                                    checked={isBrokerageIncluded} 
+                                    checked={!!isBrokerageIncluded} 
                                     onCheckedChange={onBrokerageToggle}
                                     leftLabel="Off"
                                     rightLabel="On"

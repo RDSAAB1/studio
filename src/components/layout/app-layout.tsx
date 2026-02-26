@@ -1,19 +1,43 @@
 
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode } from 'react';
+import { Fragment, Suspense, createContext, useContext, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
-import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import CustomSidebar from '@/components/layout/custom-sidebar';
+import { Loader2, Bell, Calculator, ChevronDown, GripVertical, Menu, X } from 'lucide-react';
+import { cn, formatCurrency } from '@/lib/utils';
 import TabBar from '@/components/layout/tab-bar';
-import { Header } from "@/components/layout/header";
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { Truck, Users, Wallet, FilePlus, Banknote } from 'lucide-react';
+import { logError } from '@/lib/error-logger';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AdvancedCalculator } from '@/components/calculator/advanced-calculator';
+import { getLoansRealtime } from '@/lib/firestore';
+import type { Loan } from '@/lib/definitions';
+import { format } from 'date-fns';
 
 // Pre-compute flattened menu items once (outside component to avoid recalculation)
 const flattenedMenuItems = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i);
+
+type LayoutSubnavContextValue = {
+  setSubnav: (node: ReactNode | null) => void;
+};
+
+const LayoutSubnavContext = createContext<LayoutSubnavContextValue | null>(null);
+
+export function useLayoutSubnav() {
+  const ctx = useContext(LayoutSubnavContext);
+  return ctx?.setSubnav ?? (() => {});
+}
 
 // Helper function to create sub-tabs for Entry and Payments
 const createSubTabs = (parentId: string): MenuItem[] => {
@@ -42,7 +66,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       serialize: (tabs) => JSON.stringify(tabs.map((t: MenuItem) => ({ id: t.id, name: t.name, icon: t.icon }))),
       deserialize: (str) => {
         const parsed = JSON.parse(str);
-        return parsed.map((t: { id: string; name: string; icon?: any }) => {
+        return parsed.map((t: { id: string; name: string; icon?: unknown }) => {
           const fullMenuItem = flattenedMenuItems.find(item => item.id === t.id);
           return fullMenuItem || t;
         });
@@ -50,7 +74,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
   );
   const [activeTabId, setActiveTabId] = usePersistedState<string>('app-active-tab', 'dashboard-overview');
-  const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const [subnav, setSubnav] = useState<ReactNode | null>(null);
   const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
@@ -60,6 +84,35 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const activeTabIdRef = useRef(activeTabId);
   const openTabsRef = useRef(openTabs);
   const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isBrowser = typeof window !== 'undefined';
+
+  const performNavigation = (path: string, options?: { forceWindow?: boolean }) => {
+    const shouldUseWindowLocation = options?.forceWindow;
+    startTransition(() => {
+      if (!isBrowser) {
+        return;
+      }
+      try {
+        if (shouldUseWindowLocation) {
+          window.location.href = path;
+          return;
+        }
+        try {
+          router.push(path);
+        } catch (error) {
+          logError(error, `app-layout: router.push to ${path}`, 'medium');
+          window.location.href = path;
+        }
+      } catch (error) {
+        logError(error, `app-layout: hard navigate to ${path}`, 'high');
+        try {
+          window.location.href = path;
+        } catch (hardError) {
+          logError(hardError, `app-layout: window.location.href to ${path}`, 'critical');
+        }
+      }
+    });
+  };
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -158,7 +211,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     const isUnifiedPaymentsPage = pathname === '/sales/payments' || pathname.startsWith('/sales/payments');
     
     // Get tab and menu from URL query for sales, entry and payments pages
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlParams = isBrowser ? new URLSearchParams(window.location.search) : null;
     const menuParam = urlParams?.get('menu') || (isSalesPage ? 'entry' : null);
     const tabParam = urlParams?.get('tab') || (isEntryPage ? 'supplier' : isUnifiedPaymentsPage ? 'supplier' : isSalesPage ? 'supplier-entry' : null);
     
@@ -204,27 +257,48 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
     
     if (isSalesPage && menuParam && tabParam) {
-      // Get menu type from URL
-      const menuItemId = menuParam === 'entry' ? 'sales-entry' : 'sales-payments';
-      const menuItem = allMenuItems.find(item => item.id === menuItemId);
+      // Get menu type from URL and map to menu item ID
+      let menuItemId: string;
+      if (menuParam === 'entry') menuItemId = 'sales-entry';
+      else if (menuParam === 'payments') menuItemId = 'sales-payments';
+      else if (menuParam === 'cash-bank') menuItemId = 'cash-bank';
+      else if (menuParam === 'reports') menuItemId = 'sales-reports';
+      else if (menuParam === 'settings') menuItemId = 'settings';
+      else menuItemId = menuParam ?? 'entry'; // hr, inventory, marketing, projects match their IDs
+
+      // Try to find the specific tab item first (leaf node)
+      const targetTabId = tabParam;
       
-      if (menuItem) {
-        // Batch state updates in a transition
-        startTransition(() => {
-          setOpenTabs(prev => {
-            // Remove old entry/payment tabs
+      // Find the menu item in flattened list (for sub-menus) or allMenuItems (for top-level)
+      const menuItem = flattenedMenuItems.find(item => item.id === targetTabId) || 
+                       allMenuItems.find(item => item.id === menuItemId);
+      
+      if (!menuItem) {
+        return;
+      }
+
+      const selectedMenuItem = menuItem!;
+      // Batch state updates in a transition
+      startTransition(() => {
+        setOpenTabs(prev => {
+            // Remove old entry/payment/other unified tabs
             const filtered = prev.filter(tab => 
               tab.id !== 'sales-entry' &&
               tab.id !== 'sales-payments' &&
               !tab.id.startsWith('entry-') &&
-              !tab.id.startsWith('payments-')
+              !tab.id.startsWith('payments-') &&
+              !tab.id.startsWith('hr-') &&
+              !tab.id.startsWith('inventory-') &&
+              !tab.id.startsWith('marketing-') &&
+              !tab.id.startsWith('project-') &&
+              !tab.id.startsWith('settings-')
             );
             
             // Add current menu item
             const newTabs = [...filtered];
-            const tabExists = newTabs.some((t: MenuItem) => t.id === menuItemId);
+            const tabExists = newTabs.some((t: MenuItem) => t.id === selectedMenuItem.id);
             if (!tabExists) {
-              newTabs.push(menuItem);
+              newTabs.push(selectedMenuItem);
             } else {
               // Tab already exists, check if array actually changed
               if (filtered.length === prev.length && filtered.every((t, i) => t.id === prev[i]?.id)) {
@@ -233,14 +307,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
             }
             
             return newTabs;
-          });
+        });
           
           // Only update activeTabId if it actually changed
-          if (activeTabIdRef.current !== menuItemId) {
-            setActiveTabId(menuItemId);
+          if (activeTabIdRef.current !== selectedMenuItem.id) {
+            setActiveTabId(selectedMenuItem.id);
           }
-        });
-      }
+      });
       
       return;
     }
@@ -341,6 +414,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
     
     if (menuItem) {
+      const selectedMenuItem = menuItem!;
       // Batch state updates in a transition
       startTransition(() => {
         setOpenTabs(prev => {
@@ -348,7 +422,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           if (tabExists) {
             return prev; // No change needed
           }
-          return [...prev, menuItem]; // Add new tab
+          return [...prev, selectedMenuItem]; // Add new tab
         });
         
         // Set as active
@@ -360,8 +434,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       // Fallback: If no tabs and current page not in menu, open dashboard
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
       if (dashboardTab) {
+        const selectedDashboardTab = dashboardTab!;
         startTransition(() => {
-          setOpenTabs([dashboardTab]);
+          setOpenTabs([selectedDashboardTab]);
           setActiveTabId('dashboard-overview');
         });
       }
@@ -383,34 +458,10 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       ? menuItem.href 
       : (menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`);
     
-    // Handle sales-entry and sales-payments menu items
-    if (menuItem.id === 'sales-entry') {
-      targetPath = '/sales?menu=entry&tab=supplier-entry';
-    } else if (menuItem.id === 'sales-payments') {
-      targetPath = '/sales?menu=payments&tab=supplier-payments';
-    } else if (menuItem.id.startsWith('entry-')) {
-      let tabType = 'supplier';
-      if (menuItem.id.includes('supplier')) {
-        tabType = 'supplier';
-      } else if (menuItem.id.includes('customer')) {
-        tabType = 'customer';
-      }
-      targetPath = `/sales/entry?tab=${tabType}`;
-    } else if (menuItem.id.startsWith('payments-')) {
-      // Payments now use direct paths, not query parameters
-      if (menuItem.href) {
-        targetPath = menuItem.href;
-      } else if (menuItem.id.includes('supplier')) {
-        targetPath = '/sales/payments-supplier';
-      } else if (menuItem.id.includes('customer')) {
-        targetPath = '/sales/payments-customer';
-      } else if (menuItem.id.includes('outsider')) {
-        targetPath = '/sales/payments-outsider';
-      }
-    }
+    // Legacy overrides removed - now using href directly from sidebar config
     
     // Check if we're already on the target path (including query params)
-    const currentPathWithQuery = typeof window !== 'undefined' ? window.location.pathname + window.location.search : pathname;
+    const currentPathWithQuery = isBrowser ? window.location.pathname + window.location.search : pathname;
     const targetPathBase = targetPath.split('?')[0];
     
     if (pathname === targetPathBase) {
@@ -418,15 +469,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       if (targetPath.includes('?')) {
         // Has query params - navigate to update them
         setActiveTabId(menuItem.id);
-        startTransition(() => {
-          if (typeof window !== 'undefined') {
-            try {
-              router.push(targetPath);
-            } catch (error) {
-              window.location.href = targetPath;
-            }
-          }
-        });
+        performNavigation(targetPath);
         return;
       } else {
         // No query params needed, just update active tab
@@ -437,33 +480,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
 
     setActiveTabId(menuItem.id);
 
-    // Navigate in a transition to keep UI responsive and guard against transient errors
-    startTransition(() => {
-      try {
-        // Check if we're already on this path to avoid unnecessary navigation
-        const currentPath = pathname.split('?')[0];
-        
-        if (currentPath === targetPathBase && !targetPath.includes('?')) {
-          // Already on this page without query params, just update the active tab
-          return;
-        }
-        
-        // Use router.push for Next.js 15 (returns void, not a promise)
-        if (typeof window !== 'undefined') {
-          try {
-            router.push(targetPath);
-          } catch (err) {
-            // As a resilience fallback, force a hard navigation
-            window.location.href = targetPath;
-          }
-        }
-      } catch (err) {
-        // Synchronous error fallback
-        if (typeof window !== 'undefined') {
-          window.location.href = targetPath;
-        }
-      }
-    });
+    const currentPath = pathname.split('?')[0];
+    if (currentPath === targetPathBase && !targetPath.includes('?')) {
+      return;
+    }
+    performNavigation(targetPath);
   };
 
   const handleTabClose = (tabIdToClose: string) => {
@@ -481,13 +502,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         const path = newActiveTab.href 
           ? newActiveTab.href 
           : (newActiveTab.id === 'dashboard-overview' ? '/' : `/${newActiveTab.id}`);
-        startTransition(() => {
-          try {
-            router.push(path);
-          } catch {
-            try { if (typeof window !== 'undefined') window.location.assign(path); } catch {}
-          }
-        });
+        performNavigation(path);
       } else {
         // This case should ideally not happen if dashboard is always present
         // but as a fallback, go to dashboard
@@ -495,13 +510,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         if (dashboardTab) {
             setOpenTabs([dashboardTab]);
             setActiveTabId(dashboardTab.id);
-            startTransition(() => {
-              try {
-                router.push('/');
-              } catch {
-                try { if (typeof window !== 'undefined') window.location.assign('/'); } catch {}
-              }
-            });
+            performNavigation('/');
         }
       }
     }
@@ -523,20 +532,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         setOpenTabs(allSubMenus);
         setActiveTabId(menuItem.id);
         const path = clickedSubItem.href || menuItem.href || `/${menuItem.id}`;
-        startTransition(() => {
-          if (typeof window !== 'undefined') {
-            // For cash-bank route, use window.location
-            if (path.includes('/cash-bank')) {
-              window.location.href = path;
-            } else {
-              try {
-                router.push(path);
-              } catch (error) {
-                window.location.href = path;
-              }
-            }
-          }
-        });
+        performNavigation(path);
         return;
       }
     }
@@ -552,19 +548,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const firstSubMenu = targetMenu.subMenus[0];
       setActiveTabId(firstSubMenu.id);
       const path = firstSubMenu.href || `/${firstSubMenu.id}`;
-      startTransition(() => {
-        if (typeof window !== 'undefined') {
-          if (path.includes('/cash-bank')) {
-            window.location.href = path;
-          } else {
-            try {
-              router.push(path);
-            } catch (error) {
-              window.location.href = path;
-            }
-          }
-        }
-      });
+      performNavigation(path);
       return;
     }
     
@@ -576,49 +560,294 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       ? targetMenu.href 
       : (targetMenu.id === 'dashboard-overview' ? '/' : `/${targetMenu.id}`);
     
-    startTransition(() => {
-      if (typeof window !== 'undefined') {
-        // For cash-bank route, always use window.location to avoid prefetch errors
-        if (targetMenu.id === 'cash-bank' || path.includes('/cash-bank')) {
-          window.location.href = path;
-        } else {
-          // For other routes, use Next.js router
-          try {
-            router.push(path);
-          } catch (error) {
-            // Fallback to window.location if router fails
-            window.location.href = path;
-          }
-        }
-      }
-    });
+    performNavigation(path);
   };
 
-  const toggleSidebar = () => setIsSidebarActive(prev => !prev);
-  const pageId = pathname.substring(1);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = getLoansRealtime(
+      (data) => setLoans(data),
+      () => {}
+    );
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (Array.isArray(loans)) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setPendingNotifications(
+        loans.filter(loan => loan.nextEmiDueDate && new Date(loan.nextEmiDueDate) <= today)
+      );
+    }
+  }, [loans]);
+
+  const [calculatorPosition, setCalculatorPosition] = useState({ x: 0, y: 0 });
+  const [isDraggingCalculator, setIsDraggingCalculator] = useState(false);
+  const calculatorDragStartRef = useRef({ x: 0, y: 0 });
+  const calculatorDialogRef = useRef<HTMLDivElement>(null);
+
+  const handleCalculatorMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    setIsDraggingCalculator(true);
+    calculatorDragStartRef.current = {
+      x: e.clientX - calculatorPosition.x,
+      y: e.clientY - calculatorPosition.y,
+    };
+  };
+
+  const handleCalculatorMouseMove = (e: MouseEvent) => {
+    if (isDraggingCalculator && calculatorDialogRef.current) {
+      const newX = e.clientX - calculatorDragStartRef.current.x;
+      const newY = e.clientY - calculatorDragStartRef.current.y;
+      setCalculatorPosition({ x: newX, y: newY });
+    }
+  };
+
+  const handleCalculatorMouseUp = () => {
+    setIsDraggingCalculator(false);
+  };
+
+  useEffect(() => {
+    if (isDraggingCalculator) {
+      window.addEventListener('mousemove', handleCalculatorMouseMove);
+      window.addEventListener('mouseup', handleCalculatorMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleCalculatorMouseMove);
+      window.removeEventListener('mouseup', handleCalculatorMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleCalculatorMouseMove);
+      window.removeEventListener('mouseup', handleCalculatorMouseUp);
+    };
+  }, [isDraggingCalculator]);
+
+  const isTopMenuActive = (item: MenuItem) => {
+    if (item.subMenus && item.subMenus.length > 0) {
+      return item.subMenus.some(sub => {
+        if (sub.href) {
+          const base = sub.href.split('?')[0];
+          return pathname === base || pathname.startsWith(base + '/');
+        }
+        const base = `/${sub.id}`;
+        return pathname === base || pathname.startsWith(base + '/');
+      });
+    }
+    if (item.href) {
+      const base = item.href.split('?')[0];
+      return pathname === base || pathname.startsWith(base + '/');
+    }
+    if (item.id === 'dashboard-overview') return pathname === '/';
+    const base = `/${item.id}`;
+    return pathname === base || pathname.startsWith(base + '/');
+  };
+
+  const isSalesRoute = pathname.startsWith('/sales');
+  const hasSubnav = isSalesRoute && !!subnav;
 
   return (
-    <div className={cn("wrapper", isSidebarActive && "active")}>
-        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
-          <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
-              <div className="sticky top-0 z-30 flex-shrink-0 bg-card" style={{ borderRadius: 0 }}>
-              <Header toggleSidebar={toggleSidebar} />
-              {/* Hide TabBar for unified sales page - it has its own tab system */}
-              {!pathname.startsWith('/sales') && (
-                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={(tabId: string) => {
-                   const menuItem = openTabs.find(tab => tab.id === tabId) || flattenedMenuItems.find(item => item.id === tabId);
-                   if (menuItem) handleTabSelect(menuItem);
-                 }} closeTab={handleTabClose} />
-              )}
-            </div>
-              <div className="flex-grow relative overflow-y-auto overflow-x-hidden">
-                <main className="p-4 sm:p-6" style={{ margin: '-16px' }}>
-                {children}
-              </main>
+    <LayoutSubnavContext.Provider value={{ setSubnav }}>
+      <div className="min-h-screen flex flex-col">
+        <div className="sticky top-0 z-50">
+          <div className="border-b border-[#24003A] bg-[#2E004F] text-white">
+            <div className="flex h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white"
+                onClick={() => {
+                  const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
+                  if (dashboardTab) handleOpenTab(dashboardTab);
+                }}
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+
+              <div className="flex-1 overflow-x-auto no-scrollbar">
+                <div className="flex min-w-max items-center gap-1">
+                  {allMenuItems.map((item) => {
+                    const active = isTopMenuActive(item);
+                    if (item.subMenus && item.subMenus.length > 0) {
+                      return (
+                        <DropdownMenu key={item.id}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "h-9 gap-1 px-2 text-white/90 hover:bg-white/10 hover:text-white",
+                                active && "bg-white/12 text-white"
+                              )}
+                            >
+                              {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                              <span className="text-xs font-semibold whitespace-nowrap">{item.name}</span>
+                              <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/90 text-white shadow-[0_18px_50px_rgba(2,6,23,0.35)] backdrop-blur-[20px]"
+                          >
+                            <DropdownMenuLabel className="font-bold text-sm text-white">{item.name}</DropdownMenuLabel>
+                            {item.subMenus.map((sub) => (
+                              <DropdownMenuItem
+                                key={sub.id}
+                                className="cursor-pointer focus:bg-white/10"
+                                onClick={() => handleOpenTab(sub)}
+                              >
+                                {sub.icon ? <sub.icon className="mr-2 h-4 w-4" /> : null}
+                                <span className="text-sm">{sub.name}</span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      );
+                    }
+
+                    return (
+                      <Button
+                        key={item.id}
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-9 gap-2 px-2 text-white/90 hover:bg-white/10 hover:text-white",
+                          active && "bg-white/12 text-white"
+                        )}
+                        onClick={() => handleOpenTab(item)}
+                      >
+                        {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                        <span className="text-xs font-semibold whitespace-nowrap">{item.name}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {pendingNotifications.length > 0 && (
+                      <span className="absolute top-2 right-2 block h-1.5 w-1.5 rounded-full bg-destructive" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="bottom"
+                  align="end"
+                  sideOffset={8}
+                  className="w-80 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 shadow-lg"
+                >
+                  <div className="space-y-2">
+                    <h4 className="font-medium leading-none">Pending EMIs</h4>
+                    {pendingNotifications.length > 0 ? (
+                      pendingNotifications.slice(0, 6).map(loan => (
+                        <button
+                          key={loan.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setNotificationsOpen(false);
+                            const params = new URLSearchParams({
+                              loanId: loan.id,
+                              amount: String(loan.emiAmount || 0),
+                              payee: loan.lenderName || loan.productName || 'Loan Payment',
+                              description: `EMI for ${loan.loanName}`
+                            }).toString();
+                            router.push(`/expense-tracker?${params}`);
+                          }}
+                          className="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                        >
+                          <p className="text-sm font-medium">{loan.loanName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Due: {loan.nextEmiDueDate ? format(new Date(loan.nextEmiDueDate), "dd MMM yyyy") : 'N/A'} • {formatCurrency(loan.emiAmount || 0)}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-2 text-center">No new notifications.</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <Dialog modal={false}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                  >
+                    <Calculator className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  ref={calculatorDialogRef}
+                  className="p-0 max-w-lg"
+                  style={{
+                    transform: `translate(calc(-50% + ${calculatorPosition.x}px), calc(-50% + ${calculatorPosition.y}px))`,
+                  }}
+                  onInteractOutside={(e) => {
+                    if (isDraggingCalculator) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <DialogHeader className="p-0 sr-only">
+                    <DialogTitle>Advanced Calculator</DialogTitle>
+                  </DialogHeader>
+                  <div
+                    onMouseDown={handleCalculatorMouseDown}
+                    className="relative cursor-grab active:cursor-grabbing w-full h-8 flex items-center justify-center bg-muted/50 rounded-t-lg"
+                  >
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    <DialogClose className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-background">
+                      <X className="h-3 w-3" />
+                    </DialogClose>
+                  </div>
+                  <AdvancedCalculator />
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
-        </CustomSidebar>
-    </div>
+
+          {hasSubnav ? (
+            <div className="border-b border-[#24003A] bg-[#F1E6F2] text-slate-900">
+              <div className="flex h-10 w-full items-center px-1.5 sm:px-3">
+                <div className="flex-1 overflow-x-auto no-scrollbar">
+                  {subnav}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+      {!pathname.startsWith('/sales') && (
+        <div className="sticky top-12 z-40 bg-background/70 backdrop-blur-[18px]">
+          <TabBar
+            openTabs={openTabs}
+            activeTabId={activeTabId}
+            setActiveTabId={(tabId: string) => {
+              const menuItem = openTabs.find(tab => tab.id === tabId) || flattenedMenuItems.find(item => item.id === tabId);
+              if (menuItem) handleTabSelect(menuItem);
+            }}
+            closeTab={handleTabClose}
+          />
+        </div>
+      )}
+
+      <div className={cn("flex-1 overflow-y-auto overflow-x-hidden", isSalesRoute && "bg-[#F3F4F6]")}>
+        <main className={cn(isSalesRoute ? "p-2" : "p-1.5 sm:p-2.5")}>
+          {children}
+        </main>
+      </div>
+      </div>
+    </LayoutSubnavContext.Provider>
   );
 }
-

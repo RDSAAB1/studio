@@ -301,6 +301,7 @@ export function useCustomerImportExport({
               rate: parseFloat(getValue(item, 'RATE', 'rate', 'Rate') || 0) || 0,
               cdRate: parseFloat(getValue(item, 'CD RATE', 'cdRate', 'CD RATE', 'cd_rate', 'CD_RATE') || 0) || 0,
               brokerageRate: parseFloat(getValue(item, 'BROKERAGE RATE', 'brokerageRate', 'BROKERAGE RATE', 'brokerage_rate', 'BROKERAGE_RATE') || 0) || 0,
+              brokerageAmount: 0,
               isBrokerageIncluded: getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === 'Yes' || 
                                    getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === 'yes' || 
                                    getValue(item, 'BROKERAGE INCLUDED', 'isBrokerageIncluded', 'BROKERAGE INCLUDED') === true,
@@ -483,4 +484,3 @@ export function useCustomerImportExport({
     importStartTime,
   };
 }
-

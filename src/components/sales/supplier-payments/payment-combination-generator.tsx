@@ -12,14 +12,10 @@ import type { PaymentOption } from '@/hooks/use-payment-combination';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PaymentCombinationGeneratorProps {
-    calcTargetAmount: number;
-    setCalcTargetAmount: (value: number) => void;
     minRate: number;
     setMinRate: (value: number) => void;
     maxRate: number;
     setMaxRate: (value: number) => void;
-    rsValue?: number;
-    setRsValue?: (value: number) => void;
     selectPaymentAmount: (option: PaymentOption) => void;
     combination: {
         paymentOptions: PaymentOption[];
@@ -40,14 +36,10 @@ interface PaymentCombinationGeneratorProps {
 }
 
 export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorProps> = ({
-    calcTargetAmount,
-    setCalcTargetAmount,
     minRate,
     setMinRate,
     maxRate,
     setMaxRate,
-    rsValue = 0,
-    setRsValue,
     selectPaymentAmount,
     combination,
     showResults = true,
@@ -81,17 +73,6 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
         <div className="space-y-3 text-[11px]">
             <div className={cn("grid grid-cols-1 gap-2", 
                 hideRateFields ? "sm:grid-cols-1" : showRsAndBagFields ? "sm:grid-cols-5" : "sm:grid-cols-3")}>
-                <div className="space-y-1">
-                    <Label htmlFor="targetAmount" className="text-[11px] whitespace-nowrap">Target Amt</Label>
-                    <Input
-                        id="targetAmount"
-                        name="targetAmount"
-                        type="number"
-                        value={calcTargetAmount}
-                        onChange={(e) => setCalcTargetAmount(Number(e.target.value))}
-                        className="h-8 text-[11px]"
-                    />
-                </div>
                 {!hideRateFields && (
                     <>
                         <div className="space-y-1">
@@ -118,21 +99,7 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         </div>
                     </>
                 )}
-                {/* Rs field - only show for Gov. payment if rate fields are not hidden */}
-                {showRsAndBagFields && setRsValue && !hideRateFields && (
-                    <div className="space-y-1">
-                        <Label htmlFor="rsValue" className="text-[11px] whitespace-nowrap">Rs</Label>
-                        <Input
-                            id="rsValue"
-                            name="rsValue"
-                            type="number"
-                            value={rsValue || ''}
-                            onChange={(e) => setRsValue(Number(e.target.value) || 0)}
-                            className="h-8 text-[11px]"
-                            placeholder="Rs value"
-                        />
-                    </div>
-                )}
+                {/* Rs field removed */}
                 {showRsAndBagFields && (
                     <div className="space-y-1">
                         <Label htmlFor="bagQty" className="text-[11px] whitespace-nowrap">Bag Qty</Label>
@@ -286,7 +253,7 @@ export const PaymentCombinationResults: React.FC<PaymentCombinationResultsProps>
         <ScrollArea className="h-56 w-full rounded-lg border">
             <Table>
                 <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-primary/20 border-b border-primary/30">
                         <TableHead className="h-8 p-2">
                             <Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="p-1 text-[11px]">
                                 Qty <ArrowUpDown className="inline h-3 w-3" />
@@ -315,7 +282,7 @@ export const PaymentCombinationResults: React.FC<PaymentCombinationResultsProps>
                 </TableHeader>
                 <TableBody>
                     {options.map((option, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={`${option.rate}-${option.quantity}-${index}`}>
                             <TableCell className="p-2 text-[11px]">{option.quantity.toFixed(2)}</TableCell>
                             <TableCell className="p-2 text-[11px]">
                                 {option.bags != null ? option.bags : '-'}
@@ -335,5 +302,4 @@ export const PaymentCombinationResults: React.FC<PaymentCombinationResultsProps>
         </ScrollArea>
     );
 };
-
 

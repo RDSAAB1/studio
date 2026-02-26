@@ -30,7 +30,9 @@ export default function ProjectManagementPage() {
     useEffect(() => {
         const unsubscribe = getProjectsRealtime(
             (data) => setProjects(data),
-            (error) => ('Error fetching projects:', error)
+            (error) => {
+                console.error('Error fetching projects:', error);
+            }
         );
         return () => unsubscribe();
     }, []);
@@ -196,7 +198,12 @@ export default function ProjectManagementPage() {
                                             id="startDate"
                                             name="startDate"
                                             value={currentProject.startDate || ''}
-                                            onChange={(next) => setCurrentProject(prev => ({ ...prev, startDate: next }))}
+                                            onChange={(next) =>
+                                                setCurrentProject(prev => ({
+                                                    ...prev,
+                                                    startDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                                                }))
+                                            }
                                             inputClassName="h-9"
                                         />
                                     </div>
@@ -214,7 +221,12 @@ export default function ProjectManagementPage() {
                                             id="endDate"
                                             name="endDate"
                                             value={currentProject.endDate || ''}
-                                            onChange={(next) => setCurrentProject(prev => ({ ...prev, endDate: next }))}
+                                            onChange={(next) =>
+                                                setCurrentProject(prev => ({
+                                                    ...prev,
+                                                    endDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                                                }))
+                                            }
                                             inputClassName="h-9"
                                         />
                                     </div>

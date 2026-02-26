@@ -5,6 +5,8 @@ import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import { cn, toTitleCase } from "@/lib/utils";
 import type { OptionItem } from "@/lib/definitions";
+import type { UseFormReturn } from "react-hook-form";
+import type { CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +34,11 @@ const capitalizeText = (text: string) => {
 };
 
 // Custom input with auto-capitalization
-const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: any) => {
+interface CustomInputProps extends Omit<React.ComponentProps<typeof Input>, "onChange"> {
+    onChange: (value: string) => void;
+}
+
+const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const capitalizedValue = capitalizeText(e.target.value);
         onChange(capitalizedValue);
@@ -50,7 +56,7 @@ const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: a
 };
 
 // Custom input with uppercase for vehicle number
-const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: any) => {
+const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const uppercaseValue = e.target.value.toUpperCase();
         onChange(uppercaseValue);
@@ -68,7 +74,7 @@ const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: an
 };
 
 interface SimpleSupplierFormAllFieldsProps {
-    form: any;
+    form: UseFormReturn<CompleteSupplierFormValues>;
     handleSrNoBlur: (value: string) => void;
     handleContactBlur: (value: string) => void;
     varietyOptions: OptionItem[];
@@ -187,7 +193,6 @@ const SimpleSupplierFormAllFields = ({
                                     render={({ field }) => (
                                         <AutoUppercaseInput
                                             id="vehicleNo"
-                                            name="vehicleNo"
                                             {...field}
                                             className="h-8 text-sm pl-10"
                                         />
@@ -209,7 +214,6 @@ const SimpleSupplierFormAllFields = ({
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
                                        <Input 
                                            id="contact"
-                                           name="contact"
                                            {...form.register('contact')} 
                                            type="tel" 
                                            maxLength={10} 
@@ -227,7 +231,6 @@ const SimpleSupplierFormAllFields = ({
                                             render={({ field }) => (
                                                 <AutoCapitalizeInput
                                                     id="name"
-                                                    name="name"
                                                     {...field}
                                                     className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")}
                                                 />
@@ -245,7 +248,6 @@ const SimpleSupplierFormAllFields = ({
                                         render={({ field }) => (
                                             <AutoCapitalizeInput
                                                 id="so"
-                                                name="so"
                                                 {...field}
                                                 className="h-8 text-sm pl-10"
                                             />
@@ -262,7 +264,6 @@ const SimpleSupplierFormAllFields = ({
                                         render={({ field }) => (
                                             <AutoCapitalizeInput
                                                 id="address"
-                                                name="address"
                                                 {...field}
                                                 className="h-8 text-sm pl-10"
                                             />
@@ -428,8 +429,8 @@ const SimpleSupplierFormAllFields = ({
             setIsOpen={setIsManageOptionsOpen}
             type={managementType}
             options={optionsToManage}
-            onAdd={handleAddOption}
-            onUpdate={handleUpdateOption}
+            onAdd={(collectionName, optionData) => handleAddOption(collectionName, optionData.name)}
+            onUpdate={(collectionName, id, optionData) => handleUpdateOption(collectionName, id, optionData.name)}
             onDelete={handleDeleteOption}
         />
         </>

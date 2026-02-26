@@ -24,6 +24,23 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
     if (!payment) return null;
 
     const totalActualPaid = payment.amount;
+    const paymentReceiptType = String((payment as any).receiptType || '').trim().toLowerCase();
+    const extraAmountSign =
+        paymentReceiptType === 'ledger' && String((payment as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
+    const extraAmountFromPaidFor =
+        payment.paidFor?.reduce((sum: number, pf: any) => sum + (Number(pf.extraAmount) || 0), 0) || 0;
+    const extraAmountFromPaymentFields =
+        Number((payment as any).extraAmount || 0) + Number((payment as any).advanceAmount || 0);
+    const ledgerAmountFallback =
+        paymentReceiptType === 'ledger' &&
+        (payment.paidFor?.length || 0) === 0 &&
+        extraAmountFromPaymentFields === 0
+            ? Math.abs(Number((payment as any).amount || 0))
+            : 0;
+    const includePaymentLevelExtra =
+        extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online');
+    const extraAmount =
+        extraAmountFromPaidFor + (((includePaymentLevelExtra ? extraAmountFromPaymentFields : 0) + ledgerAmountFallback) * extraAmountSign);
 
     return (
         <Dialog open={!!payment} onOpenChange={onOpenChange}>
@@ -36,9 +53,13 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                 <DetailItem icon={<Banknote size={14} />} label="Actual Amount Paid" value={formatCurrency(totalActualPaid)} />
                 <DetailItem icon={<Percent size={14} />} label="Total CD Amount" value={formatCurrency(payment.cdAmount || 0)} />
+                <DetailItem icon={<Hash size={14} />} label="Extra Amount" value={extraAmount !== 0 ? formatCurrency(extraAmount) : '-'} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={payment.type} />
                 <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={payment.receiptType} />
                 <DetailItem icon={<Hash size={14} />} label="CD Applied" value={payment.cdApplied ? "Yes" : "No"} />
+                {String((payment as any).notes || '').trim() && (
+                  <DetailItem label="Particulars / Remarks" value={(payment as any).notes} className="md:col-span-2" />
+                )}
                 
                 {/* Gov. Payment Specific Fields */}
                 {payment.receiptType === 'Gov.' && (
@@ -46,8 +67,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <DetailItem icon={<Hash size={14} />} label="Gov. Quantity" value={(payment as any).govQuantity || 0} />
                     <DetailItem icon={<Hash size={14} />} label="Gov. Rate" value={formatCurrency((payment as any).govRate || 0)} />
                     <DetailItem icon={<Hash size={14} />} label="Gov. Amount" value={formatCurrency((payment as any).govAmount || 0)} />
-                    <DetailItem icon={<Hash size={14} />} label="Gov. Required Amount" value={formatCurrency((payment as any).govRequiredAmount || 0)} />
-                    <DetailItem icon={<Hash size={14} />} label="Extra Amount" value={formatCurrency((payment as any).extraAmount || 0)} />
+
                     {(payment as any).rtgsSrNo && (
                       <DetailItem icon={<Hash size={14} />} label="Gov. SR No" value={(payment as any).rtgsSrNo} />
                     )}
@@ -58,9 +78,10 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
               <div className="max-h-64 overflow-y-auto border rounded-md">
                 <Table>
                     <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-primary/20 border-b border-primary/30">
                             <TableHead>SR No</TableHead>
                             <TableHead>Supplier</TableHead>
+                            <TableHead className="text-right">Extra</TableHead>
                             <TableHead className="text-right">Total Paid Amount</TableHead>
                             <TableHead className="text-right">CD</TableHead>
                             <TableHead className="text-right">Actual Paid</TableHead>
@@ -82,14 +103,16 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                             
                             const totalPaidAmount = pf.amount;
                             const actualPaid = totalPaidAmount - cdForThisEntry;
+                            const rowExtraAmount = Number(pf.extraAmount || 0);
 
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
+                                    <TableCell className="text-right font-semibold text-slate-700">{rowExtraAmount !== 0 ? formatCurrency(rowExtraAmount) : '-'}</TableCell>
                                     <TableCell className="text-right font-semibold">{formatCurrency(totalPaidAmount)}</TableCell>
                                     <TableCell className="text-right text-destructive">{formatCurrency(cdForThisEntry)}</TableCell>
-                                    <TableCell className="text-right font-bold text-green-600">{formatCurrency(actualPaid)}</TableCell>
+                                    <TableCell className="text-right font-bold text-slate-900">{formatCurrency(actualPaid)}</TableCell>
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />

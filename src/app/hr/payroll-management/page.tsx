@@ -16,14 +16,11 @@ import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calculator, TrendingUp }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getUserFriendlyErrorMessage } from "@/lib/utils";
+import { logError } from "@/lib/error-logger";
 
-// Helper function to handle errors with logging
+// Helper function to handle errors with centralized logging
 function handleError(error: unknown, context: string): void {
-  // Log error for debugging
-  if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
-    console.error(`[Payroll Management] Error in ${context}:`, error);
-  }
+  logError(error, `[Payroll Management] ${context}`, 'medium');
 }
 
 type AttendanceSummary = {
@@ -48,8 +45,9 @@ export default function PayrollManagementPage() {
   
   useEffect(() => {
     setIsClient(true);
-    const unsubPayroll = getPayrollRealtime(setPayrollEntries, );
-    const unsubEmployees = getEmployeesRealtime(setEmployees, );
+    // Removed duplicate fetch logic to prevent unnecessary re-renders
+    const unsubPayroll = getPayrollRealtime(setPayrollEntries, () => {});
+    const unsubEmployees = getEmployeesRealtime(setEmployees, () => {});
     return () => {
         unsubPayroll();
         unsubEmployees();

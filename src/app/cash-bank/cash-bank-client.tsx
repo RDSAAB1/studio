@@ -27,7 +27,7 @@ import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-f
 import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { getLoansRealtime } from "@/lib/firestore";
 import { db } from "@/lib/database";
-import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
+import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalData } from "@/contexts/global-data-context";
 
@@ -158,7 +158,9 @@ export default function CashBankClient() {
                 setLoans(data);
                 // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically when loans change
             },
-            (error) => ('Error fetching loans:', error)
+            (error) => {
+                console.error('Error fetching loans:', error);
+            }
         );
         
         // ✅ Listen for payment updates to refresh immediately when payment is finalized
@@ -209,8 +211,15 @@ export default function CashBankClient() {
             }
         };
         
-        window.addEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
-        window.addEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+        const handlePaymentUpdateListener: EventListener = (evt) => {
+            void handlePaymentUpdate(evt as unknown as CustomEvent);
+        };
+        const handlePaymentDeleteListener: EventListener = (evt) => {
+            void handlePaymentDelete(evt as unknown as CustomEvent);
+        };
+
+        window.addEventListener('indexeddb:payment:updated', handlePaymentUpdateListener);
+        window.addEventListener('indexeddb:payment:deleted', handlePaymentDeleteListener);
         
         // ✅ OPTIMIZED: Don't read from IndexedDB on visibility change
         // GlobalDataProvider already keeps data in sync via realtime listeners
@@ -223,8 +232,8 @@ export default function CashBankClient() {
             if (unsubLoans && typeof unsubLoans === 'function') {
                 unsubLoans();
             }
-            window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdate as EventListener);
-            window.removeEventListener('indexeddb:payment:deleted', handlePaymentDelete as EventListener);
+            window.removeEventListener('indexeddb:payment:updated', handlePaymentUpdateListener);
+            window.removeEventListener('indexeddb:payment:deleted', handlePaymentDeleteListener);
         };
     }, []);
     // All data is now fetched directly via useState hooks above
@@ -265,8 +274,8 @@ export default function CashBankClient() {
         defaultValues: { 
             amount: 0, 
             description: "",
-            source: null,
-            destination: null
+            source: "",
+            destination: ""
         } 
     });
     
@@ -319,9 +328,6 @@ export default function CashBankClient() {
                 balanceKey = t.paymentMethod === 'Cash' ? 'CashInHand' : '';
             }
             // For Income type without bankAccountId, check paymentMethod
-            else if ('transactionType' in t && t.transactionType === 'Income' && 'paymentMethod' in t) {
-                balanceKey = t.paymentMethod === 'Cash' ? 'CashInHand' : '';
-            }
             
             if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
@@ -397,7 +403,7 @@ export default function CashBankClient() {
                 amount: transactionAmount, 
                 description: values.description 
             });
-            transferForm.reset({ amount: 0, description: "", source: null, destination: null });
+            transferForm.reset({ amount: 0, description: "", source: "", destination: "" });
         } catch (error) {
             // Error is already handled in handleAddFundTransaction, just prevent unhandled rejection
         }
@@ -588,7 +594,7 @@ export default function CashBankClient() {
                         <CardContent>
                             <form onSubmit={(e) => {
                                 e.preventDefault(); // ✅ FIX: Explicitly prevent default to avoid page reload
-                                transferForm.handleSubmit(onTransferSubmit)(e);
+                                transferForm.handleSubmit((data) => onTransferSubmit(data as TransferValues))(e);
                             }} className="space-y-4">
                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                                    <div className="space-y-1">
@@ -766,7 +772,12 @@ export default function CashBankClient() {
                                     id="startDate"
                                     name="startDate"
                                     value={currentLoan?.startDate || ''}
-                                    onChange={(next) => setCurrentLoan(prev => ({...prev, startDate: next }))}
+                                    onChange={(next) =>
+                                        setCurrentLoan(prev => ({
+                                            ...prev,
+                                            startDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                                        }))
+                                    }
                                 />
                             </div>
                              <div className="space-y-1">

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, orderBy } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is your Firestore instance
 import { Campaign } from "@/lib/definitions"; // Adjust the import based on your definition file
 import { Button } from "@/components/ui/button";
@@ -47,12 +47,15 @@ export default function CampaignsPage() {
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const campaignsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as Campaign,
-        startDate: doc.data().startDate ? format(new Date(doc.data().startDate), 'yyyy-MM-dd') : '',
-        endDate: doc.data().endDate ? format(new Date(doc.data().endDate), 'yyyy-MM-dd') : '',
-      }));
+      const campaignsData = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as Omit<Campaign, 'id'>;
+        return {
+          ...data,
+          id: docSnap.id,
+          startDate: data.startDate ? format(new Date(data.startDate), 'yyyy-MM-dd') : '',
+          endDate: data.endDate ? format(new Date(data.endDate), 'yyyy-MM-dd') : '',
+        };
+      });
       setCampaigns(campaignsData);
       setLoading(false);
       
@@ -214,7 +217,12 @@ export default function CampaignsPage() {
                 id="startDate"
                 name="startDate"
                 value={formData.startDate}
-                onChange={(next) => setFormData(prev => ({ ...prev, startDate: next }))}
+                onChange={(next) =>
+                  setFormData(prev => ({
+                    ...prev,
+                    startDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd'),
+                  }))
+                }
                 className="col-span-3"
                 inputClassName="h-9"
               />
@@ -227,7 +235,12 @@ export default function CampaignsPage() {
                 id="endDate"
                 name="endDate"
                 value={formData.endDate}
-                onChange={(next) => setFormData(prev => ({ ...prev, endDate: next }))}
+                onChange={(next) =>
+                  setFormData(prev => ({
+                    ...prev,
+                    endDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd'),
+                  }))
+                }
                 className="col-span-3"
                 inputClassName="h-9"
               />

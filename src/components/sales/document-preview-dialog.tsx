@@ -17,6 +17,7 @@ import { TaxInvoice } from "@/components/print-formats/tax-invoice";
 import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
 import { Challan } from "@/components/print-formats/challan";
 import { cn, calculateCustomerEntry } from "@/lib/utils";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
@@ -25,16 +26,11 @@ import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 import { runTransaction, doc, collection, getDoc, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import { db } from '@/lib/database';
+import { logError } from "@/lib/error-logger";
 
 // Helper function to handle errors silently (for non-critical operations)
 function handleSilentError(error: unknown, context: string): void {
-  // Error is intentionally handled silently for non-critical operations
-  // In production, this could be sent to an error tracking service
-  if (process.env.NODE_ENV === 'development') {
-    // Only log in development for debugging
-    // eslint-disable-next-line no-console
-    console.debug(`[Document Preview] Silent error in ${context}:`, error);
-  }
+  logError(error, `[Document Preview] ${context}`, 'low');
 }
 
 interface DocumentPreviewDialogProps {
@@ -115,7 +111,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         };
 
         initialize();
-        const unsub = getBankAccountsRealtime(setBankAccounts, );
+        const unsub = getBankAccountsRealtime(setBankAccounts, () => {});
         return () => unsub();
 
     }, [customer, receiptSettings, isOpen]);
@@ -274,11 +270,13 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             // Update local database for immediate sync
             if (db && customer) {
                 try {
+                    const recalculated = calculateCustomerEntry({ ...customer, ...editableInvoiceDetails, advanceFreight: invoiceDetails.advanceFreight }, []);
                     const customerToUpdate: Customer = {
                         ...customer,
-                        ...dataToSave,
+                        ...editableInvoiceDetails,
+                        ...recalculated,
                         id: customer.id,
-                        updatedAt: Timestamp.now().toMillis() as any,
+                        updatedAt: Timestamp.now().toMillis(),
                     } as Customer;
                     await db.customers.put(customerToUpdate);
                 } catch (error) {
@@ -363,6 +361,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         
         const finalInvoiceDetails = {
             ...invoiceDetails,
+            totalAdvance: invoiceDetails.advanceFreight || 0,
             showBagWeightColumns,
         };
 
@@ -493,7 +492,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         <SmartDatePicker
                                             id="grDate"
                                             value={invoiceDetails.grDate || ""}
-                                            onChange={(next) => setInvoiceDetails({...invoiceDetails, grDate: next })}
+                                            onChange={(next) => setInvoiceDetails({...invoiceDetails, grDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd') })}
                                             inputClassName="h-8 text-xs"
                                             buttonClassName="h-8 w-8"
                                         />

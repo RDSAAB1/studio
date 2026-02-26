@@ -39,10 +39,10 @@ export default function AnalyticsPage() {
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const customersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as Customer
-      }));
+      const customersData = snapshot.docs.map((doc) => {
+        const data = doc.data() as Omit<Customer, 'id'>;
+        return { ...data, id: doc.id };
+      });
       setCustomers(customersData);
       setLoading(false);
       

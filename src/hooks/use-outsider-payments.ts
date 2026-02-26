@@ -99,6 +99,9 @@ export const useOutsiderPayments = (data: any) => {
             await handleDeletePaymentLogic({
                 paymentId: paymentId,
                 paymentHistory: data?.paymentHistory || [],
+                suppliers: data?.suppliers || [],
+                expenses: data?.expenses || [],
+                incomes: (data as any)?.incomes || [],
                 isCustomer: false,
             });
             
@@ -120,6 +123,8 @@ export const useOutsiderPayments = (data: any) => {
     }, [toast, data]);
 
     const handleProcessPayment = useCallback(async () => {
+        if (isProcessing) return;
+
         if (!form.paymentId && !form.rtgsSrNo) {
             toast({
                 title: "Error",
@@ -145,7 +150,7 @@ export const useOutsiderPayments = (data: any) => {
                 selectedCustomerKey: 'OUTSIDER', // Always OUTSIDER for outsider payments
                 selectedEntries: [],
                 editingPayment: form.editingPayment,
-                paymentAmount: form.rtgsAmount,
+                finalAmountToPay: form.rtgsAmount,
                 paymentMethod: 'RTGS',
                 selectedAccountId: form.selectedAccountId,
                 cdEnabled: false,
@@ -202,20 +207,12 @@ export const useOutsiderPayments = (data: any) => {
         suppliers: [],
         paymentHistory: data?.paymentHistory || [],
         customerSummaryMap: new Map(),
-        selectedCustomerKey: null,
-        selectedEntryIds: new Set(),
-        handleCustomerSelect: () => {},
         handleEditPayment,
         handleDeletePayment,
         handleProcessPayment,
-        calcTargetAmount: () => 0,
-        minRate: 0,
-        maxRate: 0,
-        serialNoSearch: '',
         activeTab,
         setActiveTab,
         selectedEntries: [],
-        setParchiNo: form.setParchiNo,
         isProcessing,
         detailsSupplierEntry,
         setDetailsSupplierEntry,
@@ -231,9 +228,6 @@ export const useOutsiderPayments = (data: any) => {
         ...form,
     };
 };
-
-
-
 
 
 

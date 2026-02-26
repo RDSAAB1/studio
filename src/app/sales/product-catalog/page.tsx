@@ -59,9 +59,9 @@ export default function ProductCatalogPage() {
   }, []);
 
   if (loading) {
-    return <PlaceholderPage title="Product Catalog" description="Loading products..." />;
+    return <PlaceholderPage title="Product Catalog" message="Loading products..." />;
   }
 
   // TODO: Implement proper product catalog display using the 'products' state.
-  return <PlaceholderPage title="Product Catalog" description="Product data loaded. Implementation pending." />;
+  return <PlaceholderPage title="Product Catalog" message="Product data loaded. Implementation pending." />;
 }

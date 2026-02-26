@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { useLayoutSubnav } from "@/components/layout/app-layout";
 import SupplierPaymentsClient from '../supplier-payments/unified-payments-client';
 
 export default function UnifiedPaymentsPage({ defaultTab = "supplier" }: { defaultTab?: "supplier" | "customer" | "outsider" }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const setSubnav = useLayoutSubnav();
   const [activeTab, setActiveTab] = useState<"supplier" | "customer" | "outsider">(defaultTab);
   
   // Update tab when defaultTab changes (from URL query)
@@ -15,38 +16,63 @@ export default function UnifiedPaymentsPage({ defaultTab = "supplier" }: { defau
     setActiveTab(defaultTab);
   }, [defaultTab]);
   
-  const handleTabChange = (value: "supplier" | "customer" | "outsider") => {
+  const handleTabChange = useCallback((value: "supplier" | "customer" | "outsider") => {
     setActiveTab(value);
-    // Update URL query parameter
+    // Update URL query parameter silently without triggering Next.js navigation to avoid lag
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', value);
-    router.push(`/sales/payments?${params.toString()}`, { scroll: false });
-  };
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+  }, [searchParams]);
+
+  const subTabs = useMemo(
+    () =>
+      [
+        { value: "supplier" as const, label: "Supplier Payments" },
+        { value: "customer" as const, label: "Customer Payments" },
+        { value: "outsider" as const, label: "RTGS Outsider" },
+      ],
+    []
+  );
+
+  useEffect(() => {
+    setSubnav(
+      <div
+        className="grid w-full gap-1"
+        style={{ gridTemplateColumns: `repeat(${subTabs.length}, minmax(0, 1fr))` }}
+      >
+        {subTabs.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => handleTabChange(t.value)}
+            className={cn(
+              "h-8 w-full rounded-md px-2 text-xs font-semibold transition-colors",
+              "text-slate-700 hover:bg-white/60 hover:text-slate-950",
+              activeTab === t.value && "bg-white/80 text-slate-950 border border-slate-200/80"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    );
+
+    return () => setSubnav(null);
+  }, [activeTab, handleTabChange, setSubnav, subTabs]);
 
   // Keep all components mounted but hide inactive ones (SPMS behavior)
   return (
-    <div className="space-y-4 w-full">
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as "supplier" | "customer" | "outsider")} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="supplier">Supplier Payments</TabsTrigger>
-          <TabsTrigger value="customer">Customer Payments</TabsTrigger>
-          <TabsTrigger value="outsider">RTGS Outsider</TabsTrigger>
-        </TabsList>
-        
-        {/* Keep all components mounted - just hide/show with CSS */}
-        <div className="mt-4">
-          <div className={activeTab === "supplier" ? "block" : "hidden"}>
-            <SupplierPaymentsClient type="supplier" />
-          </div>
-          <div className={activeTab === "customer" ? "block" : "hidden"}>
-            <SupplierPaymentsClient type="customer" />
-          </div>
-          <div className={activeTab === "outsider" ? "block" : "hidden"}>
-            <SupplierPaymentsClient type="outsider" />
-          </div>
-        </div>
-      </Tabs>
+    <div className="w-full">
+      <div className={activeTab === "supplier" ? "block" : "hidden"}>
+        <SupplierPaymentsClient type="supplier" />
+      </div>
+      <div className={activeTab === "customer" ? "block" : "hidden"}>
+        <SupplierPaymentsClient type="customer" />
+      </div>
+      <div className={activeTab === "outsider" ? "block" : "hidden"}>
+        <SupplierPaymentsClient type="outsider" />
+      </div>
     </div>
   );
 }
-

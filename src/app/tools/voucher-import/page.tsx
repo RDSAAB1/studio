@@ -67,9 +67,16 @@ type VoucherBlock = {
   quantityQtl: number;
   ratePerQtl: number;
   grossAmount: number;
+  netAmount?: number;
   mandiFee: number;
   developmentCess: number;
   totalMandiFee: number;
+  traderName?: string;
+  buyerFirm?: string;
+  buyerLicense?: string;
+  mandiName?: string;
+  mandiSiteType?: string;
+  mandiSiteName?: string;
 };
 
 type PaymentBlock = {
@@ -531,6 +538,7 @@ const parseVoucherBlock = (raw: string): VoucherBlock => {
     quantityQtl,
     ratePerQtl,
     grossAmount,
+    netAmount: netAmountCandidate,
     mandiFee,
     developmentCess,
     totalMandiFee,
@@ -2017,10 +2025,11 @@ export default function VoucherImportTool() {
             <Label className="flex items-center justify-between text-sm font-medium">
               Field 1 - Mandi Voucher
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 onClick={() => handlePaste("voucher")}
                 type="button"
+                className="h-7 px-2 text-xs"
               >
                 <Clipboard className="mr-1 h-3 w-3" />
                 Paste
@@ -2037,10 +2046,11 @@ export default function VoucherImportTool() {
             <Label className="flex items-center justify-between text-sm font-medium">
               Field 2 - Payment Details
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 onClick={() => handlePaste("payment")}
                 type="button"
+                className="h-7 px-2 text-xs"
               >
                 <Clipboard className="mr-1 h-3 w-3" />
                 Paste
@@ -2349,7 +2359,12 @@ export default function VoucherImportTool() {
               <Label>6R Issue Date</Label>
               <SmartDatePicker
                 value={formState.purchaseDate || ""}
-                onChange={(next) => handleFieldChange("purchaseDate", next)}
+                onChange={(next) =>
+                  handleFieldChange(
+                    "purchaseDate",
+                    next instanceof Date ? format(next, "yyyy-MM-dd") : next
+                  )
+                }
               />
             </div>
             <div className="space-y-1 md:col-span-2">
@@ -2450,7 +2465,12 @@ export default function VoucherImportTool() {
               <Label>Payment Date</Label>
               <SmartDatePicker
                 value={formState.paymentDate || ""}
-                onChange={(next) => handleFieldChange("paymentDate", next)}
+                onChange={(next) =>
+                  handleFieldChange(
+                    "paymentDate",
+                    next instanceof Date ? format(next, "yyyy-MM-dd") : next
+                  )
+                }
               />
             </div>
             <div className="space-y-1">

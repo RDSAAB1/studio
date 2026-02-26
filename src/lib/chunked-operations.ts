@@ -101,13 +101,12 @@ export async function chunkedToArray<T>(
             return await table.toArray() as T[];
         }
         
-        // ✅ FIXED: Use proper cursor-based pagination with last item tracking
-        // Dexie doesn't support filter on queries, so we fetch all and process in memory
-        // For very large datasets, this is still better than blocking with single toArray
+        // ✅ FIXED: Use offset-based pagination which handles duplicate values correctly
+        // Dexie's offset is efficient enough for client-side limits (< 100k records)
+        // and guarantees we don't skip items with same values (unlike above/below)
+        
         const allItems: T[] = [];
         let processed = 0;
-        let lastItem: T | undefined = undefined;
-        const seenIds = new Set<string | number>(); // Track seen IDs to prevent duplicates
         
         // Get base query
         let baseQuery: any;
@@ -120,74 +119,15 @@ export async function chunkedToArray<T>(
         }
         
         while (processed < count) {
-            let chunk: T[];
+            const chunk = await baseQuery.offset(processed).limit(chunkSize).toArray() as T[];
             
-            if (orderByField && lastItem !== undefined) {
-                // ✅ FIXED: Use above/below with last item's value
-                const lastValue = (lastItem as any)[orderByField];
-                const baseOrderQuery = reverse 
-                    ? table.orderBy(orderByField).reverse()
-                    : table.orderBy(orderByField);
-                
-                if (reverse) {
-                    // For reverse order, get items with value less than lastValue
-                    chunk = await baseOrderQuery
-                        .below(lastValue)
-                        .limit(chunkSize)
-                        .toArray() as T[];
-                } else {
-                    // For normal order, get items with value greater than lastValue
-                    chunk = await baseOrderQuery
-                        .above(lastValue)
-                        .limit(chunkSize)
-                        .toArray() as T[];
-                }
-            } else if (orderByField) {
-                // First chunk with ordering
-                chunk = await baseQuery.limit(chunkSize).toArray() as T[];
-            } else {
-                // No ordering - use ID-based pagination
-                if (lastItem !== undefined) {
-                    const lastId = (lastItem as any).id;
-                    chunk = await table
-                        .where(':id')
-                        .above(lastId)
-                        .limit(chunkSize)
-                        .toArray() as T[];
-                } else {
-                    chunk = await table.limit(chunkSize).toArray() as T[];
-                }
-            }
+            if (chunk.length === 0) break;
             
-            if (chunk.length === 0) break; // No more data
+            allItems.push(...chunk);
+            processed += chunk.length;
             
-            // ✅ FIXED: Filter out duplicates and add to results
-            const uniqueChunk = chunk.filter(item => {
-                const id = (item as any).id;
-                if (seenIds.has(id)) {
-                    return false; // Skip duplicate
-                }
-                seenIds.add(id);
-                return true;
-            });
-            
-            allItems.push(...uniqueChunk);
-            processed += uniqueChunk.length;
-            
-            // Get last item for next iteration
-            if (uniqueChunk.length > 0) {
-                lastItem = uniqueChunk[uniqueChunk.length - 1];
-            }
-            
-            // Yield to main thread every chunk (except last)
-            if (processed < count && uniqueChunk.length === chunkSize) {
-                await yieldToMainThread();
-            }
-            
-            // Safety check: if we got fewer items than expected, we're done
-            if (uniqueChunk.length < chunkSize) {
-                break;
-            }
+            // Yield to main thread
+            await yieldToMainThread();
         }
         
         return allItems;

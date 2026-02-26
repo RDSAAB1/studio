@@ -507,7 +507,9 @@ export default function RtgsReportClient() {
                     if (db) {
                         for (const paymentId of selectedPaymentIds) {
                             try {
-                                const existing = await db.payments.get(paymentId);
+                                const existing =
+                                    (await db.payments.get(paymentId as any)) ||
+                                    (await db.payments.where('paymentId').equals(paymentId).first());
                                 if (existing) {
                                     const localUpdateData: any = { ...existing, ...updateData };
                                     // Handle date update - if updateDate is undefined, don't change; if it's null/empty, clear it

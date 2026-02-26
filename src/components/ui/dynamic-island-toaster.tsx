@@ -4,37 +4,35 @@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import React, { useState, useEffect, useMemo } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 
-export default function DynamicIslandToaster() {
+/**
+ * A Dynamic Island style toaster component.
+ * It displays error and warning toasts in a pill-shaped container.
+ * Success toasts are ignored (as per requirement).
+ */
+function DynamicIslandToasterInner() {
   const { toasts } = useToast();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // This will only run on the client side, after the component has mounted
     setIsClient(true);
   }, []);
   
-  // ✅ FIX: Move useMemo before early return to follow Rules of Hooks
-  // ✅ IMPROVED: Better error detection - check variant, title, and description
-  // Filter out success toasts - only show errors/warnings
   const filteredToasts = useMemo(() => {
-    // Return empty array if not client yet (to avoid hydration issues)
     if (!isClient) {
       return [];
     }
     
     return toasts.filter((t) => {
-      // Explicitly exclude success toasts
       if (t.variant === 'success') {
         return false;
       }
       
-      // Show destructive (error) toasts
       if (t.variant === 'destructive') {
         return true;
       }
       
-      // Check for error keywords in title or description
       const titleStr = t.title?.toString().toLowerCase() || '';
       const descStr = t.description?.toString().toLowerCase() || '';
       const errorKeywords = ['error', 'failed', 'failure', 'invalid', 'warning', 'alert', 'issue', 'problem'];
@@ -47,15 +45,12 @@ export default function DynamicIslandToaster() {
     });
   }, [toasts, isClient]);
   
-  // Early return after all hooks are called
   if (!isClient) {
-    // On the server or during the initial client render, render nothing
-    // to avoid the hydration mismatch.
     return null;
   }
   
   const hasToasts = filteredToasts.length > 0;
-  const toast = filteredToasts[0]; // Always work with the first toast
+  const toast = filteredToasts[0];
 
   const title = toast ? toast.title : null;
   const description = toast ? toast.description : null;
@@ -68,12 +63,11 @@ export default function DynamicIslandToaster() {
         "flex items-center justify-center rounded-full",
         "h-8",
         {
-          "w-8": !hasToasts, // Punch-hole size when no toasts
-          "w-auto min-w-48 max-w-sm px-4": hasToasts, // Expands with content
+          "w-8": !hasToasts,
+          "w-auto min-w-48 max-w-sm px-4": hasToasts,
         }
       )}
       style={{
-        // Ensure it doesn't block interactions
         pointerEvents: 'none',
       }}
       role="status"
@@ -96,5 +90,17 @@ export default function DynamicIslandToaster() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Wrapper for DynamicIslandToasterInner with ErrorBoundary.
+ * Ensures that toaster crashes don't break the entire app.
+ */
+export default function DynamicIslandToaster() {
+  return (
+    <ErrorBoundary>
+      <DynamicIslandToasterInner />
+    </ErrorBoundary>
   );
 }

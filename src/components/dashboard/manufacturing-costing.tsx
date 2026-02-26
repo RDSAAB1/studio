@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Calculator, DollarSign, Package, TrendingUp, Plus, Percent, Loader2, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
-import { getManufacturingCostingRealtime, saveManufacturingCosting, type ManufacturingCostingData } from '@/lib/firestore';
-import { useManufacturingCalculations, type Product } from './manufacturing-costing/hooks/use-manufacturing-calculations';
+import { getManufacturingCostingRealtime, saveManufacturingCosting } from '@/lib/firestore';
+import { useManufacturingCalculations, type Product, type CalculatedProduct } from './manufacturing-costing/hooks/use-manufacturing-calculations';
 import { ManufacturingProductTable } from './manufacturing-costing/components/manufacturing-product-table';
 import { ManufacturingSummaryCards } from './manufacturing-costing/components/manufacturing-summary-cards';
 
@@ -65,10 +65,24 @@ export function ManufacturingCosting() {
     // Calculations are now from useManufacturingCalculations hook
 
 
-    const updateProduct = (id: string, field: keyof Product, value: string | number) => {
-        setProducts(products.map(p => 
-            p.id === id ? { ...p, [field]: value } : p
-        ));
+    const updateProduct = (id: string, field: keyof CalculatedProduct, value: string | number) => {
+        setProducts(products.map(p => {
+            if (p.id !== id) return p;
+            switch (field) {
+                case 'name':
+                    return { ...p, name: String(value) };
+                case 'percentage':
+                    return { ...p, percentage: Number(value) };
+                case 'sellingPrice':
+                    return { ...p, sellingPrice: Number(value) };
+                case 'soldPercentage':
+                    return { ...p, soldPercentage: Number(value) };
+                case 'targetProfit':
+                    return { ...p, targetProfit: Number(value) };
+                default:
+                    return p;
+            }
+        }));
     };
 
     // Load data from Firestore

@@ -400,8 +400,8 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
             setIsOpen={setIsManageOptionsOpen}
             type={managementType}
             options={optionsToManage}
-            onAdd={handleAddOption}
-            onUpdate={handleUpdateOption}
+            onAdd={(collectionName, optionData) => handleAddOption(collectionName, optionData.name)}
+            onUpdate={(collectionName, id, optionData) => handleUpdateOption(collectionName, id, optionData.name)}
             onDelete={(collectionName: string, id: string, name: string) => handleDeleteOption(collectionName, id, name)}
         />
         </>
@@ -410,5 +410,4 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
 
 // Memoized component for better performance
 export const SupplierForm = memo(SupplierFormComponent);
-
 

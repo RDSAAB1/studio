@@ -48,13 +48,27 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     // All hooks must be called before any conditional returns
     const paymentsForDetailsEntry = useMemo(() => {
         if (!customer) return [];
-        return (paymentHistory || []).filter(p => p.paidFor?.some(pf => pf.srNo === customer.srNo));
+        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
+        const filtered = (paymentHistory || []).filter(p => {
+            const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
+            const parchiMatch = String((p as any).parchiNo || '').trim().toLowerCase() === targetSrNo;
+            return Boolean(paidForMatch || parchiMatch);
+        });
+        return filtered.filter((p, index, self) => {
+            const pKey = String((p as any).paymentId || (p as any).id || '').trim();
+            if (!pKey) return false;
+            return index === self.findIndex((t) => {
+                const tKey = String((t as any).paymentId || (t as any).id || '').trim();
+                return tKey === pKey;
+            });
+        });
     }, [paymentHistory, customer?.srNo]);
 
     const totalPaidForThisEntry = useMemo(() => {
         if (!customer) return 0;
+        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
         return paymentsForDetailsEntry.reduce((sum, p) => {
-            const paidForThis = p.paidFor?.find(pf => pf.srNo === customer.srNo);
+            const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
             
             if (!paidForThis) return sum;
 
@@ -66,8 +80,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
 
     const totalCdForThisEntry = useMemo(() => {
         if (!customer) return 0;
+        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
         return paymentsForDetailsEntry.reduce((sum, p) => {
-            const paidForThisDetail = p.paidFor?.find(pf => pf.srNo === customer.srNo);
+            const paidForThisDetail = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
             if (!paidForThisDetail) return sum;
 
             // First check if CD amount is directly stored in paidFor (new format - more accurate)
@@ -87,41 +102,44 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         }, 0);
     }, [paymentsForDetailsEntry, customer?.srNo]);
 
-    // Calculate adjusted original and extra amount from Gov. payments
-    const { adjustedOriginal, totalExtraAmount, govPaymentDetails } = useMemo(() => {
-        if (!customer) return { adjustedOriginal: 0, totalExtraAmount: 0, govPaymentDetails: null };
+    const totalExtraForThisEntry = useMemo(() => {
+        if (!customer) return 0;
+        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
+        return paymentsForDetailsEntry.reduce((sum, p) => {
+            const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
+            const paidForExtra = Number((paidForThis as any)?.extraAmount || 0);
+            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            const paymentLevelExtraRawFromFields =
+                Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
+            const ledgerAmountFallback =
+                receiptType === 'ledger' &&
+                (p.paidFor?.length || 0) === 0 &&
+                paymentLevelExtraRawFromFields === 0
+                    ? Math.abs(Number((p as any).amount || 0))
+                    : 0;
+            const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
+            const paymentLevelExtraSign =
+                receiptType === 'ledger' && String((p as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
+            const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
+            const isPaymentAttachedToThisEntry = String((p as any).parchiNo || '').trim().toLowerCase() === targetSrNo;
+            const includePaymentLevelExtra =
+                paidForExtra === 0 || !(receiptType === 'ledger' || receiptType === 'online');
+
+            return sum + paidForExtra + (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0);
+        }, 0);
+    }, [paymentsForDetailsEntry, customer?.srNo]);
+
+
+    // Calculate adjusted original (just use original net amount now)
+    const { adjustedOriginal, govPaymentDetails } = useMemo(() => {
+        if (!customer) return { adjustedOriginal: 0, govPaymentDetails: null };
         
-        let adjustedOriginal = customer.originalNetAmount || 0;
-        let totalExtraAmount = 0;
-        let govPaymentDetails: Payment | null = null;
+        const baseOriginal = Number(customer.originalNetAmount || 0);
+        const adjustedOriginal = baseOriginal + totalExtraForThisEntry;
+        const govPaymentDetails = null;
 
-        // Find Gov. payment for this entry
-        const govPayment = paymentsForDetailsEntry.find(p => 
-            (p as any).receiptType === 'Gov.' && 
-            p.paidFor?.some(pf => pf.srNo === customer.srNo)
-        );
-
-        if (govPayment) {
-            govPaymentDetails = govPayment as Payment;
-            const paidForThisEntry = govPayment.paidFor?.find(pf => pf.srNo === customer.srNo);
-            
-            // Check for adjustedOriginal first (most reliable)
-            if (paidForThisEntry && paidForThisEntry.adjustedOriginal !== undefined) {
-                adjustedOriginal = paidForThisEntry.adjustedOriginal;
-                totalExtraAmount = adjustedOriginal - (customer.originalNetAmount || 0);
-            } else if (paidForThisEntry && paidForThisEntry.extraAmount !== undefined) {
-                // Fallback: Use extraAmount to calculate adjustedOriginal
-                totalExtraAmount = paidForThisEntry.extraAmount || 0;
-                adjustedOriginal = (customer.originalNetAmount || 0) + totalExtraAmount;
-            } else if ((govPayment as any).extraAmount !== undefined) {
-                // Fallback: Check payment-level extraAmount
-                totalExtraAmount = (govPayment as any).extraAmount || 0;
-                adjustedOriginal = (customer.originalNetAmount || 0) + totalExtraAmount;
-            }
-        }
-
-        return { adjustedOriginal, totalExtraAmount, govPaymentDetails };
-    }, [paymentsForDetailsEntry, customer]);
+        return { adjustedOriginal, govPaymentDetails };
+    }, [customer, totalExtraForThisEntry]);
     
     // Calculate derived values (not hooks, so safe to be after early return check)
     // Outstanding = Adjusted Original - Total Paid - Total CD
@@ -249,14 +267,21 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                         
                         <Card className="border-primary/50 bg-primary/5 text-center">
                             <CardContent className="p-3 space-y-2">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">Base Original Amount</p>
-                                    <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
-                                </div>
-                                {totalExtraAmount > 0 && (
-                                    <div className="pt-1">
-                                        <p className="text-xs text-muted-foreground">Extra Amount (Gov. Payment)</p>
-                                        <p className="text-lg font-semibold text-green-600 font-mono">+ {formatCurrency(totalExtraAmount)}</p>
+                                {totalExtraForThisEntry !== 0 ? (
+                                    <>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Base Original Amount</p>
+                                            <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
+                                        </div>
+                                        <div className="flex items-center justify-center gap-2 text-teal-600">
+                                            <p className="text-xs font-medium">Extra Amount</p>
+                                            <p className="text-sm font-bold font-mono">{formatCurrency(totalExtraForThisEntry)}</p>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Base Original Amount</p>
+                                        <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                     </div>
                                 )}
                                 <Separator className="my-2"/>
@@ -284,6 +309,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs">Type</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Extra</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Paid Amount</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">CD</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Total Settled</TableHead>
@@ -292,29 +318,51 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             </TableHeader>
                                             <TableBody>
                                                 {paymentsForDetailsEntry.map((payment, index) => {
-                                                    const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
-                                                    if (!paidForThis) return null;
+                                                    const paidForThis = payment.paidFor?.find(pf =>
+                                                        String(pf.srNo || '').trim().toLowerCase() === String(customer?.srNo || '').trim().toLowerCase()
+                                                    );
+                                                    const receiptType = String((payment as any).receiptType || '').trim().toLowerCase();
+                                                    const paymentLevelExtraRawFromFields =
+                                                        Number((payment as any).extraAmount || 0) + Number((payment as any).advanceAmount || 0);
+                                                    const ledgerAmountFallback =
+                                                        receiptType === 'ledger' &&
+                                                        (payment.paidFor?.length || 0) === 0 &&
+                                                        paymentLevelExtraRawFromFields === 0
+                                                            ? Math.abs(Number((payment as any).amount || 0))
+                                                            : 0;
+                                                    const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
+                                                    const paymentLevelExtraSign =
+                                                        receiptType === 'ledger' && String((payment as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
+                                                    const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
+                                                    const isPaymentAttachedToThisEntry =
+                                                        String((payment as any).parchiNo || '').trim().toLowerCase() ===
+                                                        String(customer?.srNo || '').trim().toLowerCase();
+                                                    const paidForExtraForThisEntry = Number((paidForThis as any)?.extraAmount || 0);
+                                                    const includePaymentLevelExtra =
+                                                        paidForExtraForThisEntry === 0 || !(receiptType === 'ledger' || receiptType === 'online');
+                                                    const extraForThisEntry =
+                                                        paidForExtraForThisEntry +
+                                                        (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0);
+                                                    if (!paidForThis && extraForThisEntry === 0) return null;
 
+                                                    const actualPaidForEntry = Number((paidForThis as any)?.amount || 0);
                                                     let cdForThisEntry = 0;
                                                     // First check if CD amount is directly stored in paidFor (new format - more accurate)
-                                                    if ('cdAmount' in paidForThis && paidForThis.cdAmount !== undefined && paidForThis.cdAmount !== null) {
-                                                        cdForThisEntry = Number(paidForThis.cdAmount || 0);
-                                                    } else if ((payment as any).cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+                                                    if (paidForThis && 'cdAmount' in paidForThis && (paidForThis as any).cdAmount !== undefined && (paidForThis as any).cdAmount !== null) {
+                                                        cdForThisEntry = Number((paidForThis as any).cdAmount || 0);
+                                                    } else if (paidForThis && (payment as any).cdAmount && payment.paidFor && payment.paidFor.length > 0) {
                                                         // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
                                                         const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
                                                         if (totalAmountInPayment > 0) {
-                                                            const proportion = Number(paidForThis.amount || 0) / totalAmountInPayment;
+                                                            const proportion = actualPaidForEntry / totalAmountInPayment;
                                                             cdForThisEntry = Math.round((payment as any).cdAmount * proportion * 100) / 100;
                                                         }
                                                     }
 
                                                     // paidForThis.amount IS the actual paid amount (To Be Paid amount)
                                                     // It's NOT (To Be Paid - CD), it's the actual payment amount
-                                                    const actualPaidForEntry = paidForThis.amount; // This is the To Be Paid / Actual Paid amount
                                                     const settledAmountForEntry = actualPaidForEntry + cdForThisEntry; // Total settled = Paid + CD
                                                     
-                                                    // Get extra amount for this payment (if Gov. payment)
-                                                    const extraAmountForThisPayment = (paidForThis as any).extraAmount || 0;
                                                     const isGovPayment = (payment as any).receiptType === 'Gov.';
 
                                                     return (
@@ -323,11 +371,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                             <TableCell className="p-2">
                                                                 {payment.type}
-                                                                {isGovPayment && extraAmountForThisPayment > 0 && (
-                                                                    <span className="ml-1 text-xs text-green-600" title={`Extra Amount: ${formatCurrency(extraAmountForThisPayment)}`}>
-                                                                        (Gov.)
-                                                                    </span>
-                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold text-teal-600">
+                                                                {extraForThisEntry !== 0 ? formatCurrency(extraForThisEntry) : '-'}
                                                             </TableCell>
                                                             <TableCell className="p-2 text-right font-bold text-green-600">{formatCurrency(actualPaidForEntry)}</TableCell>
                                                             <TableCell className="p-2 text-right text-blue-600">{formatCurrency(cdForThisEntry)}</TableCell>
@@ -404,7 +450,14 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                         } else {
                                             // Get all suppliers for the delete logic
                                             const allSuppliers = await db.suppliers.toArray();
-                                            await handleDeletePaymentLogic(paymentToDelete as any, allSuppliers);
+                                            await handleDeletePaymentLogic({
+                                                paymentId: paymentToDelete.id || paymentToDelete.paymentId,
+                                                paymentHistory: [],
+                                                suppliers: allSuppliers,
+                                                expenses: [],
+                                                incomes: [],
+                                                isCustomer: false,
+                                            });
                                             toast({
                                                 title: "Payment Deleted",
                                                 description: `Payment ${paymentToDelete.paymentId || paymentToDelete.id} has been deleted successfully.`,

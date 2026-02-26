@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ interface CompactSupplierTableProps {
     isDeleting?: boolean;
 }
 
-export const CompactSupplierTable = ({ 
+const CompactSupplierTableComponent = ({ 
     suppliers, 
     onEditSupplier, 
     onDeleteSupplier, 
@@ -114,10 +114,10 @@ export const CompactSupplierTable = ({
                                         {supplier.so}
                                     </td>
                                     <td className="p-2 text-xs">
-                                        ₹{supplier.amount?.toFixed(2) || '0.00'}
+                                        ₹{Number(supplier.amount || 0).toFixed(2)}
                                     </td>
                                     <td className="p-2 text-xs font-medium">
-                                        ₹{supplier.netAmount?.toFixed(2) || '0.00'}
+                                        ₹{Number(supplier.netAmount || 0).toFixed(2)}
                                     </td>
                                     <td className="p-2">
                                         <div className="flex items-center gap-1">
@@ -127,6 +127,7 @@ export const CompactSupplierTable = ({
                                                 onClick={() => onEditSupplier(supplier)}
                                                 className="h-6 w-6 p-0 hover:bg-primary/10"
                                                 title="Edit"
+                                                aria-label={`Edit entry ${supplier.srNo}`}
                                             >
                                                 <Edit2 className="h-3 w-3" />
                                             </Button>
@@ -137,6 +138,7 @@ export const CompactSupplierTable = ({
                                                 disabled={isDeleting || deletingId === supplier.id}
                                                 className="h-6 w-6 p-0 hover:bg-destructive/10"
                                                 title="Delete"
+                                                aria-label={`Delete entry ${supplier.srNo}`}
                                             >
                                                 {deletingId === supplier.id ? (
                                                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -163,3 +165,5 @@ export const CompactSupplierTable = ({
         </Card>
     );
 };
+
+export const CompactSupplierTable = memo(CompactSupplierTableComponent);

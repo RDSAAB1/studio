@@ -6,7 +6,7 @@ import type { WriteBatch } from "firebase/firestore";
  * Collection name mapping from internal names to Firestore collection names
  * Complete mapping of all 28 collections
  */
-const COLLECTION_MAP: Record<string, string> = {
+export const COLLECTION_MAP: Record<string, string> = {
     // Core collections
     'suppliers': 'suppliers',
     'customers': 'customers',

@@ -10,7 +10,7 @@ import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Download, Printer } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { formatDate } from "@/lib/date-utils";
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
@@ -174,7 +174,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="mt-2 text-sm w-full sm:w-80 border-t border-gray-300 pt-1">
                         <div className="flex justify-between">
                             <span className="font-semibold text-black">Statement Date:</span>
-                            <span className="text-black">{format(new Date(), 'dd-MMM-yyyy')}</span>
+                            <span className="text-black">
+                                {formatDate(new Date(), "dd-MMM-yyyy")}
+                            </span>
                         </div>
                         <div className="flex justify-between">
                             <span className="font-semibold text-black">Closing Balance:</span>
@@ -246,7 +248,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             </TableRow>
                             {transactions.map((item, index) => (
                                 <TableRow key={index} className="[&_td]:py-2 [&_td]:px-3">
-                                    <TableCell className="text-black">{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="text-black">
+                                        {formatDate(item.date, "dd-MMM-yy")}
+                                    </TableCell>
                                     <TableCell className="text-black">{item.particulars}</TableCell>
                                     <TableCell className="text-right font-mono text-black">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
                                     <TableCell className="text-right font-mono text-black">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>

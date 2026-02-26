@@ -6,9 +6,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, RefreshCw, FileText } from 'lucide-react';
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Simple markdown to HTML converter
 function markdownToHtml(markdown: string): string {
-  let html = markdown;
+  let html = escapeHtml(markdown);
   
   // Headers
   html = html.replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>');
@@ -27,7 +36,14 @@ function markdownToHtml(markdown: string): string {
   html = html.replace(/^- (.*$)/gim, '<li class="ml-4 list-disc">$1</li>');
   
   // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary hover:underline" target="_blank">$1</a>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text: string, url: string) => {
+    const trimmedUrl = url.trim();
+    const isSafeProtocol = /^(https?:\/\/|mailto:|\/)/i.test(trimmedUrl);
+    if (!isSafeProtocol) {
+      return text;
+    }
+    return `<a href="${trimmedUrl}" class="text-primary hover:underline" target="_blank">${text}</a>`;
+  });
   
   // Paragraphs
   html = html.split('\n\n').map(para => {

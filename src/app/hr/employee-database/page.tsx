@@ -32,7 +32,7 @@ export default function EmployeeDatabasePage() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = getEmployeesRealtime(setEmployees, );
+    const unsubscribe = getEmployeesRealtime(setEmployees, () => {});
     return () => unsubscribe();
   }, []);
 

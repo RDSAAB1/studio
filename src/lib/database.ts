@@ -1,6 +1,6 @@
 
 import Dexie, { type Table } from 'dexie';
-import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday, LedgerAccount, LedgerEntry, MandiReport, SyncTask } from './definitions';
+import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings } from './definitions';
 import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
 import { logError } from './error-logger';
 import { firestoreDB } from './firebase';
@@ -24,6 +24,7 @@ export class AppDatabase extends Dexie {
     banks!: Table<Bank>;
     bankBranches!: Table<BankBranch>;
     bankAccounts!: Table<BankAccount>;
+    supplierBankAccounts!: Table<BankAccount>;
     settings!: Table<RtgsSettings | ReceiptSettings | FormatSettings | Holiday>;
     projects!: Table<Project>;
     loans!: Table<Loan>;
@@ -36,7 +37,13 @@ export class AppDatabase extends Dexie {
     ledgerEntries!: Table<LedgerEntry>;
     mandiReports!: Table<MandiReport>;
     syncQueue!: Table<SyncTask>;
-    
+    kantaParchi!: Table<KantaParchi>;
+    manufacturingCosting!: Table<ManufacturingCostingData>; // Added
+    incomeCategories!: Table<IncomeCategory>;
+    expenseCategories!: Table<ExpenseCategory>;
+    customerDocuments!: Table<CustomerDocument>; // Added
+    accounts!: Table<Account>; // Added
+
     constructor() {
         super('bizsuiteDB_v2');
         this.version(1).stores({
@@ -156,6 +163,69 @@ export class AppDatabase extends Dexie {
             mandiReports: '&id, voucherNo, sellerName, purchaseDate',
             syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
         });
+
+        this.version(6).stores({
+            suppliers: '&id, &srNo, name, contact, date, customerId',
+            customers: '++id, &srNo, name, contact, date, customerId',
+            payments: '++id, paymentId, customerId, date',
+            customerPayments: '++id, paymentId, customerId, date',
+            governmentFinalizedPayments: '++id, paymentId, customerId, date',
+            transactions: '++id, transactionId, date, category, subCategory, type',
+            options: '++id, type, name',
+            banks: '&id, name',
+            bankBranches: '++id, &ifscCode, bankName, branchName',
+            bankAccounts: '++id, &accountNumber',
+            settings: '&id',
+            projects: '++id, name, startDate',
+            loans: '++id, loanId, startDate, date, srNo',
+            fundTransactions: '++id, date, type',
+            employees: '++id, employeeId, name',
+            payroll: '++id, employeeId, payPeriod',
+            attendance: '&id, employeeId, date', 
+            inventoryItems: '++id, sku, name',
+            ledgerAccounts: '&id, name, date, srNo',
+            ledgerEntries: '&id, accountId, date',
+            mandiReports: '&id, voucherNo, sellerName, purchaseDate',
+            syncQueue: '++id, status, nextRetryAt, dedupeKey, type',
+            kantaParchi: '&id, srNo, date',
+        });
+
+        this.version(7).stores({
+            manufacturingCosting: '&id',
+        });
+
+        this.version(8).stores({
+            incomeCategories: '&id, name',
+            expenseCategories: '&id, name',
+        });
+
+        this.version(9).stores({
+            customerDocuments: '&id, documentSrNo, kantaParchiSrNo, date',
+        });
+
+        this.version(10).stores({
+            accounts: '&id, name',
+        });
+
+        this.version(11).stores({
+            supplierBankAccounts: '&id, accountNumber',
+        });
+
+        this.version(12).stores({
+            bankAccounts: null,
+            bankBranches: null,
+        });
+
+        this.version(13).stores({
+            bankAccounts: '&id, accountNumber',
+            bankBranches: '&id, &ifscCode, bankName, branchName',
+        });
+
+        this.version(14).stores({
+            payments: '++id, paymentId, customerId, date',
+            customerPayments: '++id, paymentId, customerId, date',
+            governmentFinalizedPayments: '++id, paymentId, customerId, date',
+        });
     }
 }
 
@@ -252,7 +322,7 @@ export async function syncAllDataWithDetails(
     { name: 'customerPayments', displayName: 'Customer Payments', getAllFn: getAllCustomerPayments, localTable: () => db.customerPayments },
     { name: 'incomes', displayName: 'Incomes', getAllFn: getAllIncomes, localTable: () => db.transactions, isSpecial: true },
     { name: 'expenses', displayName: 'Expenses', getAllFn: getAllExpenses, localTable: () => db.transactions, isSpecial: true },
-    { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', getAllFn: getAllSupplierBankAccounts, localTable: () => db.bankAccounts, isSpecial: true },
+    { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', getAllFn: getAllSupplierBankAccounts, localTable: () => db.supplierBankAccounts },
     { name: 'banks', displayName: 'Banks', getAllFn: getAllBanks, localTable: () => db.banks },
     { name: 'bankBranches', displayName: 'Bank Branches', getAllFn: getAllBankBranches, localTable: () => db.bankBranches },
     { name: 'bankAccounts', displayName: 'Bank Accounts', getAllFn: getAllBankAccounts, localTable: () => db.bankAccounts },
@@ -260,8 +330,8 @@ export async function syncAllDataWithDetails(
     { name: 'loans', displayName: 'Loans', getAllFn: getAllLoans, localTable: () => db.loans },
     { name: 'fundTransactions', displayName: 'Fund Transactions', getAllFn: getAllFundTransactions, localTable: () => db.fundTransactions },
     { name: 'mandiReports', displayName: 'Mandi Reports', getAllFn: fetchMandiReports, localTable: () => db.mandiReports },
-    { name: 'incomeCategories', displayName: 'Income Categories', getAllFn: getAllIncomeCategories, localTable: () => db.options, isSpecial: true },
-    { name: 'expenseCategories', displayName: 'Expense Categories', getAllFn: getAllExpenseCategories, localTable: () => db.options, isSpecial: true },
+    { name: 'incomeCategories', displayName: 'Income Categories', getAllFn: getAllIncomeCategories, localTable: () => db.incomeCategories },
+    { name: 'expenseCategories', displayName: 'Expense Categories', getAllFn: getAllExpenseCategories, localTable: () => db.expenseCategories },
     { name: 'employees', displayName: 'Employees', getAllFn: getAllEmployees, localTable: () => db.employees },
     { name: 'payroll', displayName: 'Payroll', getAllFn: getAllPayroll, localTable: () => db.payroll },
     { name: 'attendance', displayName: 'Attendance', getAllFn: getAllAttendance, localTable: () => db.attendance },
@@ -270,9 +340,9 @@ export async function syncAllDataWithDetails(
     { name: 'ledgerAccounts', displayName: 'Ledger Accounts', getAllFn: getAllLedgerAccounts, localTable: () => db.ledgerAccounts },
     { name: 'ledgerEntries', displayName: 'Ledger Entries', getAllFn: fetchAllLedgerEntries, localTable: () => db.ledgerEntries },
     { name: 'ledgerCashAccounts', displayName: 'Ledger Cash Accounts', getAllFn: getAllLedgerCashAccounts, localTable: () => db.ledgerAccounts, isSpecial: true },
-    { name: 'kantaParchi', displayName: 'Kanta Parchi', getAllFn: getAllKantaParchi, localTable: () => db.options, isSpecial: true },
+    { name: 'kantaParchi', displayName: 'Kanta Parchi', getAllFn: getAllKantaParchi, localTable: () => db.kantaParchi },
     { name: 'customerDocuments', displayName: 'Customer Documents', getAllFn: getAllCustomerDocuments, localTable: () => db.options, isSpecial: true },
-    { name: 'manufacturingCosting', displayName: 'Manufacturing Costing', getAllFn: getAllManufacturingCosting, localTable: () => db.options, isSpecial: true },
+    { name: 'manufacturingCosting', displayName: 'Manufacturing Costing', getAllFn: getAllManufacturingCosting, localTable: () => db.manufacturingCosting },
   ];
 
   // Filter collections based on selection
@@ -714,6 +784,9 @@ export async function hardSyncAllData() {
                 'lastSync:projects',
                 'lastSync:loans',
                 'lastSync:fundTransactions',
+                'lastSync:incomeCategories',
+                'lastSync:expenseCategories',
+                'lastSync:manufacturingCosting',
             ];
             syncKeys.forEach(key => localStorage.removeItem(key));
 
@@ -726,7 +799,10 @@ export async function hardSyncAllData() {
             payments,
             customerPayments,
             incomes,
-            expenses
+            expenses,
+            manufacturingCosting,
+            incomeCategories,
+            expenseCategories
         ] = await Promise.all([
             getAllSuppliers().catch(e => { return []; }),
             getAllCustomers().catch(e => { return []; }),
@@ -734,33 +810,39 @@ export async function hardSyncAllData() {
             getAllCustomerPayments().catch(e => { return []; }),
             getAllIncomes().catch(e => { return []; }),
             getAllExpenses().catch(e => { return []; }),
+            getAllManufacturingCosting().catch(e => { return []; }),
+            getAllIncomeCategories().catch(e => { return []; }),
+            getAllExpenseCategories().catch(e => { return []; }),
         ]);
         
         // ✅ Update IndexedDB with fresh data
-        await db.transaction('rw', [db.suppliers, db.customers, db.payments, db.customerPayments, db.transactions], async () => {
+        await db.transaction('rw', [
+            db.suppliers, 
+            db.customers, 
+            db.payments, 
+            db.customerPayments, 
+            db.transactions, 
+            db.manufacturingCosting,
+            db.incomeCategories,
+            db.expenseCategories
+        ], async () => {
             // Clear existing data
             await db.suppliers.clear();
             await db.customers.clear();
             await db.payments.clear();
             await db.customerPayments.clear();
+            await db.manufacturingCosting.clear();
+            await db.incomeCategories.clear();
+            await db.expenseCategories.clear();
             
             // Add fresh data
-            if (suppliers?.length) {
-                await db.suppliers.bulkAdd(suppliers);
-
-            }
-            if (customers?.length) {
-                await db.customers.bulkAdd(customers);
-
-            }
-            if (payments?.length) {
-                await db.payments.bulkAdd(payments);
-
-            }
-            if (customerPayments?.length) {
-                await db.customerPayments.bulkAdd(customerPayments);
-
-            }
+            if (suppliers?.length) await db.suppliers.bulkAdd(suppliers);
+            if (customers?.length) await db.customers.bulkAdd(customers);
+            if (payments?.length) await db.payments.bulkAdd(payments);
+            if (customerPayments?.length) await db.customerPayments.bulkAdd(customerPayments);
+            if (manufacturingCosting?.length) await db.manufacturingCosting.bulkAdd(manufacturingCosting);
+            if (incomeCategories?.length) await db.incomeCategories.bulkAdd(incomeCategories);
+            if (expenseCategories?.length) await db.expenseCategories.bulkAdd(expenseCategories);
             
             // Handle incomes and expenses (stored in transactions table)
             // ✅ Standardize type casing and use bulkPut to avoid ConstraintError on existing keys
@@ -784,6 +866,9 @@ export async function hardSyncAllData() {
             localStorage.setItem('lastSync:customerPayments', String(now));
             localStorage.setItem('lastSync:incomes', String(now));
             localStorage.setItem('lastSync:expenses', String(now));
+            localStorage.setItem('lastSync:manufacturingCosting', String(now));
+            localStorage.setItem('lastSync:incomeCategories', String(now));
+            localStorage.setItem('lastSync:expenseCategories', String(now));
         }
 
     } catch (e) {
@@ -846,7 +931,10 @@ export async function updateSupplierInLocalDB(id: string, data: Partial<Customer
 
 export async function deletePaymentFromLocalDB(paymentId: string) {
     if (db) {
-        await db.payments.delete(paymentId);
+        await db.payments.delete(paymentId as any);
+        await db.payments.where('paymentId').equals(paymentId).delete();
+        await db.governmentFinalizedPayments.delete(paymentId as any);
+        await db.governmentFinalizedPayments.where('paymentId').equals(paymentId).delete();
     }
 }
 

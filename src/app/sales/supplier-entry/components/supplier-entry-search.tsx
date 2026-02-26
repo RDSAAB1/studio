@@ -98,7 +98,7 @@ export const SupplierEntrySearch = ({
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-medium text-gray-900">
-                    {formatCurrency(supplier.netAmount || 0)}
+                    {formatCurrency(Number(supplier.netAmount || 0))}
                   </div>
                   <div className="text-xs text-gray-500">
                     Due: {supplier.dueDate}
