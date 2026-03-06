@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Loader2, Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import SupplierBankAccountsPage from '@/app/sales/supplier-bank-accounts/page';
@@ -320,12 +321,25 @@ export default function BankManagementPage() {
                      <div className="py-4 space-y-4">
                         <div className="space-y-1">
                             <Label>Bank</Label>
-                             <CustomDropdown
-                                options={banks.map(bank => ({ value: bank.name, label: bank.name }))}
-                                value={currentBranch.bankName || null}
-                                onChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value || ''}))}
-                                placeholder="Select a bank"
-                            />
+                            <Select
+                                value={currentBranch.bankName || '__placeholder__'}
+                                onValueChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value === '__placeholder__' ? '' : value}))}
+                            >
+                                <SelectTrigger className="h-9 w-full">
+                                    <SelectValue placeholder="Select a bank" />
+                                </SelectTrigger>
+                                <SelectContent sideOffset={4}>
+                                    <SelectItem value="__placeholder__">Select a bank</SelectItem>
+                                    {banks.map(bank => (
+                                        <SelectItem key={bank.id} value={bank.name}>
+                                            {bank.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {banks.length === 0 && (
+                                <p className="text-xs text-muted-foreground">Add a bank first from &quot;Add Bank&quot; button.</p>
+                            )}
                         </div>
                         <div className="space-y-1">
                             <Label>Branch Name</Label>

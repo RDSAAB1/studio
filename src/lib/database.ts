@@ -6,6 +6,7 @@ import { logError } from './error-logger';
 import { firestoreDB } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { chunkedBulkPut } from './chunked-operations';
+import { getTenantCollectionPath } from './tenancy';
 
 // Helper function to handle errors silently (for sync fallback scenarios)
 function handleSilentError(error: unknown, context: string): void {
@@ -903,14 +904,14 @@ export async function getSyncCounts(): Promise<SyncCountRow[]> {
     const incomesIndexed = await db.transactions.where('type').equals('Income').count().catch(() => 0);
     const expensesIndexed = await db.transactions.where('type').equals('Expense').count().catch(() => 0);
     const fundTransactionsIndexed = await db.fundTransactions.count().catch(() => 0);
-    const suppliersFirestore = (await getDocs(collection(firestoreDB, 'suppliers'))).size;
-    const customersFirestore = (await getDocs(collection(firestoreDB, 'customers'))).size;
-    const paymentsFirestore = (await getDocs(collection(firestoreDB, 'payments'))).size;
-    const govPaymentsFirestore = (await getDocs(collection(firestoreDB, 'governmentFinalizedPayments'))).size;
-    const customerPaymentsFirestore = (await getDocs(collection(firestoreDB, 'customer_payments'))).size;
-    const incomesFirestore = (await getDocs(collection(firestoreDB, 'incomes'))).size;
-    const expensesFirestore = (await getDocs(collection(firestoreDB, 'expenses'))).size;
-    const fundTransactionsFirestore = (await getDocs(collection(firestoreDB, 'fundTransactions'))).size;
+    const suppliersFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('suppliers')))).size;
+    const customersFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('customers')))).size;
+    const paymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('payments')))).size;
+    const govPaymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('governmentFinalizedPayments')))).size;
+    const customerPaymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('customer_payments')))).size;
+    const incomesFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('incomes')))).size;
+    const expensesFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('expenses')))).size;
+    const fundTransactionsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('fundTransactions')))).size;
     rows.push({ collection: 'suppliers', indexeddb: suppliersIndexed, firestore: suppliersFirestore });
     rows.push({ collection: 'customers', indexeddb: customersIndexed, firestore: customersFirestore });
     rows.push({ collection: 'payments', indexeddb: paymentsIndexed + govPaymentsIndexed, firestore: paymentsFirestore + govPaymentsFirestore });

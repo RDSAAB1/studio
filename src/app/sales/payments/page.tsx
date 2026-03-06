@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import React, { Suspense, use } from "react";
 import { useSearchParams } from 'next/navigation';
 import UnifiedPaymentsPage from "./unified-payments-page";
 
@@ -11,7 +11,9 @@ function PaymentsPageContent() {
   return <UnifiedPaymentsPage defaultTab={tab as 'supplier' | 'customer' | 'outsider'} />;
 }
 
-export default function PaymentsPage() {
+type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+export default function PaymentsPage(props: PageProps) {
+  if (props.searchParams) use(props.searchParams);
   return (
     <Suspense fallback={null}>
       <PaymentsPageContent />

@@ -1,6 +1,7 @@
 import { firestoreDB } from "./firebase";
 import { collection, doc, setDoc, getDoc, Timestamp, serverTimestamp } from "firebase/firestore";
 import type { WriteBatch } from "firebase/firestore";
+import { getTenantCollectionPath } from "./tenancy";
 
 /**
  * Collection name mapping from internal names to Firestore collection names
@@ -19,6 +20,7 @@ export const COLLECTION_MAP: Record<string, string> = {
     'expenses': 'expenses',
     'fundTransactions': 'fund_transactions',
     'loans': 'loans',
+    'accounts': 'accounts',
     
     // Bank related
     'banks': 'banks',
@@ -30,6 +32,11 @@ export const COLLECTION_MAP: Record<string, string> = {
     'settings': 'settings',
     'options': 'options',
     
+    // Categories and holidays
+    'incomeCategories': 'incomeCategories',
+    'expenseCategories': 'expenseCategories',
+    'holidays': 'holidays',
+    
     // User and employee management
     'users': 'users',
     'employees': 'employees',
@@ -38,6 +45,7 @@ export const COLLECTION_MAP: Record<string, string> = {
     
     // Project and inventory
     'projects': 'projects',
+    'tasks': 'tasks',
     'inventoryItems': 'inventoryItems',
     'expenseTemplates': 'expenseTemplates',
     
@@ -46,14 +54,16 @@ export const COLLECTION_MAP: Record<string, string> = {
     'ledgerEntries': 'ledgerEntries',
     'ledgerCashAccounts': 'ledgerCashAccounts',
     
+    // Sales
+    'products': 'products',
+    'orders': 'orders',
+    
     // Other collections
     'mandiReports': 'mandiReports',
     'kantaParchi': 'kantaParchi',
     'customerDocuments': 'customerDocuments',
     'manufacturingCosting': 'manufacturingCosting',
 };
-
-const syncRegistryCollection = collection(firestoreDB, "sync_registry");
 
 /**
  * Update sync registry timestamp when any collection is modified
@@ -72,7 +82,7 @@ export async function notifySyncRegistry(
     }
 ): Promise<void> {
     const registryDocId = COLLECTION_MAP[collectionName] || collectionName;
-    const registryRef = doc(syncRegistryCollection, registryDocId);
+    const registryRef = doc(collection(firestoreDB, ...getTenantCollectionPath("sync_registry")), registryDocId);
     
     const updateData = {
         last_updated: serverTimestamp(),
@@ -109,7 +119,7 @@ export async function notifySyncRegistry(
  */
 export async function getSyncRegistryTimestamp(collectionName: string): Promise<Timestamp | null> {
     const registryDocId = COLLECTION_MAP[collectionName] || collectionName;
-    const registryRef = doc(syncRegistryCollection, registryDocId);
+    const registryRef = doc(collection(firestoreDB, ...getTenantCollectionPath("sync_registry")), registryDocId);
     
     try {
         const docSnap = await getDoc(registryRef);
@@ -138,4 +148,3 @@ export function getTrackedCollections(): string[] {
 export function getFirestoreCollectionName(internalName: string): string {
     return COLLECTION_MAP[internalName] || internalName;
 }
-

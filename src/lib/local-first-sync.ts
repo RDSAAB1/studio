@@ -18,6 +18,9 @@ import { enqueueSyncTask } from './sync-queue';
 import { yieldToMainThread, chunkedBulkPut } from './chunked-operations';
 import { logError } from './error-logger';
 import { retryFirestoreOperation } from './retry-utils';
+import { getTenantCollectionPath } from './tenancy';
+import { getFirestoreCollectionName } from './sync-registry';
+import { withCreateMetadata, withEditMetadata, logActivity } from './audit';
 
 // Helper function to handle errors silently (for sync fallback scenarios)
 function handleSilentError(error: unknown, context: string): void {
@@ -123,14 +126,15 @@ export async function writeLocalFirst<T extends { id: string }>(
         switch (operation) {
             case 'create':
                 if (!data) throw new Error('Data required for create operation');
-                // ✅ Ensure updatedAt and createdAt fields exist with current timestamp
+                // ✅ Ensure updatedAt and createdAt + audit metadata (createdBy, createdByName)
                 const now = new Date();
-                const dataWithTimestamp = {
+                const baseCreate = {
                     ...data,
                     updatedAt: (data as any).updatedAt || now.toISOString(),
                     createdAt: (data as any).createdAt || now.toISOString()
                 };
-                await localTable.put(dataWithTimestamp as any);
+                const dataWithTimestamp = withCreateMetadata(baseCreate as Record<string, unknown>) as any;
+                await localTable.put(dataWithTimestamp);
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                 }
@@ -150,14 +154,15 @@ export async function writeLocalFirst<T extends { id: string }>(
                 if (!changes) throw new Error('Changes required for update operation');
                 const existing = await localTable.get(id);
                 if (existing) {
-                    // ✅ Ensure updatedAt field exists
-                    const updated = { 
+                    // ✅ Ensure updatedAt + audit metadata (editedBy, editedByName)
+                    const baseUpdated = { 
                         ...existing, 
                         ...changes,
                         updatedAt: new Date().toISOString()
                     };
+                    const updated = withEditMetadata(baseUpdated as Record<string, unknown>) as any;
 
-                    await localTable.put(updated as any);
+                    await localTable.put(updated);
                     if (typeof window !== 'undefined') {
                         window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                     }
@@ -168,11 +173,17 @@ export async function writeLocalFirst<T extends { id: string }>(
                         throw new Error(`Failed to verify update: ${collectionName}:${id}`);
                     }
 
+                    const changesWithAudit = {
+                        ...changes,
+                        updatedAt: updated.updatedAt,
+                        editedBy: (updated as any).editedBy,
+                        editedByName: (updated as any).editedByName,
+                    };
                     pendingChanges.set(`${collectionName}:${id}`, {
                         id,
                         type: 'update',
                         collection: collectionName,
-                        changes: { ...changes, updatedAt: updated.updatedAt },
+                        changes: changesWithAudit,
                         data: updated,
                         timestamp
                     });
@@ -184,14 +195,14 @@ export async function writeLocalFirst<T extends { id: string }>(
 
                     // If not found locally, treat as create
                     if (data) {
-                        // ✅ Ensure updatedAt and createdAt fields exist with current timestamp
                         const now = new Date();
-                        const dataWithTimestamp = {
+                        const baseCreate = {
                             ...data,
                             updatedAt: (data as any).updatedAt || now.toISOString(),
                             createdAt: (data as any).createdAt || now.toISOString()
                         };
-                        await localTable.put(dataWithTimestamp as any);
+                        const dataWithTimestamp = withCreateMetadata(baseCreate as Record<string, unknown>) as any;
+                        await localTable.put(dataWithTimestamp);
                         if (typeof window !== 'undefined') {
                             window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                         }
@@ -430,11 +441,11 @@ export async function syncToFirestore() {
                         } catch (error: unknown) {
                             const firestoreError = error as { code?: string };
                             if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
-                                // Queue for later sync - use correct task type
+                                // Queue for later sync - use correct task type (processors expect { id, data })
                                 const taskType = getSyncTaskType(change.collection, 'update');
                                 await enqueueSyncTask(
                                     taskType,
-                                    { id: change.id, changes: change.changes },
+                                    { id: change.id, data: change.changes },
                                     { dedupeKey: `${change.collection}:update:${change.id}` }
                                 );
                                 continue; // Skip this change
@@ -498,18 +509,35 @@ export async function syncToFirestore() {
             // Commit batch for this change
             try {
                 await batch.commit();
+                const path = getTenantCollectionPath(change.collection).join("/");
+                if (change.type === "create" && change.data) {
+                    logActivity({
+                        type: "create",
+                        collection: change.collection,
+                        docId: change.id,
+                        docPath: path,
+                        summary: `Created ${change.collection}/${change.id}`,
+                        afterData: change.data as Record<string, unknown>,
+                    }).catch(() => {});
+                } else if (change.type === "update" && change.changes) {
+                    logActivity({
+                        type: "edit",
+                        collection: change.collection,
+                        docId: change.id,
+                        docPath: path,
+                        summary: `Updated ${change.collection}/${change.id}`,
+                        afterData: change.changes as Record<string, unknown>,
+                    }).catch(() => {});
+                }
             } catch (error: unknown) {
                 const firestoreError = error as { code?: string };
                 if (firestoreError?.code === 'permission-denied' || firestoreError?.code === 'unavailable') {
-                    // Re-queue the change
                     pendingChanges.set(`${change.collection}:${change.id}`, change);
                 } else {
                     throw error;
                 }
             }
         } catch (error) {
-
-            // Re-add to pending changes for retry
             pendingChanges.set(`${change.collection}:${change.id}`, change);
         }
     }
@@ -652,7 +680,7 @@ async function syncCollectionFromFirestore(
     if (!db) return;
 
     try {
-        const firestoreCollection = collection(firestoreDB, firestoreCollectionName);
+        const firestoreCollection = collection(firestoreDB, ...getTenantCollectionPath(firestoreCollectionName));
         const localTable = getLocalTable(collectionName);
         if (!localTable) return;
 
@@ -769,7 +797,8 @@ async function syncCollectionFromFirestore(
  * Get Firestore collection reference
  */
 function getFirestoreCollection(collectionName: CollectionName) {
-    return collection(firestoreDB, collectionName);
+    const firestoreCollectionName = getFirestoreCollectionName(collectionName);
+    return collection(firestoreDB, ...getTenantCollectionPath(firestoreCollectionName));
 }
 
 /**
@@ -798,4 +827,16 @@ export async function forceSyncToFirestore(): Promise<void> {
  */
 export async function forceSyncFromFirestore(): Promise<void> {
     await syncFromFirestore();
+}
+
+/** Clear lastSync for a collection and sync it - use after restore to refresh local data */
+export async function forceSyncCollectionFromFirestore(collectionName: string): Promise<void> {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem(`lastSync:${collectionName}`);
+    }
+    const firestoreName = getFirestoreCollectionName(collectionName as CollectionName);
+    await syncCollectionFromFirestore(collectionName as CollectionName, firestoreName, undefined);
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
+    }
 }

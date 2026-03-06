@@ -1,22 +1,15 @@
 
-### 15. UX Architecture & Navigation
+### Multitenant + Multiuser Enablement
 
-**Status:** ✅ Completed | **Progress:** 3/3 tasks
+**Goal:** Ek hi software ko multiple companies (tenants) aur multiple users ke liye safe banana.
 
-- [x] Implement Single Page Architecture for Sales Module
-  - Status: ✅ Completed
-  - File: `src/app/sales/unified-sales-page.tsx`
-  - Notes: Added Dashboard, Sales Reports, Order Tracking, and Product Catalog as tabs.
-  - **Completed On:** 2026-01-23
+**Status:** 🟡 In Progress | **Progress:** 0/8 tasks
 
-- [x] Update Sidebar Navigation to use Query Params
-  - Status: ✅ Completed
-  - File: `src/components/layout/sidebar-content-wrapper.tsx`
-  - Notes: Converted all Sales/Entry/Payments/Reports links to use `/sales?tab=...` format.
-  - **Completed On:** 2026-01-23
-
-- [x] Refactor App Layout Navigation Logic
-  - Status: ✅ Completed
-  - File: `src/components/layout/app-layout.tsx`
-  - Notes: Removed legacy route overrides to support new query-param based navigation.
-  - **Completed On:** 2026-01-23
+- [ ] Tenants aur tenant-membership model implement karo
+- [ ] Login par default tenant auto-create/resolve karo
+- [ ] Active tenant switcher (UI) add karo
+- [ ] Tenant switch par local cache/IndexedDB reset karo
+- [ ] Firestore reads/writes ko tenant-aware banao (root vs tenant storage mode)
+- [ ] Settings/options ko tenant-aware banao (companyDetails, options docs, etc.)
+- [ ] Multiuser join/invite flow add karo (join code ya membership add)
+- [ ] Lint + typecheck run karke sab errors fix karo

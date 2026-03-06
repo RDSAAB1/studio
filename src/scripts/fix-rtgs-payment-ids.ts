@@ -9,6 +9,14 @@
 import { collection, getDocs, writeBatch, doc, deleteDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
+type FirestorePath = [string, ...string[]];
+
+const tenantId = String((globalThis as any)?.process?.env?.TENANT_ID || '').trim();
+const tenantCollectionPath = (collectionName: string): FirestorePath =>
+    (tenantId ? (['tenants', tenantId, collectionName] as const) : ([collectionName] as const)) as unknown as FirestorePath;
+const tenantDocPath = (collectionName: string, id: string): FirestorePath =>
+    (tenantId ? (['tenants', tenantId, collectionName, id] as const) : ([collectionName, id] as const)) as unknown as FirestorePath;
+
 // Helper function to convert "R" prefix to "RT" prefix
 function normalizeRtgsId(id: string | undefined): string | null {
     if (!id) return null;
@@ -34,7 +42,7 @@ export async function fixRtgsPaymentIds() {
 
 
     try {
-        const paymentsRef = collection(firestoreDB, 'payments');
+        const paymentsRef = collection(firestoreDB, ...tenantCollectionPath('payments'));
         const snapshot = await getDocs(paymentsRef);
         
         let updateCount = 0;
@@ -206,7 +214,7 @@ export async function fixRtgsPaymentIds() {
                         batchOps = 0;
                     }
                     
-                    const paymentRef = doc(firestoreDB, 'payments', docId);
+                    const paymentRef = doc(firestoreDB, ...tenantDocPath('payments', docId));
                     const updates: any = {};
                     
                     if (data.paymentId !== correctId) {
@@ -235,11 +243,11 @@ export async function fixRtgsPaymentIds() {
                         batchOps = 0;
                     }
                     
-                    const newDocRef = doc(firestoreDB, 'payments', newId);
+                    const newDocRef = doc(firestoreDB, ...tenantDocPath('payments', newId));
                     currentBatch.set(newDocRef, data);
                     batchOps++;
                     
-                    const oldDocRef = doc(firestoreDB, 'payments', oldId);
+                    const oldDocRef = doc(firestoreDB, ...tenantDocPath('payments', oldId));
                     currentBatch.delete(oldDocRef);
                     batchOps++;
 

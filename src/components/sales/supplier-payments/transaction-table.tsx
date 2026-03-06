@@ -183,11 +183,11 @@ export const TransactionTable = React.memo(
             </colgroup>
         );
 
-        const headCellBaseClass = `${headerHeightClass} ${headTextClass} font-extrabold sticky top-0 z-10 bg-primary/20`;
+        const headCellBaseClass = `${headerHeightClass} ${headTextClass} font-extrabold sticky top-0 z-10 bg-muted/50`;
 
         const tableHeader = (
             <TableHeader>
-                <TableRow className={`border-b border-primary/30 ${headerHeightClass} bg-transparent`}>
+                <TableRow className={`border-b border-border ${headerHeightClass} rounded-none bg-transparent`}>
                     <TableHead className={`py-0 px-1 ${headCellBaseClass} text-center`}>
                         <div className="flex items-center justify-center">
                             <Checkbox
@@ -210,18 +210,18 @@ export const TransactionTable = React.memo(
         );
 
         const tableBody = (
-            <div className={`${compact ? "text-[10px]" : "text-[12px]"} rounded-[12px] overflow-hidden flex flex-col flex-1 min-h-0 bg-white/80 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.14)] transition-shadow backdrop-blur-[20px]`}>
-                <div className="flex-shrink-0 bg-primary/20 border-b border-primary/30 shadow-sm backdrop-blur-sm">
+            <div className={`${compact ? "text-[10px]" : "text-[12px]"} rounded-md overflow-hidden flex flex-col flex-1 min-h-0 bg-card`}>
+                <div className="flex-shrink-0 bg-card border-b border-border rounded-none">
                     {showTabsInHeader && (
                         <div className="px-1 py-1 border-b border-slate-200/70">
-                            <div className="flex items-center gap-1 rounded-[12px] bg-slate-100/80 border border-slate-200/80 p-0.5">
+                            <div className="flex items-center gap-1 rounded-md border border-border/50 bg-card p-0.5">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab("all")}
                                     className={`${tabButtonBaseClass} ${
                                         activeTab === "all"
-                                            ? "bg-white border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60"
-                                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70 hover:border-slate-200/80"
+                                            ? "bg-primary text-primary-foreground border-primary/40 shadow-sm"
+                                            : "bg-transparent border-transparent text-muted-foreground hover:bg-card hover:border-border"
                                     }`}
                                 >
                                     <span className={tabLabelClass}>All</span>
@@ -232,8 +232,8 @@ export const TransactionTable = React.memo(
                                     onClick={() => setActiveTab("outstanding")}
                                     className={`${tabButtonBaseClass} ${
                                         activeTab === "outstanding"
-                                            ? "bg-white border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60"
-                                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70 hover:border-slate-200/80"
+                                            ? "bg-primary text-primary-foreground border-primary/40 shadow-sm"
+                                            : "bg-transparent border-transparent text-muted-foreground hover:bg-card hover:border-border"
                                     }`}
                                 >
                                     <span className={tabLabelClass}>Outstanding</span>
@@ -244,8 +244,8 @@ export const TransactionTable = React.memo(
                                     onClick={() => setActiveTab("running")}
                                     className={`${tabButtonBaseClass} ${
                                         activeTab === "running"
-                                            ? "bg-white border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60"
-                                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70 hover:border-slate-200/80"
+                                            ? "bg-primary text-primary-foreground border-primary/40 shadow-sm"
+                                            : "bg-transparent border-transparent text-muted-foreground hover:bg-card hover:border-border"
                                     }`}
                                 >
                                     <span className={tabLabelClass}>Running</span>
@@ -256,8 +256,8 @@ export const TransactionTable = React.memo(
                                     onClick={() => setActiveTab("profitable")}
                                     className={`${tabButtonBaseClass} ${
                                         activeTab === "profitable"
-                                            ? "bg-white border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60"
-                                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70 hover:border-slate-200/80"
+                                            ? "bg-primary text-primary-foreground border-primary/40 shadow-sm"
+                                            : "bg-transparent border-transparent text-muted-foreground hover:bg-card hover:border-border"
                                     }`}
                                 >
                                     <span className={tabLabelClass}>Profitable</span>
@@ -268,8 +268,8 @@ export const TransactionTable = React.memo(
                                     onClick={() => setActiveTab("paid")}
                                     className={`${tabButtonBaseClass} ${
                                         activeTab === "paid"
-                                            ? "bg-white border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60"
-                                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70 hover:border-slate-200/80"
+                                            ? "bg-primary text-primary-foreground border-primary/40 shadow-sm"
+                                            : "bg-transparent border-transparent text-muted-foreground hover:bg-card hover:border-border"
                                     }`}
                                 >
                                     <span className={tabLabelClass}>Paid</span>
@@ -641,14 +641,14 @@ export const TransactionTable = React.memo(
 
         if (embed) {
             return (
-                <div className="overflow-hidden rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] flex flex-col h-full">
+                <div className="overflow-hidden rounded-md border border-border bg-card flex flex-col h-full">
                     {tableBody}
                 </div>
             );
         }
 
         return (
-            <Card className="mt-3 flex flex-col h-full rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
+            <Card className="mt-3 flex flex-col h-full">
                 <CardHeader className="p-2 pb-1 flex-shrink-0">
                     <CardTitle className="text-[11px]">Outstanding Entries</CardTitle>
                 </CardHeader>

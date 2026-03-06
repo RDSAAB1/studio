@@ -13,7 +13,8 @@ import {
     getExpensesRealtime,
     getIncomeRealtime,
     getBankBranchesRealtime,
-    getReceiptSettings
+    getReceiptSettings,
+    refreshTenantFirestoreBindings
 } from "@/lib/firestore";
 import { db } from "@/lib/database";
 import type { 
@@ -200,21 +201,22 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     
     // ✅ FIX: Defer realtime listeners setup until after initialization is complete
     // This prevents blocking initialization with heavy Firestore queries
-    // ✅ CRITICAL: Keep listeners active across page navigations - don't cleanup on unmount
+    // ✅ CRITICAL: Re-setup listeners when company/tenant changes (erp:selection-changed) so we fetch correct company data
     useEffect(() => {
         let isSubscribed = true;
         let unsubFunctions: Array<(() => void) | undefined> = [];
         let supplierBankAccountsUnsub: (() => void) | undefined;
         
-        // ✅ OPTIMIZED: Wait a bit before setting up listeners to avoid blocking initialization
-        // Use requestIdleCallback or setTimeout to defer
+        const cleanupListeners = () => {
+            unsubFunctions.forEach((unsub) => { try { unsub?.(); } catch {} });
+            unsubFunctions = [];
+        };
+        
         const setupListeners = () => {
             if (!isSubscribed) return;
             
-            // ✅ FIX: Don't setup listeners again if they're already set up
-            if (unsubFunctions.length > 0) {
-                return;
-            }
+            // Cleanup existing listeners before re-setting up (needed when company changes)
+            cleanupListeners();
             
             // Setup all realtime listeners
             unsubFunctions = [
@@ -375,32 +377,33 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         };
         
         // ✅ FIX: Defer listener setup to avoid blocking initialization
-        // Use requestIdleCallback if available, otherwise setTimeout
+        const runSetup = () => {
+            if (isSubscribed) setupListeners();
+        };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            (window as any).requestIdleCallback(() => {
-                if (isSubscribed) {
-                    setupListeners();
-                }
-            }, { timeout: 1000 });
+            (window as any).requestIdleCallback(runSetup, { timeout: 1000 });
         } else {
-            setTimeout(() => {
-                if (isSubscribed) {
-                    setupListeners();
-                }
-            }, 100); // Small delay to let initialization complete
+            setTimeout(runSetup, 100);
         }
         
-        // ✅ FIX: Don't cleanup listeners on unmount - keep them active across page navigations
-        // GlobalDataProvider persists in layout, so listeners should stay active
-        // Only cleanup when component is truly unmounting (e.g., logout)
-        return () => {
-            // Mark as unsubscribed to prevent new updates
-            isSubscribed = false;
-            // ✅ CRITICAL: Don't unsubscribe listeners here - keep data available across navigations
-            // Listeners will be cleaned up when the provider is truly unmounted (logout)
-            // This ensures data persists when navigating between pages
+        // ✅ Re-setup listeners when company/tenant changes (skipReload case)
+        const onCompanyChanged = () => {
+            if (!isSubscribed) return;
+            refreshTenantFirestoreBindings();
+            setupListeners();
         };
-    }, []); // Empty deps - setup once, updates happen via realtime listeners
+        if (typeof window !== 'undefined') {
+            window.addEventListener('erp:selection-changed', onCompanyChanged);
+        }
+        
+        return () => {
+            isSubscribed = false;
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('erp:selection-changed', onCompanyChanged);
+            }
+            cleanupListeners();
+        };
+    }, []); // Empty deps - setup once, company change handled via event
     
     // ✅ OPTIMIZED: Lazy load supplierBankAccounts when actually needed (not on every page)
     // This prevents blocking when opening pages like cash-bank that don't need it

@@ -5,6 +5,7 @@ import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtim
 import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
 import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
+import { getTenantCollectionPath } from "./tenancy";
 
 type CollectionName = string;
 type FetchFunction<T> = () => Promise<T[]>;
@@ -100,7 +101,7 @@ export function createMetadataBasedListener<T extends { id: string }>(
     // ✅ Step 2: Listen to sync_registry document for this collection
     // Use the mapped Firestore collection name (same as notifySyncRegistry uses)
     const registryDocId = getFirestoreCollectionName(collectionName);
-    const registryDocRef = doc(collection(firestoreDB, "sync_registry"), registryDocId);
+    const registryDocRef = doc(collection(firestoreDB, ...getTenantCollectionPath("sync_registry")), registryDocId);
     
     const unsubscribe = onSnapshot(registryDocRef, async (snapshot) => {
         if (!snapshot.exists()) {

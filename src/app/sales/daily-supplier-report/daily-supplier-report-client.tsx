@@ -194,6 +194,14 @@ export default function DailySupplierReportClient() {
          const printStyles = iframeDoc.createElement('style');
          printStyles.textContent = `
             @media print {
+                body, body *, .printable-area, .printable-area * {
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                    backdrop-filter: none !important;
+                    -webkit-backdrop-filter: none !important;
+                }
                 @page { size: landscape; margin: 10mm; }
                 body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background-color: #fff !important; }
                 .printable-area, .printable-area * { background-color: #fff !important; color: #000 !important; border-color: #ccc !important; }

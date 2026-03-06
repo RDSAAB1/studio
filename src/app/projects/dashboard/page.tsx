@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { collection, query, onSnapshot, where, orderBy, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming you have initialized Firestore in firebase.ts
+import { getActiveTenant, getTenantCollectionPath } from '@/lib/tenancy';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -72,7 +73,9 @@ export default function ProjectDashboardPage() {
     // ✅ Use incremental sync - only read changed documents
     const getLastSyncTime = (collectionName: string): number | undefined => {
       if (typeof window === 'undefined') return undefined;
-      const stored = localStorage.getItem(`lastSync:${collectionName}`);
+      const active = getActiveTenant();
+      const key = active ? `lastSync:${active.storageMode}:${active.id}:${collectionName}` : `lastSync:${collectionName}`;
+      const stored = localStorage.getItem(key);
       return stored ? parseInt(stored, 10) : undefined;
     };
 
@@ -86,26 +89,26 @@ export default function ProjectDashboardPage() {
       // ✅ Only get projects modified after last sync
       const lastSyncTimestamp = Timestamp.fromMillis(projectsLastSync);
       projectsQuery = query(
-        collection(firestoreDB, 'projects'),
+        collection(firestoreDB, ...getTenantCollectionPath('projects')),
         where('updatedAt', '>', lastSyncTimestamp),
         orderBy('updatedAt')
       );
     } else {
       // First sync - get all (only once)
-      projectsQuery = query(collection(firestoreDB, 'projects'));
+      projectsQuery = query(collection(firestoreDB, ...getTenantCollectionPath('projects')));
     }
 
     if (tasksLastSync) {
       // ✅ Only get tasks modified after last sync
       const lastSyncTimestamp = Timestamp.fromMillis(tasksLastSync);
       tasksQuery = query(
-        collection(firestoreDB, 'tasks'),
+        collection(firestoreDB, ...getTenantCollectionPath('tasks')),
         where('updatedAt', '>', lastSyncTimestamp),
         orderBy('updatedAt')
       );
     } else {
       // First sync - get all (only once)
-      tasksQuery = query(collection(firestoreDB, 'tasks'));
+      tasksQuery = query(collection(firestoreDB, ...getTenantCollectionPath('tasks')));
     }
 
     let tasksSnapshot: any = null;
@@ -138,7 +141,9 @@ export default function ProjectDashboardPage() {
 
       // ✅ Save last sync time
       if (projectSnapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:projects', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:projects` : 'lastSync:projects';
+        localStorage.setItem(key, String(Date.now()));
       }
     });
 
@@ -156,7 +161,9 @@ export default function ProjectDashboardPage() {
 
       // ✅ Save last sync time
       if (snapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:tasks', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:tasks` : 'lastSync:tasks';
+        localStorage.setItem(key, String(Date.now()));
       }
     });
 

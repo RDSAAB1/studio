@@ -9,7 +9,6 @@ import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes } from "lucide-react";
@@ -61,8 +60,7 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                 </DialogHeader>
                 <ScrollArea className="max-h-[85vh]">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
-                        <Card>
-                            <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                        <div className="rounded-lg border border-border/50 bg-card p-4 flex flex-col md:flex-row items-center gap-4">
                                 <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full">
                                     <p className="text-xs text-muted-foreground">SR No.</p>
                                     <p className="text-2xl font-bold font-mono text-primary">{customer.srNo}</p>
@@ -76,13 +74,11 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                     <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
                                     <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
                                 </div>
-                            </CardContent>
-                        </Card>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-3">
+                            <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3">
+                                <h3 className="text-base font-semibold">Transaction & Weight</h3>
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                         <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
                                         <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
@@ -99,11 +95,9 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
                                         </tbody>
                                     </table>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0">
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-card p-4">
+                                <h3 className="text-base font-semibold mb-3">Financial Calculation</h3>
                                     <table className="w-full text-xs">
                                         <tbody>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
@@ -115,25 +109,19 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(Number(customer.brokerageRate || customer.brokerage) || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>
                                         </tbody>
                                     </table>
-                                </CardContent>
-                            </Card>
+                            </div>
                         </div>
                         
-                        <Card className="border-primary/50 bg-primary/5 text-center">
-                            <CardContent className="p-3">
+                        <div className="rounded-lg border border-primary/50 bg-primary/5 text-center p-3">
                                 <p className="text-sm text-primary/80 font-medium">Original Payable Amount</p>
                                 <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                 <Separator className="my-2"/>
                                 <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
                                 <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p>
-                            </CardContent>
-                        </Card>
+                        </div>
 
-                         <Card className="mt-4">
-                                <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-0">
+                         <div className="rounded-lg border border-border/50 bg-card p-4 mt-4">
+                                <h3 className="text-base font-semibold flex items-center gap-2 mb-3"><Banknote size={16} />Payment Details</h3>
                                     {paymentsForDetailsEntry.length > 0 ? (
                                         <Table className="text-sm">
                                             <TableHeader>
@@ -161,8 +149,7 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                     ) : (
                                         <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
                                     )}
-                                </CardContent>
-                            </Card>  
+                            </div>  
                     </div>
                 </ScrollArea>
             </DialogContent>

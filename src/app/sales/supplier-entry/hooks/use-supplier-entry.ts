@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments, recalculateAndUpdateSuppliers, deleteMultipleSuppliers, recalculateAndUpdateAllSuppliers } from "@/lib/firestore";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase";
+import { getTenantDocPath } from '@/lib/tenancy';
 import { format } from "date-fns";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 import { db } from '@/lib/database';
@@ -136,19 +137,19 @@ export const useSupplierEntry = () => {
     const initializeOptions = async () => {
         try {
             // Check if varieties document exists, if not create it
-            const varietiesDoc = await getDoc(doc(firestoreDB, 'options', 'varieties'));
+            const varietiesDoc = await getDoc(doc(firestoreDB, ...getTenantDocPath('options', 'varieties')));
             if (!varietiesDoc.exists()) {
 
-                await setDoc(doc(firestoreDB, 'options', 'varieties'), {
+                await setDoc(doc(firestoreDB, ...getTenantDocPath('options', 'varieties')), {
                     items: ['Wheat', 'Rice', 'Corn', 'Barley']
                 });
             }
             
             // Check if paymentTypes document exists, if not create it
-            const paymentTypesDoc = await getDoc(doc(firestoreDB, 'options', 'paymentTypes'));
+            const paymentTypesDoc = await getDoc(doc(firestoreDB, ...getTenantDocPath('options', 'paymentTypes')));
             if (!paymentTypesDoc.exists()) {
 
-                await setDoc(doc(firestoreDB, 'options', 'paymentTypes'), {
+                await setDoc(doc(firestoreDB, ...getTenantDocPath('options', 'paymentTypes')), {
                     items: ['Full', 'Partial']
                 });
             }

@@ -14,7 +14,21 @@
           "order": "ASCENDING"
         }
       ]
-    }
+    },
+    {
+      "collectionGroup": "activityLog",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
   ],
   "fieldOverrides": []
 }

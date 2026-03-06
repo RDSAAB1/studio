@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from 'react';
+import React, { useState, use } from 'react';
 import Link from 'next/link';
 import { getFirebaseAuth, sendPasswordResetEmail } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +20,9 @@ const forgotPasswordSchema = z.object({
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
-export default function ForgotPasswordPage() {
+type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+export default function ForgotPasswordPage(props: PageProps) {
+    if (props.searchParams) use(props.searchParams);
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -48,7 +49,7 @@ export default function ForgotPasswordPage() {
             setLoading(false);
         }
     };
-    
+
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
             <Card className="w-full max-w-md">

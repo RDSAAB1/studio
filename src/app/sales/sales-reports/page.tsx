@@ -5,6 +5,7 @@ import PlaceholderPage from "@/components/placeholder-page";
 import { useEffect, useState } from "react";
 import { collection, query, onSnapshot, orderBy, Timestamp, where } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase.ts
+import { getActiveTenant, getTenantCollectionPath } from "@/lib/tenancy";
 import { Customer } from "@/lib/definitions"; // Assuming Customer type includes relevant fields for reports
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,12 +27,14 @@ export default function SalesReportsPage() {
     // ✅ Use incremental sync - only read changed documents
     const getLastSyncTime = (): number | undefined => {
       if (typeof window === 'undefined') return undefined;
-      const stored = localStorage.getItem('lastSync:customers');
+      const active = getActiveTenant();
+      const key = active ? `lastSync:${active.storageMode}:${active.id}:customers` : 'lastSync:customers';
+      const stored = localStorage.getItem(key);
       return stored ? parseInt(stored, 10) : undefined;
     };
 
     const lastSyncTime = getLastSyncTime();
-    const salesCollectionRef = collection(firestoreDB, "customers");
+    const salesCollectionRef = collection(firestoreDB, ...getTenantCollectionPath("customers"));
     let q;
     
     if (lastSyncTime) {
@@ -97,7 +100,9 @@ export default function SalesReportsPage() {
       
       // ✅ Save last sync time
       if (snapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:customers', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:customers` : 'lastSync:customers';
+        localStorage.setItem(key, String(Date.now()));
       }
     }, (error) => {
 

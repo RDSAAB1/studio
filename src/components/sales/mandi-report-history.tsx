@@ -37,9 +37,14 @@ export function MandiReportHistory() {
     }
   }, []);
   
-  // Real-time listener for mandi reports
+  // Real-time listener for mandi reports - clear stale cache on mount so we show correct season's data
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Clear local cache so we don't show wrong season's data; refresh will fetch correct data
+    if (db) {
+      db.mandiReports.clear().catch(() => {});
+    }
     
     const unsubscribe = getMandiReportsRealtime(
       (data) => {

@@ -13,9 +13,11 @@ import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 import { bankNames } from '@/lib/data';
+import { migrateTenantDataToSeason, type MigrationResult } from "@/lib/erp-migration";
+import { AddCompanyUserCard } from "@/components/settings/add-company-user-card";
 
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +43,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { format } from "date-fns";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Progress } from "@/components/ui/progress";
 
 
 // Schemas
@@ -133,8 +136,13 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
 };
 
 
-export default function SettingsPage() {
-    const { toast } = useToast();
+type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+export default function SettingsPage({ searchParams: searchParamsProp }: PageProps) {
+  const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
+  const searchParams = useSearchParams();
+  const tabFromUrl = (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
+  const activeTab = (tabFromUrl && ["general", "team", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "general";
+  const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -157,6 +165,13 @@ export default function SettingsPage() {
     const [newHoliday, setNewHoliday] = useState<{ date: Date | undefined, name: string }>({ date: undefined, name: '' });
     
     const [autoSyncInterval, setAutoSyncInterval] = useState<string>('never');
+
+    // ERP migration state
+    const [migrationCompanyName, setMigrationCompanyName] = useState<string>("");
+    const [migrationSubCompanyName, setMigrationSubCompanyName] = useState<string>("MAIN");
+    const [migrationSeasonName, setMigrationSeasonName] = useState<string>(`${new Date().getFullYear()} A`);
+    const [migrationRunning, setMigrationRunning] = useState(false);
+    const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
 
 
     // Form Hooks
@@ -211,8 +226,11 @@ export default function SettingsPage() {
                 setLoading(true);
 
                 const companySettings = await getRtgsSettings();
-                if(companySettings) {
+                if (companySettings) {
                     companyForm.reset(companySettings);
+                    if (!migrationCompanyName) {
+                        setMigrationCompanyName(companySettings.companyName || "");
+                    }
                 }
                 
                 const emailSettings = await getCompanySettings(currentUser.uid);
@@ -264,7 +282,7 @@ export default function SettingsPage() {
             }
         });
         return () => unsubscribeAuth();
-    }, [router, companyForm, emailForm]);
+    }, [router, companyForm, emailForm, migrationCompanyName]);
 
     const handleAutoSyncChange = (value: string | null) => {
         const nextValue = value ?? 'never';
@@ -542,6 +560,42 @@ export default function SettingsPage() {
         setHolidays(prev => prev.filter(h => h.id !== id));
         toast({ title: "Holiday removed.", variant: "success" });
     };
+
+    const handleMigrationRun = async () => {
+        if (!migrationCompanyName.trim() || !migrationSubCompanyName.trim() || !migrationSeasonName.trim()) {
+            toast({
+                title: "Missing details",
+                description: "Please enter Company, Sub Company and Season before migrating.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setMigrationRunning(true);
+        setMigrationResult(null);
+
+        try {
+            const result = await migrateTenantDataToSeason({
+                companyName: migrationCompanyName.trim(),
+                subCompanyName: migrationSubCompanyName.trim(),
+                seasonName: migrationSeasonName.trim()
+            });
+            setMigrationResult(result);
+            toast({
+                title: "Migration complete",
+                description: `Migrated ${result.totalMigrated} records to ${migrationSeasonName}.`,
+                variant: "success"
+            });
+        } catch (error: any) {
+            toast({
+                title: "Migration failed",
+                description: error?.message || "Could not migrate data.",
+                variant: "destructive"
+            });
+        } finally {
+            setMigrationRunning(false);
+        }
+    };
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
     const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
@@ -554,15 +608,16 @@ export default function SettingsPage() {
     return (
         <div className="space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
-            <Tabs defaultValue="company" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
-                    <TabsTrigger value="company">Company</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={(v) => { const p = new URLSearchParams(searchParams.toString()); p.set("tab", v); router.replace(`/settings?${p.toString()}`); }} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6">
+                    <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="team">Team</TabsTrigger>
                     <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
                     <TabsTrigger value="formats">Formats & Data</TabsTrigger>
                     <TabsTrigger value="account">Account</TabsTrigger>
                 </TabsList>
-                <TabsContent value="company" className="mt-6">
+                <TabsContent value="general" className="mt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                          <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
                             <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
@@ -676,6 +731,9 @@ export default function SettingsPage() {
                          </div>
                     </div>
                 </TabsContent>
+                 <TabsContent value="team" className="mt-6">
+                    <AddCompanyUserCard />
+                </TabsContent>
                 <TabsContent value="banks" className="mt-6">
                      <SettingsCard title="Bank Accounts" description="Manage all your company bank accounts here." footer={
                         <Button size="sm" onClick={() => { setCurrentBankAccount({}); setIsBankAccountDialogOpen(true); }}>
@@ -771,7 +829,7 @@ export default function SettingsPage() {
                             <OptionsManager type="variety" options={varietyOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                             <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                             <OptionsManager type="centerName" options={centerNameOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
-                             <SettingsCard title="Holiday Management" description="Add or remove holidays. Due dates will automatically skip these days and Sundays.">
+                            <SettingsCard title="Holiday Management" description="Add or remove holidays. Due dates will automatically skip these days and Sundays.">
                                 <div className="flex gap-2 mb-4">
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -794,6 +852,67 @@ export default function SettingsPage() {
                                     ))}
                                 </ScrollArea>
                             </SettingsCard>
+                            <SettingsCard
+                                title="ERP Data Migration"
+                                description="Move all existing data of the current company into a single Company → Sub Company → Season structure for the new ERP system."
+                                footer={
+                                    <Button type="button" onClick={handleMigrationRun} disabled={migrationRunning}>
+                                        {migrationRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Migrate Existing Data
+                                    </Button>
+                                }
+                            >
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <Label>Company Name</Label>
+                                            <Input
+                                                value={migrationCompanyName}
+                                                onChange={(e) => setMigrationCompanyName(e.target.value)}
+                                                placeholder="e.g. JRMD Agro"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Sub Company</Label>
+                                            <Input
+                                                value={migrationSubCompanyName}
+                                                onChange={(e) => setMigrationSubCompanyName(e.target.value)}
+                                                placeholder="e.g. MAIN BRANCH"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Season / Year Label</Label>
+                                            <Input
+                                                value={migrationSeasonName}
+                                                onChange={(e) => setMigrationSeasonName(e.target.value)}
+                                                placeholder="e.g. 2024 A"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        This will copy all existing data of the active company into the selected Sub Company and
+                                        Season. Old data is not deleted; a marker is added so you can safely run migration again
+                                        without duplicating records.
+                                    </p>
+                                    {migrationRunning && (
+                                        <div className="space-y-2">
+                                            <Progress value={100} className="h-2 animate-pulse" />
+                                            <p className="text-xs text-muted-foreground">
+                                                Migrating data… please keep this tab open.
+                                            </p>
+                                        </div>
+                                    )}
+                                    {migrationResult && !migrationRunning && (
+                                        <div className="space-y-1 text-xs text-muted-foreground">
+                                            <p>
+                                                Migrated <span className="font-semibold">{migrationResult.totalMigrated}</span> records
+                                                to <span className="font-semibold">{migrationSeasonName}</span> in Sub Company{" "}
+                                                <span className="font-semibold">{migrationSubCompanyName}</span>.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </SettingsCard>
                         </div>
                      </div>
                  </TabsContent>
@@ -805,7 +924,7 @@ export default function SettingsPage() {
                                     <UserCircle className="h-10 w-10 text-muted-foreground" />
                                     <div>
                                         <p className="font-semibold">{user.displayName || "No name provided"}</p>
-                                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                                        <p className="text-sm text-muted-foreground">{user.email || (user.uid?.startsWith("cu_") ? "Company User" : "")}</p>
                                     </div>
                                 </div>
                                 <Button variant="outline" onClick={handleSignOut}>

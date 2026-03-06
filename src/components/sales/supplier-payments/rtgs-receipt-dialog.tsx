@@ -45,6 +45,19 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
 
             }
         });
+
+        const printOverride = iframeDoc.createElement('style');
+        printOverride.textContent = `@media print {
+          body, body *, .printable-area, .printable-area * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+        }`;
+        iframeDoc.head.appendChild(printOverride);
         
         iframeDoc.write(`
             <style>

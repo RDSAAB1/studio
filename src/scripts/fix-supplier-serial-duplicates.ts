@@ -8,6 +8,14 @@
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
+type FirestorePath = [string, ...string[]];
+
+const tenantId = String((globalThis as any)?.process?.env?.TENANT_ID || '').trim();
+const tenantCollectionPath = (collectionName: string): FirestorePath =>
+    (tenantId ? (['tenants', tenantId, collectionName] as const) : ([collectionName] as const)) as unknown as FirestorePath;
+const tenantDocPath = (collectionName: string, id: string): FirestorePath =>
+    (tenantId ? (['tenants', tenantId, collectionName, id] as const) : ([collectionName, id] as const)) as unknown as FirestorePath;
+
 export interface FixResult {
     success: boolean;
     fixedSrNos: number;
@@ -22,7 +30,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
 
 
     try {
-        const suppliersRef = collection(firestoreDB, 'suppliers');
+        const suppliersRef = collection(firestoreDB, ...tenantCollectionPath('suppliers'));
         const snapshot = await getDocs(suppliersRef);
         
         type SupplierRecord = { id: string; srNo?: string } & Record<string, any>;
@@ -71,7 +79,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
                     const newSrNo = generateUniqueSrNo(srNo, index + 1);
 
                     try {
-                        const supplierRef = doc(firestoreDB, 'suppliers', record.id);
+                        const supplierRef = doc(firestoreDB, ...tenantDocPath('suppliers', record.id));
                         batch.update(supplierRef, { srNo: newSrNo });
                         fixedSrNos++;
                     } catch (error) {
@@ -93,7 +101,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
 
                     try {
                         // Note: We can't update document ID directly, so we'll update the id field
-                        const supplierRef = doc(firestoreDB, 'suppliers', record.id);
+                        const supplierRef = doc(firestoreDB, ...tenantDocPath('suppliers', record.id));
                         batch.update(supplierRef, { id: newId });
                         fixedIds++;
                     } catch (error) {
@@ -111,7 +119,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
                 const newSrNo = generateUniqueSrNo('S', 0);
 
                 try {
-                    const supplierRef = doc(firestoreDB, 'suppliers', supplier.id);
+                    const supplierRef = doc(firestoreDB, ...tenantDocPath('suppliers', supplier.id));
                     batch.update(supplierRef, { srNo: newSrNo });
                     fixedSrNos++;
                 } catch (error) {
@@ -128,7 +136,7 @@ export async function fixSupplierSerialDuplicates(): Promise<FixResult> {
                 const newId = generateUniqueId('SUP', 0);
 
                 try {
-                    const supplierRef = doc(firestoreDB, 'suppliers', supplier.id);
+                    const supplierRef = doc(firestoreDB, ...tenantDocPath('suppliers', supplier.id));
                     batch.update(supplierRef, { id: newId });
                     fixedIds++;
                 } catch (error) {

@@ -1,6 +1,4 @@
 "use client";
-
-import { Card, CardContent } from "@/components/ui/card";
 import { Scale, FileText, Banknote, TrendingUp } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Customer, Payment } from "@/lib/definitions";
@@ -189,16 +187,16 @@ function StatementMetric({
                   ? "Gov Extra"
                   : label;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_max-content] items-baseline gap-2">
+    <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0">
       <div
-        className="min-w-0 truncate whitespace-nowrap text-[10px] font-medium text-slate-600 leading-tight"
+        className="min-w-0 truncate text-[10px] font-medium text-slate-600 leading-tight"
         title={label}
       >
         {displayLabel}
       </div>
       <div
         className={cn(
-          "justify-self-end min-w-[76px] text-right text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap",
+          "text-right text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap min-w-[88px]",
           computedValueClassName
         )}
       >
@@ -208,6 +206,7 @@ function StatementMetric({
   );
 }
 
+/* Flat section - no nested card, just content */
 function StatementPanel({
   title,
   children,
@@ -218,12 +217,7 @@ function StatementPanel({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "min-w-0 rounded-[10px] bg-slate-50/70 p-1 border border-slate-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]",
-        className
-      )}
-    >
+    <div className={cn("min-w-0 p-1", className)}>
       {title ? (
         <div className="mb-1 flex items-center justify-between">
           <div className="text-[9px] font-bold tracking-wide uppercase text-slate-700">{title}</div>
@@ -234,6 +228,7 @@ function StatementPanel({
   );
 }
 
+/* Flat tile - no card styling, just header + content */
 function StatementTile({
   title,
   value,
@@ -252,24 +247,19 @@ function StatementTile({
   children?: React.ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "min-w-0 overflow-hidden rounded-[12px] bg-white/80 border border-slate-200/80 shadow-[0_10px_25px_rgba(0,0,0,0.08)] hover:shadow-[0_14px_35px_rgba(0,0,0,0.10)] transition-shadow",
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 px-1.5 py-1 bg-slate-50/70 border-b border-slate-200/70">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <div className={cn("grid place-items-center size-4 rounded-[9px] bg-[hsl(var(--primary)/0.10)] border border-[hsl(var(--primary)/0.14)]", iconWrapClassName)}>
+    <div className={cn("min-w-0 overflow-hidden flex flex-col", className)}>
+      <div className="flex items-center justify-between gap-2 px-1.5 py-1 border-b border-border/40 flex-shrink-0">
+        <div className="flex min-w-0 items-center gap-1.5 shrink-0">
+          <div className={cn("grid place-items-center size-4 rounded shrink-0 bg-[hsl(var(--primary)/0.10)]", iconWrapClassName)}>
             {icon}
           </div>
-          <div className="min-w-0 truncate whitespace-nowrap text-[10px] font-bold tracking-wide uppercase text-slate-800">
+          <div className="min-w-0 truncate text-[10px] font-bold tracking-wide uppercase text-slate-800">
             {title}
           </div>
         </div>
-        <div className={cn("shrink-0 text-[12px] font-bold tabular-nums leading-none text-slate-900", valueClassName)}>{value}</div>
+        <div className={cn("text-[11px] font-bold tabular-nums text-slate-900 text-right min-w-0 truncate", valueClassName)}>{value}</div>
       </div>
-      {children ? <div className="px-1.5 py-1">{children}</div> : null}
+      {children ? <div className="px-1.5 py-1 flex-1 min-h-0">{children}</div> : null}
     </div>
   );
 }
@@ -314,22 +304,21 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
   const govPct = Math.max(0, Math.min(100, (govPaid / paidShareDenom) * 100));
 
   return (
-    <div className="mt-0.5 w-full">
-      <Card className="w-full rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
-          <CardContent className="p-1.5">
+    <div className="mt-0.5 w-full min-w-0 overflow-hidden">
+      <div className="ui-card w-full rounded-md p-1.5 bg-card min-w-0 overflow-hidden">
             {action ? <div className="flex items-center justify-end pb-1">{action}</div> : null}
-            <div className="grid grid-cols-12 gap-2">
+            <div className="grid grid-cols-12 gap-2 items-stretch">
               <div className="col-span-12 md:col-span-5">
                 <StatementTile
                   title="Net (kg)"
                   value={formatDecimalLocal(summary.totalNetWeight)}
                   valueClassName="text-slate-900"
                   icon={<Scale size={12} className="text-slate-700" />}
-                  iconWrapClassName="bg-white/70 border-slate-200/80"
+                  iconWrapClassName="bg-card border-border/60"
                   className=""
                 >
-                  <StatementPanel className="border-0 bg-transparent shadow-none p-0">
-                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-6">
+                  <StatementPanel className="p-0">
+                    <div className="grid grid-cols-1 gap-y-0.5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-0.5">
                       <StatementMetric label="Net" value={`${formatDecimalLocal(summary.totalNetWeight)} kg`} valueClassName="text-slate-900" />
                       <StatementMetric label="Final" value={`${formatDecimalLocal(summary.totalFinalWeight)} kg`} valueClassName="text-slate-900" />
                       <StatementMetric label="Gross" value={`${formatDecimalLocal(grossWeight)} kg`} valueClassName="text-slate-900" />
@@ -349,11 +338,11 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                   value={formatCurrency(summary.totalAmount || 0)}
                   valueClassName="text-slate-900"
                   icon={<FileText size={13} className="text-slate-700" />}
-                  iconWrapClassName="bg-white/70 border-slate-200/80"
+                  iconWrapClassName="bg-card border-border/60"
                   className=""
                 >
-                  <StatementPanel className="border-0 bg-transparent shadow-none p-0">
-                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-6">
+                  <StatementPanel className="p-0">
+                    <div className="grid grid-cols-1 gap-y-0.5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-0.5">
                       <StatementMetric label="Paid" value={formatCurrency(summary.totalPaid || 0)} valueClassName="text-emerald-700" />
                       <StatementMetric label="Outstanding" value={formatCurrency(summary.totalOutstanding || 0)} valueClassName="text-rose-700" />
                       <StatementMetric label="Net (kg)" value={formatDecimalLocal(summary.totalNetWeight)} valueClassName="text-slate-900" />
@@ -373,11 +362,11 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                   value={formatCurrency(totalPaid)}
                   valueClassName="text-slate-900"
                   icon={<Banknote size={12} className="text-slate-700" />}
-                  iconWrapClassName="bg-white/70 border-slate-200/80"
+                  iconWrapClassName="bg-card border-border/60"
                   className=""
                 >
-                  <StatementPanel className="border-0 bg-transparent shadow-none p-0">
-                    <div className="grid grid-cols-1 gap-y-1">
+                  <StatementPanel className="p-0">
+                    <div className="grid grid-cols-1 gap-y-0.5">
                       <StatementMetric
                         label={`Cash (${Math.round(cashPct)}%)`}
                         value={formatCurrency(cashPaid)}
@@ -405,11 +394,11 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                   value={formatRateLocal(summary.averageRate)}
                   valueClassName="text-slate-900"
                   icon={<TrendingUp size={12} className="text-slate-700" />}
-                  iconWrapClassName="bg-white/70 border-slate-200/80"
+                  iconWrapClassName="bg-card border-border/60"
                   className=""
                 >
-                  <StatementPanel className="border-0 bg-transparent shadow-none p-0">
-                    <div className="grid grid-cols-1 gap-y-1">
+                  <StatementPanel className="p-0">
+                    <div className="grid grid-cols-1 gap-y-0.5">
                       <StatementMetric label="Min" value={formatRateLocal(minRate)} valueClassName="text-slate-900" />
                       <StatementMetric label="Max" value={formatRateLocal(maxRate)} valueClassName="text-slate-900" />
                       <StatementMetric label="Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
@@ -435,15 +424,15 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                   value={formatCurrency(summary.totalAmount || 0)}
                   valueClassName="text-slate-900"
                   icon={<FileText size={14} className="text-slate-700" />}
-                  iconWrapClassName="bg-white/70 border-slate-200/80"
+                  iconWrapClassName="bg-card border-border/60"
                   className=""
                 >
-                  <div className="grid grid-cols-1 gap-y-2 md:grid-cols-2 md:gap-x-6 md:gap-y-0">
+                  <div className="grid grid-cols-1 gap-y-2 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
                     <StatementPanel
                       title="Originals"
-                      className="border-0 bg-transparent shadow-none p-0"
+                      className="p-0"
                     >
-                      <div className="grid grid-cols-1 gap-y-1">
+                      <div className="grid grid-cols-1 gap-y-0.5">
                         <StatementMetric label="Base" value={formatCurrency(baseOriginalAmount)} valueClassName="text-emerald-900" />
                         <StatementMetric
                           label="Gov Extra"
@@ -469,9 +458,9 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                     </StatementPanel>
                     <StatementPanel
                       title="Deductions"
-                      className="border-0 bg-transparent shadow-none p-0"
+                      className="p-0"
                     >
-                      <div className="grid grid-cols-1 gap-y-1">
+                      <div className="grid grid-cols-1 gap-y-0.5">
                         <StatementMetric
                           label="Karta"
                           value={`- ${formatCurrency(summary.totalKartaAmount || 0)}`}
@@ -504,8 +493,7 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
               </div>
 
             </div>
-          </CardContent>
-        </Card>
+      </div>
     </div>
   );
 }

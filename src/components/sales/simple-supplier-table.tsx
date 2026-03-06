@@ -634,7 +634,7 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
 
             {/* Multi-Edit Form */}
             {isMultiEditing && selectedSuppliers.size > 0 && (
-                <Card className="bg-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-lg">
+                <Card>
                     <CardHeader className="p-3 pb-2">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-sm font-semibold">
@@ -1138,6 +1138,11 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
                                         </td>
                                         <td className="p-1 text-xs w-32">
                                                 <span className="text-xs truncate block">{supplier.name}</span>
+                                                {(supplier as any).editedByName || (supplier as any).createdByName ? (
+                                                    <span className="text-[10px] text-muted-foreground truncate block" title={`Created by: ${(supplier as any).createdByName || '-'}\nLast edited by: ${(supplier as any).editedByName || (supplier as any).createdByName || '-'}`}>
+                                                        By: {(supplier as any).editedByName || (supplier as any).createdByName}
+                                                    </span>
+                                                ) : null}
                                         </td>
                                         <td className="p-1 text-xs w-24">
                                                 <span className="text-xs truncate block">{supplier.so}</span>

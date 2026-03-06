@@ -33,7 +33,10 @@ export const SegmentedSwitch: React.FC<SegmentedSwitchProps> = ({
       id={id}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden",
+        "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out overflow-hidden",
+        "bg-gradient-to-b from-muted/80 to-muted/60",
+        "shadow-[inset_3px_3px_6px_rgba(0,0,0,0.12),inset_-2px_-2px_4px_rgba(255,255,255,0.6)]",
+        "border border-border/80",
         className
       )}
     >
@@ -51,10 +54,12 @@ export const SegmentedSwitch: React.FC<SegmentedSwitchProps> = ({
         {displayRight}
       </span>
       
-      {/* Sliding indicator */}
+      {/* Sliding indicator - 3D raised pill */}
       <div
         className={cn(
-          "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+          "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+          "shadow-[4px_4px_8px_rgba(0,0,0,0.2),-2px_-2px_4px_rgba(255,255,255,0.3),inset_1px_1px_2px_rgba(255,255,255,0.2)]",
+          "active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2)]",
           checked ? "left-[calc(50%+2px)]" : "left-[2px]"
         )}
         style={{

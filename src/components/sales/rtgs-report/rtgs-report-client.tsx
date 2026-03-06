@@ -252,6 +252,19 @@ export default function RtgsReportClient() {
 
             }
         });
+
+        const printOverride = iframeDoc.createElement('style');
+        printOverride.textContent = `@media print {
+          body, body *, .print-header, .print-header * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+        }`;
+        iframeDoc.head.appendChild(printOverride);
         
         iframeDoc.write('</head><body></body></html>');
         

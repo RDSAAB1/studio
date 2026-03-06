@@ -26,7 +26,6 @@ import { PaymentHistory } from '@/components/sales/supplier-payments/payment-his
 import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
 import { PaymentFilters } from '@/components/sales/supplier-payments/payment-filters';
 import { SupplierSummaryCards } from '@/components/sales/supplier-payments/supplier-summary-cards';
-import { CdForm } from '@/components/sales/supplier-payments/cd-form';
 import { GeneratePaymentOptions } from '@/components/sales/supplier-payments/generate-payment-options';
 import { PaymentDialogs } from '@/components/sales/supplier-payments/payment-dialogs';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
@@ -225,6 +224,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const [editEntryDialogOpen, setEditEntryDialogOpen] = useState(false);
   const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<Customer | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [govSuggestions, setGovSuggestions] = useState<any[]>([]);
   const [activeTransactionTab, setActiveTransactionTab] = useState<string>("all");
   const [historyTab, setHistoryTab] = useState<'cash' | 'gov' | 'rtgs'>('cash');
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -890,7 +891,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
              {type === 'outsider' ? (
                 // For outsider: No tabs, just show payment content directly
                 <>
-                    <div className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                    <div className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
                         <div className="w-full px-1.5 sm:px-2.5 py-0.5 flex flex-wrap gap-2 items-center text-[12px]">
                             <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                                 <div className="flex items-center gap-2 md:pl-3">
@@ -963,10 +964,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
              ) : (
                 // For non-outsider: Show payment interface
                 <>
-                    <div className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                        <div className="w-full px-2 md:px-2.5 py-0.5">
-                            <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)] gap-1 items-start">
-                                <div className="min-w-0 flex flex-col gap-1">
+                    <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
+                        <div className="w-full px-2 md:px-2.5 py-2.5">
+                            <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[500px_minmax(0,1fr)] gap-2 items-start">
+                                <div className="min-w-0 flex flex-col gap-2">
                                     <div className="flex items-center gap-1.5 w-full">
                                         <Button
                                             variant="outline"
@@ -1031,15 +1032,26 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                       onFilterVarietyChange={setFilterVariety}
                                       onClearFilters={handleClearSupplierFilters}
                                       extraActions={
-                                        <Button
-                                          onClick={() => setIsStatementOpen(true)}
-                                          size="sm"
-                                          disabled={!hook.selectedCustomerKey}
-                                          className="h-6 px-2 py-0 text-[9px] font-bold bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 shadow-md hover:shadow-lg transition-all duration-300 border border-primary/40 hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          <FileText className="h-2 w-2 mr-1" />
-                                          Generate Statement
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            onClick={() => setIsStatementOpen(true)}
+                                            size="sm"
+                                            disabled={!hook.selectedCustomerKey}
+                                            className="h-6 px-2 py-0 text-[9px] font-bold bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 shadow-md hover:shadow-lg transition-all duration-300 border border-primary/40 hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            <FileText className="h-2 w-2 mr-1" />
+                                            Generate Statement
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            className="h-6 px-2 text-[9px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+                                            disabled={!hook.selectedCustomerKey}
+                                            onClick={() => setIsSummaryOpen(true)}
+                                          >
+                                            Summary
+                                          </Button>
+                                        </div>
                                       }
                                     />
 
@@ -1047,7 +1059,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                       transactionsForSelectedSupplier &&
                                       Array.isArray(transactionsForSelectedSupplier) &&
                                       transactionsForSelectedSupplier.length > 0 && (
-                                        <div className="hidden lg:block w-full h-[225px] overflow-auto">
+                                        <div className="hidden lg:block w-full h-[300px] overflow-auto">
                                           <PaymentForm
                                             {...hook}
                                             bankAccounts={hook.bankAccounts}
@@ -1070,7 +1082,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                   Array.isArray(transactionsForSelectedSupplier) &&
                                   transactionsForSelectedSupplier.length > 0 && (
                                     <div className="hidden lg:flex min-w-0 flex-col gap-2">
-                                      <div className="min-w-0 h-[170px] overflow-hidden">
+                                      <div className="min-w-0 h-[220px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)]">
                                         <TransactionTable
                                           suppliers={transactionsForSelectedSupplier}
                                           onShowDetails={hook.setDetailsSupplierEntry}
@@ -1086,7 +1098,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                           highlightEntryId={highlightEntryId}
                                         />
                                       </div>
-                                      <div className="w-full h-[130px] overflow-hidden">
+                                      <div className="w-full h-[170px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)] mt-1">
                                         <PaymentHistoryCompact
                                           payments={selectedSupplierPayments}
                                           onEdit={hook.handleEditPayment}
@@ -1101,7 +1113,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                     <div className="mt-0.5 px-1 sm:px-1.5 pb-1">
                             {hook.selectedCustomerKey && (
                               <div
-                                className={`w-full overflow-hidden mb-2 ${
+                                className={`w-full overflow-hidden mb-2 rounded-xl border border-border/60 bg-card shadow-sm p-3 ${
                                   transactionsForSelectedSupplier &&
                                   Array.isArray(transactionsForSelectedSupplier) &&
                                   transactionsForSelectedSupplier.length > 0
@@ -1129,64 +1141,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                             {/* DO NOT RENDER TransactionTable for outsider type - it shows outstanding entries which we don't need */}
                             {/* EXPLICITLY CHECK: Never render this entire grid section for outsider type */}
                             {/* CRITICAL: This section is INSIDE the IIFE, so it will NOT execute for outsider type */}
-                            {transactionsForSelectedSupplier && Array.isArray(transactionsForSelectedSupplier) && transactionsForSelectedSupplier.length > 0 && (
-                              <div className="space-y-2 w-full">
-                                {filteredSupplierSummary && (
-                                  <div className="w-full min-w-0">
-                                    <SupplierSummaryCards summary={filteredSupplierSummary as any} />
-                                  </div>
-                                )}
-
-                                <div className="w-full min-w-0">
-                                  <CdForm
-                                    cdEnabled={hook.cdEnabled ?? false}
-                                    cdAt={hook.cdAt ?? "partial_on_paid"}
-                                    setCdAt={hook.setCdAt ?? (() => {})}
-                                    cdPercent={hook.cdPercent ?? 0}
-                                    setCdPercent={hook.setCdPercent ?? (() => {})}
-                                    calculatedCdAmount={hook.calculatedCdAmount ?? 0}
-                                    setCdAmount={hook.setCdAmount ?? (() => {})}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* CD Form - Full Width, Single Row (when CD is enabled) */}
                             {(!transactionsForSelectedSupplier ||
                               !Array.isArray(transactionsForSelectedSupplier) ||
                               transactionsForSelectedSupplier.length === 0) && (
                               <div className="space-y-2 w-full">
-                                {filteredSupplierSummary ? (
-                                  <div className="w-full min-w-0">
-                                    <SupplierSummaryCards summary={filteredSupplierSummary as any} />
-                                  </div>
-                                ) : (
-                                  <div className="min-w-0">
-                                    <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
-                                      <CardContent className="p-3">
-                                        <div className="text-[11px] font-semibold text-slate-800">Summary</div>
-                                        <div className="mt-1 text-[11px] text-slate-600">
-                                          Supplier select karne par yahan statement metrics show honge.
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  </div>
-                                )}
-
-                                {hook.selectedCustomerKey ? (
-                                  <div className="w-full min-w-0">
-                                    <CdForm
-                                      cdEnabled={hook.cdEnabled ?? false}
-                                      cdAt={hook.cdAt ?? "partial_on_paid"}
-                                      setCdAt={hook.setCdAt ?? (() => {})}
-                                      cdPercent={hook.cdPercent ?? 0}
-                                      setCdPercent={hook.setCdPercent ?? (() => {})}
-                                      calculatedCdAmount={hook.calculatedCdAmount ?? 0}
-                                      setCdAmount={hook.setCdAmount ?? (() => {})}
-                                    />
-                                  </div>
-                                ) : null}
-
                                 <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                                   <CardContent className="p-3">
                                     <div className="flex items-start gap-3">
@@ -1253,14 +1211,18 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                     <GovReceiptSelector
                                       availableReceipts={transactionsForSelectedSupplier}
                                       govRate={hook.govRate || hook.minRate || 0}
+                                      extraAmountPerQuintal={0}
                                       onSelectReceipts={(receiptIds) => {
                                         hook.setSelectedEntryIds(new Set(receiptIds));
                                       }}
                                       selectedReceiptIds={hook.selectedEntryIds}
                                       allowManualRsPerQtl={true}
                                       allowManualGovRate={true}
+                                      calcTargetAmount={hook.rtgsAmount ?? 0}
+                                      setCalcTargetAmount={hook.setRtgsAmount}
                                       combination={paymentCombination}
                                       selectPaymentAmount={hook.selectPaymentAmount}
+                                      onSuggestionsChange={setGovSuggestions}
                                     />
                                     {/* Gov. Details Section - Right Half */}
                                     <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
@@ -1282,6 +1244,64 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                 )}
                               </div>
                                 )}
+
+            {/* GOV Suggested Combinations - full width below both helper and details */}
+            {(type === 'supplier' && hook.paymentMethod === 'Gov.' && govSuggestions.length > 0) && (
+              <div className="mt-3 rounded-xl border border-border/70 bg-card shadow-[0_4px_14px_rgba(15,23,42,0.10)] overflow-hidden">
+                <div className="px-3 py-2 bg-muted/70 border-b border-border/80 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-primary">Suggested Combinations</span>
+                </div>
+                <div className="max-h-[320px] overflow-y-auto">
+                  <table className="w-full text-[9px]">
+                    <thead className="bg-muted/50 border-b border-border">
+                      <tr className="h-7">
+                        <th className="px-2 text-left font-bold w-[40px]">Select</th>
+                        <th className="px-2 text-left font-bold w-[60px]">Type</th>
+                        <th className="px-2 text-left font-bold">Receipts</th>
+                        <th className="px-2 text-right font-bold w-[90px]">Total GOV</th>
+                        <th className="px-2 text-right font-bold w-[80px]">Excess</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {govSuggestions.map((comb, idx) => {
+                        const difference = comb.difference ?? 0;
+                        return (
+                          <tr key={idx} className="h-7 border-b border-border/60 hover:bg-muted/30 transition-colors">
+                            <td className="px-2">
+                              <input
+                                type="checkbox"
+                                className="h-3 w-3"
+                                checked={Array.isArray(comb.receipts) && comb.receipts.every((r: any) => hook.selectedEntryIds.has(r.id || r.srNo))}
+                                onChange={() => {
+                                  const receiptIds = (comb.receipts || []).map((r: any) => r.id || r.srNo);
+                                  hook.setSelectedEntryIds(new Set(receiptIds));
+                                }}
+                              />
+                            </td>
+                            <td className="px-2 font-medium">{comb.type}</td>
+                            <td className="px-2 truncate max-w-xs">
+                              {(comb.details || []).map((d: any) => d.srNo).join(", ")}
+                            </td>
+                            <td className="px-2 text-right font-bold text-primary">
+                              {formatCurrency(comb.totalGov || 0)}
+                            </td>
+                            <td
+                              className={cn(
+                                "px-2 text-right font-semibold",
+                                difference > 0 ? "text-primary" : "text-muted-foreground"
+                              )}
+                            >
+                              {difference > 0 ? `+${formatCurrency(difference)}` : formatCurrency(difference)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
                 </div>
                 </>
              )}
@@ -1299,6 +1319,426 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 />
               </div>
             )}
+
+            <Dialog open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
+              <DialogContent className="max-w-[min(1400px,98vw)] w-[min(1400px,98vw)] p-0 overflow-hidden">
+                <div className="flex h-[min(88vh,820px)] flex-col">
+                  <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-primary via-primary/95 to-primary/90 text-white shadow-[0_12px_30px_rgba(88,28,135,0.55)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <DialogTitle className="text-sm sm:text-base md:text-lg font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+                          Payment Summary
+                        </DialogTitle>
+                        <DialogDescription className="mt-0.5 text-[11px] sm:text-xs text-primary-100/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+                          Current filters ke hisaab se supplier ka full statement summary.
+                        </DialogDescription>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="flex-1 min-h-0 bg-gradient-to-b from-primary/15 via-background to-background">
+                    <ScrollArea className="h-full pr-3">
+                      {filteredSupplierSummary ? (
+                        (() => {
+                          const summary: any = filteredSupplierSummary;
+                          const totalAmount = summary.totalAmount || 0;
+                          const totalOutstanding = summary.totalOutstanding || 0;
+                          const totalNetWeight = summary.totalNetWeight || 0;
+                          const totalGrossWeight = summary.totalGrossWeight || 0;
+                          const totalFinalWeight = summary.totalFinalWeight || 0;
+                          const totalPaid = summary.totalPaid || 0;
+                          const totalCashPaid = summary.totalCashPaid || 0;
+                          const totalRtgsPaid = summary.totalRtgsPaid || 0;
+                          const minRate = summary.minRate || 0;
+                          const maxRate = summary.maxRate || 0;
+                          const avgRate = summary.averageRate || 0;
+                          const totalKartaAmount = summary.totalKartaAmount || 0;
+                          const totalLabouryAmount = summary.totalLabouryAmount || 0;
+                          const totalKanta = summary.totalKanta || 0;
+                          const totalBrokerage = summary.totalBrokerage || 0;
+                          const baseOriginalAmount = summary.totalBaseOriginalAmount ?? summary.totalOriginalAmount ?? 0;
+                          const govExtraAmount = summary.totalGovExtraAmount ?? 0;
+                          const adjustedOriginalAmount = summary.totalOriginalAmount || 0;
+                          const ledgerCreditAmount = summary.ledgerCreditAmount || 0;
+                          const ledgerDebitAmount = summary.ledgerDebitAmount || 0;
+                          const totalCdAmount = summary.totalCdAmount || 0;
+                          const totalDeductions =
+                            totalKartaAmount +
+                            totalLabouryAmount +
+                            totalKanta +
+                            totalBrokerage;
+                          const rateSpread = Math.max(0, maxRate - minRate);
+                          const averageOriginalPrice = summary.averageOriginalPrice || 0;
+                          const averageLabouryRate = summary.averageLabouryRate || 0;
+                          const txCount = (summary.allTransactions?.length as number) || 0;
+                          const outstandingCount = (summary.outstandingEntryIds?.length as number) || 0;
+                          const paidCount = Math.max(0, txCount - outstandingCount);
+
+                          const govPaid = (summary.allPayments || [])
+                            .filter((p: Payment) => {
+                              const receiptType = ((p as any).receiptType || "").trim();
+                              return (
+                                receiptType === "Gov." ||
+                                receiptType.toLowerCase() === "gov" ||
+                                receiptType.toLowerCase().startsWith("gov")
+                              );
+                            })
+                            .reduce((sum: number, p: Payment) => {
+                              const matchingPaidFor =
+                                p.paidFor?.filter((pf: PaidFor) =>
+                                  (summary.allTransactions || []).some(
+                                    (t: Customer) => t.srNo === pf.srNo
+                                  )
+                                ) || [];
+                              const govPaidForThisPayment = matchingPaidFor.reduce(
+                                (paymentSum, pf) => paymentSum + (pf.amount || 0),
+                                0
+                              );
+                              return sum + govPaidForThisPayment;
+                            }, 0);
+
+                          const paidShareDenom = totalPaid > 0 ? totalPaid : 1;
+                          const netLedgerImpact = ledgerDebitAmount - ledgerCreditAmount;
+                          const netBillAfterDeductions = adjustedOriginalAmount - totalDeductions;
+                          const cashPct = Math.max(
+                            0,
+                            Math.min(100, (totalCashPaid / paidShareDenom) * 100)
+                          );
+                          const rtgsPct = Math.max(
+                            0,
+                            Math.min(100, (totalRtgsPaid / paidShareDenom) * 100)
+                          );
+                          const govPct = Math.max(
+                            0,
+                            Math.min(100, (govPaid / paidShareDenom) * 100)
+                          );
+
+                          return (
+                            <div className="w-full min-w-0 space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 bg-slate-50">
+                              {/* Top overview bar */}
+                              <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 md:grid-cols-4">
+                                <Card className="border-emerald-200 bg-emerald-50/90 shadow-sm">
+                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
+                                    <div className="text-[11px] font-medium text-emerald-900/90">
+                                      Total Amount
+                                    </div>
+                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-emerald-950 tabular-nums">
+                                      {formatCurrency(totalAmount)}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="border-rose-200 bg-rose-50/90 shadow-sm">
+                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
+                                    <div className="text-[11px] font-medium text-rose-900/90">
+                                      Outstanding
+                                    </div>
+                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-rose-950 tabular-nums">
+                                      {formatCurrency(totalOutstanding)}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="border-slate-200 bg-slate-50 shadow-sm">
+                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
+                                    <div className="text-[11px] font-medium text-slate-800">
+                                      Net Weight (kg)
+                                    </div>
+                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-slate-950 tabular-nums">
+                                      {Number(totalNetWeight || 0).toFixed(2)}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="border-indigo-200 bg-indigo-50/90 shadow-sm">
+                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
+                                    <div className="text-[11px] font-medium text-indigo-900/90">
+                                      Entries (Paid / Total)
+                                    </div>
+                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-indigo-950 tabular-nums">
+                                      {paidCount} / {txCount}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+
+                              {/* Sectioned summary layout – clearer categories */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+                                {/* Weights & Entries */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Weights & Entries
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Gross</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {Number(totalGrossWeight || 0).toFixed(2)} kg
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Teir</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {Number(summary.totalTeirWeight || 0).toFixed(2)} kg
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Final</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {Number(totalFinalWeight || 0).toFixed(2)} kg
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Net</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {Number(totalNetWeight || 0).toFixed(2)} kg
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
+                                      <span>Entries (Paid / Pending)</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {paidCount} / {outstandingCount}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Bill Amounts (Original vs Final) */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Bill Amounts (Original vs Final)
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Base Original</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(baseOriginalAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Gov Extra</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(govExtraAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Adjusted Original</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(adjustedOriginalAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Net Bill Amount</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Total Deductions</span>
+                                      <span className="font-semibold tabular-nums text-rose-700">
+                                        {formatCurrency(totalDeductions)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Payment Status & Ledger */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Payment Status & Ledger
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Total Paid</span>
+                                      <span className="font-semibold tabular-nums text-emerald-700">
+                                        {formatCurrency(totalPaid)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Outstanding</span>
+                                      <span className="font-semibold tabular-nums text-rose-700">
+                                        {formatCurrency(totalOutstanding)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Ledger Credit</span>
+                                      <span className="font-semibold tabular-nums text-sky-800">
+                                        {formatCurrency(ledgerCreditAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Ledger Debit</span>
+                                      <span className="font-semibold tabular-nums text-rose-800">
+                                        {formatCurrency(ledgerDebitAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
+                                      <span>Net Ledger Impact</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(netLedgerImpact)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Rate Summary */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Rate Summary
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Avg Rate</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(avgRate)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Rate Range</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(minRate)} – {formatCurrency(maxRate)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Avg Original Rate</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(averageOriginalPrice)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Avg Laboury Rate</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {Number(averageLabouryRate || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Rate Spread</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(rateSpread)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Deductions Breakdown */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Deductions Breakdown
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Karta Amount</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalKartaAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Laboury Amount</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalLabouryAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Kanta + Other</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalKanta)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Brokerage</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalBrokerage)}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
+                                      <span>Total Deductions</span>
+                                      <span className="font-semibold tabular-nums text-rose-800">
+                                        {formatCurrency(totalDeductions)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                {/* Payment Modes & CD */}
+                                <Card className="border-slate-200 bg-white shadow-sm">
+                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
+                                    <CardTitle className="text-xs font-semibold text-slate-800">
+                                      Payment Modes & CD
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Cash</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalCashPaid)}{" "}
+                                        <span className="text-[10px] text-slate-500">
+                                          ({Math.round(cashPct)}%)
+                                        </span>
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>RTGS</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalRtgsPaid)}{" "}
+                                        <span className="text-[10px] text-slate-500">
+                                          ({Math.round(rtgsPct)}%)
+                                        </span>
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Gov</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(govPaid)}{" "}
+                                        <span className="text-[10px] text-slate-500">
+                                          ({Math.round(govPct)}%)
+                                        </span>
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
+                                      <span>CD Granted</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(totalCdAmount)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+
+                              {/* Removed extra main card with full statement breakdown to keep summary focused */}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="p-4 sm:p-5 md:p-6">
+                          <Card className="rounded-[16px] border border-slate-200/80 bg-white/90 shadow-[0_18px_45px_rgba(15,23,42,0.15)]">
+                            <CardContent className="p-4 sm:p-5">
+                              <div className="text-[12px] sm:text-sm font-semibold text-slate-900">
+                                Summary
+                              </div>
+                              <div className="mt-1.5 text-[11px] sm:text-xs text-slate-600 leading-relaxed">
+                                Supplier select karke (aur entries load hone ke baad) yahan detailed
+                                payment summary dikh jayegi – weight, rate, paid, outstanding sab
+                                ek jagah par.
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
  
             <DetailsDialog
               isOpen={!!hook.detailsSupplierEntry}

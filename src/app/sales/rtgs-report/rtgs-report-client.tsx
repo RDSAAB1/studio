@@ -17,6 +17,7 @@ import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
 import { useGlobalData } from '@/contexts/global-data-context';
 import { doc, updateDoc, writeBatch, Timestamp, FieldValue } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+import { getTenantDocPath } from '@/lib/tenancy';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
@@ -220,9 +221,11 @@ export default function RtgsReportClient() {
         }
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -374,11 +377,16 @@ export default function RtgsReportClient() {
         `);
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
     };
     
     const handleDownloadExcel = () => {
@@ -493,7 +501,7 @@ export default function RtgsReportClient() {
 
             let updateCount = 0;
             for (const paymentId of selectedPaymentIds) {
-                const paymentRef = doc(firestoreDB, 'payments', paymentId);
+                const paymentRef = doc(firestoreDB, ...getTenantDocPath('payments', paymentId));
                 batch.update(paymentRef, updateData);
                 updateCount++;
             }

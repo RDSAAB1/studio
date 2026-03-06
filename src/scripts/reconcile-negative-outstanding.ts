@@ -8,6 +8,12 @@
 import { writeBatch, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
+type FirestorePath = [string, ...string[]];
+
+const tenantId = String((globalThis as any)?.process?.env?.TENANT_ID || '').trim();
+const tenantDocPath = (collectionName: string, id: string): FirestorePath =>
+  (tenantId ? (['tenants', tenantId, collectionName, id] as const) : ([collectionName, id] as const)) as unknown as FirestorePath;
+
 type ReportPayment = {
   id: string;
   paymentId: string;
@@ -73,7 +79,7 @@ export async function planReconciliation(entries: ReportEntry[], options: Reconc
 
     for (const rp of paymentsSorted) {
       if (remainingExcess <= 0) break;
-      const ref = doc(firestoreDB, 'payments', rp.id);
+      const ref = doc(firestoreDB, ...tenantDocPath('payments', rp.id));
       const snap = await getDoc(ref);
       if (!snap.exists()) {
         plans.push({ paymentDocId: rp.id, paymentId: rp.paymentId, beforePaidFor: [], afterPaidFor: [], notes: [`Skip: payment doc not found`] });
@@ -127,7 +133,7 @@ export async function applyReconciliation(plans: PlannedChange[]): Promise<void>
   if (!plans.length) return;
   const batch = writeBatch(firestoreDB);
   for (const plan of plans) {
-    const ref = doc(firestoreDB, 'payments', plan.paymentDocId);
+    const ref = doc(firestoreDB, ...tenantDocPath('payments', plan.paymentDocId));
     batch.update(ref, { paidFor: plan.afterPaidFor });
   }
   await batch.commit();

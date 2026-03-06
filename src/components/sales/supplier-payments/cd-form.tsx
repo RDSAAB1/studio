@@ -28,7 +28,7 @@ export function CdForm({
   if (!cdEnabled) return null;
 
   return (
-    <Card className="text-[9px] mt-1.5 border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+    <Card className="text-[9px] mt-1.5">
       <CardContent className="p-2">
         <div className="flex items-end gap-2">
           <div className="space-y-1 flex-1">

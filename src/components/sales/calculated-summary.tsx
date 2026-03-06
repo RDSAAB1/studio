@@ -102,7 +102,7 @@ export const CalculatedSummary = ({
     }, [customer, showSupplierSummary]);
     
     return (
-        <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
+        <Card>
             <CardContent className="p-3 space-y-3">
                  <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
                     {/* Kanta Parchi Summary */}

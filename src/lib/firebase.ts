@@ -1,7 +1,7 @@
 
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { initializeFirestore, persistentLocalCache, setLogLevel, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { initializeFirestore, setLogLevel, type Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { 
     getAuth, 
@@ -45,13 +45,12 @@ if (typeof window !== 'undefined') {
 }
 
 
-const firestoreDB = initializeFirestore(app, {
-    localCache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
-});
+// No persistent cache in browser — persistentLocalCache was causing setDoc to hang on company creation.
+// Use default (in-memory) so writes go straight to server. Re-enable later if offline support is needed.
+const firestoreDB: Firestore = initializeFirestore(app, {});
 const storage = getStorage(app);
 
-// Suppress Firestore connectivity logs in production/offline.
-// App uses IndexedDB-first, so connectivity warnings are noise.
+// Suppress Firestore connectivity logs.
 if (typeof window !== 'undefined') {
     setLogLevel('silent');
 }

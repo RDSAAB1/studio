@@ -8,7 +8,6 @@ import type { OptionItem } from "@/lib/definitions";
 import type { UseFormReturn } from "react-hook-form";
 import type { CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -114,8 +113,8 @@ const SimpleSupplierFormAllFields = ({
     return (
         <>
         <div className="space-y-3">
-            <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                <CardContent className="p-3">
+            {/* Top row - flat panel, no nested cards */}
+            <div className="rounded-md border border-border/50 bg-card p-3">
                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
@@ -201,13 +200,11 @@ const SimpleSupplierFormAllFields = ({
                             </InputWithIcon>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+            </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
                 <div className="lg:col-span-5">
-                    <Card className="h-full">
-                        <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
+                    <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
@@ -271,13 +268,11 @@ const SimpleSupplierFormAllFields = ({
                                     />
                                 </InputWithIcon>
                             </div>
-                        </CardContent>
-                    </Card>
+                    </div>
                 </div>
 
                 <div className="lg:col-span-3">
-                    <Card className="h-full">
-                         <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
+                    <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">
                                     Payment Type
@@ -349,13 +344,11 @@ const SimpleSupplierFormAllFields = ({
                                         returnDate={true}
                                     />
                                 </div>
-                            )} />
-                         </CardContent>
-                    </Card>
+                            )                            } />
+                    </div>
                 </div>
                  <div className="lg:col-span-4">
-                    <Card className="h-full">
-                         <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
+                    <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
                             <div className="space-y-1">
                                 <div className="flex gap-2">
                                     <div className="flex-1">
@@ -419,8 +412,7 @@ const SimpleSupplierFormAllFields = ({
                                     />
                                 </InputWithIcon>
                             </div>
-                         </CardContent>
-                    </Card>
+                    </div>
                  </div>
             </div>
         </div>

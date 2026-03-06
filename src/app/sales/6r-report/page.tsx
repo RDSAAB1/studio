@@ -15,6 +15,7 @@ import { getRtgsSettings } from '@/lib/firestore';
 import { useGlobalData } from '@/contexts/global-data-context';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+import { getTenantDocPath } from '@/lib/tenancy';
 import { db } from '@/lib/database';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -162,9 +163,11 @@ export default function SixRReportPage() {
         if (!settings) return;
         
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -243,14 +246,15 @@ export default function SixRReportPage() {
         iframeDoc.write(`
             <html><head><title>6R Report</title>
                 <style>
+                    html, body { background: white !important; color: black !important; margin: 0; padding: 0; font-family: sans-serif; }
+                    body * { color: #000 !important; }
                     @media print {
                         @page { size: portrait; margin: 10mm; }
-                        body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; font-family: sans-serif; }
+                        html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                         .print-header { text-align: center; margin-bottom: 1rem; }
                         table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                        th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
-                        thead { background-color: #f2f2f2 !important; }
-                        th { background-color: #f2f2f2 !important; }
+                        th, td { border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; background: #fff !important; }
+                        thead, th { background-color: #f2f2f2 !important; color: #000 !important; }
                         td { vertical-align: top; }
                     }
                 </style>
@@ -264,11 +268,16 @@ export default function SixRReportPage() {
         `);
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
     };
 
     const handleDownloadExcel = () => {
@@ -330,7 +339,7 @@ export default function SixRReportPage() {
         setIsUpdating(true);
 
         try {
-            const paymentRef = doc(firestoreDB, 'payments', paymentId);
+            const paymentRef = doc(firestoreDB, ...getTenantDocPath('payments', paymentId));
             const updateData: Partial<Payment> = {
                 sixRNo: trimmed6RNo || undefined, // Remove field if empty
             };

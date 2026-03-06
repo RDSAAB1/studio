@@ -5,6 +5,7 @@ import PlaceholderPage from "@/components/placeholder-page";
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, orderBy, Timestamp } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
+import { getActiveTenant, getTenantCollectionPath } from "@/lib/tenancy";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -17,7 +18,9 @@ export default function ProductCatalogPage() {
     // ✅ Use incremental sync - only read changed documents
     const getLastSyncTime = (): number | undefined => {
       if (typeof window === 'undefined') return undefined;
-      const stored = localStorage.getItem('lastSync:products');
+      const active = getActiveTenant();
+      const key = active ? `lastSync:${active.storageMode}:${active.id}:products` : 'lastSync:products';
+      const stored = localStorage.getItem(key);
       return stored ? parseInt(stored, 10) : undefined;
     };
 
@@ -28,13 +31,13 @@ export default function ProductCatalogPage() {
       // ✅ Only get documents modified after last sync
       const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
       q = query(
-        collection(firestoreDB, "products"),
+        collection(firestoreDB, ...getTenantCollectionPath("products")),
         where('updatedAt', '>', lastSyncTimestamp),
         orderBy('updatedAt')
       );
     } else {
       // First sync - get all (only once)
-      q = query(collection(firestoreDB, "products"));
+      q = query(collection(firestoreDB, ...getTenantCollectionPath("products")));
     }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -47,7 +50,9 @@ export default function ProductCatalogPage() {
       
       // ✅ Save last sync time
       if (querySnapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:products', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:products` : 'lastSync:products';
+        localStorage.setItem(key, String(Date.now()));
       }
     }, (err) => {
 

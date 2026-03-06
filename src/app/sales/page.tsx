@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import React, { Suspense, use } from "react";
 import { useSearchParams } from 'next/navigation';
 import UnifiedSalesPage from "./unified-sales-page";
 
@@ -17,10 +17,12 @@ function SalesPageContent() {
   
   const mappedTab = tabMap[tab] || tab;
   
-  return <UnifiedSalesPage defaultTab={mappedTab as any} defaultMenu={menu as 'entry' | 'payments' | 'reports'} />;
+  return <UnifiedSalesPage defaultTab={mappedTab as any} defaultMenu={menu as any} />;
 }
 
-export default function SalesPage() {
+type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+export default function SalesPage(props: PageProps) {
+  if (props.searchParams) use(props.searchParams);
   return (
     <Suspense fallback={null}>
       <SalesPageContent />

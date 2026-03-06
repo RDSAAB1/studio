@@ -8,6 +8,12 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
+type FirestorePath = [string, ...string[]];
+
+const tenantId = String((globalThis as any)?.process?.env?.TENANT_ID || '').trim();
+const tenantCollectionPath = (collectionName: string): FirestorePath =>
+    (tenantId ? (['tenants', tenantId, collectionName] as const) : ([collectionName] as const)) as unknown as FirestorePath;
+
 export interface DuplicateAnalysis {
     totalSuppliers: number;
     duplicateSrNos: { [srNo: string]: any[] };
@@ -21,7 +27,7 @@ export async function checkSupplierSerialDuplicates(): Promise<DuplicateAnalysis
 
 
     try {
-        const suppliersRef = collection(firestoreDB, 'suppliers');
+        const suppliersRef = collection(firestoreDB, ...tenantCollectionPath('suppliers'));
         const snapshot = await getDocs(suppliersRef);
         
         type SupplierRecord = { id: string; srNo?: string } & Record<string, any>;

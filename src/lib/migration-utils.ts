@@ -1,6 +1,7 @@
 import { firestoreDB } from "./firebase";
 import { collection, getDocs, writeBatch } from "firebase/firestore";
 import { notifySyncRegistry, COLLECTION_MAP } from "./sync-registry";
+import { getTenantCollectionPath } from "./tenancy";
 
 export interface MigrationResult {
     collection: string;
@@ -20,7 +21,7 @@ export async function migrateUpdatedAt(): Promise<MigrationResult[]> {
     // Iterate over all collections
     for (const [internalName, firestoreName] of Object.entries(COLLECTION_MAP)) {
         try {
-            const colRef = collection(firestoreDB, firestoreName);
+            const colRef = collection(firestoreDB, ...getTenantCollectionPath(firestoreName));
             const snapshot = await getDocs(colRef);
             
             if (snapshot.empty) {

@@ -3,18 +3,19 @@
 import { runTransaction, doc, collection, getDoc, Timestamp, writeBatch, query, where, getDocs, increment, deleteDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import type { Payment, Customer, PaidFor, Expense } from '@/lib/definitions';
+import { getTenantCollectionPath } from '@/lib/tenancy';
 import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 import { db } from '@/lib/database';
 import { notifySyncRegistry } from '@/lib/sync-registry';
 import { savePaymentOffline } from '@/lib/indexed-db';
 
-const paymentsCollection = collection(firestoreDB, "payments");
-const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
-const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
-const customersCollection = collection(firestoreDB, "customers");
-const suppliersCollection = collection(firestoreDB, "suppliers");
-const expensesCollection = collection(firestoreDB, "expenses");
+const paymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("payments"));
+const customerPaymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("customer_payments"));
+const governmentFinalizedPaymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("governmentFinalizedPayments"));
+const customersCollection = () => collection(firestoreDB, ...getTenantCollectionPath("customers"));
+const suppliersCollection = () => collection(firestoreDB, ...getTenantCollectionPath("suppliers"));
+const expensesCollection = () => collection(firestoreDB, ...getTenantCollectionPath("expenses"));
 
 const omitUndefinedDeep = <T,>(input: T): T => {
     if (Array.isArray(input)) {
@@ -203,7 +204,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
 
             for (const item of (shouldDistributeToEntries ? entryOutstandings : [])) {
                 const entryId = item.entry.id;
-                const entryRef = doc(isCustomer ? customersCollection : suppliersCollection, entryId);
+                const entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), entryId);
                 const entryDoc = await transaction.get(entryRef);
                 
                 if (!entryDoc.exists()) {
@@ -331,7 +332,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             finalPaymentData = omitUndefinedDeep(finalPaymentData);
             
             // 3. Save Payment
-            const paymentRef = doc(isCustomer ? customerPaymentsCollection : paymentsCollection, newPaymentId);
+            const paymentRef = doc(isCustomer ? customerPaymentsCollection() : paymentsCollection(), newPaymentId);
             transaction.set(paymentRef, finalPaymentData);
 
             if (isCustomer) {
@@ -416,8 +417,8 @@ export const handleDeletePaymentLogic = async (params: {
     
     if (!payment) {
         // Try fetching from Firestore
-        const primaryCollection = isCustomer ? customerPaymentsCollection : paymentsCollection;
-        const fallbackCollection = isCustomer ? null : governmentFinalizedPaymentsCollection;
+        const primaryCollection = isCustomer ? customerPaymentsCollection() : paymentsCollection();
+        const fallbackCollection = isCustomer ? null : governmentFinalizedPaymentsCollection();
 
         const paymentRef = doc(primaryCollection, paymentId);
         const paymentDoc = await getDoc(paymentRef);
@@ -469,21 +470,21 @@ export const handleDeletePaymentLogic = async (params: {
                 // We search by ID if available, otherwise srNo
                 let entryRef;
                 if (paidItem.supplierId) {
-                     entryRef = doc(isCustomer ? customersCollection : suppliersCollection, paidItem.supplierId);
+                     entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), paidItem.supplierId);
                 } else if (paidItem.srNo) {
                     // This is inefficient inside transaction, but if we don't have ID...
                     // Better to query outside or assume ID is present.
                     // Most PaidFor items should have supplierId now.
                     // If not, we might skip or fail.
                     // Let's assume we can query.
-                    const q = query(isCustomer ? customersCollection : suppliersCollection, where("srNo", "==", paidItem.srNo));
+                    const q = query(isCustomer ? customersCollection() : suppliersCollection(), where("srNo", "==", paidItem.srNo));
                     const snapshot = await getDocs(q); // getDocs inside transaction? No, query outside.
                     // Wait, we can't do query inside transaction easily for multiple docs unless we know IDs.
                     // So we must rely on supplierId.
                     // If supplierId is missing, we can try to find it in the 'suppliers' passed in params.
                     const foundSupplier = suppliers.find(s => s.srNo === paidItem.srNo);
                     if (foundSupplier) {
-                        entryRef = doc(isCustomer ? customersCollection : suppliersCollection, foundSupplier.id);
+                        entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), foundSupplier.id);
                     }
                 }
 
@@ -499,8 +500,8 @@ export const handleDeletePaymentLogic = async (params: {
 
         // 3. Delete the payment document
         const targetCollection = isCustomer
-            ? customerPaymentsCollection
-            : (isGovPayment ? governmentFinalizedPaymentsCollection : paymentsCollection);
+            ? customerPaymentsCollection()
+            : (isGovPayment ? governmentFinalizedPaymentsCollection() : paymentsCollection());
         const paymentDocRef = doc(targetCollection, payment!.id);
         transaction.delete(paymentDocRef);
 

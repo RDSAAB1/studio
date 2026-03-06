@@ -25,6 +25,7 @@ export default {
         body: ['var(--font-inter)', 'sans-serif'],
         headline: ['var(--font-space-grotesk)', 'sans-serif'],
         code: ['var(--font-source-code-pro)', 'monospace'],
+        jakarta: ['var(--font-plus-jakarta-sans)', 'sans-serif'],
       },
       colors: {
         background: 'hsl(var(--background))',

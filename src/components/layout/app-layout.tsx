@@ -2,7 +2,7 @@
 "use client";
 
 import { Fragment, Suspense, createContext, useContext, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import { Loader2, Bell, Calculator, ChevronDown, GripVertical, Menu, X } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -18,12 +18,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AdvancedCalculator } from '@/components/calculator/advanced-calculator';
 import { getLoansRealtime } from '@/lib/firestore';
 import type { Loan } from '@/lib/definitions';
+import { setErpMode } from '@/lib/tenancy';
 import { format } from 'date-fns';
+import { ProfileDropdown } from '@/components/layout/profile-dropdown';
+import { ErpCompanySelector } from '@/components/layout/erp-company-selector';
+import { listErpCompanies } from '@/lib/erp-migration';
 
 // Pre-compute flattened menu items once (outside component to avoid recalculation)
 const flattenedMenuItems = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i);
@@ -78,6 +83,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const lastPathnameRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const isProcessingRef = useRef(false);
@@ -85,6 +91,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const openTabsRef = useRef(openTabs);
   const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isBrowser = typeof window !== 'undefined';
+  const [erpCompanies, setErpCompanies] = useState<{ id: string; name: string }[]>([]);
 
   const performNavigation = (path: string, options?: { forceWindow?: boolean }) => {
     const shouldUseWindowLocation = options?.forceWindow;
@@ -113,12 +120,25 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       }
     });
   };
-  
+
   // Keep refs in sync with state
   useEffect(() => {
     activeTabIdRef.current = activeTabId;
     openTabsRef.current = openTabs;
   }, [activeTabId, openTabs]);
+
+  useEffect(() => {
+    if (!isBrowser) return;
+    listErpCompanies()
+      .then((list) => {
+        setErpCompanies(list.map((c) => ({ id: c.id, name: c.name })));
+        setErpMode(list.length > 0);
+      })
+      .catch(() => {
+        setErpCompanies([]);
+        setErpMode(false);
+      });
+  }, [isBrowser]);
 
   // Initialize tabs on mount
   useEffect(() => {
@@ -264,7 +284,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       else if (menuParam === 'cash-bank') menuItemId = 'cash-bank';
       else if (menuParam === 'reports') menuItemId = 'sales-reports';
       else if (menuParam === 'settings') menuItemId = 'settings';
-      else menuItemId = menuParam ?? 'entry'; // hr, inventory, marketing, projects match their IDs
+      else if (menuParam === 'history') menuItemId = 'history';
+      else if (menuParam === 'admin') menuItemId = 'admin';
+      else menuItemId = menuParam ?? 'entry'; // hr, projects match their IDs
 
       // Try to find the specific tab item first (leaf node)
       const targetTabId = tabParam;
@@ -278,6 +300,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       }
 
       const selectedMenuItem = menuItem!;
+      const parentMenu = allMenuItems.find(p => p.subMenus?.some(s => s.id === targetTabId));
+      const tabsToShow = parentMenu?.subMenus && parentMenu.subMenus.some(s => s.id === targetTabId)
+        ? parentMenu.subMenus
+        : [selectedMenuItem];
+      const activeId = flattenedMenuItems.some(m => m.id === targetTabId) ? targetTabId : selectedMenuItem.id;
+
       // Batch state updates in a transition
       startTransition(() => {
         setOpenTabs(prev => {
@@ -289,29 +317,27 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
               !tab.id.startsWith('payments-') &&
               !tab.id.startsWith('hr-') &&
               !tab.id.startsWith('inventory-') &&
-              !tab.id.startsWith('marketing-') &&
               !tab.id.startsWith('project-') &&
+              !tab.id.startsWith('history-') &&
               !tab.id.startsWith('settings-')
             );
             
-            // Add current menu item
             const newTabs = [...filtered];
-            const tabExists = newTabs.some((t: MenuItem) => t.id === selectedMenuItem.id);
-            if (!tabExists) {
-              newTabs.push(selectedMenuItem);
-            } else {
-              // Tab already exists, check if array actually changed
-              if (filtered.length === prev.length && filtered.every((t, i) => t.id === prev[i]?.id)) {
-                return prev; // Return same reference to avoid re-render
+            let hasChanges = false;
+            for (const t of tabsToShow) {
+              if (!newTabs.some((tab: MenuItem) => tab.id === t.id)) {
+                newTabs.push(t);
+                hasChanges = true;
               }
             }
-            
+            if (!hasChanges && filtered.length === prev.length && filtered.every((t, i) => t.id === prev[i]?.id)) {
+              return prev;
+            }
             return newTabs;
         });
           
-          // Only update activeTabId if it actually changed
-          if (activeTabIdRef.current !== selectedMenuItem.id) {
-            setActiveTabId(selectedMenuItem.id);
+          if (activeTabIdRef.current !== activeId) {
+            setActiveTabId(activeId);
           }
       });
       
@@ -446,7 +472,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   }, [pathnameChanged]);
 
   const handleTabSelect = (tabIdOrMenuItem: string | MenuItem) => {
-    // Handle both string (tabId from TabBar) and MenuItem (from CustomSidebar)
+    // Handle both string (tabId from TabBar) and MenuItem
     const menuItem = typeof tabIdOrMenuItem === 'string' 
       ? openTabs.find(tab => tab.id === tabIdOrMenuItem) || flattenedMenuItems.find(item => item.id === tabIdOrMenuItem)
       : tabIdOrMenuItem;
@@ -458,7 +484,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       ? menuItem.href 
       : (menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`);
     
-    // Legacy overrides removed - now using href directly from sidebar config
+    // Using href from menu config
     
     // Check if we're already on the target path (including query params)
     const currentPathWithQuery = isBrowser ? window.location.pathname + window.location.search : pathname;
@@ -625,8 +651,38 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     };
   }, [isDraggingCalculator]);
 
+  // Use URL params when on /sales so highlight updates immediately (no wait for effect)
+  const isSalesPath = pathname === "/sales" || pathname === "/sales/" || pathname.startsWith("/sales/");
+  const menuParam = isSalesPath ? searchParams.get("menu") : null;
+  const tabParam = isSalesPath ? searchParams.get("tab") : null;
+
+  // Map menu param to top-level menu item id (entry->sales-entry, payments->sales-payments, etc.)
+  const menuParamToId: Record<string, string> = {
+    entry: "sales-entry",
+    payments: "sales-payments",
+    reports: "sales-reports",
+  };
+  const effectiveMenuId = (pathname === "/sales" || pathname === "/sales/") && menuParam
+    ? (menuParamToId[menuParam] ?? menuParam)
+    : null;
+
+  const tabFromUrl =
+    pathname === "/sales"
+      ? tabParam
+      : pathname === "/sales/entry"
+        ? (tabParam ? `entry-${tabParam}` : null)
+        : pathname.startsWith("/sales/payments")
+          ? (tabParam ? `payments-${tabParam}` : null)
+          : null;
+  const effectiveActiveTabId = tabFromUrl ?? activeTabId;
+
   const isTopMenuActive = (item: MenuItem) => {
+    // On /sales: use menu param to determine which top-level item is active
+    if ((pathname === "/sales" || pathname === "/sales/") && effectiveMenuId) {
+      return item.id === effectiveMenuId;
+    }
     if (item.subMenus && item.subMenus.length > 0) {
+      if (item.subMenus.some(sub => sub.id === effectiveActiveTabId)) return true;
       return item.subMenus.some(sub => {
         if (sub.href) {
           const base = sub.href.split('?')[0];
@@ -641,10 +697,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       return pathname === base || pathname.startsWith(base + '/');
     }
     if (item.id === 'dashboard-overview') return pathname === '/';
+    if (item.id === effectiveActiveTabId) return true;
     const base = `/${item.id}`;
     return pathname === base || pathname.startsWith(base + '/');
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isSalesRoute = pathname.startsWith('/sales');
   const hasSubnav = isSalesRoute && !!subnav;
 
@@ -654,20 +712,76 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         <div className="sticky top-0 z-50">
           <div className="border-b border-[#24003A] bg-[#2E004F] text-white">
             <div className="flex h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white"
-                onClick={() => {
-                  const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
-                  if (dashboardTab) handleOpenTab(dashboardTab);
-                }}
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white lg:hidden"
+                  >
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 bg-[#2E004F] border-violet-900/30 p-0">
+                  <SheetHeader className="p-4 border-b border-white/10">
+                    <SheetTitle className="text-white text-left">Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-col py-2">
+                    {allMenuItems.map((item) => {
+                      if (item.subMenus && item.subMenus.length > 0) {
+                        const parentActive = item.subMenus.some(sub => sub.id === effectiveActiveTabId);
+                        return (
+                          <div key={item.id} className="px-2">
+                            <p className={cn(
+                              "px-3 py-2 text-xs font-semibold uppercase rounded-md",
+                              parentActive ? "text-white bg-white/12" : "text-white/60"
+                            )}>{item.name}</p>
+                            {item.subMenus.map((sub) => (
+                              <button
+                                key={sub.id}
+                                className={cn(
+                                  "flex w-full items-center gap-3 px-4 py-2.5 text-sm rounded-md",
+                                  sub.id === effectiveActiveTabId ? "bg-white/12 text-white" : "text-white/90 hover:bg-white/10"
+                                )}
+                                onClick={() => {
+                                  handleOpenTab(sub);
+                                  setMobileMenuOpen(false);
+                                }}
+                              >
+                                {sub.icon ? <sub.icon className="h-4 w-4" /> : null}
+                                {sub.name}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      }
+                      const active =
+                        item.id === effectiveMenuId ||
+                        item.id === effectiveActiveTabId ||
+                        (item.href && (pathname === item.href.split('?')[0] || pathname === item.href.split('?')[0] + '/'));
+                      return (
+                        <button
+                          key={item.id}
+                          className={cn(
+                            "flex w-full items-center gap-3 px-4 py-2.5 text-sm rounded-md",
+                            active ? "bg-white/12 text-white" : "text-white/90 hover:bg-white/10"
+                          )}
+                          onClick={() => {
+                            handleOpenTab(item);
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                          {item.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SheetContent>
+              </Sheet>
 
-              <div className="flex-1 overflow-x-auto no-scrollbar">
-                <div className="flex min-w-max items-center gap-1">
+              <div className="flex-1 overflow-x-auto no-scrollbar hidden lg:block">
+                <div className="flex min-w-max items-stretch h-12">
                   {allMenuItems.map((item) => {
                     const active = isTopMenuActive(item);
                     if (item.subMenus && item.subMenus.length > 0) {
@@ -676,15 +790,15 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               className={cn(
-                                "h-9 gap-1 px-2 text-white/90 hover:bg-white/10 hover:text-white",
-                                active && "bg-white/12 text-white"
+                                "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
+                                active && "bg-white/25 text-white"
                               )}
+                              title={item.name}
+                              onClick={() => handleOpenTab(item)}
                             >
                               {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                              <span className="text-xs font-semibold whitespace-nowrap">{item.name}</span>
-                              <ChevronDown className="h-3.5 w-3.5 opacity-80" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
@@ -711,19 +825,29 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                       <Button
                         key={item.id}
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         className={cn(
-                          "h-9 gap-2 px-2 text-white/90 hover:bg-white/10 hover:text-white",
-                          active && "bg-white/12 text-white"
+                          "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
+                          active && "bg-white/25 text-white"
                         )}
+                        title={item.name}
                         onClick={() => handleOpenTab(item)}
                       >
                         {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                        <span className="text-xs font-semibold whitespace-nowrap">{item.name}</span>
                       </Button>
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="ml-auto flex items-center gap-1">
+                <ErpCompanySelector
+                  hasErpCompanies={erpCompanies.length > 0}
+                  tenants={[]}
+                  activeTenant={null}
+                  hideCompanySelector
+                />
+                <ProfileDropdown />
               </div>
 
               <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>

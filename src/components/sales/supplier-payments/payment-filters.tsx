@@ -180,7 +180,7 @@ export function PaymentFilters({
             </Select>
           </div>
 
-          <div className="w-full lg:w-[180px] flex-shrink-0">
+          <div className="w-full lg:w-[110px] flex-shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3 w-3 text-slate-500" />
               <Input

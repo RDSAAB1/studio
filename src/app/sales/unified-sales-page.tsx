@@ -34,13 +34,6 @@ const ContractPaymentsPage = dynamic(() => import("@/app/hr/contract-payments/pa
 
 // Inventory Modules
 const InventoryManagementPage = dynamic(() => import("@/app/inventory/inventory-management/page"));
-const SupplierInformationPage = dynamic(() => import("@/app/inventory/supplier-information/page"));
-const PurchaseOrdersPage = dynamic(() => import("@/app/inventory/purchase-orders/page"));
-
-// Marketing Modules
-const CampaignsPage = dynamic(() => import("@/app/marketing/campaigns/page"));
-const EmailMarketingPage = dynamic(() => import("@/app/marketing/email-marketing/page"));
-const AnalyticsPage = dynamic(() => import("@/app/marketing/analytics/page"));
 
 // Project Management Modules
 const ProjectDashboardPage = dynamic(() => import("@/app/projects/dashboard/page"));
@@ -53,8 +46,10 @@ const CashBankPage = dynamic(() => import("@/app/cash-bank/page"));
 // Settings Modules
 const BankAccountsPage = dynamic(() => import("@/app/settings/bank-accounts/page"));
 const BankManagementPage = dynamic(() => import("@/app/settings/bank-management/page"));
-const PrinterSettingsPage = dynamic(() => import("@/app/settings/printer/page"));
-const ThemeCustomizationPage = dynamic(() => import("@/app/settings/theme-customization/page"));
+const ErpMigrationPage = dynamic(() => import("@/app/settings/erp-migration/page"));
+const AddCompanyUserCard = dynamic(() => import("@/components/settings/add-company-user-card").then(m => ({ default: m.AddCompanyUserCard })));
+import ActivityHistoryPage from "@/app/activity-history/page";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 type SalesTab = 
   | "dashboard" 
@@ -62,13 +57,13 @@ type SalesTab =
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
   | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor" | "sales-reports" | "order-tracking" | "product-catalog"
   | "hr-employee-database" | "hr-payroll-management" | "hr-attendance-tracking" | "hr-contract-payments"
-  | "inventory-management" | "inventory-supplier-info" | "inventory-purchase-orders"
-  | "marketing-campaigns" | "marketing-email" | "marketing-analytics"
+  | "inventory-management"
   | "project-dashboard" | "project-tasks" | "project-collaboration"
-  | "cash-bank-management"
-  | "settings-bank-accounts" | "settings-bank-management" | "settings-printer" | "settings-theme";
+  | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
+  | "history-new" | "history-edit" | "history-recycle" | "history-delete"
+  | "settings-team" | "settings-data-migration";
 
-type MenuType = "dashboard" | "entry" | "payments" | "reports" | "hr" | "inventory" | "marketing" | "projects" | "cash-bank" | "settings";
+type MenuType = "dashboard" | "entry" | "payments" | "reports" | "hr" | "projects" | "cash-bank" | "history" | "settings" | "admin";
 
 const TAB_LABELS: Record<SalesTab, string> = {
   "dashboard": "Dashboard Overview",
@@ -98,13 +93,6 @@ const TAB_LABELS: Record<SalesTab, string> = {
   
   // Inventory
   "inventory-management": "Inventory Management",
-  "inventory-supplier-info": "Supplier Info",
-  "inventory-purchase-orders": "Purchase Orders",
-  
-  // Marketing
-  "marketing-campaigns": "Campaigns",
-  "marketing-email": "Email Marketing",
-  "marketing-analytics": "Analytics",
   
   // Projects
   "project-dashboard": "Project Dashboard",
@@ -113,12 +101,18 @@ const TAB_LABELS: Record<SalesTab, string> = {
   
   // Cash & Bank
   "cash-bank-management": "Cash & Bank",
-  
-  // Settings
   "settings-bank-accounts": "Bank Accounts",
   "settings-bank-management": "Bank Management",
-  "settings-printer": "Printer Settings",
-  "settings-theme": "Theme Customization",
+  
+  // History
+  "history-new": "New Entry",
+  "history-edit": "Edit History",
+  "history-recycle": "Recycle Bin",
+  "history-delete": "Delete History",
+  
+  // Settings / Admin
+  "settings-team": "Team",
+  "settings-data-migration": "Data Migration",
 };
 
 export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu = "dashboard" }: { defaultTab?: SalesTab; defaultMenu?: MenuType }) {
@@ -141,7 +135,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         let tabsToMount: SalesTab[] = [];
         
         if (menuParam === 'entry') {
-          tabsToMount = ['supplier-entry', 'customer-entry'];
+          tabsToMount = ['supplier-entry', 'customer-entry', 'inventory-management'];
         } else if (menuParam === 'payments') {
           tabsToMount = ['supplier-payments', 'customer-payments', 'rtgs-outsider', 'income-expense', 'ledger'];
         } else if (menuParam === 'reports') {
@@ -159,17 +153,17 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
             'firestore-monitor'
           ];
         } else if (menuParam === 'hr') {
-          tabsToMount = ['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking'];
-        } else if (menuParam === 'inventory') {
-          tabsToMount = ['inventory-management', 'inventory-supplier-info', 'inventory-purchase-orders'];
-        } else if (menuParam === 'marketing') {
-          tabsToMount = ['marketing-campaigns', 'marketing-email', 'marketing-analytics'];
+          tabsToMount = ['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'];
         } else if (menuParam === 'projects') {
           tabsToMount = ['project-dashboard', 'project-tasks', 'project-collaboration'];
         } else if (menuParam === 'cash-bank') {
-          tabsToMount = ['cash-bank-management'];
+          tabsToMount = ['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'];
+        } else if (menuParam === 'history') {
+          tabsToMount = ['history-new', 'history-edit', 'history-recycle', 'history-delete'];
         } else if (menuParam === 'settings') {
-          tabsToMount = ['settings-bank-accounts', 'settings-bank-management', 'settings-printer', 'settings-theme'];
+          tabsToMount = ['settings-team'];
+        } else if (menuParam === 'admin') {
+          tabsToMount = ['settings-data-migration'];
         }
         
         const toAdd = tabsToMount.filter(t => !prev.includes(t));
@@ -178,36 +172,17 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     }
   }, [searchParams]);
 
-  // Prefetch heavy report components after mount
+  // Silent mount of critical tabs for data warm-up (prefetch removed - was causing ChunkLoadError 404s)
   useEffect(() => {
-    // Small delay to let main thread clear first
     const timer = setTimeout(() => {
-      // 1. Prefetch Report Modules (Code Splitting)
-      import("./rtgs-report/rtgs-report-client");
-      import("./daily-supplier-report/daily-supplier-report-client");
-      import("./6r-report/page");
-      import("@/app/tools/voucher-import/page");
-      import("@/components/sales/mandi-report-history");
-      import("@/app/admin/firestore-monitor/page");
-      import("@/app/sales/sales-reports/page");
-      import("@/app/sales/order-tracking/page");
-      import("@/app/sales/product-catalog/page");
-      
-      // 3. Prefetch Other Modules (HR, Inventory, etc.)
-      import("@/app/hr/employee-database/page");
-      import("@/app/inventory/inventory-management/page");
-      import("@/app/marketing/campaigns/page");
-      import("@/app/projects/dashboard/page");
-      import("@/app/cash-bank/page");
-      import("@/app/settings/bank-accounts/page");
-      
-      // 2. Silent Mount of Critical Tabs (Data Fetching Warm-up)
+      // Silent Mount of Critical Tabs (Data Fetching Warm-up)
       // This ensures that when user clicks "Supplier Entry" or "Payments", 
       // the component is ALREADY mounted and data is ALREADY fetched.
       setMountedTabs(prev => {
         const criticalTabs: SalesTab[] = [
           "supplier-entry", 
           "customer-entry", 
+          "inventory-management",
           "supplier-payments", 
           "customer-payments",
           "ledger",
@@ -236,17 +211,17 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   const handleTabChange = useCallback((value: SalesTab) => {
     setActiveTab(value);
     
-    // Determine menu type based on tab (for sidebar highlighting)
+    // Determine menu type based on tab (for top bar highlighting)
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
-    else if (['supplier-entry', 'customer-entry'].includes(value)) newMenuType = 'entry';
+    else if (['supplier-entry', 'customer-entry', 'inventory-management'].includes(value)) newMenuType = 'entry';
     else if (['daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor', 'sales-reports', 'order-tracking', 'product-catalog'].includes(value)) newMenuType = 'reports';
-    else if (['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking'].includes(value)) newMenuType = 'hr';
-    else if (['inventory-management', 'inventory-supplier-info', 'inventory-purchase-orders'].includes(value)) newMenuType = 'inventory';
-    else if (['marketing-campaigns', 'marketing-email', 'marketing-analytics'].includes(value)) newMenuType = 'marketing';
+    else if (['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'].includes(value)) newMenuType = 'hr';
     else if (['project-dashboard', 'project-tasks', 'project-collaboration'].includes(value)) newMenuType = 'projects';
-    else if (['cash-bank-management'].includes(value)) newMenuType = 'cash-bank';
-    else if (['settings-bank-accounts', 'settings-bank-management', 'settings-printer', 'settings-theme'].includes(value)) newMenuType = 'settings';
+    else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
+    else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
+    else if (['settings-team'].includes(value)) newMenuType = 'settings';
+    else if (['settings-data-migration'].includes(value)) newMenuType = 'admin';
     else newMenuType = 'payments';
     
     setMenuType(newMenuType);
@@ -260,7 +235,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
-    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }];
+    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }, { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] }];
     if (menuType === "reports") {
       return [
         { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
@@ -280,20 +255,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "hr-employee-database" as const, label: TAB_LABELS["hr-employee-database"] },
         { value: "hr-payroll-management" as const, label: TAB_LABELS["hr-payroll-management"] },
         { value: "hr-attendance-tracking" as const, label: TAB_LABELS["hr-attendance-tracking"] },
-      ];
-    }
-    if (menuType === "inventory") {
-      return [
-        { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] },
-        { value: "inventory-supplier-info" as const, label: TAB_LABELS["inventory-supplier-info"] },
-        { value: "inventory-purchase-orders" as const, label: TAB_LABELS["inventory-purchase-orders"] },
-      ];
-    }
-    if (menuType === "marketing") {
-      return [
-        { value: "marketing-campaigns" as const, label: TAB_LABELS["marketing-campaigns"] },
-        { value: "marketing-email" as const, label: TAB_LABELS["marketing-email"] },
-        { value: "marketing-analytics" as const, label: TAB_LABELS["marketing-analytics"] },
+        { value: "hr-contract-payments" as const, label: TAB_LABELS["hr-contract-payments"] },
       ];
     }
     if (menuType === "projects") {
@@ -303,15 +265,21 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "project-collaboration" as const, label: TAB_LABELS["project-collaboration"] },
       ];
     }
-    if (menuType === "cash-bank") return [{ value: "cash-bank-management" as const, label: TAB_LABELS["cash-bank-management"] }];
-    if (menuType === "settings") {
+    if (menuType === "cash-bank") return [
+      { value: "cash-bank-management" as const, label: TAB_LABELS["cash-bank-management"] },
+      { value: "settings-bank-accounts" as const, label: TAB_LABELS["settings-bank-accounts"] },
+      { value: "settings-bank-management" as const, label: TAB_LABELS["settings-bank-management"] },
+    ];
+    if (menuType === "history") {
       return [
-        { value: "settings-bank-accounts" as const, label: TAB_LABELS["settings-bank-accounts"] },
-        { value: "settings-bank-management" as const, label: TAB_LABELS["settings-bank-management"] },
-        { value: "settings-printer" as const, label: TAB_LABELS["settings-printer"] },
-        { value: "settings-theme" as const, label: TAB_LABELS["settings-theme"] },
+        { value: "history-new" as const, label: TAB_LABELS["history-new"] },
+        { value: "history-edit" as const, label: TAB_LABELS["history-edit"] },
+        { value: "history-recycle" as const, label: TAB_LABELS["history-recycle"] },
+        { value: "history-delete" as const, label: TAB_LABELS["history-delete"] },
       ];
     }
+    if (menuType === "settings") return [{ value: "settings-team" as const, label: TAB_LABELS["settings-team"] }];
+    if (menuType === "admin") return [{ value: "settings-data-migration" as const, label: TAB_LABELS["settings-data-migration"] }];
     return [
       { value: "supplier-payments" as const, label: TAB_LABELS["supplier-payments"] },
       { value: "customer-payments" as const, label: TAB_LABELS["customer-payments"] },
@@ -401,17 +369,6 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         // Inventory
         case "inventory-management":
           return <InventoryManagementPage />;
-        case "inventory-supplier-info":
-          return <SupplierInformationPage />;
-        case "inventory-purchase-orders":
-          return <PurchaseOrdersPage />;
-        // Marketing
-        case "marketing-campaigns":
-          return <CampaignsPage />;
-        case "marketing-email":
-          return <EmailMarketingPage />;
-        case "marketing-analytics":
-          return <AnalyticsPage />;
         // Projects
         case "project-dashboard":
           return <ProjectDashboardPage />;
@@ -422,15 +379,24 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         // Cash & Bank
         case "cash-bank-management":
           return <CashBankPage />;
+        // History
+        case "history-new":
+          return <ErrorBoundary><ActivityHistoryPage initialTab="new" /></ErrorBoundary>;
+        case "history-edit":
+          return <ErrorBoundary><ActivityHistoryPage initialTab="edit" /></ErrorBoundary>;
+        case "history-recycle":
+          return <ErrorBoundary><ActivityHistoryPage initialTab="recycle" /></ErrorBoundary>;
+        case "history-delete":
+          return <ErrorBoundary><ActivityHistoryPage initialTab="delete" /></ErrorBoundary>;
         // Settings
+        case "settings-team":
+          return <AddCompanyUserCard />;
         case "settings-bank-accounts":
           return <BankAccountsPage />;
         case "settings-bank-management":
           return <BankManagementPage />;
-        case "settings-printer":
-          return <PrinterSettingsPage />;
-        case "settings-theme":
-          return <ThemeCustomizationPage />;
+        case "settings-data-migration":
+          return <ErpMigrationPage />;
         default:
           return null;
       }

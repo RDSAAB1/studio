@@ -99,6 +99,14 @@ export type Customer = {
   collectedReport?: number; // Collected report for rate calculation
   riceBranGst?: number; // GST amount to add to calculated rate
   calculatedRate?: number; // Final calculated rate for RICE BRAN entries
+
+  // Audit trail
+  createdAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedAt?: string;
+  editedBy?: string;
+  editedByName?: string;
 };
 
 export type Supplier = Customer;
@@ -557,16 +565,6 @@ export type LedgerCashAccount = {
 
 export type LedgerCashAccountInput = Omit<LedgerCashAccount, "id" | "createdAt" | "updatedAt">;
 
-export type PurchaseOrder = {
-  id: string;
-  supplierId: string;
-  orderDate: string;
-  deliveryDate: string;
-  status: 'Pending' | 'Received' | 'Cancelled';
-  items: { itemId: string; quantity: number; unitPrice: number }[];
-  totalAmount: number;
-};
-
 export type SyncTaskStatus = "pending" | "processing" | "failed";
 
 export type SyncTask<TPayload = unknown> = {
@@ -619,14 +617,6 @@ export type AttendanceEntry = {
     date: string; 
     employeeId: string;
     status: 'Present' | 'Absent' | 'Leave' | 'Half-day';
-};
-
-export type Campaign = {
-  id: string;
-  name: string;
-  description: string;
-  startDate: string;
-  endDate: string;
 };
 
 export type ReceiptFieldSettings = {

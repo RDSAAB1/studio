@@ -50,6 +50,7 @@ import { format, parse } from "date-fns";
 import * as XLSX from "xlsx";
 import { db } from "@/lib/database";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { useErpSelectionOptional } from "@/contexts/erp-selection-context";
 
 type VoucherBlock = {
   voucherNo: string;
@@ -723,6 +724,7 @@ const createReportId = (voucherNo?: string | null) => {
 };
 
 export default function VoucherImportTool() {
+  const erpSelection = useErpSelectionOptional();
   const { toast } = useToast();
   const [voucherInput, setVoucherInput] = useState("");
   const [paymentInput, setPaymentInput] = useState("");
@@ -860,8 +862,10 @@ export default function VoucherImportTool() {
 
   useEffect(() => {
     let mounted = true;
+    // When ERP season is selected, skip local cache - it may have wrong season's data
+    const skipLocal = !!erpSelection;
     const loadLocal = async () => {
-      if (!db) return;
+      if (!db || skipLocal) return;
       try {
         const localReports = await db.mandiReports.toArray();
         if (mounted && localReports.length) {
@@ -889,19 +893,19 @@ export default function VoucherImportTool() {
 
     const loadReports = async () => {
       try {
-        const reports = await fetchMandiReports();
+        const reports = await fetchMandiReports(true); // Force from Firestore to get correct season's data
         if (!mounted) return;
-        if (reports.length) {
-          setEntries(
-            reports.map((report) =>
-              normalizeEntryDates({
-                ...emptyEntry,
-                ...report,
-                id: report.id || createReportId(report.voucherNo),
-              })
-            )
-          );
-        }
+        setEntries(
+          reports.length
+            ? reports.map((report) =>
+                normalizeEntryDates({
+                  ...emptyEntry,
+                  ...report,
+                  id: report.id || createReportId(report.voucherNo),
+                })
+              )
+            : []
+        );
       } catch (error) {
 
         if (mounted) {
@@ -917,7 +921,7 @@ export default function VoucherImportTool() {
     return () => {
       mounted = false;
     };
-  }, [toast]);
+  }, [toast, erpSelection]);
 
   const handleParse = async () => {
     setErrors([]);

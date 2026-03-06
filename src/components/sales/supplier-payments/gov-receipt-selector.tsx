@@ -6,17 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import type { PaymentOption } from "@/hooks/use-payment-combination";
-import { Calculator, Receipt, Target, Package, Sparkles, TrendingUp, Wallet, Coins } from "lucide-react";
+import { Calculator, Receipt, Target, Package, Sparkles, TrendingUp, Wallet, Coins, DollarSign, Percent } from "lucide-react";
+
+/** Extra amount base: Outstanding (amount/govRate as qty), Net Qty (netWeight), or Final Qty (weight) */
+export type ExtraAmountBase = 'outstanding' | 'netQty' | 'finalQty';
 
 interface ReceiptGovCalculation {
     receipt: any;
     normalAmount: number;
     govAmount: number;
+    extraAmount: number;
     quantity: number;
     baseQuantity: number;
     rate: number;
@@ -28,6 +29,7 @@ interface Combination {
     details: ReceiptGovCalculation[];
     totalGov: number;
     totalNormal: number;
+    totalExtra: number;
     totalQuantity: number;
     difference: number;
     type: 'single' | 'pair' | 'triplet' | 'multiple';
@@ -36,10 +38,13 @@ interface Combination {
 interface GovReceiptSelectorProps {
     availableReceipts: any[];
     govRate: number;
+    extraAmountPerQuintal?: number;
     onSelectReceipts: (receiptIds: string[]) => void;
     selectedReceiptIds: Set<string>;
     allowManualRsPerQtl?: boolean;
     allowManualGovRate?: boolean;
+    calcTargetAmount?: number;
+    setCalcTargetAmount?: (value: number) => void;
     combination?: {
         paymentOptions: any[];
         sortedPaymentOptions: any[];
@@ -55,26 +60,37 @@ interface GovReceiptSelectorProps {
         requestSort: (key: keyof PaymentOption) => void;
     };
     selectPaymentAmount?: (option: any) => void;
+    onSuggestionsChange?: (suggestions: Combination[]) => void;
 }
 
 export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
     availableReceipts,
     govRate: initialGovRate,
+    extraAmountPerQuintal: initialExtraAmountPerQuintal = 0,
     onSelectReceipts,
     selectedReceiptIds,
     allowManualRsPerQtl = false,
     allowManualGovRate = false,
+    calcTargetAmount = 0,
+    setCalcTargetAmount,
     combination,
     selectPaymentAmount,
+    onSuggestionsChange,
 }) => {
     const instanceId = React.useId();
     const [targetGovAmount, setTargetGovAmount] = useState<number>(0);
     const [manualGovRate, setManualGovRate] = useState<number>(initialGovRate);
+    const [manualRsPerQtl, setManualRsPerQtl] = useState<number>(initialExtraAmountPerQuintal);
     const [bagWeight, setBagWeight] = useState<number>(0);
     const [hasManualInputRate, setHasManualInputRate] = useState(false);
-    const [suggestions, setSuggestions] = useState<Combination[]>([]);
+    const [hasManualInputRs, setHasManualInputRs] = useState(false);
+    const [extraAmountBase, setExtraAmountBase] = useState<ExtraAmountBase>('outstanding');
+    const [extraAmountBaseType, setExtraAmountBaseType] = useState<'receipt' | 'target'>('receipt');
+    const [targetIncludesExtra, setTargetIncludesExtra] = useState(false);
+    const [useFinalWeight, setUseFinalWeight] = useState(false);
 
     const govRate = hasManualInputRate ? manualGovRate : initialGovRate;
+    const extraAmountPerQuintal = hasManualInputRs ? manualRsPerQtl : initialExtraAmountPerQuintal;
 
     // Get selected receipts for extra amount base calculation
     const selectedReceipts = useMemo(() => {
@@ -83,24 +99,6 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
             return selectedReceiptIds.has(receiptId);
         });
     }, [availableReceipts, selectedReceiptIds]);
-
-    // Wrapper function to pass selectedReceipts and targetGovAmount as targetAmount, and bagWeight as bagSize to handleGeneratePaymentOptions
-    // IMPORTANT: Generate options based on Target GOV amount
-    const handleGenerateWithExtraBase = () => {
-        if (combination?.handleGeneratePaymentOptions) {
-            // Use targetGovAmount for generation
-            const requiredGovForGeneration = targetGovAmount > 0 ? targetGovAmount : totalAvailableGov;
-            
-            combination.handleGeneratePaymentOptions({
-                selectedReceipts,
-                targetAmount: requiredGovForGeneration,
-                bagSize: bagWeight > 0 ? bagWeight : undefined, // Pass bagWeight as bagSize
-                minRate: govRate || 0, // Pass govRate as minRate for validation
-                maxRate: govRate || 0, // Pass govRate as maxRate for validation
-                rsValue: 0, 
-            });
-        }
-    };
 
     const receiptCalculations = useMemo((): ReceiptGovCalculation[] => {
         return availableReceipts
@@ -114,17 +112,26 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                 const normalAmount = (receipt as any).outstandingForEntry !== undefined
                     ? Number((receipt as any).outstandingForEntry)
                     : (receipt.netAmount !== undefined ? Number(receipt.netAmount) : 0);
-                
                 const actualQuantity = Number(receipt.netWeight) || 0;
+                const finalQuantity = Number((receipt as any).weight) || 0;
                 const baseQuantity = govRate > 0 ? normalAmount / govRate : 0;
-                
-                // Extra amount logic removed
-                const govAmount = normalAmount; // Gov Amount is just Normal Amount
-                
+
+                let baseForExtraAmount = 0;
+                if (extraAmountBase === 'netQty') {
+                    baseForExtraAmount = actualQuantity;
+                } else if (extraAmountBase === 'finalQty') {
+                    baseForExtraAmount = finalQuantity;
+                } else {
+                    baseForExtraAmount = govRate > 0 ? normalAmount / govRate : 0;
+                }
+                const extraAmount = baseForExtraAmount * extraAmountPerQuintal;
+                const govAmount = normalAmount + extraAmount;
+
                 return {
                     receipt,
                     normalAmount,
                     govAmount,
+                    extraAmount,
                     quantity: actualQuantity,
                     baseQuantity,
                     rate: Number(receipt.rate) || govRate,
@@ -132,7 +139,22 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                 };
             })
             .sort((a, b) => a.govAmount - b.govAmount);
-    }, [availableReceipts, govRate, manualGovRate]);
+    }, [availableReceipts, govRate, extraAmountPerQuintal, extraAmountBase]);
+
+    // Wrapper: pass Required GOV (Normal + Extra) as target for generation
+    const handleGenerateWithExtraBase = () => {
+        if (combination?.handleGeneratePaymentOptions) {
+            const requiredGovForGeneration = govRequiredAmount > 0 ? govRequiredAmount : totalAvailableGov;
+            combination.handleGeneratePaymentOptions({
+                selectedReceipts,
+                targetAmount: requiredGovForGeneration,
+                bagSize: bagWeight > 0 ? bagWeight : combination?.bagSize ? combination.bagSize : undefined,
+                minRate: govRate || 0,
+                maxRate: govRate || 0,
+                rsValue: 0,
+            });
+        }
+    };
 
     // Filter receiptCalculations based on selected receipts (if any selected, show only selected; otherwise show all)
     const displayReceiptCalculations = useMemo(() => {
@@ -161,9 +183,60 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
     
     const totalSelectedGov = selectedReceiptCalculations.reduce((sum, calc) => sum + calc.govAmount, 0);
     const totalSelectedNormal = selectedReceiptCalculations.reduce((sum, calc) => sum + calc.normalAmount, 0);
-    
-    // Required GOV = Normal (Base)
-    const calculatedBaseAmount = totalSelectedNormal;
+
+    const baseAmountForExtra = useMemo(() => {
+        if (selectedReceiptCalculations.length === 0) return 0;
+        if (extraAmountBase === 'netQty') {
+            return selectedReceiptCalculations.reduce((sum, calc) => sum + (Number(calc.receipt.netWeight) || 0), 0);
+        }
+        if (extraAmountBase === 'finalQty') {
+            return selectedReceiptCalculations.reduce((sum, calc) => sum + (Number(calc.receipt.weight) || 0), 0);
+        }
+        return totalSelectedNormal;
+    }, [selectedReceiptCalculations, extraAmountBase, totalSelectedNormal]);
+
+    const { calculatedBaseAmount, calculatedExtraAmount } = useMemo(() => {
+        const normalAmount = totalSelectedNormal;
+        if (extraAmountBaseType === 'target') {
+            const targetAmt = targetGovAmount > 0 ? targetGovAmount : (typeof calcTargetAmount === 'number' ? calcTargetAmount : 0);
+            const currentGovRate = govRate || 0;
+            const currentExtraRate = extraAmountPerQuintal || 0;
+            if (currentGovRate > 0 && targetAmt > 0 && currentExtraRate > 0) {
+                if (targetIncludesExtra) {
+                    const baseAmount = targetAmt / (1 + currentExtraRate / currentGovRate);
+                    const extraAmount = targetAmt - baseAmount;
+                    return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: extraAmount };
+                }
+                const extraAmount = (targetAmt / currentGovRate) * currentExtraRate;
+                return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: extraAmount };
+            }
+            return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: 0 };
+        }
+        const currentGovRate = govRate || 0;
+        const currentExtraRate = extraAmountPerQuintal || 0;
+        if (extraAmountBase === 'netQty' || extraAmountBase === 'finalQty') {
+            const baseAmountForExtraCalc = baseAmountForExtra;
+            if (useFinalWeight && currentExtraRate > 0 && baseAmountForExtraCalc > 0) {
+                const baseAmountInRs = baseAmountForExtraCalc * currentGovRate;
+                const initialExtra = baseAmountForExtraCalc * currentExtraRate;
+                const finalExtra = (initialExtra + baseAmountInRs) / currentGovRate * currentExtraRate;
+                return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: finalExtra };
+            }
+            const extraAmount = baseAmountForExtraCalc * currentExtraRate;
+            return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: extraAmount };
+        }
+        if (useFinalWeight && currentGovRate > 0 && currentExtraRate > 0 && baseAmountForExtra > 0) {
+            const initialExtra = (baseAmountForExtra / currentGovRate) * currentExtraRate;
+            const finalExtra = (initialExtra + baseAmountForExtra) / currentGovRate * currentExtraRate;
+            return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: finalExtra };
+        }
+        const extraAmount = currentGovRate > 0 && currentExtraRate > 0 && baseAmountForExtra > 0
+            ? (baseAmountForExtra / currentGovRate) * currentExtraRate
+            : 0;
+        return { calculatedBaseAmount: normalAmount, calculatedExtraAmount: extraAmount };
+    }, [extraAmountBaseType, targetGovAmount, calcTargetAmount, govRate, extraAmountPerQuintal, targetIncludesExtra, totalSelectedNormal, useFinalWeight, baseAmountForExtra, extraAmountBase]);
+
+    const govRequiredAmount = calculatedBaseAmount + calculatedExtraAmount;
 
     const handleCalculateCombinations = () => {
         if (targetGovAmount <= 0 || receiptCalculations.length === 0) return;
@@ -187,6 +260,7 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                         details: [...current],
                         totalGov,
                         totalNormal: current.reduce((sum, calc) => sum + calc.normalAmount, 0),
+                        totalExtra: current.reduce((sum, calc) => sum + calc.extraAmount, 0),
                         totalQuantity: current.reduce((sum, calc) => sum + calc.quantity, 0),
                         difference: totalGov - targetGovAmount,
                         type,
@@ -254,7 +328,8 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
         });
 
         // Return only the best 100 combinations (nearest to target)
-        setSuggestions(allCombinations.slice(0, MAX_COMBINATIONS_TO_RETURN));
+        const bestCombinations = allCombinations.slice(0, MAX_COMBINATIONS_TO_RETURN);
+        onSuggestionsChange?.(bestCombinations);
     };
 
     const handleSelectCombination = (combination: Combination) => {
@@ -262,52 +337,50 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
         onSelectReceipts(receiptIds);
     };
 
-    // Calculate grid columns for input fields
-    const inputFieldCount = (allowManualGovRate ? 1 : 0) + (allowManualRsPerQtl ? 2 : 0) + 1 + (combination && combination.bagSize !== undefined ? 1 : 0);
-    const inputGridCols = inputFieldCount === 5 ? 'grid-cols-5' : inputFieldCount === 4 ? 'grid-cols-4' : inputFieldCount === 3 ? 'grid-cols-3' : inputFieldCount === 2 ? 'grid-cols-2' : 'grid-cols-1';
-
     return (
-        <Card className="text-[10px] border-2 border-primary/25 shadow-2xl bg-gradient-to-br from-card via-card/98 to-card/95 backdrop-blur-md">
-            <CardHeader className="pb-2 px-3 pt-2.5 bg-gradient-to-r from-primary/18 via-primary/12 to-primary/8 border-b-2 border-primary/25 shadow-sm">
-                <CardTitle className="text-[11px] font-extrabold flex items-center gap-2 text-foreground tracking-tight">
-                    <div className="p-1 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-md">
-                        <Calculator className="h-3.5 w-3.5 text-primary drop-shadow-sm" />
-                    </div>
-                    <span className="bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent">GOV Receipt Selection Helper</span>
+        <div className="space-y-2">
+        <Card className="text-[10px] rounded-xl border border-border/70 bg-card shadow-[0_4px_14px_rgba(15,23,42,0.10)]">
+            <CardHeader className="pb-1.5 px-3 pt-2 bg-muted/70 border-b border-border/80">
+                <CardTitle className="text-[11px] font-semibold flex items-center gap-2 tracking-tight text-primary">
+                    <Calculator className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span>GOV Receipt Selection Helper</span>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3 space-y-2">
-                {/* Summary - Compact 4 Column Layout */}
-                <div className="grid grid-cols-4 gap-1.5 p-2 bg-gradient-to-br from-primary/12 via-muted/85 to-muted/65 rounded-lg border-2 border-primary/20 shadow-xl">
-                    <div className="flex flex-col items-center justify-center text-center px-1.5 py-1.5 rounded-md bg-background/50 border-2 border-border/40 hover:bg-primary/15 hover:border-primary/40 hover:shadow-md transition-all duration-300 group cursor-pointer">
-                        <div className="p-1 rounded-md bg-muted/80 border-2 border-border/50 mb-1 group-hover:bg-primary/25 group-hover:border-primary/40 group-hover:scale-110 transition-all shadow-sm">
-                            <Receipt className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                        <span className="text-[9px] text-muted-foreground font-extrabold mb-0.5 uppercase tracking-wide">Available</span>
-                        <span className="font-black text-foreground text-[12px] leading-none px-1.5 py-0.5 rounded-md bg-background/60 border border-border/30">{displayReceiptCalculations.length}</span>
+            <CardContent className="px-3 pb-2.5 pt-2 space-y-2 bg-white">
+                {/* 4 Summary cards - AVAILABLE, TOTAL GOV, NORMAL, EXTRA */}
+                <div className="grid grid-cols-4 gap-1.5">
+                    <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
+                        <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
+                            <DollarSign className="h-2.5 w-2.5" /> Available
+                        </span>
+                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-foreground">{displayReceiptCalculations.length}</span>
                     </div>
-                    <div className="flex flex-col items-center justify-center text-center px-1.5 py-1.5 rounded-md bg-primary/18 border-2 border-primary/30 hover:bg-primary/25 hover:border-primary/45 hover:shadow-lg transition-all duration-300 group cursor-pointer shadow-md">
-                        <div className="p-1 rounded-md bg-primary/30 border-2 border-primary/45 mb-1 group-hover:bg-primary/40 group-hover:scale-110 transition-all shadow-md">
-                            <TrendingUp className="h-3.5 w-3.5 text-primary drop-shadow-sm" />
-                        </div>
-                        <span className="text-[9px] text-muted-foreground font-extrabold mb-0.5 uppercase tracking-wide">
-                            Total Selected
+                    <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
+                        <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
+                            <TrendingUp className="h-2.5 w-2.5" /> {extraAmountBaseType === 'target' ? 'Required GOV' : 'Total GOV'}
                         </span>
-                        <span className="font-black text-primary text-[12px] leading-none px-1.5 py-0.5 rounded-md bg-primary/20 border border-primary/30">
-                            {formatCurrency(totalSelectedNormal)}
+                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-primary">{formatCurrency(govRequiredAmount)}</span>
+                    </div>
+                    <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
+                        <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
+                            <Wallet className="h-2.5 w-2.5" /> Normal
                         </span>
+                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-foreground">{formatCurrency(calculatedBaseAmount)}</span>
+                    </div>
+                    <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
+                        <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
+                            <Coins className="h-2.5 w-2.5" /> Extra
+                        </span>
+                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-primary">{formatCurrency(calculatedExtraAmount)}</span>
                     </div>
                 </div>
 
-                {/* Rate & Amount Configuration - Compact Grid */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Input fields - 3 per row, 2 rows */}
+                <div className="grid grid-cols-3 gap-1.5">
                     {allowManualGovRate && (
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-extrabold flex items-center gap-1.5 text-foreground">
-                                <div className="p-0.5 rounded bg-gradient-to-br from-primary/15 to-primary/8 border border-primary/25 shadow-sm">
-                                    <TrendingUp className="h-2.5 w-2.5 text-primary" />
-                                </div>
-                                GOV Rate
+                        <div className="space-y-0.5">
+                            <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                                <TrendingUp className="h-2.5 w-2.5" /> GOV Rate
                             </Label>
                             <Input
                                 type="number"
@@ -316,147 +389,305 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                                     setManualGovRate(Number(e.target.value) || 0);
                                     setHasManualInputRate(true);
                                 }}
-                                className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner"
-                                placeholder="e.g., 1500"
+                                className="h-7 text-[9px] rounded-md border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 bg-background"
+                                placeholder="e.g., 1800"
                             />
                         </div>
                     )}
-                    <div className="space-y-1">
-                        <Label className="text-[10px] font-extrabold flex items-center gap-1.5 text-foreground">
-                            <div className="p-0.5 rounded bg-gradient-to-br from-primary/15 to-primary/8 border border-primary/25 shadow-sm">
-                                <Target className="h-2.5 w-2.5 text-primary" />
-                            </div>
-                            Target Amount
+                    <div className="space-y-0.5">
+                        <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                            <Target className="h-2.5 w-2.5" /> Target Amount
                         </Label>
                         <Input
                             type="number"
-                            value={targetGovAmount || ''}
+                            value={targetGovAmount || calcTargetAmount || ''}
                             onChange={(e) => {
                                 const value = Number(e.target.value) || 0;
                                 setTargetGovAmount(value);
+                                setCalcTargetAmount?.(value);
                             }}
-                            className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner"
+                            className="h-7 text-[9px] rounded-md border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 bg-background"
                             placeholder="e.g., 80000"
                         />
                     </div>
-                    {combination && combination.bagSize !== undefined && combination.setBagSize && (
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-extrabold flex items-center gap-1.5 text-foreground">
-                                <div className="p-0.5 rounded bg-gradient-to-br from-primary/15 to-primary/8 border border-primary/25 shadow-sm">
-                                    <Package className="h-2.5 w-2.5 text-primary" />
-                                </div>
-                                Bag Qty
+                    <div className="space-y-0.5">
+                        <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                            <Sparkles className="h-2.5 w-2.5" /> Extra Base
+                        </Label>
+                        <Select value={extraAmountBase} onValueChange={(v) => setExtraAmountBase(v as ExtraAmountBase)}>
+                            <SelectTrigger className="h-7 text-[9px] rounded-md border border-border/80 bg-background">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="netQty">Net Qty</SelectItem>
+                                <SelectItem value="finalQty">Final Qty</SelectItem>
+                                <SelectItem value="outstanding">Outstanding</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {allowManualRsPerQtl && (
+                        <div className="space-y-0.5">
+                            <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                                <Percent className="h-2.5 w-2.5" /> Extra Rs/Qtl
                             </Label>
                             <Input
                                 type="number"
-                                value={combination.bagSize ?? ''}
+                                value={manualRsPerQtl ?? ''}
+                                onChange={(e) => {
+                                    setManualRsPerQtl(Number(e.target.value) || 0);
+                                    setHasManualInputRs(true);
+                                }}
+                                className="h-7 text-[9px] rounded-md border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 bg-background"
+                                placeholder="e.g., 100"
+                            />
+                        </div>
+                    )}
+                    {combination?.setBagSize != null && (
+                        <div className="space-y-0.5">
+                            <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                                <Package className="h-2.5 w-2.5" /> Bag Weight
+                            </Label>
+                            <Input
+                                type="number"
+                                value={(combination.bagSize ?? bagWeight) || ''}
                                 onChange={(e) => {
                                     const v = Number(e.target.value);
                                     if (!e.target.value || isNaN(v) || v <= 0) {
                                         combination.setBagSize(undefined);
+                                        setBagWeight(0);
                                     } else {
                                         combination.setBagSize(v);
+                                        setBagWeight(v);
                                     }
                                 }}
-                                className="h-8 text-[10px] border-2 border-primary/25 focus:border-primary focus:ring-2 focus:ring-primary/25 transition-all bg-background/80 shadow-inner"
-                                placeholder="Per bag qty"
+                                className="h-7 text-[9px] rounded-md border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 bg-background"
+                                placeholder="e.g., 50"
                             />
                         </div>
                     )}
+                    <div className="space-y-0.5">
+                        <Label className="text-[9px] font-medium text-foreground flex items-center gap-1">
+                            <Coins className="h-2.5 w-2.5" /> Extra Calc
+                        </Label>
+                        <Select value={extraAmountBaseType} onValueChange={(v) => setExtraAmountBaseType(v as 'receipt' | 'target')}>
+                            <SelectTrigger className="h-7 text-[9px] rounded-md border border-border/80 bg-background">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="receipt">Receipt Based</SelectItem>
+                                <SelectItem value="target">Target Based</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
-                {/* Settings & Controls */}
-                <div className="space-y-2">
-                    
-                    {/* Round Fig, Amount, Step (only when combination exists) */}
+                {/* All toggles in one row: Extra Include / Final WT + Round Fig + Amount + Step */}
+                <div className="grid grid-cols-4 gap-2 items-end">
+                    {extraAmountBaseType === 'target' ? (
+                        <div className="space-y-0.5 min-w-0">
+                            <Label className="text-[9px] font-medium text-foreground">Extra Include</Label>
+                            <button
+                                type="button"
+                                onClick={() => setTargetIncludesExtra(!targetIncludesExtra)}
+                                className={cn(
+                                    "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                                )}
+                            >
+                                <span className={cn("absolute left-2 text-[9px] font-semibold z-0", targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Base only</span>
+                                <span className={cn("absolute right-2 text-[9px] font-semibold z-0", !targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Includes extra</span>
+                                <div className={cn(
+                                    "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                    targetIncludesExtra ? "left-[calc(50%+2px)]" : "left-[2px]"
+                                )}>
+                                    <span className="text-[9px] font-bold text-primary-foreground">{targetIncludesExtra ? 'Extra' : 'Base'}</span>
+                                </div>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-0.5 min-w-0">
+                            <Label htmlFor={`finalWtToggle-${instanceId}`} className="text-[9px] font-medium text-foreground">Final WT</Label>
+                            <button
+                                id={`finalWtToggle-${instanceId}`}
+                                type="button"
+                                onClick={() => setUseFinalWeight(!useFinalWeight)}
+                                className={cn(
+                                    "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                                )}
+                            >
+                                <span className={cn("absolute left-2 text-[9px] font-semibold z-0", useFinalWeight ? "text-muted-foreground/70" : "text-foreground")}>FW</span>
+                                <span className={cn("absolute right-2 text-[9px] font-semibold z-0", !useFinalWeight ? "text-muted-foreground/70" : "text-foreground")}>On</span>
+                                <div className={cn(
+                                    "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                    useFinalWeight ? "left-[calc(50%+2px)]" : "left-[2px]"
+                                )}>
+                                    <span className="text-[9px] font-bold text-primary-foreground">{useFinalWeight ? 'On' : 'FW'}</span>
+                                </div>
+                            </button>
+                        </div>
+                    )}
                     {combination && (
-                        <div className="grid gap-2 grid-cols-3">
-                            <div className="space-y-1">
-                                <Label htmlFor={`roundFigToggle-${instanceId}`} className="text-[10px] font-extrabold text-foreground">Round Fig</Label>
+                        <>
+                            {/* Round Fig toggle - RF pill, same as RTGS Generate Payment Options */}
+                            <div className="space-y-0.5 min-w-0">
+                                <Label
+                                    htmlFor={`roundFigToggle-${instanceId}`}
+                                    className="text-[9px] font-medium text-foreground"
+                                >
+                                    Round Fig
+                                </Label>
                                 <button
                                     id={`roundFigToggle-${instanceId}`}
                                     type="button"
-                                    onClick={() => combination.setRoundFigureToggle(!combination.roundFigureToggle)}
-                                    className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
+                                    onClick={() =>
+                                        combination.setRoundFigureToggle(!combination.roundFigureToggle)
+                                    }
+                                    className={cn(
+                                        "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                                    )}
                                 >
-                                    <span className="absolute left-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">Off</span>
-                                    <span className="absolute right-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">On</span>
+                                    <span
+                                        className={cn(
+                                            "absolute left-2 text-[9px] font-semibold transition-colors z-0",
+                                            !combination.roundFigureToggle
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        Off
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "absolute right-2 text-[9px] font-semibold transition-colors z-0",
+                                            combination.roundFigureToggle
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        On
+                                    </span>
                                     <div
                                         className={cn(
-                                            "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-md shadow-xl flex items-center justify-center z-10 border",
-                                            combination.roundFigureToggle 
-                                                ? "left-[calc(50%+2px)] border-primary"
-                                                : "left-[2px] border-[hsl(160_40%_20%)]"
+                                            "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                            combination.roundFigureToggle
+                                                ? "left-[calc(50%+2px)]"
+                                                : "left-[2px]"
                                         )}
-                                        style={{
-                                            backgroundColor: combination.roundFigureToggle 
-                                                ? 'hsl(160 40% 45%)' // Light green for ON
-                                                : 'hsl(160 40% 20%)' // Dark green for OFF
-                                        }}
                                     >
-                                        <span className="text-[9px] font-black text-primary-foreground drop-shadow-sm">RF</span>
+                                        <span className="text-[9px] font-bold text-primary-foreground">
+                                            RF
+                                        </span>
                                     </div>
                                 </button>
                             </div>
-                            <div className="space-y-1">
-                                <Label htmlFor={`amountToggle-${instanceId}`} className="text-[10px] font-extrabold text-foreground">Amount</Label>
+
+                            {/* Amount toggle - ₹ Only vs ₹ + Paise */}
+                            <div className="space-y-0.5 min-w-0">
+                                <Label
+                                    htmlFor={`amountToggle-${instanceId}`}
+                                    className="text-[9px] font-medium text-foreground"
+                                >
+                                    Amount
+                                </Label>
                                 <button
                                     id={`amountToggle-${instanceId}`}
                                     type="button"
-                                    onClick={() => combination.setAllowPaiseAmount(!combination.allowPaiseAmount)}
-                                    className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
+                                    onClick={() =>
+                                        combination.setAllowPaiseAmount(!combination.allowPaiseAmount)
+                                    }
+                                    className={cn(
+                                        "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                                    )}
                                 >
-                                    <span className="absolute left-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">₹ Only</span>
-                                    <span className="absolute right-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">₹+Ps</span>
+                                    <span
+                                        className={cn(
+                                            "absolute left-2 text-[9px] font-semibold transition-colors z-0",
+                                            !combination.allowPaiseAmount
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        ₹
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "absolute right-2 text-[9px] font-semibold transition-colors z-0",
+                                            combination.allowPaiseAmount
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        ₹+Ps
+                                    </span>
                                     <div
                                         className={cn(
-                                            "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-md shadow-xl flex items-center justify-center z-10 border",
-                                            combination.allowPaiseAmount 
-                                                ? "left-[calc(50%+2px)] border-primary"
-                                                : "left-[2px] border-[hsl(160_40%_20%)]"
+                                            "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                            combination.allowPaiseAmount
+                                                ? "left-[calc(50%+2px)]"
+                                                : "left-[2px]"
                                         )}
-                                        style={{
-                                            backgroundColor: combination.allowPaiseAmount 
-                                                ? 'hsl(160 40% 45%)' // Light green for ON
-                                                : 'hsl(160 40% 20%)' // Dark green for OFF
-                                        }}
                                     >
-                                        <span className="text-[9px] font-black text-primary-foreground drop-shadow-sm">
-                                            {combination.allowPaiseAmount ? "₹.ps" : "₹"}
+                                        <span className="text-[9px] font-bold text-primary-foreground">
+                                            {combination.allowPaiseAmount ? "₹+Ps" : "₹"}
                                         </span>
                                     </div>
                                 </button>
                             </div>
-                            <div className="space-y-1">
-                                <Label htmlFor={`stepToggle-${instanceId}`} className="text-[10px] font-extrabold text-foreground">Step</Label>
+
+                            {/* Step toggle - ÷1 vs ÷5 */}
+                            <div className="space-y-0.5 min-w-0">
+                                <Label
+                                    htmlFor={`stepToggle-${instanceId}`}
+                                    className="text-[9px] font-medium text-foreground"
+                                >
+                                    Step
+                                </Label>
                                 <button
                                     id={`stepToggle-${instanceId}`}
                                     type="button"
-                                    onClick={() => combination.setRateStep(combination.rateStep === 1 ? 5 : 1)}
-                                    className="relative w-full min-w-[120px] h-8 flex items-center rounded-md p-1 cursor-pointer border-2 border-border/55 bg-muted/75 overflow-hidden text-[9px] shadow-md hover:shadow-lg hover:border-primary/30"
+                                    onClick={() =>
+                                        combination.setRateStep(
+                                            combination.rateStep === 1 ? 5 : 1
+                                        )
+                                    }
+                                    className={cn(
+                                        "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+                                    )}
                                 >
-                                    <span className="absolute left-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">÷1</span>
-                                    <span className="absolute right-2.5 text-[9px] font-extrabold text-muted-foreground/70 z-0">÷5</span>
+                                    <span
+                                        className={cn(
+                                            "absolute left-2 text-[9px] font-semibold transition-colors z-0",
+                                            combination.rateStep === 1
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        +1
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "absolute right-2 text-[9px] font-semibold transition-colors z-0",
+                                            combination.rateStep === 5
+                                                ? "text-muted-foreground/70"
+                                                : "text-foreground"
+                                        )}
+                                    >
+                                        +5
+                                    </span>
                                     <div
                                         className={cn(
-                                            "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-md shadow-xl flex items-center justify-center z-10 border",
-                                            combination.rateStep === 5 
-                                                ? "left-[calc(50%+2px)] border-primary"
-                                                : "left-[2px] border-[hsl(160_40%_20%)]"
+                                            "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                            combination.rateStep === 5
+                                                ? "left-[calc(50%+2px)]"
+                                                : "left-[2px]"
                                         )}
-                                        style={{
-                                            backgroundColor: combination.rateStep === 5 
-                                                ? 'hsl(160 40% 45%)' // Light green for ON
-                                                : 'hsl(160 40% 20%)' // Dark green for OFF
-                                        }}
                                     >
-                                        <span className="text-[9px] font-black text-primary-foreground drop-shadow-sm">
-                                            ÷{combination.rateStep}
+                                        <span className="text-[9px] font-bold text-primary-foreground">
+                                            +{combination.rateStep}
                                         </span>
                                     </div>
                                 </button>
                             </div>
-                        </div>
+                        </>
                     )}
                 </div>
 
@@ -467,7 +698,7 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                         <Button
                             onClick={handleGenerateWithExtraBase}
                             size="sm"
-                            className="h-8 text-[10px] font-extrabold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 border-2 border-primary/35 hover:border-primary/45"
+                            className="h-7 text-[9px] rounded-md font-semibold bg-primary text-primary-foreground hover:bg-primary/90 border border-primary/80"
                         >
                             <Sparkles className="h-3 w-3 mr-1" />
                             Generate
@@ -476,62 +707,16 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                     <Button
                         onClick={handleCalculateCombinations}
                         size="sm"
-                        className="h-8 text-[10px] font-extrabold shadow-lg hover:shadow-xl transition-all border-2 border-primary/25 hover:border-primary/35 bg-background/80 hover:bg-background/95"
+                        className="h-7 text-[9px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 border border-primary/80 disabled:opacity-50 disabled:pointer-events-none"
                         disabled={targetGovAmount <= 0 || receiptCalculations.length === 0}
                     >
                         <Calculator className="h-3 w-3 mr-1" />
                         Calculate
                     </Button>
                 </div>
-
-                {/* Suggestions Table - Enhanced */}
-                {suggestions.length > 0 && (
-                    <div className="mt-2 border-t pt-2">
-                        <div className="text-[10px] font-bold mb-2 flex items-center gap-1.5">
-                            <Sparkles className="h-3 w-3 text-primary" />
-                            Suggested Combinations
-                        </div>
-                        <div className="max-h-[300px] overflow-y-auto rounded-md border border-border/50">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="h-7 bg-primary/20 border-b border-primary/30">
-                                        <TableHead className="text-[9px] w-[30px] font-bold">Select</TableHead>
-                                        <TableHead className="text-[9px] font-bold">Type</TableHead>
-                                        <TableHead className="text-[9px] font-bold">Receipts</TableHead>
-                                        <TableHead className="text-[9px] font-bold">Total GOV</TableHead>
-                                        <TableHead className="text-[9px] font-bold">Excess</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {suggestions.map((comb, idx) => (
-                                        <TableRow key={idx} className="h-7 hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-[9px]">
-                                                <Checkbox
-                                                    checked={comb.receipts.every(r => selectedReceiptIds.has(r.id || r.srNo))}
-                                                    onCheckedChange={() => handleSelectCombination(comb)}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="text-[9px] font-medium">{comb.type}</TableCell>
-                                            <TableCell className="text-[9px]">
-                                                {comb.details.map(d => d.srNo).join(', ')}
-                                            </TableCell>
-                                            <TableCell className="text-[9px] font-bold text-primary">
-                                                {formatCurrency(comb.totalGov)}
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                "text-[9px] font-semibold",
-                                                comb.difference > 0 ? "text-primary" : "text-muted-foreground"
-                                            )}>
-                                                {comb.difference > 0 ? `+${formatCurrency(comb.difference)}` : formatCurrency(comb.difference)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-                )}
             </CardContent>
         </Card>
+
+    </div>
     );
 };

@@ -269,13 +269,14 @@ export default function DashboardClient() {
             }
         });
         
-        // Subtract payments from receivables
+        // Subtract payments from receivables (amount + CD both reduce receivable)
         // Note: We use all customer payments (not filtered by date) because receivables are cumulative
         customerPayments.forEach(payment => {
             if (payment.paidFor && payment.paidFor.length > 0) {
                 payment.paidFor.forEach((paidFor: PaidFor) => {
                     const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
-                    const newReceivable = Math.max(0, currentReceivable - (Number(paidFor.amount) || 0));
+                    const paidAmount = (Number(paidFor.amount) || 0) + (Number(paidFor.cdAmount) || 0);
+                    const newReceivable = Math.max(0, currentReceivable - paidAmount);
                     customerReceivablesMap.set(paidFor.srNo, newReceivable);
                 });
             }
@@ -284,11 +285,29 @@ export default function DashboardClient() {
         // Sum all outstanding receivables
         const totalCustomerReceivables = Array.from(customerReceivablesMap.values()).reduce((sum, amount) => sum + amount, 0);
 
+        // Supplier Dues: Use ALL suppliers (not date-filtered), outstanding = originalNetAmount - totalPaid - totalCd
+        const supplierDuesMap = new Map<string, number>();
+        suppliers.forEach(s => {
+            const originalAmount = Number(s.originalNetAmount) || Number(s.netAmount) || 0;
+            supplierDuesMap.set(s.srNo, originalAmount);
+        });
+        supplierPayments.forEach(payment => {
+            if (payment.paidFor && payment.paidFor.length > 0) {
+                payment.paidFor.forEach((pf: PaidFor) => {
+                    const currentDue = supplierDuesMap.get(pf.srNo) || 0;
+                    const paidAmount = (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
+                    const newDue = Math.max(0, currentDue - paidAmount);
+                    supplierDuesMap.set(pf.srNo, newDue);
+                });
+            }
+        });
+        const totalSupplierDues = Array.from(supplierDuesMap.values()).reduce((sum, amt) => sum + amt, 0);
+
         return {
             totalIncome: currentTotalIncome,
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
-            totalSupplierDues: filteredData.filteredSuppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
+            totalSupplierDues,
             totalCustomerReceivables: totalCustomerReceivables,
             totalCdReceived: cdReceived,
             expenseBreakdown: {
@@ -297,7 +316,7 @@ export default function DashboardClient() {
                 outsiderRTGS: outsiderRTGS,
             }
         }
-    }, [filteredData, kantaParchi, customers, customerPayments]);
+    }, [filteredData, kantaParchi, customers, customerPayments, suppliers, supplierPayments]);
     
     const appCountsMap = useMemo(() => ({
         suppliers: suppliers.length,

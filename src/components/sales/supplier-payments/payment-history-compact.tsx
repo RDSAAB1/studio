@@ -172,11 +172,11 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
   }, [maxRows, sortedPayments]);
 
   return (
-    <Card className="text-[9px] flex flex-col h-full overflow-hidden border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
+    <Card className="text-[9px] flex flex-col h-full overflow-hidden rounded-md">
       <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
-          {/* Fixed Header */}
-          <div className="sticky top-0 z-30 bg-primary/20 border-b border-primary/30 shadow-sm backdrop-blur-sm">
+          {/* Fixed Header – flat, no rounding, so it reads as part of the table */}
+          <div className="sticky top-0 z-30 bg-muted/50 border-b border-border rounded-none">
             <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="h-1 border-b-0 overflow-hidden">
@@ -217,9 +217,9 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                   {historyType === 'payment' && (
                     <>
                       <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[8%] text-left align-middle overflow-hidden">ID</TableHead>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[8%] text-left align-middle overflow-hidden">Date</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Account Holder</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[26%] text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[22%] text-left align-middle overflow-hidden">Account Holder</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Paid For</TableHead>
                       <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Extra</TableHead>
                       <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Paid</TableHead>
                       <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
@@ -230,8 +230,8 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
               </TableHeader>
             </Table>
           </div>
-          {/* Scrollable Body */}
-          <div className={maxRows ? "overflow-x-hidden overflow-y-hidden flex-1 min-h-0" : "overflow-x-hidden overflow-y-auto flex-1 min-h-0"}>
+          {/* Scrollable Body – no gap, no rounding at top */}
+          <div className={`flex-1 min-h-0 ${maxRows ? "overflow-x-hidden overflow-y-hidden" : "overflow-x-hidden overflow-y-auto"}`}>
             <Table className="table-fixed w-full">
               <TableBody>
                 {visiblePayments.length === 0 ? (
@@ -269,7 +269,7 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                       : '-';
                     
                     return (
-                      <TableRow key={`${payment.id || payment.paymentId || 'pay'}-${index}`} className="h-5 border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-violet-50/60 transition-colors">
+                      <TableRow key={`${payment.id || payment.paymentId || 'pay'}-${index}`} className="h-5 border-b border-slate-200/70 text-slate-900 odd:bg-card/50 hover:bg-primary/5 transition-colors">
                         {historyType === 'cash' && (
                           <>
                             <TableCell className="text-[10px] px-2 py-0.5 w-[14%] text-left align-middle">
@@ -428,13 +428,13 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                             <TableCell className="px-2 py-0.5 w-[8%] text-left align-top">
                               <div className="font-mono font-bold text-[10px] leading-none truncate">{payment.paymentId || payment.id}</div>
                             </TableCell>
-                            <TableCell className="px-2 py-0.5 w-[8%] text-left align-top">
+                            <TableCell className="px-2 py-0.5 w-[12%] text-left align-top">
                               <div className="text-muted-foreground text-[9px] font-medium leading-none truncate">{paymentDate}</div>
                             </TableCell>
-                            <TableCell className="px-2 py-0.5 w-[16%] text-left align-top">
+                            <TableCell className="px-2 py-0.5 w-[22%] text-left align-top">
                               <div className="text-[9px] font-semibold leading-none truncate">{accountHolderName || '-'}</div>
                             </TableCell>
-                            <TableCell className="px-2 py-0.5 w-[26%] text-left align-top">
+                            <TableCell className="px-2 py-0.5 w-[16%] text-left align-top">
                               <div className="text-[9px] text-muted-foreground font-medium leading-none truncate">{receiptNumbers || '-'}</div>
                             </TableCell>
                             <TableCell className="px-2 py-0.5 w-[12%] text-right align-top">

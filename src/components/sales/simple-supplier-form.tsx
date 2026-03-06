@@ -5,7 +5,6 @@ import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -30,9 +29,7 @@ interface SimpleSupplierFormProps {
 const SimpleSupplierForm = ({ form, handleSrNoBlur }: SimpleSupplierFormProps) => {
     return (
         <div className="space-y-4">
-            {/* Basic Information Card */}
-            <Card>
-                <CardContent className="p-4">
+            <div className="rounded-lg border border-border/50 bg-card p-4">
                     <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
@@ -104,12 +101,9 @@ const SimpleSupplierForm = ({ form, handleSrNoBlur }: SimpleSupplierFormProps) =
                             </InputWithIcon>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+            </div>
 
-            {/* Transaction Details Card */}
-            <Card>
-                <CardContent className="p-4">
+            <div className="rounded-lg border border-border/50 bg-card p-4">
                     <h3 className="text-lg font-semibold mb-4">Transaction Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-2">
@@ -177,8 +171,7 @@ const SimpleSupplierForm = ({ form, handleSrNoBlur }: SimpleSupplierFormProps) =
                             </InputWithIcon>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+            </div>
         </div>
     );
 };

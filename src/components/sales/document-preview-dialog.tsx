@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
@@ -21,10 +20,12 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { SmartDatePicker } from "../ui/smart-date-picker";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 import { runTransaction, doc, collection, getDoc, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+import { getTenantCollectionPath, getTenantDocPath } from '@/lib/tenancy';
 import { db } from '@/lib/database';
 import { logError } from "@/lib/error-logger";
 
@@ -73,7 +74,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                  // Verify expense ID exists before setting state
                 let verifiedExpenseId = customer.advanceExpenseId;
                 if (customer.advanceExpenseId) {
-                    const expenseRef = doc(firestoreDB, "expenses", customer.advanceExpenseId);
+                    const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", customer.advanceExpenseId));
                     const expenseSnap = await getDoc(expenseRef);
                     if (!expenseSnap.exists()) {
 
@@ -158,7 +159,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
         try {
             await runTransaction(firestoreDB, async (transaction) => {
-                const customerRef = doc(firestoreDB, "customers", customer.id);
+                const customerRef = doc(firestoreDB, ...getTenantDocPath("customers", customer.id));
                 
                 const newAdvanceAmount = invoiceDetails.advanceFreight;
                 let currentExpenseId = editableInvoiceDetails.advanceExpenseId;
@@ -183,15 +184,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
                 if (newAdvanceAmount > 0) {
                     if (currentExpenseId) {
-                        const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
+                        const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", currentExpenseId));
                         transaction.update(expenseRef, expenseData);
                     } else {
-                        const newExpenseRef = doc(collection(firestoreDB, "expenses"));
+                        const newExpenseRef = doc(collection(firestoreDB, ...getTenantCollectionPath("expenses")));
                         transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
                         currentExpenseId = newExpenseRef.id;
                     }
                 } else if (newAdvanceAmount === 0 && currentExpenseId) {
-                    const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
+                    const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", currentExpenseId));
                     transaction.delete(expenseRef);
                     currentExpenseId = undefined; 
                 }
@@ -289,9 +290,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             if (!receiptNode) return;
 
             const iframe = document.createElement('iframe');
-            iframe.style.position = 'absolute';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-9999px';
+            iframe.style.top = '0';
+            iframe.style.width = '210mm';
+            iframe.style.height = '297mm';
             iframe.style.border = '0';
             document.body.appendChild(iframe);
             
@@ -304,28 +307,52 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
             iframeDoc.open();
             iframeDoc.write('<html><head><title>Print Document</title>');
+            iframeDoc.write(`
+                <style>
+                    html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
+                    body * { background-color: transparent; }
+                    .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
+                    @media print { html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+                </style>`);
 
             Array.from(document.styleSheets).forEach(styleSheet => {
                 try {
                     const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                     const style = iframeDoc.createElement('style');
                     style.appendChild(iframeDoc.createTextNode(cssText));
-                    style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
                     iframeDoc.head.appendChild(style);
                 } catch (e) {
                     handleSilentError(e, 'saveAndPrint - iframe style injection');
                 }
             });
 
+            const printOverride = iframeDoc.createElement('style');
+            printOverride.textContent = `@media print {
+              body, body *, .printable-area, .printable-area * {
+                visibility: visible !important;
+                opacity: 1 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+              }
+            }`;
+            iframeDoc.head.appendChild(printOverride);
+
             iframeDoc.write('</head><body></body></html>');
             iframeDoc.body.innerHTML = receiptNode.innerHTML;
             iframeDoc.close();
 
-            setTimeout(() => {
+            let printed = false;
+            const doPrint = () => {
+                if (printed) return;
+                printed = true;
                 iframe.contentWindow?.focus();
                 iframe.contentWindow?.print();
                 document.body.removeChild(iframe);
-            }, 500);
+            };
+            iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+            setTimeout(doPrint, 800);
 
             toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
 
@@ -446,9 +473,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     <ScrollArea className="flex-grow pr-3 -mr-3">
                         <div className="space-y-4">
                             {documentType === 'tax-invoice' && (
-                            <Card>
-                                <CardHeader className="p-3"><CardTitle className="text-base">Tax & Invoice Info</CardTitle></CardHeader>
-                                <CardContent className="p-3 space-y-3">
+                            <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3">
+                                <h3 className="text-base font-semibold">Tax & Invoice Info</h3>
                                     <div className="space-y-1"><Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label><Input id="hsnCode" name="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label><Input id="taxRate" name="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                     
@@ -478,12 +504,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                             </div>
                                         </button>
                                     </div>
-                                </CardContent>
-                            </Card>
+                            </div>
                             )}
-                             <Card>
-                                <CardHeader className="p-3"><CardTitle className="text-base">Additional Details</CardTitle></CardHeader>
-                                <CardContent className="p-3 grid grid-cols-2 gap-3">
+                             <div className="rounded-lg border border-border/50 bg-card p-3 grid grid-cols-2 gap-3">
+                                <h3 className="text-base font-semibold col-span-2">Additional Details</h3>
                                     <div className="space-y-1"><Label htmlFor="nineRNo" className="text-xs">9R No.</Label><Input id="nineRNo" name="nineRNo" value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label htmlFor="gatePassNo" className="text-xs">Gate Pass No.</Label><Input id="gatePassNo" name="gatePassNo" value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label htmlFor="grNo" className="text-xs">G.R. No.</Label><Input id="grNo" name="grNo" value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
@@ -501,11 +525,22 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.advanceFreight} onChange={(e) => setInvoiceDetails({...invoiceDetails, advanceFreight: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Advance Paid Via</Label>
-                                        <CustomDropdown 
-                                            options={[{value: "CashInHand", label: "Cash In Hand"}, ...bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))]} 
+                                        <Select
                                             value={invoiceDetails.advancePaymentMethod}
-                                            onChange={(v) => v && setInvoiceDetails(prev => ({ ...prev, advancePaymentMethod: v }))} 
-                                        />
+                                            onValueChange={(v) => setInvoiceDetails(prev => ({ ...prev, advancePaymentMethod: v }))}
+                                        >
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue placeholder="Select account" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="CashInHand">Cash In Hand</SelectItem>
+                                                {bankAccounts.map(acc => (
+                                                    <SelectItem key={acc.id} value={acc.id}>
+                                                        {acc.accountHolderName}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div className="col-span-2 flex items-center space-x-2 pt-2">
                                         <SegmentedSwitch 
@@ -518,11 +553,9 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         />
                                         <Label htmlFor="show-bag-weight" className="text-xs">Show Bag Wt & Final Wt Columns</Label>
                                     </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="p-3"><CardTitle className="text-base">Bill To Details</CardTitle></CardHeader>
-                                <CardContent className="p-3 space-y-3">
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3">
+                                <h3 className="text-base font-semibold">Bill To Details</h3>
                                     <div className="space-y-1"><Label className="text-xs">Customer Name</Label><Input name="name" value={editableInvoiceDetails.name || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">Company Name</Label><Input name="companyName" value={editableInvoiceDetails.companyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">Contact</Label><Input name="contact" value={editableInvoiceDetails.contact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
@@ -538,12 +571,14 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                             <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.stateCode || null} onChange={(value) => handleStateChange('billing', 'code', value)} placeholder="Code"/>
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="p-3 flex items-center justify-between"><CardTitle className="text-base">Ship To Details</CardTitle><div className="flex items-center space-x-2"><SegmentedSwitch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} leftLabel="Off" rightLabel="On" className="w-32" /><Label htmlFor="same-as-billing" className="text-xs">Same as Bill To</Label></div></CardHeader>
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-card p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-base font-semibold">Ship To Details</h3>
+                                    <div className="flex items-center space-x-2"><SegmentedSwitch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} leftLabel="Off" rightLabel="On" className="w-32" /><Label htmlFor="same-as-billing" className="text-xs">Same as Bill To</Label></div>
+                                </div>
                                 {!isSameAsBilling && (
-                                    <CardContent className="p-3 space-y-3">
+                                    <div className="space-y-3">
                                         <div className="space-y-1"><Label className="text-xs">Name</Label><Input name="shippingName" value={editableInvoiceDetails.shippingName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                         <div className="space-y-1"><Label className="text-xs">Company Name</Label><Input name="shippingCompanyName" value={editableInvoiceDetails.shippingCompanyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                         <div className="space-y-1"><Label className="text-xs">Contact</Label><Input name="shippingContact" value={editableInvoiceDetails.shippingContact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
@@ -558,10 +593,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                                 <Label className="text-xs">State Code</Label>
                                                 <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.shippingStateCode || null} onChange={(value) => handleStateChange('shipping', 'code', value)} placeholder="Code"/>
                                             </div>
-                                        </div>
-                                    </CardContent>
-                                )}
-                            </Card>
+                                            </div>
+                                    </div>
+                                    )}
+                            </div>
                         </div>
                     </ScrollArea>
                     <DialogFooter className="pt-4 flex-row justify-end gap-2 flex-shrink-0">

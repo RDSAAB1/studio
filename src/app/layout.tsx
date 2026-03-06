@@ -1,20 +1,22 @@
 
 "use client";
 
-import { useEffect, useState, useRef, type ReactNode } from 'react';
+import React, { useEffect, useState, useRef, type ReactNode } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { GlobalConfirmDialog } from "@/components/ui/global-confirm-dialog";
-import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
+import { Inter, Space_Grotesk, Source_Code_Pro, Plus_Jakarta_Sans } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store';
 import { GlobalDataProvider } from '@/contexts/global-data-context';
-import { Loader2 } from 'lucide-react';
+import { ErpSelectionProvider } from '@/contexts/erp-selection-context';
 import AppLayoutWrapper from '@/components/layout/app-layout';
+import { AuthTransitionScreen } from '@/components/auth/auth-transition-screen';
 import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import { getRtgsSettings } from "@/lib/firestore";
+import { getRtgsSettings, refreshTenantFirestoreBindings } from "@/lib/firestore";
+import { ensureTenantForUser, getActiveTenant } from "@/lib/tenancy";
 import { syncAllData } from '@/lib/database';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -39,6 +41,12 @@ const sourceCodePro = Source_Code_Pro({
   variable: '--font-source-code-pro',
 });
 
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-plus-jakarta-sans',
+});
+
 const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
@@ -59,7 +67,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 setAuthChecked(true);
             }, 8000);
 
-		    unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+		    unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
                 if (timeoutId) {
                     clearTimeout(timeoutId);
                     timeoutId = null;
@@ -77,6 +85,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             }
             
 			if (currentUser) {
+				try {
+					await ensureTenantForUser(currentUser);
+					refreshTenantFirestoreBindings();
+				} catch {
+				}
+
                 // ✅ FIX: Only initialize once - skip if already initialized for this user
                 if (initializedRef.current && wasLoggedIn) {
                     // User was already logged in, just update setup status if needed
@@ -86,7 +100,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                         getRtgsSettings()
                             .then((companySettings) => {
                                 if (typeof window !== 'undefined') {
-                                    localStorage.setItem('rtgsSettingsCache', JSON.stringify({
+                                    const active = getActiveTenant();
+                                    const cacheKey = active ? `rtgsSettingsCache:${active.storageMode}:${active.id}` : 'rtgsSettingsCache';
+                                    localStorage.setItem(cacheKey, JSON.stringify({
                                         data: companySettings,
                                         timestamp: Date.now()
                                     }));
@@ -107,9 +123,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 // Mark as initialized for this user
                 initializedRef.current = true;
 				// ✅ OPTIMIZED: Check cache first to avoid blocking initialization
-				const cachedSettings = typeof window !== 'undefined' 
-					? localStorage.getItem('rtgsSettingsCache')
-					: null;
+				const cachedSettings = (() => {
+					if (typeof window === 'undefined') return null;
+					const active = getActiveTenant();
+					const cacheKey = active ? `rtgsSettingsCache:${active.storageMode}:${active.id}` : 'rtgsSettingsCache';
+					return localStorage.getItem(cacheKey);
+				})();
 				
 				if (cachedSettings) {
 					try {
@@ -123,7 +142,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 							getRtgsSettings()
 								.then((companySettings) => {
 									if (typeof window !== 'undefined') {
-										localStorage.setItem('rtgsSettingsCache', JSON.stringify({
+										const active = getActiveTenant();
+										const cacheKey = active ? `rtgsSettingsCache:${active.storageMode}:${active.id}` : 'rtgsSettingsCache';
+										localStorage.setItem(cacheKey, JSON.stringify({
 											data: companySettings,
 											timestamp: Date.now()
 										}));
@@ -156,7 +177,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 				getRtgsSettings()
 					.then((companySettings) => {
 						if (typeof window !== 'undefined') {
-							localStorage.setItem('rtgsSettingsCache', JSON.stringify({
+							const active = getActiveTenant();
+							const cacheKey = active ? `rtgsSettingsCache:${active.storageMode}:${active.id}` : 'rtgsSettingsCache';
+							localStorage.setItem(cacheKey, JSON.stringify({
 								data: companySettings,
 								timestamp: Date.now()
 							}));
@@ -246,10 +269,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
         // ✅ FIX: Normalize pathname to handle trailing slashes
         const normalizedPathname = pathname.replace(/\/$/, '') || '/';
-        const isPublicPage = ['/login', '/signup', '/forgot-password'].some(page => 
+        const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
+        const isAuthPublicPage = ['/login', '/signup', '/forgot-password'].some(page => 
             normalizedPathname === page || normalizedPathname.startsWith(page + '/')
         );
-        const isSettingsPage = normalizedPathname === '/settings';
+        const isPublicPage = isAuthPublicPage || isIntroPage;
+        const isSettingsPage = normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/');
         
         if (user) { // User is logged in
             // ✅ FIX: Wait for initialization to complete before redirecting
@@ -279,12 +304,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
             // Setup status is determined (true or false) - proceed with redirect logic
             if (!isSetupComplete && !isSettingsPage) {
-                // Setup not complete - redirect to settings
+                // No company yet - redirect to ERP Migration so user can create company
                 if (!redirectHandledRef.current) {
-                    router.replace('/settings');
+                    router.replace('/settings/erp-migration');
                     redirectHandledRef.current = true;
                 }
-            } else if (isSetupComplete && isPublicPage) {
+            } else if (isSetupComplete && isAuthPublicPage) {
                 // ✅ FIX: Setup complete and on login page - redirect to dashboard (/)
                 // Force redirect immediately - always redirect if on public page
                 if (normalizedPathname !== '/') {
@@ -312,7 +337,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         } else { // User is not logged in
              if (!isPublicPage) {
                 if (!redirectHandledRef.current) {
-                    router.replace('/login');
+                    router.replace('/intro');
                     redirectHandledRef.current = true;
                 }
             } else {
@@ -322,56 +347,59 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         }, [user, authChecked, isSetupComplete, initializationComplete, pathname, router]);
 
 	if (!authChecked) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-4 text-muted-foreground">Initializing...</span>
-            </div>
-        );
+        return <AuthTransitionScreen />;
     }
-    
-    const showAppLayout = user && isSetupComplete;
-    const isDashboardPage = pathname === '/';
+
+    // When user is logged in but still on a public auth page (login/signup/forgot),
+    // show transition screen until redirect completes. Never show top bar + login page together.
+    const normalizedPathname = pathname.replace(/\/$/, '') || '/';
+    const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
+    const isAuthPublicPage = ['/login', '/signup', '/forgot-password'].some(
+        (p) => normalizedPathname === p || normalizedPathname.startsWith(p + '/')
+    );
+    const showAppLayout = !!user && !isAuthPublicPage && !isIntroPage;
 
     // ✅ FIX: Always mount GlobalDataProvider to prevent "useGlobalData must be used within a GlobalDataProvider" errors
-    // The provider will only set up listeners when user is logged in (handled internally)
-    // This ensures components can safely use useGlobalData even during SSR or before auth is determined
     if (showAppLayout) {
-        // Setup complete - show full app layout
+        return (
+            <ErpSelectionProvider>
+                <GlobalDataProvider>
+                    <AppLayoutWrapper>{children}</AppLayoutWrapper>
+                </GlobalDataProvider>
+            </ErpSelectionProvider>
+        );
+    }
+    // User logged in but still on auth public page (login/signup/forgot) - show transition screen until redirect
+    if (user && isAuthPublicPage) {
         return (
             <GlobalDataProvider>
-                <AppLayoutWrapper>{children}</AppLayoutWrapper>
+                <AuthTransitionScreen />
             </GlobalDataProvider>
         );
-    } else if (user && isDashboardPage) {
-        // ✅ FIX: User logged in and on dashboard - show app layout even if setup is still loading
-        // This ensures dashboard is visible immediately after login redirect
-        return (
-            <GlobalDataProvider>
-                <AppLayoutWrapper>{children}</AppLayoutWrapper>
-            </GlobalDataProvider>
-        );
-    } else if (user) {
-        // User logged in but setup not complete and not on dashboard - mount provider but show loading
-        // This allows components to use useGlobalData without errors
-        return (
-            <GlobalDataProvider>
-                {children}
-            </GlobalDataProvider>
-        );
-    } else {
-        // No user yet - still mount provider (it won't set up listeners until user is logged in)
-        // This prevents errors when components try to use useGlobalData during SSR or initial render
+    }
+    // User logged in and on intro page - always allow intro page directly
+    if (user && isIntroPage) {
         return (
             <GlobalDataProvider>
                 {children}
             </GlobalDataProvider>
         );
     }
+    // No user - show login/intro page
+    return (
+        <GlobalDataProvider>
+            {children}
+        </GlobalDataProvider>
+    );
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-    const { toast } = useToast();
+type LayoutProps = {
+  children: ReactNode;
+  params?: Promise<Record<string, string>>;
+};
+export default function RootLayout({ children, params }: LayoutProps) {
+  if (params) React.use(params);
+  const { toast } = useToast();
     useSyncQueue();
 
     // ✅ OPTIMIZED: Combined service worker registration and message handling
@@ -424,7 +452,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <meta name="apple-mobile-web-app-title" content="JRMD Studio" />
                 <meta name="mobile-web-app-capable" content="yes" />
             </head>
-            <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
+            <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} ${plusJakartaSans.variable} font-body antialiased`}>
                 <ErrorBoundary>
                     <StateProvider>
                         <AuthWrapper>
@@ -432,8 +460,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                         </AuthWrapper>
                     </StateProvider>
                 </ErrorBoundary>
-                {/* Toaster hidden - using DynamicIslandToaster in header instead */}
-                {/* <Toaster /> */}
+                <Toaster />
                 <GlobalConfirmDialog />
             </body>
         </html>

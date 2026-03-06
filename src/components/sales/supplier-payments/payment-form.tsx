@@ -3,7 +3,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,10 +36,10 @@ const cdOptions = [
 
 const getPaymentMethodStyles = (method: string, isSelected: boolean) => {
     if (!isSelected) {
-        return "bg-transparent border border-transparent text-slate-600 hover:bg-card/70 hover:border-slate-200/80";
+        return "bg-transparent border border-transparent text-muted-foreground hover:bg-muted/50 hover:border-border/60";
     }
 
-    return "bg-card border border-slate-200/80 text-slate-900 shadow-sm ring-1 ring-violet-200/60";
+    return "bg-primary text-primary-foreground border-primary/40 shadow-md";
 };
 
 export const PaymentForm = React.memo(PaymentFormComponent);
@@ -126,6 +125,9 @@ function PaymentFormComponent(props: any) {
 
     const isLedger = paymentMethod === 'Ledger';
     const isGov = paymentMethod === 'Gov.';
+    const isCash = paymentMethod === 'Cash';
+    const isOnline = paymentMethod === 'Online';
+    const isRtgs = paymentMethod === 'RTGS';
     const cdAllowed = !(isLedger || isGov);
     
     const queueToBePaidUpdate = (value: number) => {
@@ -160,14 +162,18 @@ function PaymentFormComponent(props: any) {
     // Memoize the buttons list to avoid recreating on every render
     const paymentMethods = useMemo(() => ['Cash', 'Online', 'Ledger', 'RTGS', 'Gov.'] as const, []);
 
+    // Layout: Cash / Online / RTGS / Ledger => 2 fields per row, Gov => 3 per row
+    const baseGridColsClass = isGov
+        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full"
+        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-1 w-full";
+
     return (
         <>
-            <div className="w-full max-w-full flex flex-col h-full">
-                <Card className="w-full max-w-full overflow-hidden flex flex-col h-full border border-slate-200/80 bg-card shadow-[0_10px_30px_rgba(0,0,0,0.10)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.14)] transition-shadow">
-                    <CardContent className="px-2.5 py-1.5 space-y-1.5 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto">
+            <div className="w-full max-w-full flex flex-col h-full rounded-xl border border-border/60 bg-card shadow-sm">
+                    <div className="px-2.5 py-1.5 space-y-1.5 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto">
                           <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                                 {!hideRtgsToggle && (
-                                <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] bg-slate-100/80 border border-slate-200/80 p-0.5">
+                                <div className="flex flex-wrap items-center gap-1.5 rounded-t-xl border-b border-border/60 bg-muted/30 p-0.5 mb-1.5 -mx-2.5 -mt-1.5 px-2.5 pt-1.5">
                                     {paymentMethods.map((method) => (
                                         <Button
                                             key={method}
@@ -195,41 +201,48 @@ function PaymentFormComponent(props: any) {
                                 )}
                                 {cdAllowed && (
                                 <div className="flex items-center shrink-0">
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => {
                                             if (cdAllowed) {
                                                 setCdEnabled(!cdEnabled);
                                             }
-                                        }} 
+                                        }}
                                         className={cn(
-                                            "relative w-28 h-6 flex items-center rounded-[12px] p-0.5 border border-slate-200/80 bg-slate-100/80 overflow-hidden text-[9px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/15 focus-visible:ring-offset-0",
-                                            cdAllowed ? "cursor-pointer hover:bg-slate-100 hover:border-slate-300" : "cursor-not-allowed opacity-60"
+                                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-0",
+                                            cdAllowed ? "hover:border-primary/30" : "cursor-not-allowed opacity-60"
                                         )}
                                     >
-                                        <span className="absolute left-2.5 text-[8px] font-semibold text-slate-500 z-0">Off</span>
-                                        <span className="absolute right-2.5 text-[8px] font-semibold text-slate-500 z-0">On</span>
+                                        <span
+                                            className={cn(
+                                                "absolute left-4 text-[10px] font-semibold transition-colors z-0",
+                                                !cdEnabled ? "text-muted-foreground/70" : "text-foreground"
+                                            )}
+                                        >
+                                            Off
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                "absolute right-4 text-[10px] font-semibold transition-colors z-0",
+                                                cdEnabled ? "text-muted-foreground/70" : "text-foreground"
+                                            )}
+                                        >
+                                            On
+                                        </span>
                                         <div
                                             className={cn(
-                                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-[10px] shadow-sm flex items-center justify-center z-10 border border-slate-200/80",
-                                                cdEnabled 
-                                                    ? "left-[calc(50%+2px)]"
-                                                    : "left-[2px]"
+                                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                                cdEnabled ? "left-[calc(50%+2px)]" : "left-[2px]"
                                             )}
-                                            style={{
-                                                backgroundColor: cdEnabled 
-                                                    ? 'hsl(var(--primary))'
-                                                    : 'rgb(255 255 255 / 0.9)'
-                                            }}
                                         >
-                                            <span className={cn("text-[8px] font-black", cdEnabled ? "text-primary-foreground" : "text-slate-700")}>CD</span>
+                                            <span className="text-[10px] font-bold text-primary-foreground">CD</span>
                                         </div>
                                     </button>
                                 </div>
                                 )}
                             </div>
                           {/* Payment Details */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full">
+                          <div className={baseGridColsClass}>
                             {/* Payment Date - Hidden for RTGS (will be filled from RTGS Report) */}
                             {paymentMethod !== 'RTGS' && (
                                 <div className="space-y-1">
@@ -261,7 +274,7 @@ function PaymentFormComponent(props: any) {
 
 
                              
-                            {(paymentMethod === 'Cash' || paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
+                            {(paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
                                 <div className="space-y-1">
                                     <Label htmlFor="parchiNo" className="text-[10px] font-semibold text-slate-500">Parchi (SR#)</Label>
                                     <Input 
@@ -280,21 +293,33 @@ function PaymentFormComponent(props: any) {
                                 </div>
                             )}
 
-                            {(paymentMethod === 'Online' || paymentMethod === 'Ledger' || paymentMethod === 'Gov.') && (
-                                <div className="space-y-1">
-                                    <Label htmlFor="checkNo" className="text-[10px] font-semibold text-slate-500">
-                                        {paymentMethod === 'Online' ? 'Serial No. (SR#)' : 'Reference No.'}
-                                    </Label>
-                                    <Input
-                                        id="checkNo"
-                                        name="checkNo"
-                                        value={checkNo}
-                                        onChange={e => setCheckNo(e.target.value)}
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
-                                    />
+                            {/* (Cash PaymentType now lives with Settle/ToBePaid column below) */}
+
+                            {/* Ledger: Reference + Particulars – full width, half-half */}
+                            {isLedger && (
+                                <div className="col-span-full grid grid-cols-2 gap-1 w-full">
+                                    <div className="space-y-1 min-w-0">
+                                      <Label htmlFor="checkNo" className="text-[10px] font-semibold text-slate-500">Reference No.</Label>
+                                      <Input
+                                          id="checkNo"
+                                          name="checkNo"
+                                          value={checkNo}
+                                          onChange={e => setCheckNo(e.target.value)}
+                                          className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                      />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                      <Label htmlFor="notes-ledger" className="text-[10px] font-semibold text-slate-500">Particulars / Remarks</Label>
+                                      <Input
+                                        id="notes-ledger"
+                                        name="notes-ledger"
+                                        value={notes || ''}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                      />
+                                    </div>
                                 </div>
                             )}
-
 
                              {paymentMethod === 'RTGS' && (
                                 <div className="space-y-1">
@@ -303,19 +328,18 @@ function PaymentFormComponent(props: any) {
                                 </div>
                             )}
 
-                             {paymentMethod === 'Gov.' && (
-                                <>
-                                <div className="space-y-1">
-                                    <Label htmlFor="govSrNo" className="text-[10px] font-semibold text-slate-500">Gov. SR No.</Label>
-                                    <Input id="govSrNo" name="govSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
-                                </div>
-                                <div className="space-y-1 hidden">
-                                    <Label className="text-[9px] font-bold">Gov Payment</Label>
-                                    <div className="h-7 text-[9px] flex items-center px-3 py-1 bg-primary/10 border-2 border-primary/20 rounded-md text-primary font-extrabold">
-                                        Gov Payment Account
+                            {/* Gov: Serial No. + Reference No. – full width, half-half */}
+                            {paymentMethod === 'Gov.' && (
+                                <div className="col-span-full grid grid-cols-2 gap-1 w-full">
+                                    <div className="space-y-1 min-w-0">
+                                        <Label htmlFor="govSrNo" className="text-[10px] font-semibold text-slate-500">Gov. SR No.</Label>
+                                        <Input id="govSrNo" name="govSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                        <Label htmlFor="checkNo-gov" className="text-[10px] font-semibold text-slate-500">Reference No.</Label>
+                                        <Input id="checkNo-gov" name="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
                                     </div>
                                 </div>
-                                </>
                             )}
 
                             {paymentMethod === 'Ledger' && (
@@ -355,160 +379,356 @@ function PaymentFormComponent(props: any) {
                                 </div>
                             )}
 
-                            {(paymentMethod === 'Ledger' || paymentMethod === 'Gov.') && (
-                                <div className="space-y-1 col-span-full">
-                                    <Label htmlFor="notes" className="text-[10px] font-semibold text-slate-500">Particulars / Remarks</Label>
-                                    <Input
-                                        id="notes"
-                                        name="notes"
-                                        value={notes || ''}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
-                                    />
-                                </div>
-                            )}
                             </div>
 
                           {!isLedger && (
                             <>
                               {paymentMethod === 'Gov.' ? (
-                                <div className="grid grid-cols-3 gap-1 w-full">
-                                  <div className="space-y-1">
-                                    <Label htmlFor="centerName" className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
-                                      Center
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-4 w-4 shrink-0 hover:bg-violet-50 hover:text-primary"
-                                        onClick={() => setIsCenterNameDialogOpen(true)}
-                                        title="Manage Center Names"
-                                      >
-                                        <Settings className="h-3 w-3"/>
-                                      </Button>
-                                    </Label>
-                                    <CustomDropdown
-                                      id="centerName"
-                                      options={centerNameOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))}
-                                      value={centerName || null}
-                                      onChange={(value) => {
-                                        if (setCenterName) {
-                                          setCenterName(value || '');
-                                        }
-                                      }}
-                                      placeholder="Select center..."
-                                      inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
-                                      maxRows={5}
-                                      showScrollbar={true}
-                                    />
+                                <div className="space-y-1 w-full">
+                                  {/* Center + Particulars – full width, half-half */}
+                                  <div className="grid grid-cols-2 gap-1 w-full">
+                                    <div className="space-y-1 min-w-0">
+                                      <Label htmlFor="centerName" className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                                        Center
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-4 w-4 shrink-0 hover:bg-violet-50 hover:text-primary"
+                                          onClick={() => setIsCenterNameDialogOpen(true)}
+                                          title="Manage Center Names"
+                                        >
+                                          <Settings className="h-3 w-3"/>
+                                        </Button>
+                                      </Label>
+                                      <CustomDropdown
+                                        id="centerName"
+                                        options={centerNameOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))}
+                                        value={centerName || null}
+                                        onChange={(value) => {
+                                          if (setCenterName) {
+                                            setCenterName(value || '');
+                                          }
+                                        }}
+                                        placeholder="Select center..."
+                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        maxRows={5}
+                                        showScrollbar={true}
+                                      />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                      <Label htmlFor="notes" className="text-[10px] font-semibold text-slate-500">Particulars / Remarks</Label>
+                                      <Input
+                                        id="notes"
+                                        name="notes"
+                                        value={notes || ''}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                      />
+                                    </div>
                                   </div>
 
-                                  <div className="space-y-1">
-                                    <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">Settle</Label>
-                                    <Input
-                                      id="settle-amount"
-                                      name="settle-amount"
-                                      type="number"
-                                      value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                      onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
-                                      readOnly={paymentType === 'Partial'}
-                                      className={cn(
-                                        "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                        paymentType === 'Partial' && 'bg-slate-50'
-                                      )}
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">To Be Paid</Label>
-                                    <Input
-                                      id="toBePaid"
-                                      name="toBePaid"
-                                      type="number"
-                                      value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
-                                      onChange={(e) => {
-                                        const value = parseFloat(e.target.value) || 0;
-                                        setLocalToBePaid(value);
-                                        queueToBePaidUpdate(value);
-                                      }}
-                                      readOnly={paymentType === 'Full'}
-                                      className={cn(
-                                        "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                        paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
-                                      )}
-                                    />
+                                  {/* Settle + To Be Paid */}
+                                  <div className="grid grid-cols-2 gap-1 w-full mt-1">
+                                    <div className="space-y-1">
+                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">Settle</Label>
+                                      <Input
+                                        id="settle-amount"
+                                        name="settle-amount"
+                                        type="number"
+                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
+                                        onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
+                                        readOnly={paymentType === 'Partial'}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === 'Partial' && 'bg-slate-50'
+                                        )}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">To Be Paid</Label>
+                                      <Input
+                                        id="toBePaid"
+                                        name="toBePaid"
+                                        type="number"
+                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          setLocalToBePaid(value);
+                                          queueToBePaidUpdate(value);
+                                        }}
+                                        readOnly={paymentType === 'Full'}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
+                                        )}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-1 w-full">
-                                  {paymentMethod !== 'Gov.' && paymentMethod !== 'Ledger' && (
+                              ) : isCash || isOnline ? (
+                                <>
+                                  {/* Row 1: Serial/Parchi + Settle + To Be Paid (3 columns) */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 w-full">
                                     <div className="space-y-1">
-                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">Payment Type</Label>
+                                      <Label
+                                        htmlFor={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        className="text-[10px] font-semibold text-slate-500"
+                                      >
+                                        {isCash ? "Parchi (SR#)" : "Serial No. (SR#)"}
+                                      </Label>
+                                      <Input
+                                        id={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        name={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        value={isCash ? (parchiNo || "") : checkNo}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          if (isCash) {
+                                            if (setParchiNo) setParchiNo(value);
+                                          } else {
+                                            setCheckNo(value);
+                                          }
+                                        }}
+                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">
+                                        Settle
+                                      </Label>
+                                      <Input
+                                        id="settle-amount"
+                                        name="settle-amount"
+                                        type="number"
+                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
+                                        onChange={(e) => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
+                                        readOnly={paymentType === "Partial"}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === "Partial" && "bg-slate-50"
+                                        )}
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">
+                                        To Be Paid
+                                      </Label>
+                                      <Input
+                                        id="toBePaid"
+                                        name="toBePaid"
+                                        type="number"
+                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          setLocalToBePaid(value);
+                                          queueToBePaidUpdate(value);
+                                        }}
+                                        readOnly={paymentType === "Full"}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === "Full" && "bg-slate-50 border-slate-200/80"
+                                        )}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Row 2: Payment Type + From (2 columns) */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 w-full mt-1">
+                                    <div className="space-y-1">
+                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">
+                                        Payment Type
+                                      </Label>
                                       <Select value={paymentType} onValueChange={setPaymentType}>
-                                        <SelectTrigger id="paymentType" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger
+                                          id="paymentType"
+                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="Full">Full</SelectItem>
                                           <SelectItem value="Partial">Partial</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </div>
-                                  )}
 
-                                  {paymentMethod !== 'Gov.' && paymentMethod !== 'Ledger' && (
                                     <div className="space-y-1">
-                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">From</Label>
-                                      <CustomDropdown
-                                        id="paymentFrom"
-                                        options={paymentFromOptions}
-                                        value={selectedAccountId}
-                                        onChange={(value) => setSelectedAccountId(value)}
-                                        placeholder="Select Account"
-                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
-                                      />
+                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
+                                        From
+                                      </Label>
+                                      <Select
+                                        value={selectedAccountId || "__placeholder__"}
+                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
+                                      >
+                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
+                                          <SelectValue placeholder="Select Account" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__placeholder__" disabled>
+                                            Select Account
+                                          </SelectItem>
+                                          {paymentFromOptions.length === 0 && (
+                                            <SelectItem value="__empty__" disabled>
+                                              Add bank accounts in Settings
+                                            </SelectItem>
+                                          )}
+                                          {paymentFromOptions.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                              {opt.displayValue || opt.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </div>
-                                  )}
-
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-1 w-full">
+                                  {/* Default (e.g. RTGS): left Payment Type + From, right Settle + To Be Paid */}
                                   <div className="space-y-1">
-                                    <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">Settle</Label>
-                                    <Input
-                                      id="settle-amount"
-                                      name="settle-amount"
-                                      type="number"
-                                      value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                      onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
-                                      readOnly={paymentType === 'Partial'}
-                                      className={cn(
-                                        "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                        paymentType === 'Partial' && 'bg-slate-50'
-                                      )}
-                                    />
+                                    <div className="space-y-1">
+                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">
+                                        Payment Type
+                                      </Label>
+                                      <Select value={paymentType} onValueChange={setPaymentType}>
+                                        <SelectTrigger
+                                          id="paymentType"
+                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Full">Full</SelectItem>
+                                          <SelectItem value="Partial">Partial</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
+                                        From
+                                      </Label>
+                                      <Select
+                                        value={selectedAccountId || "__placeholder__"}
+                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
+                                      >
+                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
+                                          <SelectValue placeholder="Select Account" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__placeholder__" disabled>
+                                            Select Account
+                                          </SelectItem>
+                                          {paymentFromOptions.length === 0 && (
+                                            <SelectItem value="__empty__" disabled>
+                                              Add bank accounts in Settings
+                                            </SelectItem>
+                                          )}
+                                          {paymentFromOptions.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                              {opt.displayValue || opt.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
                                   </div>
 
                                   <div className="space-y-1">
-                                    <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">To Be Paid</Label>
-                                    <Input
-                                      id="toBePaid"
-                                      name="toBePaid"
-                                      type="number"
-                                      value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
-                                      onChange={(e) => {
-                                        const value = parseFloat(e.target.value) || 0;
-                                        setLocalToBePaid(value);
-                                        queueToBePaidUpdate(value);
-                                      }}
-                                      readOnly={paymentType === 'Full'}
-                                      className={cn(
-                                        "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                        paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
-                                      )}
-                                    />
+                                    <div className="space-y-1">
+                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">
+                                        Settle
+                                      </Label>
+                                      <Input
+                                        id="settle-amount"
+                                        name="settle-amount"
+                                        type="number"
+                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
+                                        onChange={(e) => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
+                                        readOnly={paymentType === "Partial"}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === "Partial" && "bg-slate-50"
+                                        )}
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">
+                                        To Be Paid
+                                      </Label>
+                                      <Input
+                                        id="toBePaid"
+                                        name="toBePaid"
+                                        type="number"
+                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          setLocalToBePaid(value);
+                                          queueToBePaidUpdate(value);
+                                        }}
+                                        readOnly={paymentType === "Full"}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          paymentType === "Full" && "bg-slate-50 border-slate-200/80"
+                                        )}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                               )}
                             </>
                           )}
+
+                          {/* Inline CD section: when CD is ON, show three fields inside same form (for non-ledger & non-gov) */}
+                          {cdEnabled && cdAllowed && (
+                            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_72px_minmax(0,1fr)] gap-1 w-full mt-1">
+                              <div className="space-y-1 min-w-0">
+                                <Label htmlFor="cdAt" className="text-[10px] font-semibold text-slate-500">CD At</Label>
+                                <Select value={cdAt} onValueChange={setCdAt}>
+                                  <SelectTrigger id="cdAt" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {cdOptions.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1 w-[72px] shrink-0">
+                                <Label htmlFor="cd-percent" className="text-[10px] font-semibold text-slate-500">CD%</Label>
+                                <Input
+                                  id="cd-percent"
+                                  type="number"
+                                  value={cdPercent}
+                                  onChange={(e) => setCdPercent(parseFloat(e.target.value) || 0)}
+                                  className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full"
+                                />
+                              </div>
+
+                              <div className="space-y-1 min-w-0">
+                                <Label htmlFor="cdAmount" className="text-[10px] font-semibold text-slate-500">CD Amount</Label>
+                                <Input
+                                  id="cdAmount"
+                                  name="cdAmount"
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.01"
+                                  value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
+                                  onChange={(e) => setCdAmount(parseFloat(e.target.value) || 0)}
+                                  className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                />
+                              </div>
+                            </div>
+                          )}
                         
-                    </CardContent>
-                    <CardFooter className="px-2.5 pb-2 pt-1 flex items-center justify-end gap-2">
+                    </div>
+                    <div className="px-2.5 pb-2 pt-1 flex items-center justify-end gap-2">
                         <Button
                             size="sm"
                             className="h-7 text-[10px] font-semibold"
@@ -526,8 +746,7 @@ function PaymentFormComponent(props: any) {
                         >
                             {isProcessing ? "Processing..." : "Finalize"}
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
             </div>
             
             {/* Center Name Management Dialog */}

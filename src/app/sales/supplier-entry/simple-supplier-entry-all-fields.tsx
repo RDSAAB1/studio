@@ -421,49 +421,53 @@ export default function SimpleSupplierEntryAllFields() {
                 </CardContent>
             </Card>
 
-            {/* Summary + Commands side-by-side with proper spacing and borders */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-lg md:col-span-2">
-                    <CardHeader className="p-3 pb-2">
-                        <CardTitle className="text-sm font-semibold">Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                        <SimpleCalculatedSummary 
-                            customer={{
-                                ...currentSupplier,
-                                grossWeight: form.watch('grossWeight') || 0,
-                                teirWeight: form.watch('teirWeight') || 0,
-                                kartaPercentage: form.watch('kartaPercentage') || 0,
-                                rate: form.watch('rate') || 0,
-                                labouryRate: form.watch('labouryRate') || 0,
-                                brokerage: form.watch('brokerage') || 0,
-                                brokerageRate: form.watch('brokerageRate') || 0,
-                                brokerageAddSubtract: form.watch('brokerageAddSubtract') ?? true,
-                                kanta: form.watch('kanta') || 0,
-                                dueDate: (() => {
-                                    const date = form.watch('date');
-                                    const term = Number(form.watch('term')) || 20;
-                                    if (date) {
-                                        const dueDate = new Date(date);
-                                        dueDate.setDate(dueDate.getDate() + term);
-                                        return format(dueDate, 'yyyy-MM-dd');
-                                    }
-                                    return currentSupplier.dueDate;
-                                })(),
-                            }}
-                            onSave={() => {
-                                calculateSummary(); // Calculate before saving
-                                form.handleSubmit(onSubmit)();
-                            }}
-                            onClearForm={undefined}
-                            isEditing={isEditing}
-                            isSubmitting={false}
-                        />
-                    </CardContent>
-                </Card>
+            {/* Summary (left) + Commands (right) - same row */}
+            <div className="mt-8 flex flex-col lg:flex-row gap-4 items-stretch">
+                {/* Summary - left side */}
+                <div className="flex-1 min-w-0 lg:flex-[0.6] lg:min-w-[55%] order-2 lg:order-1">
+                    <Card className="h-full">
+                        <CardHeader className="p-3 pb-2">
+                            <CardTitle className="text-sm font-semibold">Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0">
+                    <SimpleCalculatedSummary 
+                        customer={{
+                            ...currentSupplier,
+                            grossWeight: form.watch('grossWeight') || 0,
+                            teirWeight: form.watch('teirWeight') || 0,
+                            kartaPercentage: form.watch('kartaPercentage') || 0,
+                            rate: form.watch('rate') || 0,
+                            labouryRate: form.watch('labouryRate') || 0,
+                            brokerage: form.watch('brokerage') || 0,
+                            brokerageRate: form.watch('brokerageRate') || 0,
+                            brokerageAddSubtract: form.watch('brokerageAddSubtract') ?? true,
+                            kanta: form.watch('kanta') || 0,
+                            dueDate: (() => {
+                                const date = form.watch('date');
+                                const term = Number(form.watch('term')) || 20;
+                                if (date) {
+                                    const dueDate = new Date(date);
+                                    dueDate.setDate(dueDate.getDate() + term);
+                                    return format(dueDate, 'yyyy-MM-dd');
+                                }
+                                return currentSupplier.dueDate;
+                            })(),
+                        }}
+                        onSave={() => {
+                            calculateSummary();
+                            form.handleSubmit(onSubmit)();
+                        }}
+                        onClearForm={undefined}
+                        isEditing={isEditing}
+                        isSubmitting={false}
+                    />
+                        </CardContent>
+                    </Card>
+                </div>
 
-                {/* Commands Panel */}
-                <Card className="bg-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-lg">
+                {/* Commands Panel - right side */}
+                <div className="flex-1 min-w-0 lg:min-w-[320px] order-1 lg:order-2">
+                <Card className="h-full">
                     <CardHeader className="p-3 pb-2">
                         <CardTitle className="text-sm font-semibold">Commands & Search</CardTitle>
                     </CardHeader>
@@ -592,6 +596,7 @@ export default function SimpleSupplierEntryAllFields() {
                         </div>
                     </CardContent>
                 </Card>
+                </div>
             </div>
 
             {/* Latest 50 Entries Table with proper spacing */}
@@ -610,6 +615,7 @@ export default function SimpleSupplierEntryAllFields() {
                 highlightEntryId={highlightEntryId ?? undefined}
                 />
             </div>
+
         </div>
     ), [form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleSetLastVariety, handleSetLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, currentSupplier, calculateSummary, handleNewEntry, isEditing, isSubmitting, filteredSuppliers, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete]);
 

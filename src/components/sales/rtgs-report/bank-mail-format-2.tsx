@@ -156,9 +156,11 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
          }
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -337,16 +339,19 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         iframeDoc.write(html);
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             const printWindow = iframe.contentWindow;
             if (printWindow) {
                 printWindow.focus();
                 printWindow.print();
             }
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
-        }, 500);
+            document.body.removeChild(iframe);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
      };
 
     const handleSendMail = async () => {

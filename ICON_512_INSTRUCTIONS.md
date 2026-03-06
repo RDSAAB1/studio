@@ -103,3 +103,4 @@ cd PUBLIC && magick convert -resize 512x512 icon-192.png icon-512.png
 
 
 
+

@@ -9,7 +9,6 @@ import type { Customer, OptionItem } from "@/lib/definitions";
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -318,8 +317,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
         <>
             <div className="space-y-3">
                 {/* Weight & Rate Section - Top */}
-                <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                    <CardContent className="pt-4 space-y-2">
+                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
@@ -416,13 +414,10 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 )}
                             </div>
                         )}
-                    </CardContent>
-                </Card>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {/* Basic Information Card */}
-                <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                    <CardContent className="pt-4 space-y-2">
+                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
@@ -476,12 +471,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </InputWithIcon>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                </div>
 
-                {/* Product Details Card */}
-                <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                    <CardContent className="pt-4 space-y-2">
+                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                              <Controller name="variety" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
@@ -502,12 +494,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </div>
                             )} />
                         </div>
-                    </CardContent>
-                </Card>
+                </div>
 
-                {/* Weight & Financial Details Card */}
-                <Card className="bg-card/60 backdrop-blur-sm border-white/10 lg:col-span-2">
-                    <CardContent className="pt-4 space-y-2">
+                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2 lg:col-span-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
@@ -592,8 +581,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </InputWithIcon>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                </div>
                             </div>
                         </div>
         

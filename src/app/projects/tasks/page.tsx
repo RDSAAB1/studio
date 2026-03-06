@@ -2,8 +2,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where, orderBy, Timestamp } from "firebase/firestore";
-import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase config
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDoc, where, orderBy, Timestamp } from "firebase/firestore";
+import { firestoreDB } from "@/lib/firebase";
+import { getTenantCollectionPath, getTenantDocPath } from "@/lib/tenancy";
+import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } from "@/lib/audit";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,7 +40,9 @@ export default function TasksPage() {
     // ✅ Use incremental sync - only read changed documents
     const getLastSyncTime = (): number | undefined => {
       if (typeof window === 'undefined') return undefined;
-      const stored = localStorage.getItem('lastSync:tasks');
+      const active = getActiveTenant();
+      const key = active ? `lastSync:${active.storageMode}:${active.id}:tasks` : 'lastSync:tasks';
+      const stored = localStorage.getItem(key);
       return stored ? parseInt(stored, 10) : undefined;
     };
 
@@ -49,13 +53,13 @@ export default function TasksPage() {
       // ✅ Only get documents modified after last sync
       const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
       q = query(
-        collection(firestoreDB, "tasks"),
+        collection(firestoreDB, ...getTenantCollectionPath("tasks")),
         where('updatedAt', '>', lastSyncTimestamp),
         orderBy('updatedAt')
       );
     } else {
       // First sync - get all (only once)
-      q = query(collection(firestoreDB, "tasks"));
+      q = query(collection(firestoreDB, ...getTenantCollectionPath("tasks")));
     }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -75,7 +79,9 @@ export default function TasksPage() {
       
       // ✅ Save last sync time
       if (querySnapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:tasks', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:tasks` : 'lastSync:tasks';
+        localStorage.setItem(key, String(Date.now()));
       }
     }, (error) => {
 
@@ -88,16 +94,12 @@ export default function TasksPage() {
     if (newTask.name.trim() === "") return;
     try {
       const now = new Date();
-      await addDoc(collection(firestoreDB, "tasks"), {
-        ...newTask,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const data = withCreateMetadata({ ...newTask, createdAt: now, updatedAt: now } as Record<string, unknown>);
+      const ref = await addDoc(collection(firestoreDB, ...getTenantCollectionPath("tasks")), data);
+      logActivity({ type: "create", collection: "tasks", docId: ref.id, docPath: getTenantCollectionPath("tasks").join("/"), summary: `Created task ${newTask.name}`, afterData: data }).catch(() => {});
       setNewTask({ name: "", description: "", status: "todo" });
       setIsAddModalOpen(false);
-    } catch (e) {
-
-    }
+    } catch (e) {}
   };
 
   const handleEditTask = (task: Task) => {
@@ -108,26 +110,24 @@ export default function TasksPage() {
   const handleUpdateTask = async () => {
     if (!editingTask) return;
     try {
-      const taskRef = doc(firestoreDB, "tasks", editingTask.id);
-      await updateDoc(taskRef, {
-        name: editingTask.name,
-        description: editingTask.description,
-        status: editingTask.status,
-        updatedAt: new Date(), // Update timestamp
-      });
+      const taskRef = doc(firestoreDB, ...getTenantDocPath("tasks", editingTask.id));
+      const data = withEditMetadata({ name: editingTask.name, description: editingTask.description, status: editingTask.status, updatedAt: new Date() } as Record<string, unknown>);
+      await updateDoc(taskRef, data);
+      logActivity({ type: "edit", collection: "tasks", docId: editingTask.id, docPath: getTenantCollectionPath("tasks").join("/"), summary: `Updated task ${editingTask.name}`, afterData: data }).catch(() => {});
       setEditingTask(null);
       setIsEditModalOpen(false);
-    } catch (e) {
-
-    }
+    } catch (e) {}
   };
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      await deleteDoc(doc(firestoreDB, "tasks", taskId));
-    } catch (e) {
-
-    }
+      const taskRef = doc(firestoreDB, ...getTenantDocPath("tasks", taskId));
+      const snap = await getDoc(taskRef);
+      if (snap.exists()) {
+        await moveToRecycleBin({ collection: "tasks", docId: taskId, docPath: getTenantCollectionPath("tasks").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted task ${taskId}` });
+      }
+      await deleteDoc(taskRef);
+    } catch (e) {}
   };
 
   if (!isClient) {

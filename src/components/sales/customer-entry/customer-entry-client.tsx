@@ -709,22 +709,22 @@ export default function CustomerEntryClient() {
                 handleDeleteOption={deleteOption}
                 allCustomers={safeCustomers}
             />
-            
-            <CalculatedSummary
-                customer={currentCustomer}
-                onSave={() => form.handleSubmit(() => onSubmit())()}
-                onSaveAndPrint={handleSaveAndPrint}
-                isEditing={isEditing}
-                isCustomerForm={true}
-                isBrokerageIncluded={form.watch('isBrokerageIncluded')}
-                onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
-                onImport={handleImport}
-                onExport={handleExport}
-                onSearch={setSearchTerm}
-                onClear={handleNew}
-            />
         </form>
       </FormProvider>      
+
+      <CalculatedSummary
+        customer={currentCustomer}
+        onSave={() => form.handleSubmit(() => onSubmit())()}
+        onSaveAndPrint={handleSaveAndPrint}
+        isEditing={isEditing}
+        isCustomerForm={true}
+        isBrokerageIncluded={form.watch('isBrokerageIncluded')}
+        onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
+        onImport={handleImport}
+        onExport={handleExport}
+        onSearch={setSearchTerm}
+        onClear={handleNew}
+      />
 
       <EntryTable 
         entries={filteredCustomers} 

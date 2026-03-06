@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import PlaceholderPage from "@/components/placeholder-page";
 import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming db is exported from firebase.ts
+import { getActiveTenant, getTenantCollectionPath } from '@/lib/tenancy';
 import { Order } from '@/lib/definitions'; // Assuming you have an Order type defined
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,12 +22,14 @@ export default function OrderTrackingPage() {
     // ✅ Use incremental sync - only read changed documents
     const getLastSyncTime = (): number | undefined => {
       if (typeof window === 'undefined') return undefined;
-      const stored = localStorage.getItem('lastSync:orders');
+      const active = getActiveTenant();
+      const key = active ? `lastSync:${active.storageMode}:${active.id}:orders` : 'lastSync:orders';
+      const stored = localStorage.getItem(key);
       return stored ? parseInt(stored, 10) : undefined;
     };
 
     const lastSyncTime = getLastSyncTime();
-    const ordersCollection = collection(firestoreDB, 'orders');
+    const ordersCollection = collection(firestoreDB, ...getTenantCollectionPath('orders'));
     let q;
     
     if (lastSyncTime) {
@@ -52,7 +55,9 @@ export default function OrderTrackingPage() {
       
       // ✅ Save last sync time
       if (snapshot.size > 0 && typeof window !== 'undefined') {
-        localStorage.setItem('lastSync:orders', String(Date.now()));
+        const active = getActiveTenant();
+        const key = active ? `lastSync:${active.storageMode}:${active.id}:orders` : 'lastSync:orders';
+        localStorage.setItem(key, String(Date.now()));
       }
     }, (err) => {
 

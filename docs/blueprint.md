@@ -2,7 +2,7 @@
 
 ## Core Features:
 
-- Module Navigation: A clean dashboard for navigating key business modules like Sales, HR, Inventory, Marketing, and Project Management, designed with Tailwind CSS.
+- Module Navigation: A clean dashboard for navigating key business modules like Sales, HR, Inventory, and Project Management, designed with Tailwind CSS.
 - Dynamic Data Forms: Interactive customer data entry form with real-time calculations and validation to enhance data accuracy and user experience.
 - Data Presentation: Display sales transaction records and payment histories in an organized way with clear navigation
 - Data Autopopulation Tool: Generate serial numbers according to rules based on largest values, as well as detecting existing serial numbers and displaying the matching data

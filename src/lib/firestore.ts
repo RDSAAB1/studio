@@ -22,7 +22,6 @@ import {
   DocumentData,
   Timestamp,
   DocumentChangeType,
-  collectionGroup,
   getCountFromServer,
   documentId,
 } from "firebase/firestore";
@@ -30,8 +29,10 @@ import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import { db } from "./database";
 import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
+import { getTenantCollectionPath, getTenantDocPath, getStorageKeySuffix } from "./tenancy";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, Account, ManufacturingCostingData } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
+import { withCreateMetadata, withEditMetadata, getEditMetadata, logActivity, moveToRecycleBin } from "./audit";
 import { format } from "date-fns";
 import { logError } from "./error-logger";
 import { retryFirestoreOperation } from "./retry-utils";
@@ -49,37 +50,77 @@ function handleSilentError(error: unknown, context: string): void {
   }
 }
 
-const suppliersCollection = collection(firestoreDB, "suppliers");
-const customersCollection = collection(firestoreDB, "customers");
-const supplierPaymentsCollection = collection(firestoreDB, "payments");
-const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
-const governmentFinalizedPaymentsCollection = collection(firestoreDB, "governmentFinalizedPayments");
-const incomesCollection = collection(firestoreDB, "incomes");
-const expensesCollection = collection(firestoreDB, "expenses");
-const accountsCollection = collection(firestoreDB, "accounts");
-const loansCollection = collection(firestoreDB, "loans");
-const fundTransactionsCollection = collection(firestoreDB, "fund_transactions");
-const banksCollection = collection(firestoreDB, "banks");
-const bankBranchesCollection = collection(firestoreDB, "bankBranches");
-const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
-const supplierBankAccountsCollection = collection(firestoreDB, "supplierBankAccounts");
-const settingsCollection = collection(firestoreDB, "settings");
-const optionsCollection = collection(firestoreDB, "options");
-const usersCollection = collection(firestoreDB, "users");
-const attendanceCollection = collection(firestoreDB, "attendance");
-const projectsCollection = collection(firestoreDB, "projects");
-const employeesCollection = collection(firestoreDB, "employees");
-const payrollCollection = collection(firestoreDB, 'payroll');
-const inventoryItemsCollection = collection(firestoreDB, 'inventoryItems');
-const expenseTemplatesCollection = collection(firestoreDB, 'expenseTemplates');
-const ledgerAccountsCollection = collection(firestoreDB, 'ledgerAccounts');
-const ledgerEntriesCollection = collection(firestoreDB, 'ledgerEntries');
-const ledgerCashAccountsCollection = collection(firestoreDB, 'ledgerCashAccounts');
-const mandiReportsCollection = collection(firestoreDB, 'mandiReports');
-const mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
-const kantaParchiCollection = collection(firestoreDB, 'kantaParchi');
-const customerDocumentsCollection = collection(firestoreDB, 'customerDocuments');
-const manufacturingCostingCollection = collection(firestoreDB, 'manufacturingCosting');
+let suppliersCollection = collection(firestoreDB, ...getTenantCollectionPath("suppliers"));
+let customersCollection = collection(firestoreDB, ...getTenantCollectionPath("customers"));
+let supplierPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("payments"));
+let customerPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customer_payments"));
+let governmentFinalizedPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("governmentFinalizedPayments"));
+let incomesCollection = collection(firestoreDB, ...getTenantCollectionPath("incomes"));
+let expensesCollection = collection(firestoreDB, ...getTenantCollectionPath("expenses"));
+let accountsCollection = collection(firestoreDB, ...getTenantCollectionPath("accounts"));
+let loansCollection = collection(firestoreDB, ...getTenantCollectionPath("loans"));
+let fundTransactionsCollection = collection(firestoreDB, ...getTenantCollectionPath("fund_transactions"));
+let banksCollection = collection(firestoreDB, ...getTenantCollectionPath("banks"));
+let bankBranchesCollection = collection(firestoreDB, ...getTenantCollectionPath("bankBranches"));
+let bankAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("bankAccounts"));
+let supplierBankAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("supplierBankAccounts"));
+let settingsCollection = collection(firestoreDB, ...getTenantCollectionPath("settings"));
+let optionsCollection = collection(firestoreDB, ...getTenantCollectionPath("options"));
+let usersCollection = collection(firestoreDB, "users");
+let attendanceCollection = collection(firestoreDB, ...getTenantCollectionPath("attendance"));
+let projectsCollection = collection(firestoreDB, ...getTenantCollectionPath("projects"));
+let employeesCollection = collection(firestoreDB, ...getTenantCollectionPath("employees"));
+let payrollCollection = collection(firestoreDB, ...getTenantCollectionPath("payroll"));
+let inventoryItemsCollection = collection(firestoreDB, ...getTenantCollectionPath("inventoryItems"));
+let expenseTemplatesCollection = collection(firestoreDB, ...getTenantCollectionPath("expenseTemplates"));
+let ledgerAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerAccounts"));
+let ledgerEntriesCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerEntries"));
+let ledgerCashAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerCashAccounts"));
+let mandiReportsCollection = collection(firestoreDB, ...getTenantCollectionPath("mandiReports"));
+let mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
+let kantaParchiCollection = collection(firestoreDB, ...getTenantCollectionPath("kantaParchi"));
+let customerDocumentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customerDocuments"));
+let manufacturingCostingCollection = collection(firestoreDB, ...getTenantCollectionPath("manufacturingCosting"));
+
+export function refreshTenantFirestoreBindings() {
+  suppliersCollection = collection(firestoreDB, ...getTenantCollectionPath("suppliers"));
+  customersCollection = collection(firestoreDB, ...getTenantCollectionPath("customers"));
+  supplierPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("payments"));
+  customerPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customer_payments"));
+  governmentFinalizedPaymentsCollection = collection(firestoreDB, ...getTenantCollectionPath("governmentFinalizedPayments"));
+  incomesCollection = collection(firestoreDB, ...getTenantCollectionPath("incomes"));
+  expensesCollection = collection(firestoreDB, ...getTenantCollectionPath("expenses"));
+  accountsCollection = collection(firestoreDB, ...getTenantCollectionPath("accounts"));
+  loansCollection = collection(firestoreDB, ...getTenantCollectionPath("loans"));
+  fundTransactionsCollection = collection(firestoreDB, ...getTenantCollectionPath("fund_transactions"));
+  banksCollection = collection(firestoreDB, ...getTenantCollectionPath("banks"));
+  bankBranchesCollection = collection(firestoreDB, ...getTenantCollectionPath("bankBranches"));
+  bankAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("bankAccounts"));
+  supplierBankAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("supplierBankAccounts"));
+  settingsCollection = collection(firestoreDB, ...getTenantCollectionPath("settings"));
+  optionsCollection = collection(firestoreDB, ...getTenantCollectionPath("options"));
+  attendanceCollection = collection(firestoreDB, ...getTenantCollectionPath("attendance"));
+  projectsCollection = collection(firestoreDB, ...getTenantCollectionPath("projects"));
+  employeesCollection = collection(firestoreDB, ...getTenantCollectionPath("employees"));
+  payrollCollection = collection(firestoreDB, ...getTenantCollectionPath("payroll"));
+  inventoryItemsCollection = collection(firestoreDB, ...getTenantCollectionPath("inventoryItems"));
+  expenseTemplatesCollection = collection(firestoreDB, ...getTenantCollectionPath("expenseTemplates"));
+  ledgerAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerAccounts"));
+  ledgerEntriesCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerEntries"));
+  ledgerCashAccountsCollection = collection(firestoreDB, ...getTenantCollectionPath("ledgerCashAccounts"));
+  mandiReportsCollection = collection(firestoreDB, ...getTenantCollectionPath("mandiReports"));
+  mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
+  kantaParchiCollection = collection(firestoreDB, ...getTenantCollectionPath("kantaParchi"));
+  customerDocumentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customerDocuments"));
+  manufacturingCostingCollection = collection(firestoreDB, ...getTenantCollectionPath("manufacturingCosting"));
+}
+
+refreshTenantFirestoreBindings();
+
+if (typeof window !== "undefined") {
+  window.addEventListener("erp:mode-changed", refreshTenantFirestoreBindings);
+  window.addEventListener("erp:selection-changed", refreshTenantFirestoreBindings);
+}
 
 function stripUndefined<T extends Record<string, unknown>>(data: T): T {
     const cleanedEntries = Object.entries(data).filter(
@@ -179,13 +220,15 @@ export async function addOption(collectionName: string, optionData: { name: stri
             throw new Error(`Option "${name}" already exists`);
         }
         
-        // Add new item
+        const meta = getEditMetadata();
         await retryFirestoreOperation(
             () => setDoc(docRef, {
-                items: arrayUnion(name)
+                items: arrayUnion(name),
+                ...meta
             }, { merge: true }),
             `addOption - set item for ${collectionName}`
         );
+        logActivity({ type: "create", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Added option ${name} to ${collectionName}`, afterData: { items: [...currentItems, name], ...meta } as Record<string, unknown> }).catch(() => {});
         
         // Also update local IndexedDB immediately
         if (db) {
@@ -239,12 +282,15 @@ export async function updateOption(collectionName: string, id: string, optionDat
         // Update: remove old name and add new name
         const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
         
+        const meta = getEditMetadata();
         await retryFirestoreOperation(
             () => setDoc(docRef, {
-                items: updatedItems
+                items: updatedItems,
+                ...meta
             }, { merge: true }),
             `updateOption - set updated items for ${collectionName}`
         );
+        logActivity({ type: "edit", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Updated option ${oldName} to ${newName} in ${collectionName}`, afterData: { items: updatedItems, ...meta } as Record<string, unknown> }).catch(() => {});
         
         // Update local IndexedDB
         if (db) {
@@ -284,12 +330,16 @@ export async function updateOption(collectionName: string, id: string, optionDat
 export async function deleteOption(collectionName: string, id: string, name: string): Promise<void> {
     try {
         const docRef = doc(optionsCollection, collectionName);
+        const docSnap = await getDoc(docRef);
+        const beforeItems = docSnap.exists() ? (docSnap.data().items || []) : [];
         await retryFirestoreOperation(
             () => updateDoc(docRef, {
-                items: arrayRemove(name)
+                items: arrayRemove(name),
+                ...getEditMetadata()
             }),
             `deleteOption - remove item from ${collectionName}`
         );
+        logActivity({ type: "delete", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Deleted option ${name} from ${collectionName}`, beforeData: { items: beforeItems } as Record<string, unknown> }).catch(() => {});
     } catch (error) {
         logError(error, `deleteOption(${collectionName}, ${id})`, 'medium');
         throw error;
@@ -453,27 +503,26 @@ export async function saveMandiHeaderSettings(settings: Partial<MandiHeaderSetti
 // --- Bank & Branch Functions ---
 export async function addBank(bankName: string): Promise<Bank> {
   const batch = writeBatch(firestoreDB);
-  const docRef = doc(firestoreDB, 'banks', bankName);
-  
-  const bankData = { name: bankName, updatedAt: new Date().toISOString() };
+  const docRef = doc(firestoreDB, ...getTenantDocPath('banks', bankName));
+  const bankData = withCreateMetadata({ name: bankName, updatedAt: new Date().toISOString() } as Record<string, unknown>);
   batch.set(docRef, bankData);
-  
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('banks', { batch });
-  
   await batch.commit();
+  logActivity({ type: "create", collection: "banks", docId: docRef.id, docPath: getTenantCollectionPath("banks").join("/"), summary: `Created bank ${bankName}`, afterData: bankData as Record<string, unknown> }).catch(() => {});
   return { id: docRef.id, ...bankData };
 }
 
 export async function deleteBank(id: string): Promise<void> {
+    const docRef = doc(firestoreDB, ...getTenantDocPath("banks", id));
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "banks", docId: id, docPath: getTenantCollectionPath("banks").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted bank ${id}` });
+    }
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, "banks", id);
-    
     batch.delete(docRef);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('banks', { batch });
-    
     await batch.commit();
 }
 
@@ -496,46 +545,36 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
 
     const batch = writeBatch(firestoreDB);
     const docRef = doc(bankBranchesCollection);
-    
-    const dataWithTimestamp = {
-        ...branchData,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const dataWithTimestamp = withCreateMetadata({ ...branchData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(docRef, dataWithTimestamp);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankBranches', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "bankBranches", docId: docRef.id, docPath: getTenantCollectionPath("bankBranches").join("/"), summary: `Created branch ${branchData.branchName}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
     return { id: docRef.id, ...dataWithTimestamp };
 }
 
-
 export async function updateBankBranch(id: string, branchData: Partial<BankBranch>): Promise<void> {
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, "bankBranches", id);
-    
-    batch.update(docRef, {
-        ...branchData,
-        updatedAt: new Date().toISOString()
-    });
-    
+    const docRef = doc(firestoreDB, ...getTenantDocPath("bankBranches", id));
+    const data = withEditMetadata({ ...branchData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankBranches', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "bankBranches", docId: id, docPath: getTenantCollectionPath("bankBranches").join("/"), summary: `Updated branch ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteBankBranch(id: string): Promise<void> {
+    const docRef = doc(firestoreDB, ...getTenantDocPath("bankBranches", id));
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "bankBranches", docId: id, docPath: getTenantCollectionPath("bankBranches").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted branch ${id}` });
+    }
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, "bankBranches", id);
-    
     batch.delete(docRef);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankBranches', { batch });
-    
     await batch.commit();
 }
 
@@ -544,46 +583,36 @@ export async function deleteBankBranch(id: string): Promise<void> {
 export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(bankAccountsCollection, accountData.accountNumber);
-    
-    const newAccount = { 
-        ...accountData, 
-        id: docRef.id,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const newAccount = withCreateMetadata({ ...accountData, id: docRef.id, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(docRef, newAccount);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankAccounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "bankAccounts", docId: docRef.id, docPath: getTenantCollectionPath("bankAccounts").join("/"), summary: `Created bank account ${accountData.accountNumber}`, afterData: newAccount as Record<string, unknown> }).catch(() => {});
     return newAccount as BankAccount;
 }
 
 export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(bankAccountsCollection, id);
-    
-    batch.update(docRef, {
-        ...accountData,
-        updatedAt: new Date().toISOString()
-    });
-    
+    const data = withEditMetadata({ ...accountData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankAccounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "bankAccounts", docId: id, docPath: getTenantCollectionPath("bankAccounts").join("/"), summary: `Updated bank account ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteBankAccount(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(bankAccountsCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "bankAccounts", docId: id, docPath: getTenantCollectionPath("bankAccounts").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted bank account ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankAccounts', { batch });
-    
     await batch.commit();
 }
 
@@ -950,7 +979,7 @@ export async function recalculateAndUpdateSuppliers(supplierIds: string[]): Prom
     let updatedCount = 0;
 
     for (const id of supplierIds) {
-        const supplierRef = doc(firestoreDB, "suppliers", id);
+        const supplierRef = doc(suppliersCollection, id);
         const supplierSnap = await getDoc(supplierRef);
         
         if (supplierSnap.exists()) {
@@ -1094,50 +1123,40 @@ export async function deleteCustomer(id: string): Promise<void> {
 export async function addKantaParchi(kantaParchiData: KantaParchi): Promise<KantaParchi> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(kantaParchiCollection, kantaParchiData.srNo);
-    const dataWithTimestamp = {
-        ...kantaParchiData,
-        createdAt: kantaParchiData.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-    
+    const base = { ...kantaParchiData, createdAt: kantaParchiData.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const dataWithTimestamp = withCreateMetadata(base as Record<string, unknown>);
     batch.set(docRef, dataWithTimestamp);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('kantaParchi', { batch });
-    
     await batch.commit();
-    return dataWithTimestamp;
+    logActivity({ type: "create", collection: "kantaParchi", docId: kantaParchiData.srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), summary: `Created kanta parchi ${kantaParchiData.srNo}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
+    return dataWithTimestamp as KantaParchi;
 }
 
 export async function updateKantaParchi(srNo: string, kantaParchiData: Partial<Omit<KantaParchi, 'id' | 'srNo'>>): Promise<boolean> {
-    if (!srNo) {
-        return false;
-    }
+    if (!srNo) return false;
     const batch = writeBatch(firestoreDB);
     const docRef = doc(kantaParchiCollection, srNo);
-    
-    batch.update(docRef, {
-        ...kantaParchiData,
-        updatedAt: new Date().toISOString(),
-    });
-
+    const data = withEditMetadata({ ...kantaParchiData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('kantaParchi', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "kantaParchi", docId: srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), summary: `Updated kanta parchi ${srNo}`, afterData: data }).catch(() => {});
     return true;
 }
 
 export async function deleteKantaParchi(srNo: string): Promise<void> {
-    if (!srNo) {
-        return;
+    if (!srNo) return;
+    const docRef = doc(kantaParchiCollection, srNo);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "kantaParchi", docId: srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted kanta parchi ${srNo}` });
     }
     const batch = writeBatch(firestoreDB);
-    batch.delete(doc(kantaParchiCollection, srNo));
-
+    batch.delete(docRef);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('kantaParchi', { batch });
-    
     await batch.commit();
 }
 
@@ -1176,50 +1195,40 @@ export function getKantaParchiRealtime(callback: (kantaParchi: KantaParchi[]) =>
 export async function addCustomerDocument(documentData: CustomerDocument): Promise<CustomerDocument> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(customerDocumentsCollection, documentData.documentSrNo);
-    const dataWithTimestamp = {
-        ...documentData,
-        createdAt: documentData.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-    
+    const base = { ...documentData, createdAt: documentData.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const dataWithTimestamp = withCreateMetadata(base as Record<string, unknown>);
     batch.set(docRef, dataWithTimestamp);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('customerDocuments', { batch });
-    
     await batch.commit();
-    return dataWithTimestamp;
+    logActivity({ type: "create", collection: "customerDocuments", docId: documentData.documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), summary: `Created customer document ${documentData.documentSrNo}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
+    return dataWithTimestamp as CustomerDocument;
 }
 
 export async function updateCustomerDocument(documentSrNo: string, documentData: Partial<Omit<CustomerDocument, 'id' | 'documentSrNo' | 'kantaParchiSrNo'>>): Promise<boolean> {
-    if (!documentSrNo) {
-        return false;
-    }
+    if (!documentSrNo) return false;
     const batch = writeBatch(firestoreDB);
     const docRef = doc(customerDocumentsCollection, documentSrNo);
-    
-    batch.update(docRef, {
-        ...documentData,
-        updatedAt: new Date().toISOString(),
-    });
-
+    const data = withEditMetadata({ ...documentData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('customerDocuments', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "customerDocuments", docId: documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), summary: `Updated customer document ${documentSrNo}`, afterData: data }).catch(() => {});
     return true;
 }
 
 export async function deleteCustomerDocument(documentSrNo: string): Promise<void> {
-    if (!documentSrNo) {
-        return;
+    if (!documentSrNo) return;
+    const docRef = doc(customerDocumentsCollection, documentSrNo);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "customerDocuments", docId: documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer document ${documentSrNo}` });
     }
     const batch = writeBatch(firestoreDB);
-    batch.delete(doc(customerDocumentsCollection, documentSrNo));
-
+    batch.delete(docRef);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('customerDocuments', { batch });
-    
     await batch.commit();
 }
 
@@ -1266,45 +1275,36 @@ export function getCustomerDocumentsRealtime(callback: (documents: CustomerDocum
 export async function addInventoryItem(item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
   const batch = writeBatch(firestoreDB);
   const docRef = doc(inventoryItemsCollection);
-  
-  const dataWithTimestamp = {
-      ...item,
-      updatedAt: new Date().toISOString()
-  };
-  
+  const dataWithTimestamp = withCreateMetadata({ ...item, updatedAt: new Date().toISOString() } as Record<string, unknown>);
   batch.set(docRef, dataWithTimestamp);
-
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('inventoryItems', { batch });
-  
   await batch.commit();
-  return { id: docRef.id, ...dataWithTimestamp };
+  logActivity({ type: "create", collection: "inventoryItems", docId: docRef.id, docPath: getTenantCollectionPath("inventoryItems").join("/"), summary: `Created inventory item ${(item as any).name || docRef.id}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
+  return { id: docRef.id, ...dataWithTimestamp } as InventoryItem;
 }
 
 export async function updateInventoryItem(id: string, item: Partial<InventoryItem>): Promise<void> {
   const batch = writeBatch(firestoreDB);
   const docRef = doc(inventoryItemsCollection, id);
-  
-  batch.update(docRef, {
-      ...item,
-      updatedAt: new Date().toISOString()
-  });
-
+  const data = withEditMetadata({ ...item, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+  batch.update(docRef, data);
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('inventoryItems', { batch });
-  
   await batch.commit();
+  logActivity({ type: "edit", collection: "inventoryItems", docId: id, docPath: getTenantCollectionPath("inventoryItems").join("/"), summary: `Updated inventory item ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteInventoryItem(id: string) {
-  const batch = writeBatch(firestoreDB);
   const docRef = doc(inventoryItemsCollection, id);
-  
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    await moveToRecycleBin({ collection: "inventoryItems", docId: id, docPath: getTenantCollectionPath("inventoryItems").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted inventory item ${id}` });
+  }
+  const batch = writeBatch(firestoreDB);
   batch.delete(docRef);
-
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('inventoryItems', { batch });
-  
   await batch.commit();
 }
 
@@ -1397,46 +1397,36 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
 export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId' | 'date'>): Promise<FundTransaction> {
   const batch = writeBatch(firestoreDB);
   const docRef = doc(fundTransactionsCollection);
-  
-  const dataWithDate = {
-    ...transactionData,
-    date: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
+  const dataWithDate = withCreateMetadata({ ...transactionData, date: new Date().toISOString(), updatedAt: new Date().toISOString() } as Record<string, unknown>);
   batch.set(docRef, dataWithDate);
-
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('fundTransactions', { batch });
-  
   await batch.commit();
-  return { id: docRef.id, transactionId: '', ...dataWithDate };
+  logActivity({ type: "create", collection: "fundTransactions", docId: docRef.id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${docRef.id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
+  return { id: docRef.id, transactionId: '', ...dataWithDate } as FundTransaction;
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(fundTransactionsCollection, id);
-    
-    batch.update(docRef, {
-        ...data,
-        updatedAt: new Date().toISOString()
-    });
-
+    const updateData = withEditMetadata({ ...data, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, updateData);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('fundTransactions', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData }).catch(() => {});
 }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(fundTransactionsCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('fundTransactions', { batch });
-    
     await batch.commit();
 }
 
@@ -1478,9 +1468,10 @@ export function getExpenseCategories(callback: (data: ExpenseCategory[]) => void
 // Fetch ALL categories without incremental sync (for category manager)
 export async function getAllIncomeCategories(): Promise<IncomeCategory[]> {
     try {
-        const q = query(collection(firestoreDB, "incomeCategories"), orderBy("name"));
+        const path = getTenantCollectionPath("incomeCategories");
+        const q = query(collection(firestoreDB, ...path), orderBy("name"));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeCategory));
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as IncomeCategory));
     } catch (error) {
         throw error;
     }
@@ -1488,9 +1479,10 @@ export async function getAllIncomeCategories(): Promise<IncomeCategory[]> {
 
 export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
     try {
-        const q = query(collection(firestoreDB, "expenseCategories"), orderBy("name"));
+        const path = getTenantCollectionPath("expenseCategories");
+        const q = query(collection(firestoreDB, ...path), orderBy("name"));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseCategory));
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseCategory));
     } catch (error) {
         throw error;
     }
@@ -1498,50 +1490,75 @@ export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
 
 export async function addCategory(collectionName: "incomeCategories" | "expenseCategories", category: { name: string; nature?: string }) {
     const batch = writeBatch(firestoreDB);
-    const newDocRef = doc(collection(firestoreDB, collectionName));
-    
-    batch.set(newDocRef, { 
-        ...category, 
-        subCategories: [],
-        updatedAt: Timestamp.now()
-    });
+    const path = getTenantCollectionPath(collectionName);
+    const newDocRef = doc(collection(firestoreDB, ...path));
+    const base = { ...category, subCategories: [], updatedAt: Timestamp.now() };
+    const data = withCreateMetadata(base as Record<string, unknown>);
+
+    batch.set(newDocRef, data);
 
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry(collectionName, { batch });
-    
+
     await batch.commit();
+    await logActivity({
+      type: "create",
+      collection: collectionName,
+      docId: newDocRef.id,
+      docPath: path.join("/"),
+      summary: `Created ${category.name} in ${collectionName}`,
+      afterData: data,
+    });
 }
 
 export async function updateCategoryName(collectionName: "incomeCategories" | "expenseCategories", id: string, name: string) {
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, collectionName, id);
-    
-    batch.update(docRef, { 
-        name,
-        updatedAt: Timestamp.now()
-    });
+    const docRef = doc(firestoreDB, ...getTenantDocPath(collectionName, id));
+    const data = withEditMetadata({ name, updatedAt: Timestamp.now() } as Record<string, unknown>);
+
+    batch.update(docRef, data);
 
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry(collectionName, { batch });
-    
+
     await batch.commit();
+    await logActivity({
+      type: "edit",
+      collection: collectionName,
+      docId: id,
+      docPath: getTenantCollectionPath(collectionName).join("/"),
+      summary: `Updated ${collectionName}/${id} to ${name}`,
+      afterData: data,
+    });
 }
 
 export async function deleteCategory(collectionName: "incomeCategories" | "expenseCategories", id: string) {
+    const docRef = doc(firestoreDB, ...getTenantDocPath(collectionName, id));
+    const snap = await getDoc(docRef);
+    const beforeData = snap.exists() ? { id: snap.id, ...snap.data() } : {};
+
+    if (Object.keys(beforeData).length > 0) {
+      await moveToRecycleBin({
+        collection: collectionName,
+        docId: id,
+        docPath: getTenantCollectionPath(collectionName).join("/"),
+        data: beforeData as Record<string, unknown>,
+        summary: `Deleted ${collectionName}/${id}`,
+      });
+    }
+
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, collectionName, id);
-    
     batch.delete(docRef);
 
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry(collectionName, { batch });
-    
+
     await batch.commit();
 }
 
 export async function addSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, collectionName, categoryId);
+    const docRef = doc(firestoreDB, ...getTenantDocPath(collectionName, categoryId));
     
     batch.update(docRef, {
         subCategories: arrayUnion(subCategoryName),
@@ -1556,7 +1573,7 @@ export async function addSubCategory(collectionName: "incomeCategories" | "expen
 
 export async function deleteSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
     const batch = writeBatch(firestoreDB);
-    const docRef = doc(firestoreDB, collectionName, categoryId);
+    const docRef = doc(firestoreDB, ...getTenantDocPath(collectionName, categoryId));
     
     batch.update(docRef, {
         subCategories: arrayRemove(subCategoryName),
@@ -1585,16 +1602,12 @@ export async function getAttendanceForPeriod(employeeId: string, startDate: stri
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(attendanceCollection, entry.id);
-    
-    batch.set(docRef, {
-        ...entry,
-        updatedAt: new Date().toISOString()
-    }, { merge: true });
-
+    const data = withEditMetadata({ ...entry, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.set(docRef, data, { merge: true });
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('attendance', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "attendance", docId: entry.id, docPath: getTenantCollectionPath("attendance").join("/"), summary: `Updated attendance ${entry.id}`, afterData: data }).catch(() => {});
 }
 
 export function getAttendanceRealtime(
@@ -1717,44 +1730,36 @@ export async function addProject(projectData: Omit<Project, 'id'>): Promise<Proj
     const batch = writeBatch(firestoreDB);
     const newDocRef = doc(projectsCollection);
     const now = new Date().toISOString();
-    
-    batch.set(newDocRef, {
-        ...projectData,
-        createdAt: now,
-        updatedAt: now
-    });
-    
+    const data = withCreateMetadata({ ...projectData, createdAt: now, updatedAt: now } as Record<string, unknown>);
+    batch.set(newDocRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('projects', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "projects", docId: newDocRef.id, docPath: getTenantCollectionPath("projects").join("/"), summary: `Created project ${(projectData as any).name || newDocRef.id}`, afterData: data }).catch(() => {});
     return { id: newDocRef.id, ...projectData, createdAt: now, updatedAt: now };
 }
 
 export async function updateProject(id: string, projectData: Partial<Project>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(projectsCollection, id);
-    
-    batch.update(docRef, {
-        ...projectData,
-        updatedAt: new Date().toISOString()
-    });
-    
+    const data = withEditMetadata({ ...projectData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('projects', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "projects", docId: id, docPath: getTenantCollectionPath("projects").join("/"), summary: `Updated project ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(projectsCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "projects", docId: id, docPath: getTenantCollectionPath("projects").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted project ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('projects', { batch });
-    
     await batch.commit();
 }
 
@@ -1763,16 +1768,10 @@ export async function deleteProject(id: string): Promise<void> {
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(loansCollection);
-    
-    const dataWithTimestamp = {
-        ...loanData,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const dataWithTimestamp = withCreateMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(docRef, dataWithTimestamp);
-
     if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
-        const fundData = {
+        const fundData = withCreateMetadata({
             type: 'CapitalInflow',
             source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
             destination: loanData.depositTo,
@@ -1780,47 +1779,40 @@ export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
             description: `Capital inflow from ${loanData.loanName}`,
             date: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-        };
-        
+        } as Record<string, unknown>);
         const fundDocRef = doc(fundTransactionsCollection);
         batch.set(fundDocRef, fundData);
-        
         const { notifySyncRegistry } = await import('./sync-registry');
         await notifySyncRegistry('fundTransactions', { batch });
     }
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('loans', { batch });
-
     await batch.commit();
-    
-    return { id: docRef.id, ...dataWithTimestamp };
+    logActivity({ type: "create", collection: "loans", docId: docRef.id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Created loan ${(loanData as any).loanName || docRef.id}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
+    return { id: docRef.id, ...dataWithTimestamp } as Loan;
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(loansCollection, id);
-    
-    batch.update(docRef, {
-        ...loanData,
-        updatedAt: new Date().toISOString()
-    });
-
+    const data = withEditMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('loans', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Updated loan ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteLoan(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(loansCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted loan ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('loans', { batch });
-    
     await batch.commit();
 }
 
@@ -1829,13 +1821,18 @@ export async function deleteLoan(id: string): Promise<void> {
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
     const docRef = doc(customerPaymentsCollection, paymentData.paymentId);
-    const newPayment = { ...paymentData, id: docRef.id };
+    const newPayment = withCreateMetadata({ ...paymentData, id: docRef.id } as Record<string, unknown>);
     await setDoc(docRef, newPayment);
-    return newPayment;
+    logActivity({ type: "create", collection: "customer_payments", docId: docRef.id, docPath: getTenantCollectionPath("customer_payments").join("/"), summary: `Created customer payment ${docRef.id}`, afterData: newPayment }).catch(() => {});
+    return newPayment as CustomerPayment;
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {
     const docRef = doc(customerPaymentsCollection, id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
+    }
     await deleteDoc(docRef);
 }
 
@@ -1864,21 +1861,14 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
             throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
         }
         
-        const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
-        
-        // ✅ Use batch write to ensure atomicity with sync registry
+        const newIncome = withCreateMetadata({ ...incomeData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>);
         const batch = writeBatch(firestoreDB);
         batch.set(docRef, newIncome);
-        
-        // ✅ Update sync registry atomically
         const { notifySyncRegistry } = await import('./sync-registry');
         await notifySyncRegistry('incomes', { batch });
-        
-        await retryFirestoreOperation(
-            () => batch.commit(),
-            'addIncome - commit batch'
-        );
-        return newIncome;
+        await retryFirestoreOperation(() => batch.commit(), 'addIncome - commit batch');
+        logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => {});
+        return newIncome as Income;
     } catch (error) {
         logError(error, `addIncome(${incomeData.transactionId || 'new'})`, 'high');
         throw error;
@@ -1912,93 +1902,74 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
         throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
     }
     
-    const newExpense = { ...expenseData, transactionId: newTransactionId, id: docRef.id };
-    
-    // ✅ Use batch write to ensure atomicity with sync registry
+    const newExpense = withCreateMetadata({ ...expenseData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>);
     const batch = writeBatch(firestoreDB);
     batch.set(docRef, newExpense);
-    
-    // ✅ Update sync registry atomically
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('expenses', { batch });
-    
     await batch.commit();
-    return newExpense;
+    logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => {});
+    return newExpense as Expense;
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
-    const updatedAt = new Date().toISOString();
-    // ✅ Use batch write to ensure atomicity with sync registry
+    const data = withEditMetadata({ ...incomeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     const batch = writeBatch(firestoreDB);
-    batch.update(doc(incomesCollection, id), {
-        ...incomeData,
-        updatedAt
-    });
-    
-    // ✅ Update sync registry atomically
+    batch.update(doc(incomesCollection, id), data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('incomes', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Updated income ${id}`, afterData: data }).catch(() => {});
 
-    // ✅ Optimistic UI update: Update IndexedDB immediately
     if (db && db.transactions) {
         try {
-            await db.transactions.update(id, { ...incomeData, updatedAt });
+            await db.transactions.update(id, { ...incomeData, updatedAt: data.updatedAt });
         } catch (error) {
-            // Ignore error if local update fails (sync will handle it)
             handleSilentError(error, 'updateIncome - local optimistic update');
         }
     }
 }
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
-    const updatedAt = new Date().toISOString();
-    // ✅ Use batch write to ensure atomicity with sync registry
+    const data = withEditMetadata({ ...expenseData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     const batch = writeBatch(firestoreDB);
-    batch.update(doc(expensesCollection, id), {
-        ...expenseData,
-        updatedAt
-    });
-    
-    // ✅ Update sync registry atomically
+    batch.update(doc(expensesCollection, id), data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('expenses', { batch });
-    
     await batch.commit();
-
-    // ✅ Optimistic UI update: Update IndexedDB immediately
+    logActivity({ type: "edit", collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Updated expense ${id}`, afterData: data }).catch(() => {});
     if (db && db.transactions) {
         try {
-            await db.transactions.update(id, { ...expenseData, updatedAt });
+            await db.transactions.update(id, { ...expenseData, updatedAt: data.updatedAt });
         } catch (error) {
-            // Ignore error if local update fails (sync will handle it)
             handleSilentError(error, 'updateExpense - local optimistic update');
         }
     }
 }
 
 export async function deleteIncome(id: string): Promise<void> {
-    // ✅ Use batch write to ensure atomicity with sync registry
+    const docRef = doc(incomesCollection, id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted income ${id}` });
+    }
     const batch = writeBatch(firestoreDB);
-    batch.delete(doc(incomesCollection, id));
-    
-    // ✅ Update sync registry atomically
+    batch.delete(docRef);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('incomes', { batch });
-    
     await batch.commit();
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-    // ✅ Use batch write to ensure atomicity with sync registry
+    const docRef = doc(expensesCollection, id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense ${id}` });
+    }
     const batch = writeBatch(firestoreDB);
-    batch.delete(doc(expensesCollection, id));
-    
-    // ✅ Update sync registry atomically
+    batch.delete(docRef);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('expenses', { batch });
-    
     await batch.commit();
 }
 
@@ -2098,9 +2069,8 @@ export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const normalizedName = toTitleCase(account.name || '').trim();
     if (!normalizedName) throw new Error('Account name is required');
-
     const docRef = doc(accountsCollection, buildAccountDocId(normalizedName));
-    const payload: Omit<Account, 'id'> = {
+    const payload = withCreateMetadata({
         name: normalizedName,
         contact: account.contact?.trim() || undefined,
         address: account.address?.trim() || undefined,
@@ -2108,14 +2078,12 @@ export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
         category: account.category?.trim() || undefined,
         subCategory: account.subCategory?.trim() || undefined,
         updatedAt: new Date().toISOString(),
-    };
-
+    } as Record<string, unknown>);
     batch.set(docRef, payload, { merge: true });
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('accounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "accounts", docId: docRef.id, docPath: getTenantCollectionPath("accounts").join("/"), summary: `Created account ${normalizedName}`, afterData: payload }).catch(() => {});
 }
 
 export async function getAccount(name: string): Promise<Account | null> {
@@ -2172,15 +2140,18 @@ export async function updateAccount(account: Omit<Account, 'id'>, previousName?:
     const batch = writeBatch(firestoreDB);
     const normalizedName = toTitleCase(account.name || '').trim();
     if (!normalizedName) throw new Error('Account name is required');
-
-    // If name changed, delete old document
-    if (previousName && toTitleCase(previousName).trim() !== normalizedName) {
-        const prevDocId = buildAccountDocId(previousName);
-        batch.delete(doc(accountsCollection, prevDocId));
+    const isRename = previousName && toTitleCase(previousName).trim() !== normalizedName;
+    if (isRename) {
+        const prevDocId = buildAccountDocId(previousName!);
+        const prevRef = doc(accountsCollection, prevDocId);
+        const prevSnap = await getDoc(prevRef);
+        if (prevSnap.exists()) {
+          await moveToRecycleBin({ collection: "accounts", docId: prevDocId, docPath: getTenantCollectionPath("accounts").join("/"), data: { id: prevSnap.id, ...prevSnap.data() } as Record<string, unknown>, summary: `Deleted account (renamed) ${previousName}` });
+        }
+        batch.delete(prevRef);
     }
-
     const docRef = doc(accountsCollection, buildAccountDocId(normalizedName));
-    const payload: Omit<Account, 'id'> = {
+    const base = {
         name: normalizedName,
         contact: account.contact?.trim() || undefined,
         address: account.address?.trim() || undefined,
@@ -2189,26 +2160,27 @@ export async function updateAccount(account: Omit<Account, 'id'>, previousName?:
         subCategory: account.subCategory?.trim() || undefined,
         updatedAt: new Date().toISOString(),
     };
-
+    const payload = isRename ? withCreateMetadata(base as Record<string, unknown>) : withEditMetadata(base as Record<string, unknown>);
     batch.set(docRef, payload, { merge: true });
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('accounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: isRename ? "create" : "edit", collection: "accounts", docId: docRef.id, docPath: getTenantCollectionPath("accounts").join("/"), summary: isRename ? `Created account ${normalizedName}` : `Updated account ${normalizedName}`, afterData: payload }).catch(() => {});
 }
 
 export async function deleteAccount(name: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const normalizedName = toTitleCase(name || '').trim();
     if (!normalizedName) return;
     const docId = buildAccountDocId(normalizedName);
-    
-    batch.delete(doc(accountsCollection, docId));
-
+    const docRef = doc(accountsCollection, docId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "accounts", docId, docPath: getTenantCollectionPath("accounts").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted account ${name}` });
+    }
+    const batch = writeBatch(firestoreDB);
+    batch.delete(docRef);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('accounts', { batch });
-    
     await batch.commit();
 }
 
@@ -2259,44 +2231,35 @@ export async function deleteAllSuppliers(): Promise<void> {
 export async function addEmployee(employeeData: Partial<Omit<Employee, 'id'>>) {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(employeesCollection, employeeData.employeeId);
-    
-    const dataToSave = {
-        ...employeeData,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const dataToSave = withCreateMetadata({ ...employeeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(docRef, dataToSave, { merge: true });
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('employees', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "employees", docId: docRef.id, docPath: getTenantCollectionPath("employees").join("/"), summary: `Created employee ${(employeeData as any).name || docRef.id}`, afterData: dataToSave }).catch(() => {});
 }
 
 export async function updateEmployee(id: string, employeeData: Partial<Employee>) {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(employeesCollection, id);
-    
-    batch.update(docRef, {
-        ...employeeData,
-        updatedAt: new Date().toISOString()
-    });
-
+    const data = withEditMetadata({ ...employeeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('employees', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "employees", docId: id, docPath: getTenantCollectionPath("employees").join("/"), summary: `Updated employee ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteEmployee(id: string) {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(employeesCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "employees", docId: id, docPath: getTenantCollectionPath("employees").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted employee ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('employees', { batch });
-    
     await batch.commit();
 }
 
@@ -2304,45 +2267,36 @@ export async function deleteEmployee(id: string) {
 export async function addPayrollEntry(entryData: Omit<PayrollEntry, 'id'>) {
     const batch = writeBatch(firestoreDB);
     const newDocRef = doc(payrollCollection);
-    
-    const dataWithTimestamp = {
-        ...entryData,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const dataWithTimestamp = withCreateMetadata({ ...entryData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(newDocRef, dataWithTimestamp);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('payroll', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "payroll", docId: newDocRef.id, docPath: getTenantCollectionPath("payroll").join("/"), summary: `Created payroll entry ${newDocRef.id}`, afterData: dataWithTimestamp }).catch(() => {});
     return { id: newDocRef.id, ...dataWithTimestamp };
 }
 
 export async function updatePayrollEntry(id: string, entryData: Partial<PayrollEntry>) {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(payrollCollection, id);
-    
-    batch.update(docRef, {
-        ...entryData,
-        updatedAt: new Date().toISOString()
-    });
-
+    const data = withEditMetadata({ ...entryData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('payroll', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "payroll", docId: id, docPath: getTenantCollectionPath("payroll").join("/"), summary: `Updated payroll entry ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deletePayrollEntry(id: string) {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(payrollCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "payroll", docId: id, docPath: getTenantCollectionPath("payroll").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted payroll entry ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('payroll', { batch });
-    
     await batch.commit();
 }
 
@@ -2371,21 +2325,22 @@ export async function getHolidays(): Promise<Holiday[]> {
     const lastSyncTime = getLastSyncTime();
     let q;
     
+    const holidaysPath = getTenantCollectionPath("holidays");
     if (lastSyncTime) {
         // Only get documents modified after last sync
         const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
         q = query(
-            collection(firestoreDB, "holidays"),
+            collection(firestoreDB, ...holidaysPath),
             where('updatedAt', '>', lastSyncTimestamp),
             orderBy('updatedAt')
         );
     } else {
         // First sync - get all (only once)
-        q = query(collection(firestoreDB, "holidays"));
+        q = query(collection(firestoreDB, ...holidaysPath));
     }
 
     const querySnapshot = await getDocs(q);
-    const holidays = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Holiday));
+    const holidays = querySnapshot.docs.map(d => ({ ...d.data(), id: d.id } as Holiday));
     
     // Save to local IndexedDB and update last sync time
     if (db && holidays.length > 0) {
@@ -2399,13 +2354,21 @@ export async function getHolidays(): Promise<Holiday[]> {
 }
 
 export async function addHoliday(date: string, name: string): Promise<void> {
-    const docRef = doc(firestoreDB, "holidays", date);
-    await setDoc(docRef, { date, name });
+    const batch = writeBatch(firestoreDB);
+    const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", date));
+    batch.set(docRef, { date, name, updatedAt: Timestamp.now() });
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('holidays', { batch });
+    await batch.commit();
 }
 
 export async function deleteHoliday(id: string): Promise<void> {
-    const docRef = doc(firestoreDB, "holidays", id);
-    await deleteDoc(docRef);
+    const batch = writeBatch(firestoreDB);
+    const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", id));
+    batch.delete(docRef);
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('holidays', { batch });
+    await batch.commit();
 }
 
 // --- Daily Payment Limit ---
@@ -2837,10 +2800,11 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
         }, callback);
     }
     
+    const storageKey = `lastSync:suppliers_v3:${getStorageKeySuffix()}`;
     const fetchFunction = async () => {
         return await fetchCollectionWithIncrementalSync<Customer>(
             suppliersCollection,
-            'lastSync:suppliers_v3',
+            storageKey,
             db?.suppliers,
             'updatedAt',
             'srNo'
@@ -2852,7 +2816,7 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
             collectionName: 'suppliers',
             fetchFunction,
             localTableName: 'suppliers',
-            storageKey: 'lastSync:suppliers_v3'
+            storageKey
         },
         callback,
         onError
@@ -2866,22 +2830,23 @@ export function getCustomersRealtime(callback: (data: Customer[]) => void, onErr
         }, callback);
     }
 
+    const storageKey = `lastSync:customers_v3:${getStorageKeySuffix()}`;
     const fetchFunction = async () => {
         return await fetchCollectionWithIncrementalSync<Customer>(
             customersCollection,
-            'lastSync:customers_v3',
+            storageKey,
             db?.customers,
             'updatedAt',
             'srNo'
         );
     };
-
+    
     return createMetadataBasedListener<Customer>(
         {
             collectionName: 'customers',
             fetchFunction,
             localTableName: 'customers',
-            storageKey: 'lastSync:customers_v3'
+            storageKey
         },
         callback,
         onError
@@ -3555,46 +3520,36 @@ export function getBankAccountsRealtime(
 export async function addSupplierBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(supplierBankAccountsCollection, accountData.accountNumber);
-    
-    const newAccount = { 
-        ...accountData, 
-        id: docRef.id,
-        updatedAt: new Date().toISOString()
-    };
-    
+    const newAccount = withCreateMetadata({ ...accountData, id: docRef.id, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     batch.set(docRef, newAccount);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('supplierBankAccounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "create", collection: "supplierBankAccounts", docId: docRef.id, docPath: getTenantCollectionPath("supplierBankAccounts").join("/"), summary: `Created supplier bank account ${accountData.accountNumber}`, afterData: newAccount as Record<string, unknown> }).catch(() => {});
     return newAccount as BankAccount;
 }
 
 export async function updateSupplierBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const docRef = doc(supplierBankAccountsCollection, id);
-    
-    batch.update(docRef, {
-        ...accountData,
-        updatedAt: new Date().toISOString()
-    });
-    
+    const data = withEditMetadata({ ...accountData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('supplierBankAccounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "supplierBankAccounts", docId: id, docPath: getTenantCollectionPath("supplierBankAccounts").join("/"), summary: `Updated supplier bank account ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteSupplierBankAccount(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(supplierBankAccountsCollection, id);
-    
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "supplierBankAccounts", docId: id, docPath: getTenantCollectionPath("supplierBankAccounts").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted supplier bank account ${id}` });
+    }
+    const batch = writeBatch(firestoreDB);
     batch.delete(docRef);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('supplierBankAccounts', { batch });
-    
     await batch.commit();
 }
 
@@ -3855,11 +3810,9 @@ export interface ExpenseTemplate {
 }
 
 export async function addExpenseTemplate(template: Omit<ExpenseTemplate, 'id'>): Promise<string> {
-  const templateData = {
-    ...template,
-    createdAt: new Date().toISOString()
-  };
+  const templateData = withCreateMetadata({ ...template, createdAt: new Date().toISOString() } as Record<string, unknown>);
   const docRef = await addDoc(expenseTemplatesCollection, templateData);
+  logActivity({ type: "create", collection: "expenseTemplates", docId: docRef.id, docPath: getTenantCollectionPath("expenseTemplates").join("/"), summary: `Created expense template ${(template as any).name || docRef.id}`, afterData: templateData }).catch(() => {});
   return docRef.id;
 }
 
@@ -3936,11 +3889,18 @@ export function getExpenseTemplatesRealtime(
 
 export async function updateExpenseTemplate(id: string, template: Partial<ExpenseTemplate>): Promise<void> {
   const docRef = doc(expenseTemplatesCollection, id);
-  await updateDoc(docRef, template);
+  const data = withEditMetadata({ ...template, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+  await updateDoc(docRef, data);
+  logActivity({ type: "edit", collection: "expenseTemplates", docId: id, docPath: getTenantCollectionPath("expenseTemplates").join("/"), summary: `Updated expense template ${id}`, afterData: data }).catch(() => {});
 }
 
 export async function deleteExpenseTemplate(id: string): Promise<void> {
-  await deleteDoc(doc(expenseTemplatesCollection, id));
+  const docRef = doc(expenseTemplatesCollection, id);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    await moveToRecycleBin({ collection: "expenseTemplates", docId: id, docPath: getTenantCollectionPath("expenseTemplates").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense template ${id}` });
+  }
+  await deleteDoc(docRef);
 }
 
 // --- Ledger Accounting Functions ---
@@ -4016,40 +3976,26 @@ export async function fetchLedgerAccounts(): Promise<LedgerAccount[]> {
 export async function createLedgerAccount(account: LedgerAccountInput): Promise<LedgerAccount> {
     const timestamp = new Date().toISOString();
     const docRef = doc(ledgerAccountsCollection);
-    const newAccount = {
-        name: account.name,
-        address: account.address || '',
-        contact: account.contact || '',
-        createdAt: timestamp,
-        updatedAt: timestamp,
-    };
-    
+    const base = { name: account.name, address: account.address || '', contact: account.contact || '', createdAt: timestamp, updatedAt: timestamp };
+    const newAccount = withCreateMetadata(base as Record<string, unknown>);
     const batch = writeBatch(firestoreDB);
     batch.set(docRef, newAccount);
-    
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('ledgerAccounts', { batch });
-    
     await batch.commit();
-
-    return {
-        id: docRef.id,
-        ...newAccount,
-    };
+    logActivity({ type: "create", collection: "ledgerAccounts", docId: docRef.id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Created ledger account ${account.name}`, afterData: newAccount }).catch(() => {});
+    return { id: docRef.id, ...newAccount } as LedgerAccount;
 }
 
 export async function updateLedgerAccount(id: string, updates: Partial<LedgerAccountInput>): Promise<void> {
     const docRef = doc(ledgerAccountsCollection, id);
+    const data = withEditMetadata({ ...updates, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     const batch = writeBatch(firestoreDB);
-    batch.update(docRef, {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-    });
-    
+    batch.update(docRef, data);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('ledgerAccounts', { batch });
-    
     await batch.commit();
+    logActivity({ type: "edit", collection: "ledgerAccounts", docId: id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Updated ledger account ${id}`, afterData: data }).catch(() => {});
 }
 
 export function getLedgerAccountsRealtime(
@@ -4093,20 +4039,18 @@ export function getLedgerAccountsRealtime(
 }
 
 export async function deleteLedgerAccount(id: string): Promise<void> {
+    const docRef = doc(ledgerAccountsCollection, id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await moveToRecycleBin({ collection: "ledgerAccounts", docId: id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted ledger account ${id}` });
+    }
     const batch = writeBatch(firestoreDB);
-    batch.delete(doc(ledgerAccountsCollection, id));
-
+    batch.delete(docRef);
     const entriesSnapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', id)));
-    entriesSnapshot.forEach((entryDoc) => {
-        batch.delete(entryDoc.ref);
-    });
-    
+    entriesSnapshot.forEach((entryDoc) => batch.delete(entryDoc.ref));
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('ledgerAccounts', { batch });
-    if (entriesSnapshot.size > 0) {
-        await notifySyncRegistry('ledgerEntries', { batch });
-    }
-
+    if (entriesSnapshot.size > 0) await notifySyncRegistry('ledgerEntries', { batch });
     await batch.commit();
 }
 
@@ -4785,14 +4729,13 @@ export async function deleteMandiReport(id: string): Promise<void> {
     }
 }
 
-export async function fetchMandiReports(): Promise<MandiReport[]> {
+export async function fetchMandiReports(forceFromFirestore = false): Promise<MandiReport[]> {
     
-    // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads
-    if (db) {
+    // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads (unless forceRefresh)
+    if (!forceFromFirestore && db) {
         try {
             const localReports = await db.mandiReports.toArray();
             if (localReports.length > 0) {
-
                 return localReports;
             }
         } catch (error) {
@@ -4805,51 +4748,11 @@ export async function fetchMandiReports(): Promise<MandiReport[]> {
     const reportMap = new Map<string, MandiReport>();
     
     try {
-        // Data structure: /mandiReports/{voucherNo}/6P/{docId}
-        // So we need to:
-        // 1. Fetch all parent documents from mandiReports collection
-        // 2. For each parent, query the 6P subcollection
-        // 3. Also try collectionGroup for '6P' subcollection (gets all 6P subcollections regardless of parent)
+        // Data structure: /mandiReports/{voucherNo}/6P/{docId} OR mandiReports/{docId} (direct)
+        // NOTE: Do NOT use collectionGroup('6P') - it fetches from ENTIRE Firestore, ignoring tenant/season!
+        // Use only tenant-scoped mandiReportsCollection.
         
-        
-        // Method 1: Use collectionGroup to get ALL '6P' subcollections
-        try {
-
-            const collectionGroup6P = collectionGroup(firestoreDB, '6P');
-            const group6PSnapshot = await getDocs(collectionGroup6P);
-            
-            if (group6PSnapshot.size > 0) {
-                group6PSnapshot.docs.forEach((docSnap, index) => {
-                    const data = docSnap.data() as MandiReport;
-                    const fullPath = docSnap.ref.path;
-                    const pathParts = fullPath.split('/');
-                    
-                    // Path format: mandiReports/{voucherNo}/6P/{docId}
-                    // Extract voucherNo (parent doc) and docId
-                    let docId = pathParts[pathParts.length - 1];
-                    let voucherNo = pathParts.length >= 2 ? pathParts[pathParts.length - 3] : undefined;
-                    
-                    const finalId = data.id || docId;
-                    
-                    if (index < 5) {
-
-                    }
-                    
-                    // Use finalId as key to avoid duplicates
-                    if (!reportMap.has(finalId)) {
-                        reportMap.set(finalId, { ...data, id: finalId });
-                    }
-                });
-                
-            } else {
-
-            }
-        } catch (collectionGroup6PError: unknown) {
-
-
-        }
-        
-        // Method 2: Manually query each parent document's 6P subcollection
+        // Method 1: Query each parent document's 6P subcollection (tenant-scoped)
         try {
 
             const parentDocsSnapshot = await getDocs(mandiReportsCollection);
@@ -5002,85 +4905,31 @@ export function getMandiReportsRealtime(
         });
     }
 
-    // Use collectionGroup to listen to all '6P' subcollections
-    const collectionGroup6P = collectionGroup(firestoreDB, '6P');
-    
-    // ✅ First fetch all reports
-    getDocs(collectionGroup6P).then((fullSnapshot) => {
-        const allReports: MandiReport[] = [];
-        fullSnapshot.docs.forEach((docSnap) => {
-            const data = docSnap.data() as MandiReport;
-            const fullPath = docSnap.ref.path;
-            const pathParts = fullPath.split('/');
-            let docId = pathParts[pathParts.length - 1];
-            const finalId = data.id || docId;
-            
-            if (!reportMap.has(finalId)) {
-                reportMap.set(finalId, { ...data, id: finalId });
+    // ✅ Use tenant-scoped mandiReportsCollection (NOT collectionGroup - that fetches from entire DB!)
+    const refreshFromFirestore = () => {
+        fetchMandiReports(true).then((reports) => {
+            firestoreReports = reports;
+            callback(firestoreReports);
+            if (db) {
+                // Always sync IndexedDB - clear if empty, bulkPut if has data (prevents stale data from wrong season)
+                if (firestoreReports.length > 0) {
+                    db.mandiReports.clear().then(() => db.mandiReports.bulkPut(firestoreReports)).catch(() => {});
+                } else {
+                    db.mandiReports.clear().catch(() => {});
+                }
             }
-        });
-        
-        firestoreReports = Array.from(reportMap.values());
-        
-        // Sort by purchaseDate (newest first)
-        firestoreReports.sort((a, b) => {
-            const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
-            const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
-            return dateB - dateA;
-        });
-        
-        callback(firestoreReports);
-        
-        // Save to IndexedDB
-        if (db && firestoreReports.length > 0) {
-            db.mandiReports.bulkPut(firestoreReports).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:mandiReports', String(Date.now()));
-        }
-    }).catch((error) => {
-
-        onError(error as Error);
-    });
-
-    // ✅ Set up realtime listener for future changes
-    return onSnapshot(collectionGroup6P, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-            const data = change.doc.data() as MandiReport;
-            const fullPath = change.doc.ref.path;
-            const pathParts = fullPath.split('/');
-            let docId = pathParts[pathParts.length - 1];
-            const finalId = data.id || docId;
-            
-            if (change.type === 'removed') {
-                reportMap.delete(finalId);
-            } else {
-                reportMap.set(finalId, { ...data, id: finalId });
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('lastSync:mandiReports', String(Date.now()));
             }
-        });
-        
-        firestoreReports = Array.from(reportMap.values());
-        
-        // Sort by purchaseDate (newest first)
-        firestoreReports.sort((a, b) => {
-            const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
-            const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
-            return dateB - dateA;
-        });
-        
-        callback(firestoreReports);
-        
-        // Save to IndexedDB
-        if (db && firestoreReports.length > 0) {
-            db.mandiReports.bulkPut(firestoreReports).catch(() => {});
-        }
-        
-        // ✅ Save last sync time
-        if (snapshot.size > 0 && typeof window !== 'undefined') {
-            localStorage.setItem('lastSync:mandiReports', String(Date.now()));
-        }
+        }).catch((err) => onError(err as Error));
+    };
+
+    // Initial fetch
+    refreshFromFirestore();
+
+    // Listen to changes on tenant-scoped mandiReports collection
+    return onSnapshot(mandiReportsCollection, () => {
+        refreshFromFirestore();
     }, (err: unknown) => {
         onError(err as Error);
     });

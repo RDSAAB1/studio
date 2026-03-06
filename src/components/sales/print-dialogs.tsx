@@ -27,9 +27,11 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
         if (!node) return;
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -42,47 +44,56 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
 
         iframeDoc.open();
         iframeDoc.write('<html><head><title>Print Receipt</title>');
+        iframeDoc.write(`
+            <style>
+                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
+                body * { background-color: transparent; }
+                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
+                @media print {
+                    @page { size: A6 landscape; margin: 5mm; }
+                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .receipt-container { page-break-after: always; }
+                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
+                }
+            </style>`);
 
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
-            } catch (e) {
-
-            }
+            } catch (e) { /* CORS - skip cross-origin styles */ }
         });
+
+        const overrideStyle = iframeDoc.createElement('style');
+        overrideStyle.id = 'print-override';
+        overrideStyle.textContent = `@media print {
+          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+        }`;
+        iframeDoc.head.appendChild(overrideStyle);
         
-        iframeDoc.write(`
-            <style>
-                @media print {
-                    @page {
-                        size: A6 landscape;
-                        margin: 5mm;
-                    }
-                    body {
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    .receipt-container { 
-                        page-break-after: always;
-                    }
-                    .printable-area * {
-                        color: #000 !important;
-                        border-color: #ccc !important;
-                    }
-                }
-            </style>
-        </head><body></body></html>`);
-        
+        iframeDoc.write(`</head><body></body></html>`);
         iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
     };
 
     return (
@@ -126,9 +137,11 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
         if (!node) return;
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -141,45 +154,56 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
 
         iframeDoc.open();
         iframeDoc.write('<html><head><title>Print Consolidated Receipt</title>');
+        iframeDoc.write(`
+            <style>
+                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
+                body * { background-color: transparent; }
+                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
+                @media print {
+                    @page { size: A4; margin: 10mm; }
+                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .receipt-container { page-break-after: always; }
+                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
+                }
+            </style>`);
 
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
-            } catch (e) {
-
-            }
+            } catch (e) { /* CORS - skip cross-origin styles */ }
         });
+
+        const overrideStyle2 = iframeDoc.createElement('style');
+        overrideStyle2.id = 'print-override';
+        overrideStyle2.textContent = `@media print {
+          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+        }`;
+        iframeDoc.head.appendChild(overrideStyle2);
         
-        iframeDoc.write(`
-            <style>
-                @media print {
-                    @page {
-                        size: A4;
-                        margin: 10mm;
-                    }
-                    body {
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    .receipt-container { page-break-after: always; }
-                    .printable-area * {
-                        color: #000 !important;
-                        border-color: #ccc !important;
-                    }
-                }
-            </style>
-        </head><body></body></html>`);
-        
+        iframeDoc.write(`</head><body></body></html>`);
         iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
     }
     
     return (
@@ -225,9 +249,11 @@ export const CombinedReceiptPrintDialog = ({ receipts, consolidatedData, allCons
         if (!node) return;
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
         
@@ -240,50 +266,56 @@ export const CombinedReceiptPrintDialog = ({ receipts, consolidatedData, allCons
 
         iframeDoc.open();
         iframeDoc.write('<html><head><title>Print All Receipts</title>');
+        iframeDoc.write(`
+            <style>
+                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
+                body * { background-color: transparent; }
+                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
+                @media print {
+                    @page { size: A6 landscape; margin: 5mm; }
+                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .receipt-container, .consolidated-receipt { page-break-after: always; }
+                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
+                }
+            </style>`);
 
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
                 style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 iframeDoc.head.appendChild(style);
-            } catch (e) {
-
-            }
+            } catch (e) { /* CORS - skip cross-origin styles */ }
         });
+
+        const overrideStyle3 = iframeDoc.createElement('style');
+        overrideStyle3.id = 'print-override';
+        overrideStyle3.textContent = `@media print {
+          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+        }`;
+        iframeDoc.head.appendChild(overrideStyle3);
         
-        iframeDoc.write(`
-            <style>
-                @media print {
-                    @page {
-                        size: A6 landscape;
-                        margin: 5mm;
-                    }
-                    body {
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    .receipt-container { 
-                        page-break-after: always;
-                    }
-                    .consolidated-receipt {
-                        page-break-after: always;
-                    }
-                    .printable-area * {
-                        color: #000 !important;
-                        border-color: #ccc !important;
-                    }
-                }
-            </style>
-        </head><body></body></html>`);
-        
+        iframeDoc.write(`</head><body></body></html>`);
         iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
-        setTimeout(() => {
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        };
+        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
+        setTimeout(doPrint, 800);
     };
 
     const hasData = receipts.length > 0 || allConsolidatedGroups.length > 0;

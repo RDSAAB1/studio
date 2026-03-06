@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 
@@ -12,7 +13,6 @@ const DashboardClient = dynamic(() => import('./dashboard-client'), {
   ),
 });
 
-// This is now the main dashboard page, rendered at the root '/'.
 export default function DashboardPage() {
   return <DashboardClient />;
 }
