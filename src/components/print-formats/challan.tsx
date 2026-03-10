@@ -119,7 +119,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
 
     return (
         <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
-            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800 {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
+            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800 {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}.print-bg-black, .print-bg-black * {background-color: #000000 !important; color: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
             
             <div className="flex-grow-0">
                  <div className="flex justify-between items-start mb-4">
@@ -236,8 +236,8 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(cgstAmount))}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(sgstAmount))}</span></div>
                          {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
-                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
-                            <span>Balance Due:</span><span>{formatCurrency(Math.round(totalInvoiceValue))}</span>
+                        <div className="flex justify-between p-3 mt-1 bg-black text-white font-bold rounded-lg text-xl print-bg-black">
+                            <span className="text-white" style={{ color: '#ffffff' }}>Total Amount:</span><span className="text-white" style={{ color: '#ffffff' }}>{formatCurrency(Math.round(totalInvoiceValue))}</span>
                         </div>
                     </div>
                 </div>

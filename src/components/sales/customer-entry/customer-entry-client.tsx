@@ -306,28 +306,36 @@ export default function CustomerEntryClient() {
         baseReport: formValues.baseReport || 0,
         collectedReport: formValues.collectedReport || 0,
         riceBranGst: formValues.riceBranGst || 0,
-        calculatedRate: currentCustomer.calculatedRate || undefined, // Store calculated rate for RICE BRAN
+        ...(currentCustomer.calculatedRate != null && { calculatedRate: currentCustomer.calculatedRate }),
     };
     
     try {
-        // If editing and SR No changed, delete old entry first (optimistic)
+        // If editing and SR No changed, delete old entry first before proceeding
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
-            // Update UI immediately
+            try {
+                await deleteCustomer(currentCustomer.id);
+            } catch (saveError) {
+                const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                toast({ title: "Failed to remove old entry from database.", description: msg, variant: "destructive" });
+                return;
+            }
             setCustomers(prev => prev.filter(c => c.id !== currentCustomer.id));
-            
-            // Write using sync system (triggers Firestore sync)
-            deleteCustomer(currentCustomer.id).catch(() => {});
         }
         
         if (deletePayments) {
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
             
-            // If editing with same ID, use updateCustomer; otherwise addCustomer (optimistic)
             if (isEditing && currentCustomer.id === dataToSave.srNo) {
                 const { id, ...updateData } = entryWithRestoredAmount as Customer;
                 const updatedEntry = entryWithRestoredAmount as Customer;
-                
-                // Update UI immediately (optimistic)
+                try {
+                    await updateCustomer(id, updateData);
+                    await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
+                } catch (saveError) {
+                    const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                    toast({ title: "Failed to save to database.", description: msg, variant: "destructive" });
+                    return;
+                }
                 setCustomers(prev => {
                     const existingIndex = prev.findIndex(c => c.id === id);
                     if (existingIndex > -1) {
@@ -337,17 +345,19 @@ export default function CustomerEntryClient() {
                     }
                     return [updatedEntry, ...prev];
                 });
-                // Highlight and scroll to entry in table
                 setHighlightEntryId(updatedEntry.id);
                 setTimeout(() => setHighlightEntryId(null), 3000);
                 toast({ title: "Entry updated, payments deleted.", variant: "success" });
                 if (callback) callback(updatedEntry); else handleNew();
-                
-                // Write using sync system (triggers Firestore sync)
-                updateCustomer(id, updateData).catch(() => {});
-                deleteCustomerPaymentsForSrNo(dataToSave.srNo!).catch(() => {});
             } else {
-                // Update UI immediately (optimistic)
+                try {
+                    await addCustomer(entryWithRestoredAmount as Customer);
+                    await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
+                } catch (saveError) {
+                    const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                    toast({ title: "Failed to save to database.", description: msg, variant: "destructive" });
+                    return;
+                }
                 setCustomers(prev => {
                     const existingIndex = prev.findIndex(c => c.id === entryWithRestoredAmount.id);
                     if (existingIndex > -1) {
@@ -357,15 +367,10 @@ export default function CustomerEntryClient() {
                     }
                     return [entryWithRestoredAmount as Customer, ...prev];
                 });
-                // Highlight and scroll to entry in table
                 setHighlightEntryId(entryWithRestoredAmount.id);
                 setTimeout(() => setHighlightEntryId(null), 3000);
                 toast({ title: "Entry updated, payments deleted.", variant: "success" });
                 if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
-                
-                // Write using sync system (triggers Firestore sync)
-                addCustomer(entryWithRestoredAmount as Customer).catch(() => {});
-                deleteCustomerPaymentsForSrNo(dataToSave.srNo!).catch(() => {});
             }
         } else {
             // Ensure ID is set to SR No
@@ -375,10 +380,16 @@ export default function CustomerEntryClient() {
             if (isEditing && currentCustomer.id) {
                 // Check if SR No changed - if yes, we need to handle it differently
                 if (currentCustomer.id !== srNo && currentCustomer.srNo && currentCustomer.srNo !== srNo) {
-                    // SR No changed - delete old and create new (optimistic)
+                    // SR No changed - delete old and create new
                     const tempEntry = { ...entryToSave, id: srNo } as Customer;
-                    
-                    // Update UI immediately (optimistic)
+                    try {
+                        await deleteCustomer(currentCustomer.id);
+                        await addCustomer(tempEntry);
+                    } catch (saveError) {
+                        const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                        toast({ title: "Failed to save to database.", description: msg, variant: "destructive" });
+                        return;
+                    }
                     setCustomers(prev => {
                         const filtered = prev.filter(c => c.id !== currentCustomer.id);
                         const existingIndex = filtered.findIndex(c => c.id === tempEntry.id);
@@ -389,8 +400,6 @@ export default function CustomerEntryClient() {
                         }
                         return [tempEntry, ...filtered];
                     });
-                    
-                    // Highlight and scroll to entry in table
                     setHighlightEntryId(tempEntry.id);
                     setTimeout(() => setHighlightEntryId(null), 3000);
                     toast({ title: "Entry updated successfully.", variant: "success" });
@@ -398,17 +407,18 @@ export default function CustomerEntryClient() {
                         localStorage.removeItem('customer-entry-form-state');
                     }
                     if (callback) callback(tempEntry); else handleNew();
-                    
-                    // Write using sync system (triggers Firestore sync)
-                    deleteCustomer(currentCustomer.id).catch(() => {});
-                    addCustomer(tempEntry).catch(() => {});
                 } else {
-                    // Same ID or updating existing - use updateCustomer (optimistic update)
+                    // Same ID or updating existing - use updateCustomer
                     const updateId = currentCustomer.id || srNo;
                     const { id, ...updateData } = entryToSave as Customer;
                     const updatedEntry = { ...entryToSave, id: updateId } as Customer;
-                    
-                    // Update UI immediately (optimistic) - no sort for better performance
+                    try {
+                        await updateCustomer(updateId, updateData);
+                    } catch (saveError) {
+                        const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                        toast({ title: "Failed to save to database.", description: msg, variant: "destructive" });
+                        return;
+                    }
                     setCustomers(prev => {
                         const existingIndex = prev.findIndex(c => c.id === updateId);
                         if (existingIndex > -1) {
@@ -416,15 +426,11 @@ export default function CustomerEntryClient() {
                             newCustomers[existingIndex] = updatedEntry;
                             return newCustomers;
                         }
-                        // Insert at beginning without sort (faster)
                         return [updatedEntry, ...prev];
                     });
-                    // Highlight and scroll to entry in table
                     setHighlightEntryId(updatedEntry.id);
                     setTimeout(() => setHighlightEntryId(null), 3000);
                     toast({ title: "Entry updated successfully.", variant: "success" });
-                    
-                    // Defer form reset to avoid blocking
                     if (callback) {
                         callback(updatedEntry);
                     } else {
@@ -435,15 +441,18 @@ export default function CustomerEntryClient() {
                             handleNew();
                         }, 0);
                     }
-                    
-                    // Write using sync system (triggers Firestore sync)
-                    updateCustomer(updateId, updateData).catch(() => {});
                 }
             } else {
-                // New entry - use addCustomer (optimistic add)
+                // New entry - save to database first, then update UI and show success
                 const tempEntry = entryToSave as Customer;
-                
-                // Update UI immediately (optimistic)
+                try {
+                    await addCustomer(tempEntry);
+                } catch (saveError) {
+                    const msg = saveError instanceof Error ? saveError.message : String(saveError);
+                    toast({ title: "Failed to save to database.", description: msg, variant: "destructive" });
+                    return;
+                }
+                // Update UI after successful save
                 setCustomers(prev => {
                     const existingIndex = prev.findIndex(c => c.id === tempEntry.id);
                     if (existingIndex > -1) {
@@ -453,7 +462,6 @@ export default function CustomerEntryClient() {
                     }
                     return [tempEntry, ...prev];
                 });
-                // Highlight and scroll to entry in table
                 setHighlightEntryId(tempEntry.id);
                 setTimeout(() => setHighlightEntryId(null), 3000);
                 toast({ title: "Entry saved successfully.", variant: "success" });
@@ -461,14 +469,15 @@ export default function CustomerEntryClient() {
                     localStorage.removeItem('customer-entry-form-state');
                 }
                 if (callback) callback(tempEntry); else handleNew();
-                
-                // Write using sync system (triggers Firestore sync)
-                addCustomer(tempEntry).catch(() => {});
             }
         }
     } catch (error) {
-
-        toast({ title: "Failed to save entry.", variant: "destructive" });
+        const message = error instanceof Error ? error.message : String(error);
+        toast({
+          title: "Failed to save entry.",
+          description: message,
+          variant: "destructive",
+        });
     }
   };
 

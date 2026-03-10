@@ -39,11 +39,11 @@ export function PaymentDialogs({
 }: PaymentDialogsProps) {
   return (
     <>
-      {/* Statement Preview Dialog */}
+      {/* Overall Statement Dialog (Generate Statement) */}
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 printable-statement-container bg-card">
           <DialogHeader className="sr-only">
-            <DialogTitle>Statement Preview</DialogTitle>
+            <DialogTitle>Overall Statement</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-background">
             {selectedSupplierSummary ? (

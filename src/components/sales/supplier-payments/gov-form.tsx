@@ -57,13 +57,10 @@ export const GovForm = (props: any) => {
                         <span className="font-semibold tabular-nums text-primary">{govRate || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground font-medium">Extra</span>
-                        <input
-                            type="number"
-                            className="font-semibold text-[10px] w-14 text-right border border-border/60 rounded px-1.5 py-0.5 bg-background"
-                            value={govExtraAmount || 0}
-                            onChange={(e) => setGovExtraAmount && setGovExtraAmount(Number(e.target.value))}
-                        />
+                        <span className="text-muted-foreground font-medium">Extra (Auto)</span>
+                        <span className="font-semibold tabular-nums text-primary">
+                            {formatCurrency(govExtraAmount || 0)}
+                        </span>
                     </div>
                 </div>
             </div>

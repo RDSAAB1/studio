@@ -5,12 +5,12 @@ import React, { useMemo, useRef } from 'react';
 import type { CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Download, Printer } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from "@/lib/date-utils";
+import { SupplierSummaryCards } from "@/components/sales/supplier-payments/supplier-summary-cards";
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
@@ -136,21 +136,114 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
         <style>
         {`
             @media print {
-            .summary-grid-container {
-                display: flex !important;
-                flex-wrap: nowrap !important;
-                gap: 1rem !important;
-            }
-            .summary-grid-container > div {
-                flex: 1;
-                padding: 8px;
-            }
-            .print-table tbody tr {
-                background-color: transparent !important;
-            }
-            .print-table th, .print-table td {
-                padding: 4px 6px;
-            }
+              .print-table tbody tr {
+                  background-color: transparent !important;
+              }
+              .print-table th, .print-table td {
+                  padding: 6px 9px;
+                  font-size: 13px !important;
+                  line-height: 1.3 !important;
+                  color: #222222 !important;
+              }
+              .print-table th {
+                  font-weight: 600 !important;
+                  color: #333333 !important;
+              }
+
+              /* Dashboard summary layout for print (SupplierSummaryCards) */
+              /* Flattened, professional summary block for print */
+              .supplier-summary-dashboard-root {
+                  background-color: #ffffff !important;
+                  border-radius: 0.3rem !important;
+                  padding: 4px 4px 2px 4px !important;
+                  margin-bottom: 6px !important;
+                  border: none !important;
+              }
+              .supplier-summary-dashboard-top,
+              .supplier-summary-dashboard-middle,
+              .supplier-summary-dashboard-bottom {
+                  display: grid !important;
+                  gap: 0.5rem !important;
+              }
+              .supplier-summary-dashboard-top {
+                  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+              }
+              .supplier-summary-dashboard-middle,
+              .supplier-summary-dashboard-bottom {
+                  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+              }
+              .supplier-summary-dashboard-card {
+                  border-radius: 0.25rem !important;
+                  border: none !important;
+                  padding: 2px 4px !important;
+                  background-color: transparent !important;
+                  box-shadow: none !important;
+              }
+
+              /* Top metric row: add subtle bottom border */
+              .supplier-summary-dashboard-top .supplier-summary-dashboard-card {
+                  border-bottom: 1px solid #e5e7eb !important;
+              }
+
+              /* Compact typography for summary (print-only) */
+              .supplier-summary-dashboard-root .text-base {
+                  font-size: 9px !important;
+                  line-height: 1.2 !important;
+              }
+              .supplier-summary-dashboard-root .text-[10px] {
+                  font-size: 7px !important;
+                  line-height: 1.2 !important;
+              }
+
+              /* Soften summary colours / weights for cleaner look */
+              .supplier-summary-dashboard-root .text-slate-900 {
+                  color: #222222 !important;
+                  font-weight: 500 !important;
+              }
+              .supplier-summary-dashboard-root .text-slate-800,
+              .supplier-summary-dashboard-root .text-slate-700,
+              .supplier-summary-dashboard-root .text-slate-600 {
+                  color: #666666 !important;
+                  font-weight: 500 !important;
+              }
+              .supplier-summary-dashboard-root .font-bold {
+                  font-weight: 600 !important;
+              }
+              .supplier-summary-dashboard-root .font-semibold {
+                  font-weight: 500 !important;
+              }
+
+              /* Top 4 KPI cards – larger amount text for print */
+              .supplier-summary-dashboard-top .text-base {
+                  font-size: 16px !important;
+                  font-weight: 700 !important;
+                  color: #111111 !important;
+                  line-height: 1.25 !important;
+              }
+              .supplier-summary-dashboard-top .text-[10px] {
+                  font-size: 10px !important;
+                  font-weight: 500 !important;
+              }
+
+              /* Coloured amount cells for table */
+              .debit-cell,
+              .closing-debit {
+                  color: #b91c1c !important; /* red */
+              }
+              .credit-cell,
+              .closing-credit {
+                  color: #15803d !important; /* green */
+              }
+              .balance-cell,
+              .closing-balance,
+              .opening-amount {
+                  color: #111827 !important; /* near-black */
+                  font-weight: 600 !important;
+              }
+              .opening-label,
+              .closing-label {
+                  color: #4b5563 !important; /* gray-600 */
+              }
             }
         `}
         </style>
@@ -186,46 +279,14 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 </div>
             </div>
 
-            {/* Summary Section */}
-            <Card className="mb-6 bg-white border-gray-200">
-                <CardContent className="p-4">
-                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
-                        {/* Operational Summary */}
-                        <div className="text-sm">
-                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Operational</h3>
-                             <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalGrossWeight)}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalTeirWeight)}</td></tr>
-                                <tr className="font-bold border-t border-gray-200"><td className="py-1 text-black">Final Wt</td><td className="py-1 text-right font-semibold text-black">{formatWeight(data.totalFinalWeight)}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold text-black">{formatWeight(data.totalKartaWeight)}</td></tr>
-                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Net Wt</td><td className="py-1 text-right">{formatWeight(data.totalNetWeight)}</td></tr>
-                            </tbody></table>
-                        </div>
-                        {/* Deduction Summary */}
-                        <div className="text-sm">
-                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Deductions</h3>
-                            <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-gray-600">Total Amount</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
-                                <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Karta Amt</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Laboury Amt</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Kanta</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Brokerage Amt</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalBrokerage || 0)}`}</td></tr>
-                                <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                            </tbody></table>
-                        </div>
-                        {/* Financial Summary */}
-                        <div className="text-sm">
-                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Financial</h3>
-                            <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-gray-600">Original Purchases</td><td className="py-0.5 text-right font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                                <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-gray-600">Total CD Granted</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
-                                <tr className="font-bold text-destructive border-t border-gray-200"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
-                            </tbody></table>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Summary Section – use same dashboard summary as unified payments */}
+            <div className="mb-4">
+                <SupplierSummaryCards
+                    summary={data as any}
+                    variant="dashboard"
+                    type="supplier"
+                />
+            </div>
 
             {/* Transaction Table */}
             <div>
@@ -243,27 +304,27 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         </TableHeader>
                         <TableBody>
                             <TableRow>
-                                <TableCell colSpan={4} className="font-semibold py-2 px-3 text-black">Opening Balance</TableCell>
-                                <TableCell className="text-right font-semibold font-mono py-2 px-3 text-black">{formatCurrency(0)}</TableCell>
+                                <TableCell colSpan={4} className="font-semibold py-2 px-3 text-gray-700 opening-label">Opening Balance</TableCell>
+                                <TableCell className="text-right font-semibold font-mono py-2 px-3 text-gray-900 opening-amount">{formatCurrency(0)}</TableCell>
                             </TableRow>
                             {transactions.map((item, index) => (
                                 <TableRow key={index} className="[&_td]:py-2 [&_td]:px-3">
-                                    <TableCell className="text-black">
+                                    <TableCell className="text-gray-800">
                                         {formatDate(item.date, "dd-MMM-yy")}
                                     </TableCell>
-                                    <TableCell className="text-black">{item.particulars}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono text-black">{formatCurrency(item.balance)}</TableCell>
+                                    <TableCell className="text-gray-800">{item.particulars}</TableCell>
+                                    <TableCell className="text-right font-mono debit-cell">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono credit-cell">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono balance-cell">{formatCurrency(item.balance)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                         <TableFooter>
                             <TableRow className="bg-gray-100 font-bold">
-                                <TableCell colSpan={2} className="py-2 px-3 text-black">Closing Balance</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalDebit)}</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(closingBalance)}</TableCell>
+                                <TableCell colSpan={2} className="py-2 px-3 text-gray-700 closing-label">Closing Balance</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-red-700 closing-debit">{formatCurrency(totalDebit)}</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-emerald-700 closing-credit">{formatCurrency(totalCredit)}</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-gray-900 closing-balance">{formatCurrency(closingBalance)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>

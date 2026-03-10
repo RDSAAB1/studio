@@ -18,7 +18,7 @@ import { enqueueSyncTask } from './sync-queue';
 import { yieldToMainThread, chunkedBulkPut } from './chunked-operations';
 import { logError } from './error-logger';
 import { retryFirestoreOperation } from './retry-utils';
-import { getTenantCollectionPath } from './tenancy';
+import { getTenantCollectionPath, getStorageKeySuffix } from './tenancy';
 import { getFirestoreCollectionName } from './sync-registry';
 import { withCreateMetadata, withEditMetadata, logActivity } from './audit';
 
@@ -343,23 +343,30 @@ function scheduleSyncToFirestore() {
  * Sync pending local changes to Firestore
  * Only runs when user is actively using the software
  */
+/** Firestore does not allow undefined; remove keys with undefined value to avoid write errors */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+    if (!obj || typeof obj !== 'object') return obj as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(obj)) {
+        if (obj[k] !== undefined) out[k] = obj[k];
+    }
+    return out;
+}
+
 /**
  * Convert ISO string dates to Firestore Timestamps
  */
-function convertDatesToTimestamps<T extends Record<string, unknown>>(data: T): T {
-    if (!data || typeof data !== 'object') return data;
-    
-    const converted = { ...data };
-    
+function convertDatesToTimestamps<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
+    if (!data || typeof data !== 'object') return data as Record<string, unknown>;
+    const cleaned = stripUndefined(data);
     // Convert updatedAt and createdAt from ISO string to Timestamp
-    if (converted.updatedAt && typeof converted.updatedAt === 'string') {
-        (converted as Record<string, unknown>).updatedAt = Timestamp.fromDate(new Date(converted.updatedAt));
+    if (cleaned.updatedAt && typeof cleaned.updatedAt === 'string') {
+        cleaned.updatedAt = Timestamp.fromDate(new Date(cleaned.updatedAt));
     }
-    if (converted.createdAt && typeof converted.createdAt === 'string') {
-        (converted as Record<string, unknown>).createdAt = Timestamp.fromDate(new Date(converted.createdAt));
+    if (cleaned.createdAt && typeof cleaned.createdAt === 'string') {
+        cleaned.createdAt = Timestamp.fromDate(new Date(cleaned.createdAt));
     }
-    
-    return converted;
+    return cleaned;
 }
 
 // Map collection names to sync processor task types
@@ -567,20 +574,24 @@ function scheduleSyncFromFirestore() {
 }
 
 /**
- * Get last sync time from localStorage
+ * Get last sync time from localStorage (per-tenant key)
  */
 function getLastSyncTime(collectionName: string): number | undefined {
     if (typeof window === 'undefined') return undefined;
-    const stored = localStorage.getItem(`lastSync:${collectionName}`);
+    const suffix = getStorageKeySuffix();
+    const key = `lastSync:${collectionName}${suffix ? `_${suffix}` : ''}`;
+    const stored = localStorage.getItem(key);
     return stored ? parseInt(stored, 10) : undefined;
 }
 
 /**
- * Save last sync time to localStorage
+ * Save last sync time to localStorage (per-tenant key)
  */
 function saveLastSyncTime(collectionName: string, timestamp: number): void {
     if (typeof window !== 'undefined') {
-        localStorage.setItem(`lastSync:${collectionName}`, String(timestamp));
+        const suffix = getStorageKeySuffix();
+        const key = `lastSync:${collectionName}${suffix ? `_${suffix}` : ''}`;
+        localStorage.setItem(key, String(timestamp));
     }
 }
 
@@ -832,7 +843,9 @@ export async function forceSyncFromFirestore(): Promise<void> {
 /** Clear lastSync for a collection and sync it - use after restore to refresh local data */
 export async function forceSyncCollectionFromFirestore(collectionName: string): Promise<void> {
     if (typeof window !== 'undefined') {
-        localStorage.removeItem(`lastSync:${collectionName}`);
+        const suffix = getStorageKeySuffix();
+        const key = `lastSync:${collectionName}${suffix ? `_${suffix}` : ''}`;
+        localStorage.removeItem(key);
     }
     const firestoreName = getFirestoreCollectionName(collectionName as CollectionName);
     await syncCollectionFromFirestore(collectionName as CollectionName, firestoreName, undefined);

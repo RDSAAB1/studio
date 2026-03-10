@@ -5,7 +5,23 @@ import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtim
 import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
 import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
-import { getTenantCollectionPath } from "./tenancy";
+import { getTenantCollectionPath, getStorageKeySuffix } from "./tenancy";
+
+/** Retry a fetch up to 4 times with backoff so transient failures don't leave data empty */
+async function fetchWithRetry<T>(fetchFn: () => Promise<T[]>, maxRetries = 4): Promise<T[]> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fetchFn();
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
 
 type CollectionName = string;
 type FetchFunction<T> = () => Promise<T[]>;
@@ -110,7 +126,7 @@ export function createMetadataBasedListener<T extends { id: string }>(
                 // ✅ FIX: Always fetch FULL sync on initial load, even if sync_registry doesn't exist
                 // This ensures we get all documents, including those added without sync_registry update
                 try {
-                    const freshData = await fetchFunction();
+                    const freshData = await fetchWithRetry(fetchFunction);
                     
                     // Update IndexedDB and detect deletions
                     if (db && localTableName) {
@@ -183,8 +199,9 @@ export function createMetadataBasedListener<T extends { id: string }>(
         const lastKnownTrigger = typeof window !== 'undefined' ? (window as any)[lastTriggerKey] : null;
         const lastKnownTimestampStr = typeof window !== 'undefined' ? (window as any)[lastTimestampKey] : null;
         
-        // ✅ Step 3: Check localStorage to avoid unnecessary initial fetch
-        const storageKey = config.storageKey || `lastSync:${collectionName}_v2`;
+        // ✅ Step 3: Check localStorage to avoid unnecessary initial fetch (per-tenant keys)
+        const suffix = typeof window !== 'undefined' ? getStorageKeySuffix() : '';
+        const storageKey = config.storageKey || `lastSync:${collectionName}_v2${suffix ? `_${suffix}` : ''}`;
         let localLastSync = 0;
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem(storageKey);
@@ -210,7 +227,7 @@ export function createMetadataBasedListener<T extends { id: string }>(
             if (!shouldSkipInitialFetch) {
                 // Initial load - fetch FULL sync
                 try {
-                    const freshData = await fetchFunction();
+                    const freshData = await fetchWithRetry(fetchFunction);
                     
                     // Update IndexedDB and detect deletions
                     if (db && localTableName) {
@@ -302,7 +319,7 @@ export function createMetadataBasedListener<T extends { id: string }>(
             // Track Firestore read (only one read per change, not streaming)
             firestoreMonitor.logRead(collectionName, 'metadataBasedListener', 1);
             
-            const freshData = await fetchFunction();
+            const freshData = await fetchWithRetry(fetchFunction);
             
             // ✅ Step 5: Update local IndexedDB and prepare final data for callback
             let finalData = freshData;
@@ -410,7 +427,7 @@ export function createMetadataBasedListener<T extends { id: string }>(
     // This ensures documents added without sync_registry update are caught quickly
     const performFullSyncCheck = async () => {
         try {
-            const freshData = await fetchFunction();
+            const freshData = await fetchWithRetry(fetchFunction);
             
             // ✅ FIX: Handle expenses and incomes specially - they're stored in transactions table
             if ((collectionName === 'expenses' || collectionName === 'incomes') && db && db.transactions) {

@@ -99,15 +99,23 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     return payment.parchiNo ? [payment.parchiNo] : [];
   }, []);
 
-  // Get payee account holder name (supplier)
+  // Get payee account holder name (supplier) – check all possible field locations
   const getAccountHolderName = React.useCallback((payment: Payment) => {
-    return payment.supplierName || (payment as any).supplierDetails?.name || '-';
+    const p = payment as any;
+    return (
+      p.supplierName ||
+      p.supplierDetails?.name ||
+      p.accountHolderName ||
+      p.bankDetails?.accountHolderName ||
+      '-'
+    );
   }, []);
 
-  // Get RTGS bank details
+  // Get RTGS bank details – check both flat and nested (bankDetails) fields
   const getBankDetails = React.useCallback((payment: Payment) => {
-    const paymentAny = payment as any;
-    let bankName = paymentAny.bankName || payment.bankName || '-';
+    const p = payment as any;
+    const bd = p.bankDetails || {};
+    let bankName = p.bankName || p.bankDetails?.bank || bd.bank || '-';
     
     // Extract full bank name if it's in format "SBI - State Bank of India"
     if (bankName.includes(' - ')) {
@@ -118,11 +126,11 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     }
     
     return {
-      accountNo: paymentAny.bankAcNo || payment.bankAcNo || '-',
+      accountNo: p.bankAcNo || bd.acNo || '-',
       bankName: bankName,
-      bankBranch: paymentAny.bankBranch || payment.bankBranch || '-',
-      bankIfsc: paymentAny.bankIfsc || payment.bankIfsc || '-',
-      checkNo: paymentAny.checkNo || payment.checkNo || '-',
+      bankBranch: p.bankBranch || bd.branch || '-',
+      bankIfsc: p.bankIfsc || bd.ifscCode || '-',
+      checkNo: p.checkNo || '-',
     };
   }, []);
 
@@ -282,7 +290,26 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
                             <TableCell className="text-[9px] px-2 py-0.5 w-[16%] text-right align-middle">
-                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                              {(() => {
+                                const amount = Number(payment.amount || 0);
+                                const receiptTypeLower = String((payment as any).receiptType || "").toLowerCase().trim();
+                                const drCrLower = String((payment as any).drCr || "").toLowerCase().trim();
+                                const isLedger = receiptTypeLower === "ledger";
+                                const isLedgerCredit = isLedger && (drCrLower === "credit" || amount < 0);
+                                const isLedgerDebit = isLedger && !isLedgerCredit;
+                                const displayAmount = Math.abs(amount);
+                                const sign = isLedgerCredit ? "+" : isLedgerDebit ? "-" : "";
+                                const colorClass = isLedgerCredit
+                                  ? "text-emerald-700"
+                                  : isLedgerDebit
+                                  ? "text-red-600"
+                                  : "text-slate-900";
+                                return (
+                                  <span className={`font-extrabold truncate block ${colorClass}`}>
+                                    {sign && `${sign} `}{formatCurrency(displayAmount)}
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-[9px] px-2 py-0.5 w-[12%] text-right align-middle">
                               <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
@@ -342,7 +369,26 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[10%] text-right align-middle">
-                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                              {(() => {
+                                const amount = Number(payment.amount || 0);
+                                const receiptTypeLower = String((payment as any).receiptType || "").toLowerCase().trim();
+                                const drCrLower = String((payment as any).drCr || "").toLowerCase().trim();
+                                const isLedger = receiptTypeLower === "ledger";
+                                const isLedgerCredit = isLedger && (drCrLower === "credit" || amount < 0);
+                                const isLedgerDebit = isLedger && !isLedgerCredit;
+                                const displayAmount = Math.abs(amount);
+                                const sign = isLedgerCredit ? "+" : isLedgerDebit ? "-" : "";
+                                const colorClass = isLedgerCredit
+                                  ? "text-emerald-700"
+                                  : isLedgerDebit
+                                  ? "text-red-600"
+                                  : "text-slate-900";
+                                return (
+                                  <span className={`font-extrabold truncate block ${colorClass}`}>
+                                    {sign && `${sign} `}{formatCurrency(displayAmount)}
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[8%] text-right align-middle">
                               <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
@@ -390,7 +436,26 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                               <span className="truncate block font-medium">{receiptNumbers || '-'}</span>
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[12%] text-right align-middle">
-                              <span className="font-extrabold text-slate-900 truncate block">{formatCurrency(payment.amount || 0)}</span>
+                              {(() => {
+                                const amount = Number(payment.amount || 0);
+                                const receiptTypeLower = String((payment as any).receiptType || "").toLowerCase().trim();
+                                const drCrLower = String((payment as any).drCr || "").toLowerCase().trim();
+                                const isLedger = receiptTypeLower === "ledger";
+                                const isLedgerCredit = isLedger && (drCrLower === "credit" || amount < 0);
+                                const isLedgerDebit = isLedger && !isLedgerCredit;
+                                const displayAmount = Math.abs(amount);
+                                const sign = isLedgerCredit ? "+" : isLedgerDebit ? "-" : "";
+                                const colorClass = isLedgerCredit
+                                  ? "text-emerald-700"
+                                  : isLedgerDebit
+                                  ? "text-red-600"
+                                  : "text-slate-900";
+                                return (
+                                  <span className={`font-extrabold truncate block ${colorClass}`}>
+                                    {sign && `${sign} `}{formatCurrency(displayAmount)}
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[8%] text-right align-middle">
                               <span className="font-extrabold text-slate-700 truncate block">{cdAmount > 0 ? formatCurrency(cdAmount) : '-'}</span>
@@ -441,13 +506,33 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                               <div className="text-[9px] font-semibold text-slate-700 leading-tight truncate">{extraAmount !== 0 ? formatCurrency(extraAmount) : '-'}</div>
                             </TableCell>
                             <TableCell className="px-2 py-0.5 w-[12%] text-right align-top">
-                              <div
-                                className={`text-[9px] font-semibold leading-tight truncate ${
-                                  Number(payment.amount || 0) < 0 ? 'text-rose-700' : 'text-slate-900'
-                                }`}
-                              >
-                                {Number(payment.amount || 0) !== 0 ? formatCurrency(Math.abs(Number(payment.amount || 0))) : '-'}
-                              </div>
+                              {(() => {
+                                const amount = Number(payment.amount || 0);
+                                const receiptTypeLower = String((payment as any).receiptType || "").toLowerCase().trim();
+                                const drCrLower = String((payment as any).drCr || "").toLowerCase().trim();
+                                const isLedger = receiptTypeLower === "ledger";
+                                const isLedgerCredit = isLedger && (drCrLower === "credit" || amount < 0);
+                                const isLedgerDebit = isLedger && !isLedgerCredit;
+                                const displayAmount = Math.abs(amount);
+                                const sign = isLedgerCredit ? "+" : isLedgerDebit ? "-" : "";
+                                const colorClass = isLedgerCredit
+                                  ? "text-emerald-700"
+                                  : isLedgerDebit
+                                  ? "text-rose-700"
+                                  : "text-slate-900";
+                                return (
+                                  <div className={`text-[9px] font-semibold leading-tight truncate ${colorClass}`}>
+                                    {amount !== 0 ? (
+                                      <>
+                                        {sign && `${sign} `}
+                                        {formatCurrency(displayAmount)}
+                                      </>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="px-2 py-0.5 w-[8%] text-right align-top">
                               <div className="text-[9px] font-semibold text-slate-600 leading-tight truncate">

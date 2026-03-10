@@ -87,7 +87,7 @@ export const useCustomerPayments = () => {
         if (form.editingPayment) {
             const editingPayment = form.editingPayment;
             return selectedEntries.reduce((sum, entry) => {
-                const originalAmount = Number(entry.originalNetAmount || entry.netAmount) || 0;
+                const originalAmount = (Number(entry.originalNetAmount || entry.netAmount) || 0) + (Number(entry.advanceFreight) || 0);
                 
                 const otherPaymentsForThisEntry = (data.paymentHistory || [])
                     .filter(p => p.id !== editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
@@ -113,7 +113,7 @@ export const useCustomerPayments = () => {
                 });
 
                 const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-                return sum + Math.max(0, currentOutstanding);
+                return sum + Math.round(currentOutstanding * 100) / 100;
             }, 0);
         }
         
@@ -123,7 +123,7 @@ export const useCustomerPayments = () => {
                 return sum + Number(entry.outstandingForEntry || 0);
             }
             
-            const originalAmount = Number(entry.originalNetAmount || entry.netAmount) || 0;
+            const originalAmount = (Number(entry.originalNetAmount || entry.netAmount) || 0) + (Number(entry.advanceFreight) || 0);
             const entrySrNo = entry.srNo?.toLowerCase();
             if (!entrySrNo) return sum;
             
@@ -152,7 +152,7 @@ export const useCustomerPayments = () => {
             });
             
             const outstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-            return sum + Math.max(0, outstanding);
+            return sum + Math.round(outstanding * 100) / 100;
         }, 0);
         
         return totalOutstanding;
@@ -318,6 +318,23 @@ export const useCustomerPayments = () => {
             return;
         }
 
+        // Balance check: selected "Payment From" must have enough balance (skip for Gov.)
+        if (form.paymentMethod !== 'Gov.') {
+            const balanceKey = form.paymentMethod === 'Cash'
+                ? (form.selectedAccountId || 'CashInHand')
+                : form.selectedAccountId;
+            if (!balanceKey && (form.paymentMethod === 'Online' || form.paymentMethod === 'RTGS' || form.paymentMethod === 'Ledger')) {
+                toast({ title: "Select account", description: "Please select Payment From account.", variant: "destructive" });
+                return;
+            }
+            const balances = data.financialState?.balances;
+            const available = balances && balanceKey ? (balances.get(balanceKey) ?? 0) : 0;
+            if (available < toBePaidAmount) {
+                toast({ title: "Not enough balance", description: "Selected account does not have sufficient balance for this payment.", variant: "destructive" });
+                return;
+            }
+        }
+
         setIsProcessing(true);
         try {
             const result = await processPaymentLogic({ 
@@ -385,8 +402,13 @@ export const useCustomerPayments = () => {
         }
     }, [form, data, handleSettleAmountChange, handleToBePaidChange]);
 
-    const handleDeletePayment = useCallback(async (paymentId: string) => {
+    const handleDeletePayment = useCallback(async (paymentOrId: Payment | string) => {
         try {
+            const paymentId = typeof paymentOrId === "string" ? paymentOrId : (paymentOrId?.id || paymentOrId?.paymentId);
+            if (!paymentId) {
+                toast({ title: "Failed to delete", description: "Payment ID is missing", variant: "destructive" });
+                return;
+            }
             await handleDeletePaymentLogic({
                 paymentId,
                 paymentHistory: data.paymentHistory,
@@ -397,7 +419,6 @@ export const useCustomerPayments = () => {
             });
             toast({ title: "Payment deleted successfully", variant: "success" });
         } catch (error) {
-
             toast({ title: "Failed to delete payment", description: (error as Error).message, variant: "destructive" });
         }
     }, [data, toast]);
@@ -430,6 +451,7 @@ export const useCustomerPayments = () => {
         ...formRest,
         ...cdProps, // Spread CD props
         calculatedCdAmount: effectiveCdAmount,
+        setCdAmount,
         // Explicitly set these after spread to ensure they're available
         setParchiNo,
         parchiNo,

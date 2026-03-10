@@ -105,7 +105,9 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
 
     // Helper function to get receipt holder name from supplier data
     const getReceiptHolderName = React.useCallback((payment: any) => {
-        // First try parchiName field
+        // First try top-level supplier fields (flat + nested)
+        if (payment.supplierName) return payment.supplierName;
+        if ((payment as any).supplierDetails?.name) return (payment as any).supplierDetails.name;
         if (payment.parchiName) return payment.parchiName;
         
         // If no parchiName, try to get from paidFor array
@@ -205,7 +207,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                         </TableCell>
                                         <TableCell 
                                             className="p-1 text-[11px] cursor-pointer overflow-hidden" 
-                                            title={`Payee: ${p.supplierName || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)} | Click receipt number to use as reference`}
+                                            title={`Payee: ${p.supplierName || (p as any).supplierDetails?.name || ''} | Receipt: ${getReceiptHolderName(p)} | No: ${getReceiptNumbers(p)} | Click receipt number to use as reference`}
                                             onClick={(e) => {
                                                 // Make the entire cell clickable for receipt numbers
                                                 const target = e.target as HTMLElement;
@@ -228,7 +230,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             }}
                                         >
                                             <div className="break-words font-bold text-foreground text-[11px]">
-                                                {p.supplierName || ''}
+                                                {p.supplierName || (p as any).supplierDetails?.name || ''}
                                             </div>
                                             <div className="text-foreground/90 text-[11px] mt-0.5 break-words font-semibold">
                                                 {getReceiptHolderName(p)}
@@ -285,20 +287,20 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             </>
                                         ) : (
                                             <>
-                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={(p.bankName || '').toString()}>
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={((p as any).bankName || (p as any).bankDetails?.bank || '').toString()}>
                                                     <div className="break-words text-foreground font-bold text-[11px]">
-                                                        {p.bankName || ''}
+                                                        {(p as any).bankName || (p as any).bankDetails?.bank || ''}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={`Branch: ${p.bankBranch || ''} | IFSC: ${p.bankIfsc || ''} | Account: ${p.bankAcNo || ''}`}>
+                                                <TableCell className="p-1 text-[11px] overflow-hidden" title={`Branch: ${(p as any).bankBranch || (p as any).bankDetails?.branch || ''} | IFSC: ${(p as any).bankIfsc || (p as any).bankDetails?.ifscCode || ''} | Account: ${(p as any).bankAcNo || (p as any).bankDetails?.acNo || ''}`}>
                                                     <div className="text-foreground text-[11px] font-bold break-words">
-                                                        {p.bankAcNo || ''}
+                                                        {(p as any).bankAcNo || (p as any).bankDetails?.acNo || ''}
                                                     </div>
                                                     <div className="text-foreground/90 text-[11px] break-words mt-0.5 font-semibold">
-                                                        {p.bankBranch || ''}
+                                                        {(p as any).bankBranch || (p as any).bankDetails?.branch || ''}
                                                     </div>
                                                     <div className="text-muted-foreground text-[11px] break-words mt-0.5 font-medium">
-                                                        {p.bankIfsc || ''}
+                                                        {(p as any).bankIfsc || (p as any).bankDetails?.ifscCode || ''}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="p-1 text-[11px] overflow-hidden" title={`Weight: ${p.quantity || 0} | Rate: ${p.rate || 0}`}>
@@ -312,13 +314,29 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                                             </>
                                         )}
                                         <TableCell className="text-right p-1 text-[11px] font-mono overflow-hidden">
-                                            <div
-                                                className={`break-words font-bold ${
-                                                    Number(p.amount || 0) < 0 ? "text-red-600" : "text-foreground"
-                                                }`}
-                                            >
-                                                {formatCurrency(Math.abs(Number(p.amount || 0)))}
-                                            </div>
+                                            {(() => {
+                                                const amount = Number(p.amount || 0);
+                                                const receiptTypeLower = String(p.receiptType || "").toLowerCase().trim();
+                                                const drCrLower = String((p as any).drCr || "").toLowerCase().trim();
+                                                const isLedger = receiptTypeLower === "ledger";
+                                                const isLedgerCredit = isLedger && (drCrLower === "credit" || amount < 0);
+                                                const isLedgerDebit = isLedger && !isLedgerCredit;
+
+                                                const displayAmount = Math.abs(amount);
+                                                const sign =
+                                                    isLedgerCredit ? "+" : isLedgerDebit ? "-" : "";
+                                                const colorClass = isLedgerCredit
+                                                    ? "text-emerald-700"
+                                                    : isLedgerDebit
+                                                    ? "text-red-600"
+                                                    : "text-foreground";
+
+                                                return (
+                                                    <div className={`break-words font-bold ${colorClass}`}>
+                                                        {sign && `${sign} `}{formatCurrency(displayAmount)}
+                                                    </div>
+                                                );
+                                            })()}
                                         </TableCell>
                                         <TableCell className="text-right p-1 text-[11px] font-mono overflow-hidden">
                                             <div className="break-words text-foreground font-semibold">{formatCurrency(p.cdAmount)}</div>

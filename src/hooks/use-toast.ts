@@ -164,12 +164,12 @@ function toast({ ...props }: Toast) {
     },
   })
 
-  // Calculate duration based on message length
-  // Base: 2000ms, + 50ms per character (min 2000ms, max 8000ms)
+  // Calculate duration so full message can be read (longer for longer text)
+  // Base: 4000ms, + 80ms per character (min 4000ms, max 20000ms)
   const titleText = props.title ? String(props.title).length : 0;
   const descText = props.description ? String(props.description).length : 0;
   const messageLength = titleText + descText;
-  const calculatedDuration = Math.min(Math.max(2000 + (messageLength * 50), 2000), 8000);
+  const calculatedDuration = Math.min(Math.max(4000 + (messageLength * 80), 4000), 20000);
 
   // Auto-dismiss after calculated delay
   setTimeout(() => {

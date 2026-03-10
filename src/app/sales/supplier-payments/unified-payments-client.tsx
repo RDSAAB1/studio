@@ -206,6 +206,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     bankDetails: {},
     setBankDetails: () => {},
     setSelectedEntryIds: () => {},
+    setCdAmount: () => {},
+    calculatedCdAmount: 0,
   };
   const hook: UnifiedPaymentsHook = { ...defaultHook, ...(rawHook as any) };
   
@@ -396,37 +398,79 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     const totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryAmount) || 0), 0);
     const totalKanta = filteredTransactions.reduce((sum, t) => sum + (Number(t.kanta) || 0), 0);
     const totalOther = filteredTransactions.reduce((sum, t) => sum + (Number(t.otherCharges) || 0), 0);
-    const totalBaseOriginalAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.originalNetAmount) || 0), 0);
+    const totalBaseOriginalAmount = filteredTransactions.reduce((sum, t) => {
+      const base = Number(t.originalNetAmount) || 0;
+      const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
+      return sum + base + advance;
+    }, 0);
     
     // Calculate paid amounts from payment history for filtered transactions
+    // Match use-supplier-summary: include paidFor match OR parchiNo match (for legacy ledger)
     const filteredSrNosSet = new Set(filteredTransactions.map((t: Customer) => t.srNo?.toLowerCase()).filter(Boolean));
-    const filteredPayments = (hook.paymentHistory || []).filter((p: Payment) => 
-      p.paidFor?.some(pf => filteredSrNosSet.has((pf.srNo || "").toLowerCase()))
-    );
+    const filteredPayments = (hook.paymentHistory || []).filter((p: Payment) => {
+      const paidForMatch = p.paidFor?.some(pf => filteredSrNosSet.has((pf.srNo || "").toLowerCase()));
+      if (paidForMatch) return true;
+      const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
+      const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map(t => t.trim()).filter(Boolean);
+      const parchiMatch = parchiTokens.some(token => filteredSrNosSet.has(token));
+      return parchiMatch;
+    });
     
+    // Ledger sahi concept: Debit = payment (paida) → Total Paid badhe; Credit = charge (bill badha) → Total Amount badhe
+    const receiptTypeOf = (p: Payment) => ((p as any).receiptType || (p as any).type || "").toString().trim().toLowerCase();
+    const isLedgerCredit = (p: Payment) => {
+      const drCr = String((p as any).drCr || "").trim().toLowerCase();
+      const amountRaw = Number((p as any).amount || 0);
+      return drCr === "credit" || amountRaw < 0;
+    };
+
     let totalPaid = 0;
     let totalCd = 0;
     let totalCashPaid = 0;
     let totalRtgsPaid = 0;
     let totalGovExtraAmount = 0;
-    
+
     filteredTransactions.forEach((entry: Customer) => {
       const entrySrNo = (entry.srNo || "").toLowerCase();
-      const paymentsForEntry = filteredPayments.filter((p: Payment) => 
-        p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
-      );
-      
+      const paymentsForEntry = filteredPayments.filter((p: Payment) => {
+        const paidForMatch = p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
+        if (paidForMatch) return true;
+        const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
+        const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
+        return parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
+      });
+
       paymentsForEntry.forEach((payment: Payment) => {
         const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
+        const parchiNoRaw = String((payment as any).parchiNo || "").trim().toLowerCase();
+        const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
+        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
+        const amountAbs = Math.abs(Number((payment as any).amount || 0));
+        const isLedger = receiptTypeOf(payment) === "ledger";
+        const ledgerCredit = isLedger && isLedgerCredit(payment);
+
+        // Legacy parchiNo-only ledger (no paidFor)
+        if (isLedger && !paidForEntry && parchiMatch && amountAbs > 0) {
+          const share = parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
+          if (ledgerCredit) {
+            totalGovExtraAmount += share;
+          } else {
+            totalPaid += share;
+          }
+          return;
+        }
+
         if (paidForEntry) {
-          totalPaid += Number(paidForEntry.amount || 0);
-          
-          // Accumulate Gov Extra Amount
+          // Ledger: sirf Debit = payment → Total Paid mein add; Credit = charge, Total Paid mein nahi
+          const isLedger = receiptTypeOf(payment) === "ledger";
+          if (!isLedger || !isLedgerCredit(payment)) {
+            totalPaid += Number(paidForEntry.amount || 0);
+          }
+
           if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
             totalGovExtraAmount += Number(paidForEntry.extraAmount);
           }
-          
-          // CD amount calculation
+
           if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
             totalCd += Number(paidForEntry.cdAmount || 0);
           } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
@@ -436,8 +480,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
               totalCd += Math.round(payment.cdAmount * proportion * 100) / 100;
             }
           }
-          
-          const receiptType = payment.receiptType?.toLowerCase();
+
+          const receiptType = receiptTypeOf(payment);
           const actualPaidAmount = Number(paidForEntry.amount || 0);
           if (receiptType === 'cash') {
             totalCashPaid += actualPaidAmount;
@@ -447,6 +491,30 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
         }
       });
     });
+
+    // Gov Extra: include payment.govExtraAmount when paidFor has no extraAmount (backward compat)
+    filteredPayments.forEach((payment: Payment) => {
+      const rt = String((payment as any).receiptType || '').trim().toLowerCase();
+      const isGov = rt === 'gov.' || rt === 'gov' || rt.startsWith('gov');
+      const govExtra = Number((payment as any).govExtraAmount || 0);
+      if (isGov && govExtra > 0) {
+        const hasPaidForExtra = payment.paidFor?.some(pf => Number(pf.extraAmount || 0) > 0);
+        if (!hasPaidForExtra) {
+          totalGovExtraAmount += govExtra;
+        }
+      }
+    });
+
+    // Gov Extra: include current form's govExtraAmount when in Gov mode (unsaved payment)
+    if (type === 'supplier' && hook.paymentMethod === 'Gov.' && (hook.govExtraAmount || 0) > 0) {
+      const formExtra = Number(hook.govExtraAmount || 0);
+      const selectedMatch = hook.selectedEntries?.some((e: Customer) =>
+        filteredSrNosSet.has((e.srNo || '').toLowerCase())
+      );
+      if (selectedMatch) {
+        totalGovExtraAmount += formExtra;
+      }
+    }
     
     // Calculate adjusted original (base original + extra amount from Gov. payments)
     const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount;
@@ -512,46 +580,31 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       { debit: 0, credit: 0 }
     );
 
-    const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.debit - ledgerAdjustment.credit) * 100) / 100;
+    const ledgerCreditAmount = Math.round(ledgerAdjustment.credit * 100) / 100;
+    // Ledger Debit (payment side) = linked debit payments + unlinked debit (for display),
+    // but outstanding formula should only use UNLINKED debit (linked debit already in totalPaid).
+    const linkedLedgerDebitPaid = filteredPayments.reduce((sum: number, p: Payment) => {
+      const receiptType = String((p as any).receiptType || "").toLowerCase().trim();
+      if (receiptType !== "ledger") return sum;
+      const drCrLower = String((p as any).drCr || "").toLowerCase().trim();
+      const amountRaw = Number((p as any).amount || 0);
+      const isLedgerCredit = drCrLower === "credit" || amountRaw < 0;
+      if (isLedgerCredit) return sum;
+      const linkedPaid = p.paidFor?.reduce((inner: number, pf: PaidFor) => inner + Number(pf.amount || 0), 0) || 0;
+      return sum + linkedPaid;
+    }, 0);
+    const unlinkedLedgerDebit = Math.round(ledgerAdjustment.debit * 100) / 100;
+    const ledgerDebitAmount = Math.round((linkedLedgerDebitPaid + unlinkedLedgerDebit) * 100) / 100;
+    // Credit = charge → Total Amount badhe; Debit (linked) already Total Paid me hai; outstanding ke liye sirf UNLINKED debit use karo.
+    const totalAmountIncludingLedger = Math.round((totalAmount + ledgerCreditAmount) * 100) / 100;
+    // Outstanding: baseOutstanding (all normal payments incl. linked ledger debits) + unlinked ledger Credit − unlinked ledger Debit
+    const totalOutstanding = Math.round((baseOutstanding + ledgerCreditAmount - unlinkedLedgerDebit) * 100) / 100;
     
-    // Calculate outstanding entry IDs (using adjusted original for Gov. payments)
+    // Calculate outstanding entry IDs — use summary's outstandingForEntry when available (consistent with display)
     const outstandingEntryIds = filteredTransactions
       .filter((t: Customer) => {
-        const entrySrNo = (t.srNo || "").toLowerCase();
-        const paymentsForEntry = filteredPayments.filter((p: Payment) => 
-          p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
-        );
-        let entryPaid = 0;
-        let entryCd = 0;
-        
-        // Base original amount (no extra amount)
-        let adjustedOriginal = Number(t.originalNetAmount) || 0;
-        
-        paymentsForEntry.forEach((payment: Payment) => {
-          const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-          if (paidForEntry) {
-            entryPaid += Number(paidForEntry.amount || 0);
-            
-            // Add extra amount to adjusted original for this entry
-            if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
-                adjustedOriginal += Number(paidForEntry.extraAmount);
-            }
-
-            if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
-              entryCd += Number(paidForEntry.cdAmount || 0);
-            } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-              const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
-              if (totalPaidForInPayment > 0) {
-                const proportion = Number(paidForEntry.amount || 0) / totalPaidForInPayment;
-                entryCd += Math.round(payment.cdAmount * proportion * 100) / 100;
-              }
-            }
-          }
-        });
-        
-        // Outstanding = Adjusted Original - Paid - CD
-        const entryOutstanding = adjustedOriginal - entryPaid - entryCd;
-        return entryOutstanding > 0.01;
+        const outstanding = Number((t as any).outstandingForEntry ?? t.netAmount ?? 0);
+        return outstanding > 0.01;
       })
       .map((t: Customer) => t.id)
       .filter(Boolean);
@@ -583,16 +636,25 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     const totalLabouryRate = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryRate) || 0), 0);
     const averageLabouryRate = filteredTransactions.length > 0 ? totalLabouryRate / filteredTransactions.length : 0;
 
+    const allPaymentsForSummary = Array.from(
+      new Map(
+        [...filteredPayments, ...uniqueLedgerPayments].map((p: Payment) => [
+          String(p.paymentId || p.id || (p as any).rtgsSrNo || `${p.date}_${p.amount}`),
+          p,
+        ])
+      ).values()
+    );
+
     return {
       ...selectedSupplierSummary,
       allTransactions: filteredTransactions,
-      allPayments: filteredPayments,
+      allPayments: allPaymentsForSummary,
       totalGrossWeight,
       totalTeirWeight,
       totalFinalWeight,
       totalKartaWeight,
       totalNetWeight,
-      totalAmount,
+      totalAmount: totalAmountIncludingLedger,
       totalKartaAmount,
       totalLabouryAmount,
       totalKanta,
@@ -600,13 +662,13 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       totalOriginalAmount,
       totalBaseOriginalAmount,
       totalGovExtraAmount,
-      totalAdjustedOriginal, // Add adjusted original for display
+      totalAdjustedOriginal,
       totalPaid,
       totalCdAmount: totalCd,
       totalCashPaid,
       totalRtgsPaid,
-      ledgerCreditAmount: Math.round(ledgerAdjustment.credit * 100) / 100,
-      ledgerDebitAmount: Math.round(ledgerAdjustment.debit * 100) / 100,
+      ledgerCreditAmount,
+      ledgerDebitAmount,
       totalOutstanding,
       outstandingEntryIds,
       averageRate,
@@ -695,50 +757,12 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   };
 
   const govHistoryRows = useMemo(() => {
-    // Load directly from IndexedDB governmentFinalizedPayments table
-    // Show ALL entries from this table without any filtering conditions
-    const loadGovPaymentsDirect = async () => {
-      try {
-        const { db } = await import('@/lib/database');
-        if (db && db.governmentFinalizedPayments) {
-          // Get all payments from governmentFinalizedPayments table
-          let allGovPayments: Payment[] = [];
-          try {
-            allGovPayments = await db.governmentFinalizedPayments
-              .orderBy('date')
-              .reverse()
-              .toArray();
-          } catch (dateError) {
-            try {
-              allGovPayments = await db.governmentFinalizedPayments
-                .orderBy('id')
-                .reverse()
-                .toArray();
-            } catch (idError) {
-              allGovPayments = await db.governmentFinalizedPayments.toArray();
-            }
-          }
-          
-          // Force set receiptType for all
-          return allGovPayments.map(p => ({
-            ...p,
-            receiptType: 'Gov.' as const
-          })) as Payment[];
-        }
-      } catch (error) {
-        // Error loading gov payments directly
-      }
-      return [];
-    };
-    
-    // For now, use paymentHistory but filter to show ALL payments that might be gov
-    // In the future, we can use the direct load above
+    // Single payments collection - filter by receiptType Gov
     if (!hook.paymentHistory || hook.paymentHistory.length === 0) {
       return [];
     }
     
-    // Show ALL payments from governmentFinalizedPayments table
-    // Check if payment has ANY gov-specific field OR receiptType is Gov.
+    // Filter payments with receiptType Gov or gov-specific fields
     const filtered = hook.paymentHistory
       .filter((payment: Payment) => {
         // Check 1: receiptType (case-insensitive)
@@ -1223,6 +1247,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                       combination={paymentCombination}
                                       selectPaymentAmount={hook.selectPaymentAmount}
                                       onSuggestionsChange={setGovSuggestions}
+                                      onExtraAmountChange={hook.setGovExtraAmount}
                                     />
                                     {/* Gov. Details Section - Right Half */}
                                     <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
@@ -1234,6 +1259,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                           setGovRate={hook.setGovRate}
                                           govAmount={hook.govAmount}
                                           setGovAmount={hook.setGovAmount}
+                                          govExtraAmount={hook.govExtraAmount}
+                                          setGovExtraAmount={hook.setGovExtraAmount}
                                           targetAmount={hook.rtgsAmount || 0}
                                           minRate={hook.minRate}
                                           selectedPaymentOption={hook.selectedPaymentOption}
@@ -1257,14 +1284,20 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                       <tr className="h-7">
                         <th className="px-2 text-left font-bold w-[40px]">Select</th>
                         <th className="px-2 text-left font-bold w-[60px]">Type</th>
-                        <th className="px-2 text-left font-bold">Receipts</th>
-                        <th className="px-2 text-right font-bold w-[90px]">Total GOV</th>
-                        <th className="px-2 text-right font-bold w-[80px]">Excess</th>
+                        <th className="px-2 text-left font-bold">Entries</th>
+                        <th className="px-2 text-right font-bold w-[70px]">Normal</th>
+                        <th className="px-2 text-right font-bold w-[70px]">Gov Extra</th>
+                        <th className="px-2 text-right font-bold w-[80px]">To Be Paid</th>
+                        <th className="px-2 text-right font-bold w-[80px]">Total Amt</th>
+                        <th className="px-2 text-right font-bold w-[70px]">Excess</th>
                       </tr>
                     </thead>
                     <tbody>
                       {govSuggestions.map((comb, idx) => {
                         const difference = comb.difference ?? 0;
+                        const totalNormal = comb.totalNormal ?? 0;
+                        const totalExtra = comb.totalExtra ?? 0;
+                        const totalGov = comb.totalGov ?? 0;
                         return (
                           <tr key={idx} className="h-7 border-b border-border/60 hover:bg-muted/30 transition-colors">
                             <td className="px-2">
@@ -1275,19 +1308,22 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                 onChange={() => {
                                   const receiptIds = (comb.receipts || []).map((r: any) => r.id || r.srNo);
                                   hook.setSelectedEntryIds(new Set(receiptIds));
+                                  hook.setGovAmount?.(totalNormal);
+                                  hook.setGovExtraAmount?.(totalExtra);
                                 }}
                               />
                             </td>
                             <td className="px-2 font-medium">{comb.type}</td>
-                            <td className="px-2 truncate max-w-xs">
+                            <td className="px-2 truncate max-w-[140px]" title={(comb.details || []).map((d: any) => `${d.srNo}: Norm ${formatCurrency(d.normalAmount || 0)}, Extra ${formatCurrency(d.extraAmount || 0)}`).join(" | ")}>
                               {(comb.details || []).map((d: any) => d.srNo).join(", ")}
                             </td>
-                            <td className="px-2 text-right font-bold text-primary">
-                              {formatCurrency(comb.totalGov || 0)}
-                            </td>
+                            <td className="px-2 text-right font-semibold tabular-nums">{formatCurrency(totalNormal)}</td>
+                            <td className="px-2 text-right font-semibold tabular-nums text-primary">{formatCurrency(totalExtra)}</td>
+                            <td className="px-2 text-right font-bold text-primary tabular-nums" title="To Be Paid = Normal + Gov Extra (as-is)">{formatCurrency(totalGov)}</td>
+                            <td className="px-2 text-right font-semibold tabular-nums" title="Total = Normal + Gov Extra (for balance)">{formatCurrency(totalGov)}</td>
                             <td
                               className={cn(
-                                "px-2 text-right font-semibold",
+                                "px-2 text-right font-semibold tabular-nums",
                                 difference > 0 ? "text-primary" : "text-muted-foreground"
                               )}
                             >
@@ -1317,6 +1353,13 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   requestSort={paymentCombination.requestSort}
                   onSelect={hook.selectPaymentAmount || (() => {})}
                 />
+              </div>
+            )}
+
+            {/* Summary at bottom when Cash or Gov selected – pic wala dashboard layout (supplier + customer) */}
+            {(type === 'supplier' || type === 'customer') && (hook.paymentMethod === 'Cash' || hook.paymentMethod === 'Gov.') && filteredSupplierSummary && (
+              <div className="mt-4 w-full min-w-0">
+                <SupplierSummaryCards summary={filteredSupplierSummary} variant="dashboard" type={type} />
               </div>
             )}
 
@@ -1546,7 +1589,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                   </CardContent>
                                 </Card>
 
-                                {/* Payment Status & Ledger */}
+                                {/* Payment Status & Ledger — Total Paid/Total Amount mein ledger include nahi; sirf Net Ledger Impact outstanding par */}
                                 <Card className="border-slate-200 bg-white shadow-sm">
                                   <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
                                     <CardTitle className="text-xs font-semibold text-slate-800">
@@ -1566,24 +1609,22 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                         {formatCurrency(totalOutstanding)}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between">
-                                      <span>Ledger Credit</span>
-                                      <span className="font-semibold tabular-nums text-sky-800">
-                                        {formatCurrency(ledgerCreditAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Ledger Debit</span>
-                                      <span className="font-semibold tabular-nums text-rose-800">
-                                        {formatCurrency(ledgerDebitAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
-                                      <span>Net Ledger Impact</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(netLedgerImpact)}
-                                      </span>
-                                    </div>
+                                    {(ledgerCreditAmount > 0 || ledgerDebitAmount > 0) ? (
+                                      <>
+                                        <div className="flex justify-between text-slate-600">
+                                          <span>Ledger (Income · Expense)</span>
+                                          <span className="tabular-nums text-[10px]">
+                                            Income {formatCurrency(ledgerCreditAmount)} · Expense {formatCurrency(ledgerDebitAmount)}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1.5">
+                                          <span>Net Ledger Impact</span>
+                                          <span className="font-semibold tabular-nums">
+                                            {formatCurrency(netLedgerImpact)}
+                                          </span>
+                                        </div>
+                                      </>
+                                    ) : null}
                                   </CardContent>
                                 </Card>
 
@@ -1678,7 +1719,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                   </CardHeader>
                                   <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
                                     <div className="flex justify-between">
-                                      <span>Cash</span>
+                                      <span>Cash In Hand</span>
                                       <span className="font-semibold tabular-nums">
                                         {formatCurrency(totalCashPaid)}{" "}
                                         <span className="text-[10px] text-slate-500">

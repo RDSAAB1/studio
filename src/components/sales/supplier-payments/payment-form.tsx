@@ -113,14 +113,19 @@ function PaymentFormComponent(props: any) {
             label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(balances.get(acc.id) || 0)})`,
             displayValue: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)})`
         }));
+        const adjustmentOption = {
+            value: 'Adjustment',
+            label: 'Adjustment (No Account Change)',
+            displayValue: 'Adjustment',
+        };
         
         if (paymentMethod === 'Cash') {
-            return [cashOption];
+            return [cashOption, adjustmentOption];
         }
         if (paymentMethod === 'Ledger') {
-            return [cashOption, ...bankOptions];
+            return [cashOption, ...bankOptions, adjustmentOption];
         }
-        return bankOptions;
+        return [...bankOptions, adjustmentOption];
     }, [paymentMethod, financialState?.balances, bankAccounts]);
 
     const isLedger = paymentMethod === 'Ledger';
@@ -194,7 +199,7 @@ function PaymentFormComponent(props: any) {
                                                 }
                                             }}
                                         >
-                                            {method}
+                                            {method === 'Cash' ? 'Cash In Hand' : method}
                                         </Button>
                                     ))}
                                 </div>
@@ -295,8 +300,9 @@ function PaymentFormComponent(props: any) {
 
                             {/* (Cash PaymentType now lives with Settle/ToBePaid column below) */}
 
-                            {/* Ledger: Reference + Particulars – full width, half-half */}
+                            {/* Ledger: Reference + Particulars, Payment From, then Debit/Credit */}
                             {isLedger && (
+                                <>
                                 <div className="col-span-full grid grid-cols-2 gap-1 w-full">
                                     <div className="space-y-1 min-w-0">
                                       <Label htmlFor="checkNo" className="text-[10px] font-semibold text-slate-500">Reference No.</Label>
@@ -319,6 +325,28 @@ function PaymentFormComponent(props: any) {
                                       />
                                     </div>
                                 </div>
+                                <div className="col-span-full space-y-1">
+                                    <Label htmlFor="ledger-paymentFrom" className="text-[10px] font-semibold text-slate-500">Payment From</Label>
+                                    <Select
+                                        value={selectedAccountId || "__placeholder__"}
+                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
+                                    >
+                                        <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
+                                            <SelectValue placeholder="Income/Credit ya Expense/Debit isse" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__placeholder__" disabled>
+                                                Select account (Income/Credit ya Expense/Debit)
+                                            </SelectItem>
+                                            {paymentFromOptions.map((opt) => (
+                                                <SelectItem key={opt.value} value={opt.value}>
+                                                    {opt.displayValue || opt.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                </>
                             )}
 
                              {paymentMethod === 'RTGS' && (
@@ -328,28 +356,15 @@ function PaymentFormComponent(props: any) {
                                 </div>
                             )}
 
-                            {/* Gov: Serial No. + Reference No. – full width, half-half */}
-                            {paymentMethod === 'Gov.' && (
-                                <div className="col-span-full grid grid-cols-2 gap-1 w-full">
-                                    <div className="space-y-1 min-w-0">
-                                        <Label htmlFor="govSrNo" className="text-[10px] font-semibold text-slate-500">Gov. SR No.</Label>
-                                        <Input id="govSrNo" name="govSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
-                                    </div>
-                                    <div className="space-y-1 min-w-0">
-                                        <Label htmlFor="checkNo-gov" className="text-[10px] font-semibold text-slate-500">Reference No.</Label>
-                                        <Input id="checkNo-gov" name="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
-                                    </div>
-                                </div>
-                            )}
-
                             {paymentMethod === 'Ledger' && (
                                 <div className="col-span-full grid grid-cols-2 gap-1 w-full">
                                     <div className="space-y-1">
-                                        <Label htmlFor="ledgerDebit" className="text-[10px] font-semibold text-slate-500">Debit</Label>
+                                        <Label htmlFor="ledgerDebit" className="text-[10px] font-semibold text-slate-500">Debit (Expense)</Label>
                                         <Input
                                             id="ledgerDebit"
                                             name="ledgerDebit"
                                             type="number"
+                                            placeholder="Payment – Total Paid"
                                             value={drCr === 'Debit' ? (isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)) : 0}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value) || 0;
@@ -361,11 +376,12 @@ function PaymentFormComponent(props: any) {
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="ledgerCredit" className="text-[10px] font-semibold text-slate-500">Credit</Label>
+                                        <Label htmlFor="ledgerCredit" className="text-[10px] font-semibold text-slate-500">Credit (Income)</Label>
                                         <Input
                                             id="ledgerCredit"
                                             name="ledgerCredit"
                                             type="number"
+                                            placeholder="Charge – Total Amount"
                                             value={drCr === 'Credit' ? (isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)) : 0}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value) || 0;
@@ -720,7 +736,7 @@ function PaymentFormComponent(props: any) {
                                   inputMode="decimal"
                                   step="0.01"
                                   value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
-                                  onChange={(e) => setCdAmount(parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => setCdAmount?.(parseFloat(e.target.value) || 0)}
                                   className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
                                 />
                               </div>

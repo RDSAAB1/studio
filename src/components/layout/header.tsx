@@ -17,7 +17,7 @@ import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter, usePathname } from "next/navigation";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { syncAllData, hardSyncAllData, syncAllDataWithDetails } from "@/lib/database";
+import { syncAllData, hardSyncAllData, syncAllDataWithDetails, getLastSyncKey } from "@/lib/database";
 import { SyncDialog } from "@/components/sync-dialog";
 
 const DynamicIslandToaster = dynamic(
@@ -243,9 +243,12 @@ export function Header({ toggleSidebar }: HeaderProps) {
     setIsSyncing(true);
     try {
       await hardSyncAllData();
+      // Re-setup realtime listeners so any that failed to fetch get retried
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('data:refresh-requested'));
+      }
       toast({ title: "Full sync completed", description: "All data has been synced from Firestore", variant: "success" });
     } catch (error) {
-
       toast({ title: "Sync failed", description: "Failed to sync data. Please try again.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
@@ -253,32 +256,13 @@ export function Header({ toggleSidebar }: HeaderProps) {
   };
 
   const handleSync = async (selectedCollections?: string[], onProgress?: (collections: any[]) => void) => {
-    // For sync dialog - clear lastSync times for selected collections to force full sync
+    // For sync dialog - clear lastSync times for selected collections to force full sync (per-tenant keys)
     if (typeof window !== 'undefined') {
-      const syncKeys = [
-        'lastSync:suppliers',
-        'lastSync:customers',
-        'lastSync:payments',
-        'lastSync:customerPayments',
-        'lastSync:incomes',
-        'lastSync:expenses',
-        'lastSync:projects',
-        'lastSync:loans',
-        'lastSync:fundTransactions',
-      ];
-      
-      // If specific collections selected, clear only those
-      if (selectedCollections && selectedCollections.length > 0) {
-        selectedCollections.forEach(collectionName => {
-          const key = `lastSync:${collectionName}`;
-          if (syncKeys.includes(key)) {
-            localStorage.removeItem(key);
-          }
-        });
-      } else {
-        // Clear all if no specific selection
-        syncKeys.forEach(key => localStorage.removeItem(key));
-      }
+      const allCollections = ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'projects', 'loans', 'fundTransactions'];
+      const toClear = selectedCollections && selectedCollections.length > 0
+        ? selectedCollections.filter(c => allCollections.includes(c))
+        : allCollections;
+      toClear.forEach(collectionName => localStorage.removeItem(getLastSyncKey(collectionName)));
     }
     
     // Now do sync - it will do full sync since lastSync times are cleared

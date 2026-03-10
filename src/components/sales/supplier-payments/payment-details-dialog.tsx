@@ -67,10 +67,6 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                     <DetailItem icon={<Hash size={14} />} label="Gov. Quantity" value={(payment as any).govQuantity || 0} />
                     <DetailItem icon={<Hash size={14} />} label="Gov. Rate" value={formatCurrency((payment as any).govRate || 0)} />
                     <DetailItem icon={<Hash size={14} />} label="Gov. Amount" value={formatCurrency((payment as any).govAmount || 0)} />
-
-                    {(payment as any).rtgsSrNo && (
-                      <DetailItem icon={<Hash size={14} />} label="Gov. SR No" value={(payment as any).rtgsSrNo} />
-                    )}
                   </>
                 )}
               </div>

@@ -239,13 +239,25 @@ export async function ensureTenantForUser(user: User): Promise<{
     const { listErpCompanies } = await import("@/lib/erp-migration");
     const erpCompanies = await listErpCompanies();
     if (erpCompanies.length > 0) {
+      const stored = getErpSelection();
+      const company = stored ? erpCompanies.find((c) => c.id === stored.companyId) : null;
+      const sub = company && stored ? company.subCompanies.find((s) => s.id === stored.subCompanyId) : null;
+      const seasonKey = sub && stored && sub.seasons.some((s) => s.key === stored.seasonKey) ? stored.seasonKey : sub?.seasons[0]?.key;
+      const storedValid = company && sub && seasonKey;
+      if (storedValid) {
+        // Preserve user's selection - do NOT overwrite on refresh
+        setErpMode(true);
+        setActiveTenant({ id: "root", storageMode: "root" });
+        setCachedTenants([]);
+        return { active: { id: "root", storageMode: "root" }, tenants: [] };
+      }
       const first = erpCompanies[0];
       const subWithSeason = first.subCompanies.find((s) => s.seasons.length > 0);
-      const sub = subWithSeason ?? first.subCompanies[0];
-      const season = sub?.seasons[0];
-      if (first && sub && season) {
+      const subFallback = subWithSeason ?? first.subCompanies[0];
+      const season = subFallback?.seasons[0];
+      if (first && subFallback && season) {
         setErpMode(true);
-        setErpSelectionStorage({ companyId: first.id, subCompanyId: sub.id, seasonKey: season.key });
+        setErpSelectionStorage({ companyId: first.id, subCompanyId: subFallback.id, seasonKey: season.key });
         const fallback: ActiveTenantStored = { id: "root", storageMode: "root" };
         setActiveTenant(fallback);
         setCachedTenants([]);
@@ -536,29 +548,11 @@ export async function activateTenant(tenant: Pick<TenantSummary, "id" | "name" |
   }
 }
 
-/** Clear IndexedDB and lastSync keys when switching context (tenant or ERP season). Call before reload. */
+/** On company/tenant switch we only invalidate the in-memory DB reference and reload.
+ * We do NOT delete IndexedDB or clear tables: each company has its own DB (bizsuiteDB_v2_<suffix>),
+ * so when the user switches back to a company, their data is still in local and we avoid extra Firebase reads.
+ * lastSync keys are already per-context (they include getStorageKeySuffix()), so no need to clear them. */
 export async function clearLocalDataForContextSwitch(): Promise<void> {
   if (typeof window === "undefined") return;
-  try {
-    const DexieModule = await import("dexie");
-    const Dexie = (DexieModule as any).default || DexieModule;
-    if (typeof Dexie?.delete === "function") {
-      await Dexie.delete("bizsuiteDB_v2");
-    }
-  } catch {
-  }
-  try {
-    const { clearAllLocalData } = await import("./database");
-    await clearAllLocalData();
-  } catch {
-  }
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k) keys.push(k);
-    }
-    keys.filter((k) => k.startsWith("lastSync:")).forEach((k) => localStorage.removeItem(k));
-  } catch {
-  }
+  // No-op: DB is per-company; context change listener in database.ts invalidates the instance so next access opens the new context's DB.
 }

@@ -524,6 +524,14 @@ export async function deleteBank(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('banks', { batch });
     await batch.commit();
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.banks.delete(id);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'banks' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
@@ -576,6 +584,14 @@ export async function deleteBankBranch(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankBranches', { batch });
     await batch.commit();
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.bankBranches.delete(id);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'bankBranches' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 
@@ -614,6 +630,14 @@ export async function deleteBankAccount(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('bankAccounts', { batch });
     await batch.commit();
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.bankAccounts.delete(id);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'bankAccounts' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 
@@ -874,9 +898,20 @@ export async function deleteSupplier(id: string): Promise<void> {
       }
     }
     
-    // ✅ Use local-first sync for supplier deletion with correct document ID
+    // ✅ UI refresh: dispatch so list/context update immediately
+    if (typeof window !== 'undefined' && (paymentsToDelete.length > 0 || paymentsToUpdate.length > 0)) {
+      window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+    }
+    
+    // ✅ Use local-first sync for supplier deletion – use IndexedDB key so delete actually removes the row
+    const idToDelete = (supplierData as any)?.id ?? documentId;
+    if (db) {
+      await db.suppliers.delete(idToDelete);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
+      }
+    }
     const { writeLocalFirst } = await import('./local-first-sync');
-    // Use documentId (which should be srNo if available) instead of the provided id
     await writeLocalFirst('suppliers', 'delete', documentId);
     
     // Enqueue sync tasks for payment deletions
@@ -962,11 +997,14 @@ export async function deleteMultipleSuppliers(supplierIds: string[]): Promise<vo
     
     await batch.commit();
 
-    // Sync Dexie
+    // Sync Dexie and refresh UI
     if (db) {
         await db.suppliers.bulkDelete(supplierIds);
         await db.payments.bulkDelete(paymentsToDelete);
-        // Handle partial payment updates in Dexie if necessary
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+        }
     }
 }
 
@@ -1402,8 +1440,19 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   const { notifySyncRegistry } = await import('./sync-registry');
   await notifySyncRegistry('fundTransactions', { batch });
   await batch.commit();
+  const saved = { id: docRef.id, transactionId: '', ...dataWithDate } as FundTransaction;
   logActivity({ type: "create", collection: "fundTransactions", docId: docRef.id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${docRef.id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
-  return { id: docRef.id, transactionId: '', ...dataWithDate } as FundTransaction;
+
+  // Update IndexedDB and notify so Cash & Bank list updates immediately without refresh
+  if (typeof window !== 'undefined' && db) {
+    try {
+      await db.fundTransactions.put(saved);
+      window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+    } catch {
+      // ignore
+    }
+  }
+  return saved;
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
@@ -1415,6 +1464,18 @@ export async function updateFundTransaction(id: string, data: Partial<FundTransa
     await notifySyncRegistry('fundTransactions', { batch });
     await batch.commit();
     logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData }).catch(() => {});
+
+    if (typeof window !== 'undefined' && db) {
+      try {
+        const existing = await db.fundTransactions.get(id);
+        if (existing) {
+          await db.fundTransactions.put({ ...existing, ...data, updatedAt: (updateData as { updatedAt?: string }).updatedAt });
+          window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+        }
+      } catch {
+        // ignore
+      }
+    }
 }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
@@ -1428,6 +1489,15 @@ export async function deleteFundTransaction(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('fundTransactions', { batch });
     await batch.commit();
+
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.fundTransactions.delete(id);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 
@@ -1834,6 +1904,17 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
       await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
     }
     await deleteDoc(docRef);
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('customerPayments');
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.customerPayments.delete(id);
+        await db.customerPayments.where('paymentId').equals(id).delete();
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'customerPayments' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 
@@ -1861,14 +1942,24 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
             throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
         }
         
-        const newIncome = withCreateMetadata({ ...incomeData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>);
+        const newIncome = withCreateMetadata(stripUndefined({ ...incomeData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
         const batch = writeBatch(firestoreDB);
         batch.set(docRef, newIncome);
         const { notifySyncRegistry } = await import('./sync-registry');
         await notifySyncRegistry('incomes', { batch });
         await retryFirestoreOperation(() => batch.commit(), 'addIncome - commit batch');
         logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => {});
-        return newIncome as Income;
+        const saved = newIncome as Income;
+        if (typeof window !== 'undefined' && db?.transactions) {
+            try {
+                const toSave = { ...saved, type: 'Income' as const, transactionType: 'Income' as const };
+                await db.transactions.put(toSave);
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'incomes' } }));
+            } catch {
+                // ignore
+            }
+        }
+        return saved;
     } catch (error) {
         logError(error, `addIncome(${incomeData.transactionId || 'new'})`, 'high');
         throw error;
@@ -1902,18 +1993,28 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
         throw new Error(`Transaction ID ${newTransactionId} already exists! Cannot overwrite existing document.`);
     }
     
-    const newExpense = withCreateMetadata({ ...expenseData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>);
+    const newExpense = withCreateMetadata(stripUndefined({ ...expenseData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
     const batch = writeBatch(firestoreDB);
     batch.set(docRef, newExpense);
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('expenses', { batch });
     await batch.commit();
     logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => {});
-    return newExpense as Expense;
+    const saved = newExpense as Expense;
+    if (typeof window !== 'undefined' && db?.transactions) {
+        try {
+            const toSave = { ...saved, type: 'Expense' as const, transactionType: 'Expense' as const };
+            await db.transactions.put(toSave);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'expenses' } }));
+        } catch {
+            // ignore
+        }
+    }
+    return saved;
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
-    const data = withEditMetadata({ ...incomeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    const data = withEditMetadata(stripUndefined({ ...incomeData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
     const batch = writeBatch(firestoreDB);
     batch.update(doc(incomesCollection, id), data);
     const { notifySyncRegistry } = await import('./sync-registry');
@@ -1931,7 +2032,7 @@ export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 
 }
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
-    const data = withEditMetadata({ ...expenseData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    const data = withEditMetadata(stripUndefined({ ...expenseData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
     const batch = writeBatch(firestoreDB);
     batch.update(doc(expensesCollection, id), data);
     const { notifySyncRegistry } = await import('./sync-registry');
@@ -1958,6 +2059,15 @@ export async function deleteIncome(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('incomes', { batch });
     await batch.commit();
+
+    if (typeof window !== 'undefined' && db?.transactions) {
+        try {
+            await db.transactions.delete(id);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'incomes' } }));
+        } catch {
+            // ignore
+        }
+    }
 }
 
 export async function deleteExpense(id: string): Promise<void> {
@@ -1971,6 +2081,15 @@ export async function deleteExpense(id: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('expenses', { batch });
     await batch.commit();
+
+    if (typeof window !== 'undefined' && db?.transactions) {
+        try {
+            await db.transactions.delete(id);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'expenses' } }));
+        } catch {
+            // ignore
+        }
+    }
 }
 
 export async function updateExpensePayee(oldPayee: string, newPayee: string): Promise<void> {
@@ -2084,6 +2203,16 @@ export async function addAccount(account: Omit<Account, 'id'>): Promise<void> {
     await notifySyncRegistry('accounts', { batch });
     await batch.commit();
     logActivity({ type: "create", collection: "accounts", docId: docRef.id, docPath: getTenantCollectionPath("accounts").join("/"), summary: `Created account ${normalizedName}`, afterData: payload }).catch(() => {});
+
+    if (typeof window !== 'undefined' && db) {
+      try {
+        const toSave: Account = { id: docRef.id, name: normalizedName, ...(payload as Omit<Account, 'id' | 'name'>) };
+        await db.accounts.put(toSave);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'accounts' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 export async function getAccount(name: string): Promise<Account | null> {
@@ -2166,6 +2295,19 @@ export async function updateAccount(account: Omit<Account, 'id'>, previousName?:
     await notifySyncRegistry('accounts', { batch });
     await batch.commit();
     logActivity({ type: isRename ? "create" : "edit", collection: "accounts", docId: docRef.id, docPath: getTenantCollectionPath("accounts").join("/"), summary: isRename ? `Created account ${normalizedName}` : `Updated account ${normalizedName}`, afterData: payload }).catch(() => {});
+
+    if (typeof window !== 'undefined' && db) {
+      try {
+        if (isRename && previousName) {
+          await db.accounts.delete(buildAccountDocId(previousName));
+        }
+        const toSave: Account = { id: docRef.id, name: normalizedName, ...(base as Omit<Account, 'id' | 'name'>) };
+        await db.accounts.put(toSave);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'accounts' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 export async function deleteAccount(name: string): Promise<void> {
@@ -2182,6 +2324,15 @@ export async function deleteAccount(name: string): Promise<void> {
     const { notifySyncRegistry } = await import('./sync-registry');
     await notifySyncRegistry('accounts', { batch });
     await batch.commit();
+
+    if (typeof window !== 'undefined' && db) {
+      try {
+        await db.accounts.delete(docId);
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'accounts' } }));
+      } catch {
+        // ignore
+      }
+    }
 }
 
 // --- Format Settings Functions ---
@@ -2520,64 +2671,40 @@ export async function getMorePayments(startAfterDoc: QueryDocumentSnapshot<Docum
   return { data, lastVisible, hasMore: data.length === count };
 }
 
-// Fetch ALL supplier payments (use cautiously for manual sync)
+// Fetch ALL supplier payments (use cautiously for manual sync) - single payments collection for all (including Gov)
 export async function getAllPayments(): Promise<Payment[]> {
-  // ✅ Read from local IndexedDB first to avoid unnecessary Firestore reads
   if (db) {
     try {
       const localPayments = await db.payments.toArray();
-      const localGovPayments = await db.governmentFinalizedPayments.toArray();
-      const allLocalPayments = [...localPayments, ...localGovPayments];
-      if (allLocalPayments.length > 0) {
-        return allLocalPayments;
+      if (localPayments.length > 0) {
+        return localPayments;
       }
     } catch (error) {
-      // If local read fails, continue with Firestore
       handleSilentError(error, 'getAllPayments - local read fallback');
     }
   }
 
-  // ✅ FIX: Always do FULL sync to ensure we get ALL documents
-  // Incremental sync misses documents without updatedAt or with incorrect timestamps
-  let q, govQ;
+  let q;
   try {
-    // Try with orderBy first (faster if index exists)
     q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-    govQ = query(governmentFinalizedPaymentsCollection, orderBy("date", "desc"));
   } catch (error: unknown) {
-    // If orderBy fails (missing index), use simple query
     q = query(supplierPaymentsCollection);
-    govQ = query(governmentFinalizedPaymentsCollection);
   }
 
-  const [snapshot, govSnapshot] = await Promise.all([
-    getDocs(q),
-    getDocs(govQ)
-  ]);
-  
+  const snapshot = await getDocs(q);
   const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-  const govPayments = govSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-  const allPayments = [...payments, ...govPayments];
   
-  // Track Firestore read
-  firestoreMonitor.logRead('payments', 'getAllPayments', allPayments.length);
+  firestoreMonitor.logRead('payments', 'getAllPayments', payments.length);
   
-  // Save to local IndexedDB and update last sync time
-  if (db && allPayments.length > 0) {
-    // ✅ OPTIMIZED: Use chunked bulkPut to prevent blocking
+  if (db && payments.length > 0) {
     const { chunkedBulkPut } = await import('./chunked-operations');
-    if (payments.length > 0) {
-      await chunkedBulkPut(db.payments, payments, 100);
-    }
-    if (govPayments.length > 0) {
-      await chunkedBulkPut(db.governmentFinalizedPayments, govPayments, 100);
-    }
+    await chunkedBulkPut(db.payments, payments, 100);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastSync:payments', String(Date.now()));
     }
   }
   
-  return allPayments;
+  return payments;
 }
 
 export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
@@ -2987,63 +3114,11 @@ async function fetchCollectionWithIncrementalSync<T extends { id?: string }>(
 export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError: (error: Error) => void) {
     if (isFirestoreTemporarilyDisabled()) {
         return createPollingFallback(async () => {
-            const regularPayments = db ? await db.payments.orderBy('date').reverse().toArray() : [];
-            const govPayments = db ? await db.governmentFinalizedPayments.orderBy('date').reverse().toArray() : [];
-            return [...regularPayments, ...govPayments] as Payment[];
+            return (db ? await db.payments.orderBy('date').reverse().toArray() : []) as Payment[];
         }, callback);
     }
 
-    let regularPayments: Payment[] = [];
-    let govPayments: Payment[] = [];
-    let regularLoaded = false;
-    let govLoaded = false;
-
-    // Helper to merge and sort payments from both sources
-    const mergeAndCallback = () => {
-        // Deduplicate by id/paymentId to prevent double counting when offline submissions create duplicates
-        const uniquePayments = new Map<string, Payment>();
-
-        const getPaymentKey = (p: Payment) => {
-            const key = String((p as any).paymentId || (p as any).id || '').trim();
-            return key || null;
-        };
-
-        const getPaymentTime = (p: Payment) => {
-            const updatedAt = (p as any).updatedAt;
-            const updatedAtMs =
-                updatedAt && typeof updatedAt === 'object' && typeof (updatedAt as any).toMillis === 'function'
-                    ? (updatedAt as any).toMillis()
-                    : (updatedAt ? new Date(updatedAt as any).getTime() : 0);
-            const dateMs = p.date ? new Date(p.date).getTime() : 0;
-            return Math.max(updatedAtMs || 0, dateMs || 0);
-        };
-        
-        [...regularPayments, ...govPayments].forEach(p => {
-            const key = getPaymentKey(p);
-            if (!key) return;
-
-            const existing = uniquePayments.get(key);
-            if (!existing) {
-                uniquePayments.set(key, p);
-                return;
-            }
-
-            if (getPaymentTime(p) >= getPaymentTime(existing)) {
-                uniquePayments.set(key, p);
-            }
-        });
-
-        // Create a new array to avoid mutating state
-        const allPayments = Array.from(uniquePayments.values()).sort((a, b) => {
-            const dateA = a.date ? new Date(a.date).getTime() : 0;
-            const dateB = b.date ? new Date(b.date).getTime() : 0;
-            return dateB - dateA;
-        });
-        callback(allPayments);
-    };
-
-    // Listener 1: Regular Payments
-    const unsubRegular = createMetadataBasedListener<Payment>(
+    return createMetadataBasedListener<Payment>(
         {
             collectionName: 'payments',
             fetchFunction: async () => {
@@ -3059,43 +3134,15 @@ export function getPaymentsRealtime(callback: (data: Payment[]) => void, onError
             storageKey: 'lastSync:payments_v3'
         },
         (data) => {
-            regularPayments = data;
-            regularLoaded = true;
-            mergeAndCallback();
+            const sorted = [...data].sort((a, b) => {
+                const dateA = a.date ? new Date(a.date).getTime() : 0;
+                const dateB = b.date ? new Date(b.date).getTime() : 0;
+                return dateB - dateA;
+            });
+            callback(sorted);
         },
         onError
     );
-
-    // Listener 2: Gov Payments
-    const unsubGov = createMetadataBasedListener<Payment>(
-        {
-            collectionName: 'governmentFinalizedPayments',
-            fetchFunction: async () => {
-                return await fetchCollectionWithIncrementalSync<Payment>(
-                    governmentFinalizedPaymentsCollection, 
-                    'lastSync:governmentFinalizedPayments_v3', 
-                    db?.governmentFinalizedPayments,
-                    'updatedAt',
-                    'date',
-                    (doc) => ({ id: doc.id, ...doc.data(), receiptType: 'Gov.' } as Payment)
-                );
-            },
-            localTableName: 'governmentFinalizedPayments',
-            storageKey: 'lastSync:governmentFinalizedPayments_v3'
-        },
-        (data) => {
-            // Force receiptType again for safety
-            govPayments = data.map(p => ({ ...p, receiptType: 'Gov.' }));
-            govLoaded = true;
-            mergeAndCallback();
-        },
-        onError
-    );
-
-    return () => {
-        unsubRegular();
-        unsubGov();
-    };
 }
 
 export function getCustomerPaymentsRealtime(callback: (data: CustomerPayment[]) => void, onError: (error: Error) => void) {

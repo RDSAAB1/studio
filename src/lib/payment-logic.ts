@@ -1,6 +1,6 @@
 "use client";
 
-import { runTransaction, doc, collection, getDoc, Timestamp, writeBatch, query, where, getDocs, increment, deleteDoc } from 'firebase/firestore';
+import { runTransaction, doc, collection, getDoc, Timestamp, writeBatch, query, where, getDocs, increment, deleteDoc, type DocumentSnapshot, type DocumentReference } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import type { Payment, Customer, PaidFor, Expense } from '@/lib/definitions';
 import { getTenantCollectionPath } from '@/lib/tenancy';
@@ -12,7 +12,6 @@ import { savePaymentOffline } from '@/lib/indexed-db';
 
 const paymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("payments"));
 const customerPaymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("customer_payments"));
-const governmentFinalizedPaymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("governmentFinalizedPayments"));
 const customersCollection = () => collection(firestoreDB, ...getTenantCollectionPath("customers"));
 const suppliersCollection = () => collection(firestoreDB, ...getTenantCollectionPath("suppliers"));
 const expensesCollection = () => collection(firestoreDB, ...getTenantCollectionPath("expenses"));
@@ -77,6 +76,7 @@ export type ProcessPaymentContext = {
     // userGovRequiredAmount?: number; // User manually entered govRequiredAmount (Removed)
     cdToDistribute?: number; // Total CD amount to distribute
     cdAt?: string; // CD calculation mode
+    cdPercent?: number; // From CD% field in form — kitna % CD katna hai vahi use hota hai
     paymentHistory?: Payment[]; // Full payment history for CD calculation
     selectedEntries?: Customer[]; // Selected entries for CD calculation
     suppliers?: Customer[]; // All suppliers for context
@@ -133,13 +133,22 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         incomingSelectedEntries,
         govQuantity, govRate, govAmount, govExtraAmount,
         centerName,
-        cdToDistribute = 0, cdAt = 'partial_on_paid', paymentHistory = [], selectedEntries = []
+        cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = []
     } = context;
+    // CD% form field se aata hai — jo % user ne CD% field mein dala hai vahi use hota hai (default 2 agar blank ho)
+    const cdPercent = (Number(cdPercentRaw) != null && cdPercentRaw !== '' && Number.isFinite(Number(cdPercentRaw)))
+        ? Math.max(0, Number(cdPercentRaw))
+        : 2;
 
     const paymentId = paymentIdRaw || "";
     const rtgsSrNo = rtgsSrNoRaw || "";
-    const accountIdForPayment = accountIdForPaymentRaw || selectedAccountId || "CashInHand";
+    const isAdjustmentAccount =
+        selectedAccountId === 'Adjustment' || accountIdForPaymentRaw === 'Adjustment';
+    const accountIdForPayment = isAdjustmentAccount
+        ? 'Adjustment'
+        : (accountIdForPaymentRaw || selectedAccountId || (paymentMethod === 'Cash' ? 'CashInHand' : undefined));
     const isLedger = paymentMethod === 'Ledger';
+    // At finalize: hook passes effectiveCdAmount (0 when cdEnabled false) so CD is only applied when enabled
     const effectiveCdAmount = isLedger ? 0 : (effectiveCdAmountRaw ?? calculatedCdAmount ?? 0);
     const drCr = (drCrRaw === 'Credit' ? 'Credit' : 'Debit') as 'Debit' | 'Credit';
     const unsignedFinalAmountToPay = Math.abs(Number(initialFinalAmountToPay || 0));
@@ -195,95 +204,417 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             let remainingPayment = distributableAmount;
             let remainingCd = effectiveCdAmount;
             
-            // Sort entries by outstanding (optional, but good practice)
-            // entryOutstandings.sort((a, b) => a.outstanding - b.outstanding); // Keep original order or sort?
+            // Ledger Debit overpayment: sort so entries with positive outstanding get payment first
+            // (otherwise 0-outstanding entry gets full amount and 4K-outstanding entry gets 0)
+            if (isLedger && drCr === 'Debit' && entryOutstandings.length > 1) {
+                entryOutstandings = [...entryOutstandings].sort((a, b) => (b.outstanding ?? 0) - (a.outstanding ?? 0));
+            }
             
             const processedEntries: PaidFor[] = [];
+            // Ledger: Debit = payment (entries ko distribute/update karo). Credit = charge (entries ko update nahi, summary me extra side se treat hota hai).
+            const shouldDistributeToEntries = !(isLedger && drCr === 'Credit');
+            const entriesToProcess = shouldDistributeToEntries ? entryOutstandings : [];
 
-            const shouldDistributeToEntries = !isLedger;
-
-            for (const item of (shouldDistributeToEntries ? entryOutstandings : [])) {
+            // Phase 1: ALL READS FIRST (Firestore transaction rule)
+            const readResults: { entryRef: DocumentReference; entryDoc: DocumentSnapshot }[] = [];
+            for (const item of entriesToProcess) {
                 const entryId = item.entry.id;
                 const entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), entryId);
                 const entryDoc = await transaction.get(entryRef);
-                
-                if (!entryDoc.exists()) {
-                    continue; // Skip if entry deleted
-                }
+                readResults.push({ entryRef, entryDoc });
+            }
 
+            // Phase 2a: Pehle sirf outstanding nikalo; amountToPay abhi 0. CD pehle distribute hogi, phir jo bache vo To Be Paid (cash).
+            type EntryPlan = { entryRef: DocumentReference; item: typeof entriesToProcess[0]; entryData: Customer; currentPaid: number; currentCd: number; netAmount: number; outstanding: number; amountToPay: number; roomForCd: number };
+            const plan: EntryPlan[] = [];
+            const toBePaidTotal = remainingPayment; // User ka To Be Paid = cash; ye CD distribute ke BAAD bache hue par distribute hoga
+            for (let i = 0; i < readResults.length; i++) {
+                const { entryRef, entryDoc } = readResults[i];
+                const item = entriesToProcess[i];
+                if (!entryDoc.exists()) continue;
                 const entryData = entryDoc.data() as Customer;
                 const currentPaid = entryData.totalPaid || 0;
                 const currentCd = entryData.totalCd || 0;
                 const netAmount = Number(entryData.netAmount) || 0;
-                
-                // Calculate how much we can pay for this entry
-                // Logic: Pay as much as possible from remainingPayment
-                // But respect the "outstanding" passed in context if we want to follow UI selection
-                // Here we assume we pay up to the outstanding amount or remainingPayment
-                
-                // If we have specific amounts per entry in initialPaidForDetails, use them?
-                // But usually processPaymentLogic recalculates or verifies.
-                // We'll implement a basic greedy distribution if no details provided.
-                
-                let amountToPay = 0;
-                let cdToPay = 0;
-                
-                if (remainingPayment > 0) {
-                    const outstanding = netAmount - currentPaid - currentCd;
-                    amountToPay = Math.min(remainingPayment, outstanding);
-                    // Ensure we don't pay negative if outstanding is negative (overpaid)
-                    amountToPay = Math.max(0, amountToPay);
-                    
-                    remainingPayment -= amountToPay;
-                }
-                
-                if (remainingCd > 0) {
-                     // Distribute CD similarly
-                     // If proportional, maybe link to amountToPay?
-                     // For now, simple greedy
-                     const outstandingAfterPay = netAmount - currentPaid - currentCd - amountToPay;
-                     cdToPay = Math.min(remainingCd, outstandingAfterPay);
-                     cdToPay = Math.max(0, cdToPay);
-                     
-                     remainingCd -= cdToPay;
-                }
+                const outstandingFromDoc = netAmount - currentPaid - currentCd;
+                // Ledger Debit: allow negative outstanding (overpayment); others cap at 0
+                const rawOutstanding = Number((item as any).outstanding ?? (item as any).originalOutstanding ?? outstandingFromDoc);
+                const outstanding = (isLedger && drCr === 'Debit') ? rawOutstanding : Math.max(0, rawOutstanding);
+                const roomForCd = Math.round(Math.max(0, outstanding) * 100) / 100; // CD room: non-negative only
+                plan.push({ entryRef, item, entryData, currentPaid, currentCd, netAmount, outstanding, amountToPay: 0, roomForCd });
+            }
 
-                // Update entry
-                transaction.update(entryRef, {
+            // Phase 2b: Pehle CD distribute karo (har entry ko uske hisse ki CD); room = outstanding abhi, so sabko CD milne ka mauka. CD allocation/distribution usi hisaab se; paid + CD ≤ outstanding (jab CD de rahe hain to paid amount kam hoga tabhi proper, nahi to outstanding negative ho jayegi).
+            // - on_previously_paid_no_cd: CD ONLY on previously paid amount that had no CD (no CD on current payment); per entry = cdPercent% of previouslyPaidNoCd, capped by room; "Ensure full CD" pass skipped.
+            // - partial_on_paid: First CD on "previously paid without CD" (by earliest date), then remainder by current amountToPay; cap by room.
+            // - on_full_amount / proportional_cd: CD by original amount (proportional); prefer entries with no previous CD; cap by room; redistribute excess.
+            // - on_unpaid_amount: CD by outstanding (proportional), cap by room.
+            // - default: by room (outstanding - amountToPay). Final verification and STEP 7 ensure no CD > room where required (no negative outstanding).
+            const totalPayment = plan.reduce((s, p) => s + p.amountToPay, 0);
+            const totalOutstandingForCd = plan.reduce((s, p) => s + p.outstanding, 0);
+            const totalRoomForCd = plan.reduce((s, p) => s + p.roomForCd, 0);
+            const cdAllocations: number[] = plan.map(() => 0);
+            const isCdOnPaidAmount = cdAt === 'partial_on_paid';
+            const isOnPreviouslyPaidNoCd = cdAt === 'on_previously_paid_no_cd';
+            const history = Array.isArray(paymentHistory) ? paymentHistory : [];
+            const editingId = editingPayment?.id;
+
+            // 20-day rule (CD On/Off jaisa): receipt ki ACTUAL DATE (date field) se 20 din — calendar day pe compare karo. 20 din ke baad wali payment par CD nahi.
+            const twentyDaysMs = 20 * 24 * 60 * 60 * 1000;
+            const toDayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            const isPaymentWithin20DaysOfReceipt = (p: Payment, receiptActualDate: string | undefined) => {
+                if (!p.date || !receiptActualDate) return false;
+                const pTime = toDayStart(new Date(p.date));
+                const rTime = toDayStart(new Date(receiptActualDate));
+                const diff = pTime - rTime; // payment receipt ke baad (calendar days)
+                return diff >= 0 && diff <= twentyDaysMs; // 20 din ke andar — 21+ din baad wali include nahi
+            };
+
+            // CD is per-payment: 2 payments 10k+10k — ek par CD kati, doosri par nahi. Kabhi mix mat karo.
+
+            // Helper: per-entry "previously paid without CD". 20-day rule: receipt ki ACTUAL DATE (entryData.date) use — createdAt/system date nahi.
+            const buildPreviouslyPaidNoCd = (apply20DayRule: boolean = true) => {
+                const previouslyPaidNoCd: number[] = [];
+                const earliestDateNoCd: (number | null)[] = [];
+                for (let i = 0; i < plan.length; i++) {
+                    const srNo = plan[i].entryData.srNo;
+                    const receiptActualDate = plan[i].entryData.date; // actual date field (receipt/entry date) — system createdAt nahi
+                    let sum = 0;
+                    let earliest: number | null = null;
+                    for (const p of history) {
+                        if (p.id === editingId) continue;
+                        if (apply20DayRule && !isPaymentWithin20DaysOfReceipt(p, receiptActualDate)) continue; // 20-day: sirf actual date se 20 din ke andar wali payment
+                        if (!p.paidFor?.some((pf: PaidFor) => pf.srNo === srNo)) continue;
+                        const hadNoCd = !p.cdApplied || !(Number(p.cdAmount) || 0);
+                        if (!hadNoCd) continue; // sirf jis payment par CD nahi kati usi ka amount count
+                        const pf = p.paidFor.find((f: PaidFor) => f.srNo === srNo);
+                        if (pf) {
+                            sum += Number(pf.amount) || 0;
+                            const d = p.date ? new Date(p.date).getTime() : 0;
+                            if (d && (earliest === null || d < earliest)) earliest = d;
+                        }
+                    }
+                    previouslyPaidNoCd.push(sum);
+                    earliestDateNoCd.push(earliest);
+                }
+                return { previouslyPaidNoCd, earliestDateNoCd };
+            };
+
+            // Total CD already received by each entry — sirf un payments se jahan CD kati (usi amount ki CD jis par banti hai)
+            const totalCdReceivedByEntry: number[] = plan.map((_, i) => {
+                const srNo = plan[i].entryData.srNo;
+                let total = 0;
+                for (const p of history) {
+                    if (p.id === editingId) continue;
+                    const pf = p.paidFor?.find((f: PaidFor) => f.srNo === srNo);
+                    if (!pf) continue;
+                    if ('cdAmount' in pf && pf.cdAmount != null) total += Number(pf.cdAmount) || 0;
+                    else if (p.cdAmount && p.paidFor?.length) {
+                        const totalPaid = p.paidFor.reduce((s: number, x: PaidFor) => s + Number(x.amount || 0), 0);
+                        if (totalPaid > 0) total += Math.round((p.cdAmount * Number(pf.amount || 0) / totalPaid) * 100) / 100;
+                    }
+                }
+                return total;
+            });
+
+            if (remainingCd > 0) {
+                if (isOnPreviouslyPaidNoCd && history.length > 0) {
+                    // "CD on Paid Amount (No CD)": CD ONLY on previously paid amount that had no CD — no CD on current payment.
+                    // 20-day rule: sirf 20 din ke andar wali payments count — 20 din se pehley payment to CD include, 20 din ke baad wali to include nahi. Isse yahaan CD sahi calculate hoti hai.
+                    const { previouslyPaidNoCd } = buildPreviouslyPaidNoCd(true);
+                    let cdRemaining = remainingCd;
+                    for (let i = 0; i < plan.length; i++) {
+                        const prevNoCd = previouslyPaidNoCd[i] ?? 0;
+                        if (prevNoCd <= 0) continue;
+                        const p = plan[i];
+                        const cdEligible = Math.round((prevNoCd * cdPercent) / 100 * 100) / 100;
+                        const room = Math.max(0, p.roomForCd - cdAllocations[i]);
+                        const give = Math.min(cdRemaining, cdEligible, room);
+                        if (give > 0) {
+                            cdAllocations[i] = Math.round((cdAllocations[i] + give) * 100) / 100;
+                            cdRemaining = Math.round((cdRemaining - give) * 100) / 100;
+                        }
+                    }
+                } else if (isCdOnPaidAmount && (totalPayment > 0 || history.length > 0)) {
+                    // "Partial CD on Paid Amount": First CD on previously paid without CD (by date), then remaining by current amountToPay. 20-day rule yahan nahi (sirf No CD mode par).
+                    const { previouslyPaidNoCd, earliestDateNoCd } = buildPreviouslyPaidNoCd(false);
+
+                    let cdRemaining = remainingCd;
+                    const sortedByEarliestFirst = plan.map((_, i) => i).sort((a, b) => {
+                        const ea = earliestDateNoCd[a] ?? Infinity;
+                        const eb = earliestDateNoCd[b] ?? Infinity;
+                        if (ea !== eb) return ea - eb;
+                        return (previouslyPaidNoCd[b] ?? 0) - (previouslyPaidNoCd[a] ?? 0);
+                    });
+                    for (const i of sortedByEarliestFirst) {
+                        if (cdRemaining <= 0) break;
+                        const prevNoCd = previouslyPaidNoCd[i] ?? 0;
+                        if (prevNoCd <= 0) continue;
+                        const p = plan[i];
+                        const cdEligibleOnPrev = Math.round((prevNoCd * cdPercent) / 100 * 100) / 100;
+                        const room = p.roomForCd - cdAllocations[i];
+                        const give = Math.min(cdRemaining, cdEligibleOnPrev, Math.max(0, room));
+                        if (give > 0) {
+                            cdAllocations[i] = Math.round((cdAllocations[i] + give) * 100) / 100;
+                            cdRemaining = Math.round((cdRemaining - give) * 100) / 100;
+                        }
+                    }
+
+                    if (cdRemaining > 0 && (totalPayment > 0 || totalOutstandingForCd > 0)) {
+                        const totalBase = totalPayment > 0 ? totalPayment : totalOutstandingForCd;
+                        let cdAssigned = 0;
+                        for (let i = 0; i < plan.length; i++) {
+                            const p = plan[i];
+                            const roomLeft = p.roomForCd - cdAllocations[i];
+                            if (roomLeft <= 0) continue;
+                            const isLast = i === plan.length - 1;
+                            let extra: number;
+                            if (isLast) {
+                                extra = Math.max(0, Math.min(roomLeft, Math.round((cdRemaining - cdAssigned) * 100) / 100));
+                            } else {
+                                const base = totalPayment > 0 ? p.amountToPay : p.outstanding;
+                                const share = totalBase > 0 ? (cdRemaining * base) / totalBase : 0;
+                                extra = Math.min(roomLeft, Math.round(share * 100) / 100);
+                                extra = Math.max(0, extra);
+                            }
+                            cdAllocations[i] = Math.round((cdAllocations[i] + extra) * 100) / 100;
+                            cdAssigned += extra;
+                        }
+                        let remainder = Math.round((cdRemaining - cdAssigned) * 100) / 100;
+                        if (remainder > 0) {
+                            for (let i = 0; i < plan.length && remainder > 0; i++) {
+                                const roomLeft = plan[i].roomForCd - cdAllocations[i];
+                                if (roomLeft > 0) {
+                                    const ex = Math.min(remainder, roomLeft);
+                                    cdAllocations[i] = Math.round((cdAllocations[i] + ex) * 100) / 100;
+                                    remainder = Math.round((remainder - ex) * 100) / 100;
+                                }
+                            }
+                        }
+                    }
+                } else if (totalRoomForCd > 0 && !isCdOnPaidAmount && !isOnPreviouslyPaidNoCd) {
+                    const isOnFullAmount = cdAt === 'on_full_amount' || cdAt === 'proportional_cd';
+                    const isOnUnpaidAmount = cdAt === 'on_unpaid_amount';
+                    const eligibleIndices = plan
+                        .map((_, i) => i)
+                        .filter(i => (totalCdReceivedByEntry[i] ?? 0) <= 0.01 && plan[i].outstanding > 0.01);
+                    const useEligibleOnly = isOnFullAmount && eligibleIndices.length > 0;
+                    const indicesToUse = useEligibleOnly
+                        ? eligibleIndices
+                        : plan.map((_, i) => i).filter(i => plan[i].roomForCd > 0.01);
+
+                    if (isOnFullAmount && indicesToUse.length > 0) {
+                        // on_full_amount / proportional_cd: CD by original amount (proportional), cap by room, redistribute excess
+                        const totalOriginal = indicesToUse.reduce((s, i) => s + plan[i].netAmount, 0);
+                        if (totalOriginal > 0) {
+                            let totalAlloc = 0;
+                            for (const i of indicesToUse) {
+                                const p = plan[i];
+                                const share = (remainingCd * p.netAmount) / totalOriginal;
+                                const raw = Math.round(share * 100) / 100;
+                                const capped = Math.min(p.roomForCd, Math.max(0, raw));
+                                cdAllocations[i] = capped;
+                                totalAlloc += capped;
+                            }
+                            let excess = Math.round((remainingCd - totalAlloc) * 100) / 100;
+                            if (excess > 0.01) {
+                                const byCapacity = [...indicesToUse].sort((a, b) => (plan[b].roomForCd - cdAllocations[b]) - (plan[a].roomForCd - cdAllocations[a]));
+                                for (const i of byCapacity) {
+                                    if (excess <= 0.01) break;
+                                    const roomLeft = plan[i].roomForCd - cdAllocations[i];
+                                    if (roomLeft > 0.01) {
+                                        const add = Math.min(excess, roomLeft);
+                                        cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
+                                        excess = Math.round((excess - add) * 100) / 100;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isOnUnpaidAmount && indicesToUse.length > 0) {
+                        // on_unpaid_amount: CD by outstanding (proportional), cap by room
+                        const totalOut = indicesToUse.reduce((s, i) => s + plan[i].outstanding, 0);
+                        if (totalOut > 0) {
+                            let totalAlloc = 0;
+                            for (const i of indicesToUse) {
+                                const p = plan[i];
+                                const share = (remainingCd * p.outstanding) / totalOut;
+                                const raw = Math.round(share * 100) / 100;
+                                const capped = Math.min(p.roomForCd, Math.max(0, raw));
+                                cdAllocations[i] = capped;
+                                totalAlloc += capped;
+                            }
+                            let remainder = Math.round((remainingCd - totalAlloc) * 100) / 100;
+                            if (remainder > 0.01) {
+                                for (const i of indicesToUse) {
+                                    if (remainder <= 0.01) break;
+                                    const roomLeft = plan[i].roomForCd - cdAllocations[i];
+                                    if (roomLeft > 0.01) {
+                                        const add = Math.min(remainder, roomLeft);
+                                        cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
+                                        remainder = Math.round((remainder - add) * 100) / 100;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Default: distribute by room (outstanding - amountToPay)
+                        let cdAssigned = 0;
+                        for (let i = 0; i < plan.length; i++) {
+                            const p = plan[i];
+                            const isLast = i === plan.length - 1;
+                            let cdToPay: number;
+                            if (isLast) {
+                                cdToPay = Math.max(0, Math.min(p.roomForCd, Math.round((remainingCd - cdAssigned) * 100) / 100));
+                            } else {
+                                cdToPay = Math.min(p.roomForCd, Math.round((remainingCd * p.roomForCd / totalRoomForCd) * 100) / 100);
+                                cdToPay = Math.max(0, cdToPay);
+                            }
+                            cdAllocations[i] = cdToPay;
+                            cdAssigned += cdToPay;
+                        }
+                        let remainder = Math.round((remainingCd - cdAllocations.reduce((a, b) => a + b, 0)) * 100) / 100;
+                        if (remainder > 0) {
+                            for (let i = 0; i < plan.length && remainder > 0; i++) {
+                                const roomLeft = plan[i].roomForCd - cdAllocations[i];
+                                if (roomLeft > 0) {
+                                    const extra = Math.min(remainder, roomLeft);
+                                    cdAllocations[i] = Math.round((cdAllocations[i] + extra) * 100) / 100;
+                                    remainder = Math.round((remainder - extra) * 100) / 100;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Final verification: no entry gets CD > room (outstanding - amountToPay); cap and redistribute excess
+            for (let i = 0; i < plan.length; i++) {
+                const maxCd = plan[i].roomForCd;
+                if (cdAllocations[i] > maxCd + 0.01) {
+                    let excess = Math.round((cdAllocations[i] - maxCd) * 100) / 100;
+                    cdAllocations[i] = Math.round(maxCd * 100) / 100;
+                    for (let j = 0; j < plan.length && excess > 0.01; j++) {
+                        if (i === j) continue;
+                        const roomLeft = plan[j].roomForCd - cdAllocations[j];
+                        if (roomLeft > 0.01) {
+                            const add = Math.min(excess, roomLeft);
+                            cdAllocations[j] = Math.round((cdAllocations[j] + add) * 100) / 100;
+                            excess = Math.round((excess - add) * 100) / 100;
+                        }
+                    }
+                }
+            }
+
+            // Ensure full CD is allocated to paidFor (breakdown) even when room was 0 (full payment)
+            // Skip for "CD on Paid Amount (No CD)". Jab amountToPay abhi 0 hai to proportion ke liye outstanding use karo.
+            const totalAllocated = cdAllocations.reduce((a, b) => a + b, 0);
+            if (
+                !isOnPreviouslyPaidNoCd &&
+                remainingCd > 0 &&
+                totalAllocated < remainingCd - 0.01 &&
+                (totalPayment > 0 || totalOutstandingForCd > 0)
+            ) {
+                const toDistribute = Math.round((remainingCd - totalAllocated) * 100) / 100;
+                const totalBase = totalPayment > 0 ? totalPayment : totalOutstandingForCd;
+                let assigned = 0;
+                for (let i = 0; i < plan.length; i++) {
+                    const p = plan[i];
+                    const isLast = i === plan.length - 1;
+                    const base = totalPayment > 0 ? p.amountToPay : p.outstanding;
+                    const share = isLast
+                        ? Math.round((toDistribute - assigned) * 100) / 100
+                        : Math.round((toDistribute * base / totalBase) * 100) / 100;
+                    const add = Math.max(0, share);
+                    cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
+                    assigned += add;
+                }
+            }
+
+            // STEP 7: ensure no negative outstanding (paid + CD ≤ outstanding). CD amount de rahe hain to paid+CD kam hona chahiye, nahi to outstanding negative ho jayegi.
+            // For "CD on Paid Amount (No CD)": always cap CD to room so paid+CD ≤ outstanding.
+            // For other modes: cap only when room > 0 so "Ensure full CD" breakdown is preserved when room === 0 (multiple receipts).
+            for (let i = 0; i < plan.length; i++) {
+                const room = plan[i].roomForCd;
+                const shouldCap = isOnPreviouslyPaidNoCd ? (cdAllocations[i] > room + 0.01) : (room > 0.01 && cdAllocations[i] > room + 0.01);
+                if (shouldCap) {
+                    let excess = Math.round((cdAllocations[i] - room) * 100) / 100;
+                    cdAllocations[i] = Math.round(Math.min(cdAllocations[i], room) * 100) / 100;
+                    for (let j = 0; j < plan.length && excess > 0.01; j++) {
+                        if (i === j) continue;
+                        const roomLeft = plan[j].roomForCd - cdAllocations[j];
+                        if (roomLeft > 0.01) {
+                            const add = Math.min(excess, roomLeft);
+                            cdAllocations[j] = Math.round((cdAllocations[j] + add) * 100) / 100;
+                            excess = Math.round((excess - add) * 100) / 100;
+                        }
+                    }
+                }
+            }
+
+            // Pehle CD distribute ho chuki; ab jo bache vo To Be Paid (cash). Har entry ko capacity = outstanding - cdAllocations[i] tak cash mil sakti hai.
+            // Ledger Debit: allow overpayment (full amount), so outstanding can go negative
+            let remainingCash = Math.round(toBePaidTotal * 100) / 100;
+            const allowOverpayment = isLedger && drCr === 'Debit';
+            for (let i = 0; i < plan.length; i++) {
+                const p = plan[i];
+                const baseCap = Math.round((p.outstanding - (cdAllocations[i] ?? 0)) * 100) / 100;
+                const cap = allowOverpayment ? Math.max(remainingCash, baseCap) : Math.max(0, baseCap);
+                let pay = 0;
+                if (remainingCash > 0 && (cap > 0 || allowOverpayment)) {
+                    pay = Math.min(remainingCash, allowOverpayment ? remainingCash : cap);
+                    pay = Math.round(pay * 100) / 100;
+                    remainingCash = Math.round((remainingCash - pay) * 100) / 100;
+                }
+                p.amountToPay = pay;
+                p.roomForCd = Math.max(0, Math.round((p.outstanding - pay - (cdAllocations[i] ?? 0)) * 100) / 100);
+            }
+
+            // Phase 2c: ALL WRITES (update each entry with amountToPay and cdToPay)
+            for (let i = 0; i < plan.length; i++) {
+                const p = plan[i];
+                const amountToPay = p.amountToPay;
+                const cdToPay = cdAllocations[i] ?? 0;
+
+                transaction.update(p.entryRef, {
                     totalPaid: increment(amountToPay),
                     totalCd: increment(cdToPay),
                     updatedAt: now
                 });
 
-                if (amountToPay > 0 || cdToPay > 0 || (initialPaidForDetails.find(p => p.srNo === entryData.srNo)?.extraAmount || 0) > 0) {
-                    const existingDetail = initialPaidForDetails.find(p => p.srNo === entryData.srNo);
+                // amount = cash (Paid Amount) only; cdAmount = CD only — keep separate so calculations are correct
+                if (amountToPay > 0 || cdToPay > 0 || (initialPaidForDetails.find(x => x.srNo === p.entryData.srNo)?.extraAmount || 0) > 0) {
+                    const existingDetail = initialPaidForDetails.find(x => x.srNo === p.entryData.srNo);
                     const extraAmount = existingDetail?.extraAmount || 0;
-
                     processedEntries.push({
-                        srNo: entryData.srNo || item.entry.srNo,
+                        srNo: p.entryData.srNo || p.item.entry.srNo,
                         amount: amountToPay,
                         cdAmount: cdToPay,
                         extraAmount: extraAmount,
-                        supplierId: entryData.id,
-                        // Enhanced fields based on user request
-                        parchiNo: entryData.parchiNo || entryData.srNo || item.entry.srNo,
+                        supplierId: p.entryData.id,
+                        parchiNo: p.entryData.parchiNo || p.entryData.srNo || p.item.entry.srNo,
                         paymentId: newPaymentId,
                         receiptType: paymentMethod,
                         sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
                         supplierAddress: supplierDetails.address || '',
                         supplierFatherName: supplierDetails.fatherName || '',
                         supplierName: supplierDetails.name || '',
-                        type: (amountToPay + cdToPay) >= (netAmount - currentPaid - currentCd) ? "Full" : "Partial",
+                        type: (amountToPay + cdToPay) >= p.outstanding ? "Full" : "Partial",
                         updatedAt: now,
                         utrNo: utrNo || '',
-                        adjustedOriginal: netAmount,
-                        adjustedOutstanding: (netAmount - currentPaid - currentCd), // Outstanding BEFORE this payment
-                        receiptOutstanding: (netAmount - currentPaid - currentCd), // Same as above
+                        adjustedOriginal: p.netAmount,
+                        adjustedOutstanding: p.outstanding,
+                        receiptOutstanding: p.outstanding,
                     });
                 }
             }
-            
             paidForDetails = processedEntries;
+
+            // Normalize paidFor so cdAmount is always a number (saves correctly in DB for CD on Paid Amount)
+            const normalizedPaidFor: PaidFor[] = paidForDetails.map((pf) => ({
+                ...pf,
+                amount: Number(pf.amount) || 0,
+                cdAmount: Number((pf as any).cdAmount) || 0,
+            }));
 
             // 2. Create Payment Object
             const remainingAdvance = Math.max(0, Math.round(remainingPayment * 100) / 100);
@@ -296,7 +627,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 amount: isLedger ? signedPaymentAmount : finalAmountToPay,
                 drCr: isLedger ? drCr : undefined,
                 advanceAmount: advanceAmount,
-                paidFor: paidForDetails,
+                paidFor: normalizedPaidFor,
                 paymentMethod,
                 receiptType: paymentMethod, // Cash, Online, RTGS, Gov.
                 supplierId: selectedCustomerKey || '',
@@ -323,7 +654,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 bankAccountId: accountIdForPayment || '',
                 updatedAt: now, // User requested updatedAt
                 cdApplied: cdEnabled || effectiveCdAmount > 0, // User requested cdApplied
-                cdAmount: effectiveCdAmount, // Ensure cdAmount is at root
+                cdAmount: Number(effectiveCdAmount) || 0, // Always number so CD on Paid Amount persists in DB
                 parchiNo: parchiNo || '', // User requested parchiNo at root
                 sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined, // User requested sixRDate at root
                 type: paymentType, // Overall payment type, maybe infer? defaulting to Full for now or based on context
@@ -416,40 +747,20 @@ export const handleDeletePaymentLogic = async (params: {
     let payment = paymentHistory.find(p => p.id === paymentId || p.paymentId === paymentId);
     
     if (!payment) {
-        // Try fetching from Firestore
+        // Try fetching from Firestore - single payments collection for all supplier payments (including Gov)
         const primaryCollection = isCustomer ? customerPaymentsCollection() : paymentsCollection();
-        const fallbackCollection = isCustomer ? null : governmentFinalizedPaymentsCollection();
-
         const paymentRef = doc(primaryCollection, paymentId);
         const paymentDoc = await getDoc(paymentRef);
         if (paymentDoc.exists()) {
             payment = paymentDoc.data() as Payment;
             if (!payment.id) payment.id = paymentId;
-        } else if (fallbackCollection) {
-            const fallbackRef = doc(fallbackCollection, paymentId);
-            const fallbackDoc = await getDoc(fallbackRef);
-            if (fallbackDoc.exists()) {
-                payment = fallbackDoc.data() as Payment;
-                if (!payment.id) payment.id = paymentId;
-                payment.receiptType = 'Gov.';
-            }
         }
-
         if (!payment) {
-            // Try searching by paymentId field
             const qPrimary = query(primaryCollection, where("paymentId", "==", paymentId));
             const snapshotPrimary = await getDocs(qPrimary);
             if (!snapshotPrimary.empty) {
                 payment = snapshotPrimary.docs[0].data() as Payment;
                 payment.id = snapshotPrimary.docs[0].id;
-            } else if (fallbackCollection) {
-                const qFallback = query(fallbackCollection, where("paymentId", "==", paymentId));
-                const snapshotFallback = await getDocs(qFallback);
-                if (!snapshotFallback.empty) {
-                    payment = snapshotFallback.docs[0].data() as Payment;
-                    payment.id = snapshotFallback.docs[0].id;
-                    payment.receiptType = 'Gov.';
-                }
             }
         }
     }
@@ -457,9 +768,6 @@ export const handleDeletePaymentLogic = async (params: {
     if (!payment) {
         throw new Error("Payment not found");
     }
-
-    const receiptType = String(payment.receiptType || "").trim().toLowerCase();
-    const isGovPayment = !isCustomer && (receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov'));
 
     // 2. Revert logic inside a transaction
     await runTransaction(firestoreDB, async (transaction) => {
@@ -472,16 +780,7 @@ export const handleDeletePaymentLogic = async (params: {
                 if (paidItem.supplierId) {
                      entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), paidItem.supplierId);
                 } else if (paidItem.srNo) {
-                    // This is inefficient inside transaction, but if we don't have ID...
-                    // Better to query outside or assume ID is present.
-                    // Most PaidFor items should have supplierId now.
-                    // If not, we might skip or fail.
-                    // Let's assume we can query.
-                    const q = query(isCustomer ? customersCollection() : suppliersCollection(), where("srNo", "==", paidItem.srNo));
-                    const snapshot = await getDocs(q); // getDocs inside transaction? No, query outside.
-                    // Wait, we can't do query inside transaction easily for multiple docs unless we know IDs.
-                    // So we must rely on supplierId.
-                    // If supplierId is missing, we can try to find it in the 'suppliers' passed in params.
+                    // Resolve by srNo using the suppliers/customers list (no read inside transaction)
                     const foundSupplier = suppliers.find(s => s.srNo === paidItem.srNo);
                     if (foundSupplier) {
                         entryRef = doc(isCustomer ? customersCollection() : suppliersCollection(), foundSupplier.id);
@@ -498,17 +797,17 @@ export const handleDeletePaymentLogic = async (params: {
             }
         }
 
-        // 3. Delete the payment document
-        const targetCollection = isCustomer
-            ? customerPaymentsCollection()
-            : (isGovPayment ? governmentFinalizedPaymentsCollection() : paymentsCollection());
-        const paymentDocRef = doc(targetCollection, payment!.id);
-        transaction.delete(paymentDocRef);
-
-        const registryCollectionName = isCustomer
-            ? 'customerPayments'
-            : (isGovPayment ? 'governmentFinalizedPayments' : 'payments');
-        await notifySyncRegistry(registryCollectionName, { transaction });
+        // 3. Delete the payment document - single payments collection for all supplier payments (including Gov)
+        const firestoreDocId = String(payment!.paymentId || payment!.id || '').trim() || String(payment!.id);
+        if (isCustomer) {
+            const paymentDocRef = doc(customerPaymentsCollection(), payment!.id);
+            transaction.delete(paymentDocRef);
+            await notifySyncRegistry('customerPayments', { transaction });
+        } else {
+            const paymentDocRef = doc(paymentsCollection(), firestoreDocId);
+            transaction.delete(paymentDocRef);
+            await notifySyncRegistry('payments', { transaction });
+        }
     });
 
     // 4. Remove from local IndexedDB immediately so UI updates without waiting for sync
@@ -522,10 +821,8 @@ export const handleDeletePaymentLogic = async (params: {
                 }
             } else {
                 await db.payments.delete(payment.id as any);
-                await db.governmentFinalizedPayments.delete(payment.id as any);
                 if (localPaymentId) {
                     await db.payments.where('paymentId').equals(localPaymentId).delete();
-                    await db.governmentFinalizedPayments.where('paymentId').equals(localPaymentId).delete();
                 }
             }
 

@@ -57,11 +57,22 @@ export const formSchema = z.object({
 
 export type FormValues = z.infer<typeof formSchema>;
 
-export const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
+/** Returns next customer serial number (e.g. C00001, C00002) from existing customers list */
+export function getNextCustomerSrNo(customers: Customer[]): string {
+  if (!customers.length) return formatSrNo(1, 'C');
+  const maxNum = customers.reduce((max, c) => {
+    const num = parseInt(c.srNo?.substring(1) ?? '0', 10) || 0;
+    return num > max ? num : max;
+  }, 0);
+  return formatSrNo(maxNum + 1, 'C');
+}
+
+export const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, initialSrNo?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dateStr = formatDateLocal(today);
-  
+  const srNo = initialSrNo ?? getNextCustomerSrNo([]);
+
   // Set default values for RICE BRAN
   const isRiceBran = (lastVariety || '').toUpperCase().trim() === 'RICE BRAN';
   const defaultBaseReport = isRiceBran ? 15 : 0;
@@ -69,7 +80,7 @@ export const getInitialFormState = (lastVariety?: string, lastPaymentType?: stri
   const defaultBagWeightKg = isRiceBran ? 0.2 : 0;
 
   return {
-    id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
+    id: "", srNo, date: dateStr, term: '0', dueDate: dateStr, 
     name: '', companyName: '', address: '', contact: '', gstin: '', stateName: '', stateCode: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: defaultBagWeightKg, bagRate: 0, bagAmount: 0,
     brokerage: 0, brokerageRate: 0, brokerageAmount: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
@@ -81,12 +92,13 @@ export const getInitialFormState = (lastVariety?: string, lastPaymentType?: stri
   };
 };
 
-const getInitialFormValues = (lastVariety?: string, lastPaymentType?: string): FormValues => {
+const getInitialFormValues = (lastVariety?: string, lastPaymentType?: string, initialSrNo?: string): FormValues => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const srNo = initialSrNo ?? getNextCustomerSrNo([]);
 
   return {
-    srNo: 'C----',
+    srNo,
     date: today,
     bags: 0,
     name: '',
@@ -138,7 +150,8 @@ interface UseCustomerEntryFormProps {
 }
 
 export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }: UseCustomerEntryFormProps) {
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
+  const initialSrNo = getNextCustomerSrNo(safeCustomers);
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(undefined, undefined, initialSrNo));
   const [isEditing, setIsEditing] = useState(false);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
@@ -147,9 +160,21 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: getInitialFormValues(lastVariety, lastPaymentType),
+    defaultValues: getInitialFormValues(lastVariety, lastPaymentType, initialSrNo),
     shouldFocusError: false,
   });
+
+  // When customers list loads/updates and we're on new entry, keep srNo in sync with next serial
+  useEffect(() => {
+    if (isEditing) return;
+    const current = form.getValues('srNo');
+    const next = getNextCustomerSrNo(safeCustomers);
+    const isPlaceholder = current === 'C----' || current === '';
+    const wasDefaultForEmpty = current === 'C00001' && safeCustomers.length > 0;
+    if (isPlaceholder || wasDefaultForEmpty) {
+      form.setValue('srNo', next, { shouldValidate: false, shouldDirty: false });
+    }
+  }, [safeCustomers, isEditing, form]);
 
   // Restore form state from localStorage
   useEffect(() => {
@@ -320,16 +345,8 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
-    let nextSrNum = 1;
-    if (safeCustomers.length > 0) {
-        const maxSrNo = safeCustomers.reduce((max, c) => {
-            const num = parseInt(c.srNo.substring(1)) || 0;
-            return num > max ? num : max;
-        }, 0);
-        nextSrNum = maxSrNo + 1;
-    }
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'C');
+    const nextSrNo = getNextCustomerSrNo(safeCustomers);
+    const newState = getInitialFormState(lastVariety, lastPaymentType, nextSrNo);
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = formatDateLocal(today);

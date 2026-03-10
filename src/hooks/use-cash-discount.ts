@@ -218,10 +218,18 @@ export const useCashDiscount = ({
                 break;
             }
             case 'on_previously_paid_no_cd': {
-                // Only process paymentHistory if CD is enabled and this mode is selected
+                // Receipt actual date se 20 din ka rule: sirf woh payment count j receipt date ke 20 din ke andar ho — 20 din ke baad wali par CD nahi.
+                const twentyDaysMs = 20 * 24 * 60 * 60 * 1000;
+                const toDayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                const isPaymentWithin20DaysOfReceipt = (paymentDateStr: string | undefined, receiptDateStr: string | undefined) => {
+                    if (!paymentDateStr || !receiptDateStr) return false;
+                    const pTime = toDayStart(new Date(paymentDateStr));
+                    const rTime = toDayStart(new Date(receiptDateStr));
+                    const diff = pTime - rTime;
+                    return diff >= 0 && diff <= twentyDaysMs;
+                };
                 const selectedSrNos = selectedEntries.map(e => e.srNo);
                 let totalPaidWithoutCD = 0;
-                // Only loop through paymentHistory if we have selected entries
                 if (selectedSrNos.length > 0) {
                     paymentHistory.forEach(payment => {
                         if (
@@ -230,9 +238,11 @@ export const useCashDiscount = ({
                             (!payment.cdApplied || !payment.cdAmount)
                         ) {
                             payment.paidFor.forEach(pf => {
-                                if (selectedSrNos.includes(pf.srNo)) {
-                                    totalPaidWithoutCD += Number(pf.amount) || 0;
-                                }
+                                if (!selectedSrNos.includes(pf.srNo)) return;
+                                const entry = selectedEntries.find(e => e.srNo === pf.srNo);
+                                const receiptActualDate = entry?.date; // actual date field, system createdAt nahi
+                                if (!isPaymentWithin20DaysOfReceipt(payment.date, receiptActualDate)) return; // 20 din ke baad wali include nahi
+                                totalPaidWithoutCD += Number(pf.amount) || 0;
                             });
                         }
                     });

@@ -167,7 +167,7 @@ export const TransactionForm = memo(function TransactionForm({
                 <CustomDropdown
                   id={paymentMethodId}
                   options={[
-                    { value: 'Cash', label: 'Cash' },
+                    { value: 'Cash', label: 'Cash In Hand' },
                     ...bankAccounts.map((acc) => ({
                       value: acc.id,
                       label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})`,

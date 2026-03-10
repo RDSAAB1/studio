@@ -38,6 +38,10 @@ interface SupplierSummary {
 interface SupplierSummaryCardsProps {
   summary: SupplierSummary;
   action?: React.ReactNode;
+  /** "dashboard" = pic wala layout (top 4 cards, middle 3 panels, bottom 3 panels); "default" = combined tiles */
+  variant?: "default" | "dashboard";
+  /** When "customer", labels show Total Receivable (incl. Advance Freight) */
+  type?: "supplier" | "customer";
 }
 
 // Helper functions for formatting
@@ -187,7 +191,7 @@ function StatementMetric({
                   ? "Gov Extra"
                   : label;
   return (
-    <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0">
+    <div className="flex items-center justify-between gap-1 supplier-summary-metric-row">
       <div
         className="min-w-0 truncate text-[10px] font-medium text-slate-600 leading-tight"
         title={label}
@@ -196,7 +200,7 @@ function StatementMetric({
       </div>
       <div
         className={cn(
-          "text-right text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap min-w-[88px]",
+          "text-right text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap",
           computedValueClassName
         )}
       >
@@ -264,7 +268,7 @@ function StatementTile({
   );
 }
 
-export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsProps) {
+export function SupplierSummaryCards({ summary, action, variant = "default", type: summaryType }: SupplierSummaryCardsProps) {
   const totalDeductions =
     (summary.totalKartaAmount || 0) +
     (summary.totalLabouryAmount || 0) +
@@ -298,10 +302,121 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
   const totalPaid = summary.totalPaid || 0;
   const cashPaid = summary.totalCashPaid || 0;
   const rtgsPaid = summary.totalRtgsPaid || 0;
+  const ledgerPaid = (summary.ledgerDebitAmount || 0); // ledger Debit = payment side
   const paidShareDenom = totalPaid > 0 ? totalPaid : 1;
   const cashPct = Math.max(0, Math.min(100, (cashPaid / paidShareDenom) * 100));
   const rtgsPct = Math.max(0, Math.min(100, (rtgsPaid / paidShareDenom) * 100));
   const govPct = Math.max(0, Math.min(100, (govPaid / paidShareDenom) * 100));
+
+  const netLedgerImpact = (summary.ledgerDebitAmount || 0) - (summary.ledgerCreditAmount || 0);
+  const netBillAmount = (summary.totalOriginalAmount || 0) - totalDeductions;
+
+  // Compact, modern card style – subtle borders, minimal shadow
+  const card3d =
+    "rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm";
+
+  if (variant === "dashboard") {
+    return (
+      <div className="mt-0.5 w-full min-w-0 overflow-hidden rounded-lg bg-[#f5f5f7] p-2.5 sm:p-3 supplier-summary-dashboard-root">
+        {action ? <div className="flex items-center justify-end pb-2">{action}</div> : null}
+        {/* Top row: 4 cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 supplier-summary-dashboard-top">
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-medium text-slate-600">Total Amount</div>
+            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatCurrency(summary.totalAmount || 0)}</div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-medium text-slate-600">Outstanding</div>
+            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatCurrency(summary.totalOutstanding || 0)}</div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-medium text-slate-600">Net Weight (kg)</div>
+            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatDecimalLocal(summary.totalNetWeight)}</div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-medium text-slate-600">Entries (Paid / Total)</div>
+            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{paidEntriesCount} / {transactionsCount}</div>
+          </div>
+        </div>
+        {/* Middle row: 3 panels */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 supplier-summary-dashboard-middle">
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Weights & Entries</div>
+            <div className="space-y-1.5">
+              <StatementMetric label="Gross" value={`${formatDecimalLocal(grossWeight)} kg`} valueClassName="text-slate-900" />
+              <StatementMetric label="Teir" value={`${formatDecimalLocal(teirWeight)} kg`} valueClassName="text-slate-900" />
+              <StatementMetric label="Final" value={`${formatDecimalLocal(summary.totalFinalWeight)} kg`} valueClassName="text-slate-900" />
+              <StatementMetric label="Net" value={`${formatDecimalLocal(summary.totalNetWeight)} kg`} valueClassName="text-slate-900" />
+              <StatementMetric label="Entries (Paid / Pending)" value={`${paidEntriesCount} / ${outstandingEntriesCount}`} valueClassName="text-slate-900" />
+            </div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">
+              {summaryType === "customer" ? "Receivable (incl. Adv. Freight)" : "Bill Amounts (Original vs Final)"}
+            </div>
+            <div className="space-y-1.5">
+              <StatementMetric label="Base Original" value={formatCurrency(baseOriginalAmount)} valueClassName="text-slate-900" />
+              {summaryType !== "customer" && <StatementMetric label="Gov Extra" value={formatCurrency(govExtraAmount)} valueClassName="text-slate-900" />}
+              <StatementMetric 
+                label={summaryType === "customer" ? "Total Receivable" : "Adjusted Original"} 
+                value={formatCurrency(summary.totalOriginalAmount || 0)} 
+                valueClassName="text-slate-900" 
+              />
+              <StatementMetric label="Net Bill Amount" value={formatCurrency(netBillAmount)} valueClassName="text-slate-900" />
+              <StatementMetric label="Total Deductions" value={formatCurrency(totalDeductions)} valueClassName="text-rose-700" />
+            </div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Payment Status & Ledger</div>
+            <div className="space-y-1.5">
+              <StatementMetric label="Total Paid" value={formatCurrency(totalPaid)} valueClassName="text-emerald-700" />
+              <StatementMetric label="Outstanding" value={formatCurrency(summary.totalOutstanding || 0)} valueClassName="text-rose-700" />
+              {/* Ledger: credit/debit aapas mein clear — Total Amount / Total Paid mein include nahi; sirf Net Ledger Impact outstanding par lagta hai */}
+              {(Number(summary.ledgerCreditAmount || 0) > 0 || Number(summary.ledgerDebitAmount || 0) > 0) ? (
+                <>
+                  <StatementMetric label="Ledger (Income/Credit · Expense/Debit)" value={`Income ${formatCurrency(summary.ledgerCreditAmount || 0)} · Expense ${formatCurrency(summary.ledgerDebitAmount || 0)}`} valueClassName="text-slate-600 text-[10px]" />
+                  <StatementMetric label="Net Ledger Impact" value={formatCurrency(netLedgerImpact)} valueClassName="text-slate-900" />
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        {/* Bottom row: 3 panels */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 supplier-summary-dashboard-bottom">
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Rate Summary</div>
+            <div className="space-y-1.5">
+              <StatementMetric label="Avg Rate" value={formatRateLocal(summary.averageRate)} valueClassName="text-slate-900" />
+              <StatementMetric label="Rate Range" value={`${formatRateLocal(minRate)} – ${formatRateLocal(maxRate)}`} valueClassName="text-slate-900" />
+              <StatementMetric label="Avg Original Rate" value={formatRateLocal(summary.averageOriginalPrice || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Avg Laboury Rate" value={formatDecimalLocal(summary.averageLabouryRate)} valueClassName="text-slate-900" />
+              <StatementMetric label="Rate Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
+            </div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Deductions Breakdown</div>
+            <div className="space-y-1.5">
+              <StatementMetric label="Karta Amount" value={formatCurrency(summary.totalKartaAmount || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Laboury Amount" value={formatCurrency(summary.totalLabouryAmount || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Kanta + Other" value={formatCurrency(summary.totalKanta || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Brokerage" value={formatCurrency(summary.totalBrokerage || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Total Deductions" value={formatCurrency(totalDeductions)} valueClassName="text-rose-700" />
+            </div>
+          </div>
+          <div className={`${card3d} supplier-summary-dashboard-card`}>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Payment Modes & CD</div>
+            <div className="space-y-1.5">
+              <StatementMetric label={`Cash (${Math.round(cashPct)}%)`} value={formatCurrency(cashPaid)} valueClassName="text-emerald-700" />
+              <StatementMetric label={`RTGS (${Math.round(rtgsPct)}%)`} value={formatCurrency(rtgsPaid)} valueClassName="text-sky-700" />
+              <StatementMetric label={`Gov (${Math.round(govPct)}%)`} value={formatCurrency(govPaid)} valueClassName="text-amber-700" />
+              <StatementMetric label="Ledger (Debit = Payment)" value={formatCurrency(ledgerPaid)} valueClassName="text-slate-900" />
+              <StatementMetric label="CD Granted" value={formatCurrency(summary.totalCdAmount || 0)} valueClassName="text-slate-900" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-0.5 w-full min-w-0 overflow-hidden">
@@ -429,31 +544,30 @@ export function SupplierSummaryCards({ summary, action }: SupplierSummaryCardsPr
                 >
                   <div className="grid grid-cols-1 gap-y-2 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
                     <StatementPanel
-                      title="Originals"
+                      title={summaryType === "customer" ? "Receivable" : "Originals"}
                       className="p-0"
                     >
                       <div className="grid grid-cols-1 gap-y-0.5">
                         <StatementMetric label="Base" value={formatCurrency(baseOriginalAmount)} valueClassName="text-emerald-900" />
+                        {summaryType !== "customer" && (
+                          <StatementMetric
+                            label="Gov Extra"
+                            value={formatCurrency(govExtraAmount)}
+                            valueClassName="text-emerald-900"
+                          />
+                        )}
                         <StatementMetric
-                          label="Gov Extra"
-                          value={formatCurrency(govExtraAmount)}
-                          valueClassName="text-emerald-900"
-                        />
-                        <StatementMetric
-                          label="Adjusted"
+                          label={summaryType === "customer" ? "Total Receivable" : "Adjusted"}
                           value={formatCurrency(summary.totalOriginalAmount || 0)}
                           valueClassName="text-emerald-900"
                         />
-                        <StatementMetric
-                          label="Credit"
-                          value={formatCurrency(summary.ledgerCreditAmount || 0)}
-                          valueClassName="text-sky-900"
-                        />
-                        <StatementMetric
-                          label="Debit"
-                          value={formatCurrency(summary.ledgerDebitAmount || 0)}
-                          valueClassName="text-rose-900"
-                        />
+                        {(Number(summary.ledgerCreditAmount || 0) > 0 || Number(summary.ledgerDebitAmount || 0) > 0) ? (
+                          <StatementMetric
+                            label="Ledger (Income · Expense → Net)"
+                            value={`Income ${formatCurrency(summary.ledgerCreditAmount || 0)} · Expense ${formatCurrency(summary.ledgerDebitAmount || 0)} → ${formatCurrency(netLedgerImpact)}`}
+                            valueClassName="text-slate-600 text-[10px]"
+                          />
+                        ) : null}
                       </div>
                     </StatementPanel>
                     <StatementPanel

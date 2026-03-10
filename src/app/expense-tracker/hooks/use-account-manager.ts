@@ -13,6 +13,7 @@ import {
   deleteExpensesForPayee,
   deleteIncomesForPayee,
 } from "@/lib/firestore";
+import { db } from "@/lib/database";
 
 interface AccountFormData {
   name: string;
@@ -62,19 +63,28 @@ export function useAccountManager({
   const prevAccountsRef = useRef<Map<string, Account>>(new Map());
   const isUpdatingRef = useRef(false);
 
-  // Load accounts from Firestore
+  // Load accounts: first from IndexedDB (instant), then subscribe to Firestore realtime
   useEffect(() => {
+    const applyAccountList = (accountList: Account[]) => {
+      const mappedAccounts = new Map<string, Account>();
+      accountList.forEach((account) => {
+        if (account?.name) {
+          const normalizedName = toTitleCase(account.name.trim());
+          mappedAccounts.set(normalizedName, account);
+        }
+      });
+      setAccounts(mappedAccounts);
+    };
+
+    // Show cached/new accounts immediately so Payee dropdown is never empty when data exists
+    if (typeof window !== "undefined" && db?.accounts) {
+      db.accounts.toArray()
+        .then(applyAccountList)
+        .catch(() => {});
+    }
+
     const unsubscribe = getAccountsRealtime(
-      (accountList) => {
-        const mappedAccounts = new Map<string, Account>();
-        accountList.forEach((account) => {
-          if (account?.name) {
-            const normalizedName = toTitleCase(account.name.trim());
-            mappedAccounts.set(normalizedName, account);
-          }
-        });
-        setAccounts(mappedAccounts);
-      },
+      applyAccountList,
       () => {
         // Error handled silently
       }
@@ -83,6 +93,32 @@ export function useAccountManager({
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  // When accounts are added/updated/deleted (Income & Expense), refresh list from IndexedDB so new accounts show without refresh
+  useEffect(() => {
+    if (typeof window === "undefined" || !db?.accounts) return;
+    const onAccountsChanged = async () => {
+      try {
+        const accountList = await db.accounts.toArray();
+        const mappedAccounts = new Map<string, Account>();
+        accountList.forEach((account) => {
+          if (account?.name) {
+            const normalizedName = toTitleCase(account.name.trim());
+            mappedAccounts.set(normalizedName, account);
+          }
+        });
+        setAccounts(mappedAccounts);
+      } catch {
+        // ignore
+      }
+    };
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ collection?: string }>).detail;
+      if (detail?.collection === "accounts") void onAccountsChanged();
+    };
+    window.addEventListener("indexeddb:collection:changed", handler);
+    return () => window.removeEventListener("indexeddb:collection:changed", handler);
   }, []);
 
   // Sync selected account to form fields

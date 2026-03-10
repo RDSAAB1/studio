@@ -121,7 +121,14 @@ export const CalculatedSummary = ({
                             <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
                             <SummaryItem label="Transport Amount" value={formatCurrency(customer.transportAmount || 0)} />
                             <SummaryItem label="Kanta" value={formatCurrency(customer.kanta || 0)} />
-                            <SummaryItem label="Net Receivable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
+                            {(Number(customer.advanceFreight) || 0) > 0 && (
+                                <SummaryItem label="Advance Freight" value={formatCurrency(Number(customer.advanceFreight) || 0)} />
+                            )}
+                            <SummaryItem 
+                                label="Total Receivable" 
+                                value={formatCurrency((Number(customer.originalNetAmount) || 0) + (Number(customer.advanceFreight) || 0))} 
+                                isHighlighted 
+                            />
                         </>
                     )}
                     

@@ -197,8 +197,9 @@ export const useCustomerData = () => {
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                // Outstanding: Original - (Payment + CD)
-                const calculatedNetAmount = (transaction.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry;
+                // Outstanding: (Original + Advance Freight) - (Payment + CD). Advance freight increases total receivable.
+                const baseOriginal = (transaction.originalNetAmount || 0) + (Number(transaction.advanceFreight) || 0);
+                const calculatedNetAmount = baseOriginal - totalPaidForEntry - totalCdForEntry;
                 
                 // Handle very small negative amounts due to rounding - treat as zero
                 if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
@@ -206,10 +207,12 @@ export const useCustomerData = () => {
                 } else {
                     transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
+                (transaction as any).outstandingForEntry = transaction.netAmount;
+                (transaction as any).adjustedOriginal = baseOriginal;
         });
         
         data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0) + (Number(t.advanceFreight) || 0), 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
         data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);

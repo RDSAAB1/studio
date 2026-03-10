@@ -419,10 +419,13 @@ export const generateStatementTransactions = async (
             const totalPaidForPayment = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
 
             const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
-            const isLedgerCreditAdjustment = isLedger && (drCrLower === 'credit' || paymentAmountRaw < 0);
-            const debitAmount = isLedger ? (isLedgerCreditAdjustment ? 0 : paymentAmountAbs) : 0;
+            // Ledger concept for statement:
+            // - Debit (Expense/Payment) => Paid side
+            // - Credit (Income/Charge)  => Debit side
+            const isLedgerCredit = isLedger && (drCrLower === 'credit' || paymentAmountRaw < 0);
+            const debitAmount = isLedger && isLedgerCredit ? paymentAmountAbs : 0;
             const creditPaidAmount = isLedger
-                ? (isLedgerCreditAdjustment ? paymentAmountAbs : 0)
+                ? (!isLedgerCredit ? paymentAmountAbs : 0)
                 : (totalPaidForPayment > 0 ? totalPaidForPayment : paymentAmountAbs);
             const creditCdAmount = isLedger ? 0 : Number((p as any).cdAmount || 0);
             const ledgerAmountFallback =
@@ -433,9 +436,15 @@ export const generateStatementTransactions = async (
                     : 0;
             const paymentLevelExtraAmount = paymentLevelExtraFromFields + ledgerAmountFallback;
             const paymentAdvanceAmount =
-                paidForExtraAmount + ((includePaymentLevelExtra ? paymentLevelExtraAmount : 0) * (isLedgerCreditAdjustment ? -1 : 1));
+                paidForExtraAmount + ((includePaymentLevelExtra ? paymentLevelExtraAmount : 0) * (isLedgerCredit ? -1 : 1));
             const paymentId = p.paymentId || p.id || '';
 
+            // Gov Extra / paidFor extra: goes in Debit column; balance = sum(debit-credit), so Debit ADDS to balance
+            const govExtraAmount = Number((p as any).govExtraAmount || 0);
+            const extraForPayment = paidForExtraAmount > 0 ? paidForExtraAmount : (govExtraAmount > 0 ? govExtraAmount : 0);
+            const debitExtra = isLedger ? 0 : Math.max(0, extraForPayment);
+            // Extra in Debit adds to balance (naki kmm); credit = paid + cd only
+            const creditWithExtra = creditPaidAmount + creditCdAmount;
 
             // Create payment details
             const paymentHeaderSrNo = formatColumn('SR No', 6);
@@ -480,7 +489,7 @@ export const generateStatementTransactions = async (
 
             const headerLines: string[] = [];
             if (isLedger) {
-                headerLines.push(`PAY: ${paymentType} ${isLedgerCreditAdjustment ? '(Credit)' : '(Debit)'}`);
+                headerLines.push(`PAY: ${paymentType} ${isLedgerCredit ? '(Credit)' : '(Debit)'}`);
             } else {
                 headerLines.push(`PAY: ${paymentType}`);
             }
@@ -500,10 +509,10 @@ export const generateStatementTransactions = async (
                 referenceDate: parsedPurchaseReference || undefined,
                 displayDate: paymentDisplayDate,
                 particulars: particulars as any,
-                debit: debitAmount,
+                debit: debitAmount + debitExtra,
                 creditPaid: creditPaidAmount,
                 creditCd: creditCdAmount,
-                credit: creditPaidAmount + creditCdAmount,
+                credit: creditWithExtra,
             });
         }
         
@@ -560,49 +569,16 @@ export const calculateStatementTotals = (
         return { totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0, totalCd: 0, outstanding: 0 };
     }
 
-    // Get all payments from transactions
-    const paymentTransactions = transactions.filter(t => t.creditPaid > 0);
-    
-    // Calculate totals from transactions
-    const totalPaidFromTransactions = paymentTransactions.reduce((sum, t) => sum + t.creditPaid, 0);
-    const totalCdFromTransactions = paymentTransactions.reduce((sum, t) => sum + t.creditCd, 0);
-    
-    // Calculate Cash and RTGS paid from payment data
-    const allPayments = data.allPayments || [];
-    const uniquePayments = allPayments.reduce((acc, payment) => {
-        const key = `${payment.paymentId || payment.id}_${payment.date}_${payment.amount}`;
-        if (!acc.has(key)) {
-            acc.set(key, payment);
-        }
-        return acc;
-    }, new Map());
-    
-    const deduplicatedPayments = Array.from(uniquePayments.values());
-    
-    let totalCashPaid = 0;
-    let totalRtgsPaid = 0;
-    
-    deduplicatedPayments.forEach(p => {
-        const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
-        if (receiptType === 'cash') {
-            const cashAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-            totalCashPaid += cashAmount;
-        } else if (receiptType === 'rtgs') {
-            const rtgsAmount = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-            totalRtgsPaid += rtgsAmount;
-        }
-    });
-    
-    const outstanding = Math.round(
-        transactions.reduce((sum, t) => sum + (t.debit || 0) - (t.credit || 0), 0) * 100
-    ) / 100;
-    
     return {
-        totalPaid: totalPaidFromTransactions,
-        totalCashPaid: totalCashPaid,
-        totalRtgsPaid: totalRtgsPaid,
-        totalCd: totalCdFromTransactions,
-        outstanding: outstanding
+        totalPaid: Number((data as any).totalPaid ?? 0),
+        totalCashPaid: Number((data as any).totalCashPaid ?? 0),
+        totalRtgsPaid: Number((data as any).totalRtgsPaid ?? 0),
+        totalCd: Number((data as any).totalCdAmount ?? (data as any).totalCd ?? 0),
+        outstanding: typeof (data as any).totalOutstanding === 'number'
+            ? (data as any).totalOutstanding
+            : Math.round(
+                  transactions.reduce((sum, t) => sum + (t.debit || 0) - (t.credit || 0), 0) * 100
+              ) / 100,
     };
 };
 

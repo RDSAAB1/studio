@@ -154,7 +154,12 @@ export const useSupplierSummary = (
       const entrySrNo = String(s.srNo || '').trim().toLowerCase();
       const paymentsForEntry = paymentHistory.filter(p => {
         const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
-        const parchiMatch = String((p as any).parchiNo || '').trim().toLowerCase() === entrySrNo;
+        const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+        const parchiTokens = parchiNoRaw
+          .split(/[,\s]+/g)
+          .map(t => t.trim())
+          .filter(Boolean);
+        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
         return Boolean(paidForMatch || parchiMatch);
       });
       
@@ -169,32 +174,59 @@ export const useSupplierSummary = (
       paymentsForEntry.forEach(payment => {
         const paidForThisPurchase = payment.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
         const receiptType = (payment.receiptType || '').toString().trim().toLowerCase();
+        const isLedger = receiptType === 'ledger';
+        const drCrLower = String((payment as any).drCr || '').trim().toLowerCase();
+        const isLedgerCredit = isLedger && (drCrLower === 'credit' || Number((payment as any).amount || 0) < 0);
+
         const paidForExtraForThisEntry = Number((paidForThisPurchase as any)?.extraAmount || 0);
         const paymentLevelExtraRawFromFields =
           (Number((payment as any).extraAmount) || 0) + (Number((payment as any).advanceAmount) || 0);
-        const ledgerAmountFallback =
-          receiptType === 'ledger' &&
-          (payment.paidFor?.length || 0) === 0 &&
-          paymentLevelExtraRawFromFields === 0
-            ? Math.abs(Number((payment as any).amount || 0))
-            : 0;
-        const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
-        const paymentLevelExtraSign =
-          receiptType === 'ledger' && String((payment as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
-        const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
+
+        const parchiNoRaw = String((payment as any).parchiNo || '').trim().toLowerCase();
+        const parchiTokens = parchiNoRaw
+          .split(/[,\s]+/g)
+          .map(t => t.trim())
+          .filter(Boolean);
+        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
+
+        const amountAbs = Math.abs(Number((payment as any).amount || 0));
+
+        // Legacy/unlinked ledger payments: paidFor empty but parchiNo has SR# list.
+        // Ledger concept: Debit = payment (Paid/Expense), Credit = charge (Extra/Income).
+        if (isLedger && !paidForThisPurchase && parchiMatch && amountAbs > 0) {
+          const share =
+            parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
+          if (isLedgerCredit) totalExtraForEntry += share;
+          else totalPaidForEntry += share;
+          return;
+        }
+
+        // Payment-level extra (Online extras) or ledger credit charge (when not stored per paidFor)
         const shouldAttachPaymentLevelExtra =
-          paymentLevelExtraRaw !== 0 &&
+          (paymentLevelExtraRawFromFields !== 0 || amountAbs > 0) &&
           (receiptType === 'ledger' || receiptType === 'online') &&
-          String((payment as any).parchiNo || '').trim().toLowerCase() === entrySrNo &&
+          parchiMatch &&
           paidForExtraForThisEntry === 0;
 
         if (shouldAttachPaymentLevelExtra) {
-          totalExtraForEntry += paymentLevelExtra;
+          if (isLedger && isLedgerCredit && amountAbs > 0 && payment.paidFor?.length === 0 && paymentLevelExtraRawFromFields === 0) {
+            const share =
+              parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
+            totalExtraForEntry += share;
+          } else if (!isLedger) {
+            totalExtraForEntry += paymentLevelExtraRawFromFields;
+          }
         }
 
         if (paidForThisPurchase) {
           // Direct database value - no calculation
-          totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
+          const paidAmount = Number(paidForThisPurchase.amount || 0);
+          if (isLedger && isLedgerCredit) {
+            // Ledger Credit = charge → income side, not paid
+            totalExtraForEntry += paidAmount;
+          } else {
+            totalPaidForEntry += paidAmount;
+          }
           
           // Calculate Gov Extra Amount share for this entry
           // Use extraAmount from paidFor details if available (highest priority as it's specific to this entry)

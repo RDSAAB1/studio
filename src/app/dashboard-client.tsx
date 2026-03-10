@@ -208,34 +208,25 @@ export default function DashboardClient() {
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
     const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
-    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived, expenseBreakdown } = useMemo(() => {
+    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived, expenseBreakdown, incomeBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
-        // Calculate CD received - check both payment.cdAmount and paidFor[].cdAmount
+        // Calculate CD received - use SAME logic as CD Granted (unified-payments): paidFor.cdAmount first, else proportional from payment.cdAmount
         const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, payment) => {
             let paymentCd = 0;
-            
-            // First check if CD is stored in paidFor array (new format - more accurate)
             if (payment.paidFor && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
-                const totalCdFromPaidFor = payment.paidFor.reduce((cdSum: number, pf: PaidFor) => {
-                    // Check if cdAmount is directly stored in paidFor (new format)
+                const totalPaidForInPayment = payment.paidFor.reduce((s: number, pf: PaidFor) => s + Number(pf.amount || 0), 0);
+                payment.paidFor.forEach((pf: PaidFor) => {
                     if ('cdAmount' in pf && pf.cdAmount !== undefined && pf.cdAmount !== null) {
-                        return cdSum + Number(pf.cdAmount || 0);
+                        paymentCd += Number(pf.cdAmount || 0);
+                    } else if (payment.cdAmount && totalPaidForInPayment > 0) {
+                        const proportion = Number(pf.amount || 0) / totalPaidForInPayment;
+                        paymentCd += Math.round(Number(payment.cdAmount || 0) * proportion * 100) / 100;
                     }
-                    return cdSum;
-                }, 0);
-                
-                if (totalCdFromPaidFor > 0) {
-                    paymentCd = totalCdFromPaidFor;
-                } else if (payment.cdAmount) {
-                    // Fallback to payment.cdAmount if not in paidFor (old format)
-                    paymentCd = Number(payment.cdAmount || 0);
-                }
+                });
             } else if (payment.cdAmount) {
-                // Old format: CD stored directly in payment
                 paymentCd = Number(payment.cdAmount || 0);
             }
-            
             return sum + paymentCd;
         }, 0);
         
@@ -314,6 +305,11 @@ export default function DashboardClient() {
                 supplierPayment: supplierPaymentRegular,
                 expenses: expenseFromEntries,
                 outsiderRTGS: outsiderRTGS,
+            },
+            incomeBreakdown: {
+                incomeEntries: incomeFromEntries,
+                customerPayments: incomeFromCustomers,
+                cdReceived,
             }
         }
     }, [filteredData, kantaParchi, customers, customerPayments, suppliers, supplierPayments]);
@@ -545,7 +541,14 @@ export default function DashboardClient() {
                 <DashboardFilters date={date} setDate={setDate} />
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" isLoading={isLoading}/>
+                <StatCard 
+                    title="Total Income" 
+                    value={formatCurrency(totalIncome)} 
+                    icon={<TrendingUp />} 
+                    colorClass="text-green-500" 
+                    isLoading={isLoading}
+                    description={`Income Entries: ${formatCurrency(incomeBreakdown.incomeEntries)} | Customer Payments: ${formatCurrency(incomeBreakdown.customerPayments)} | CD Received: ${formatCurrency(incomeBreakdown.cdReceived)}`}
+                />
                 <StatCard 
                     title="Total Expense" 
                     value={formatCurrency(totalExpense)} 

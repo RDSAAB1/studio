@@ -1251,12 +1251,30 @@ const LedgerPage: React.FC = () => {
 
         // Check if this is a Gov payment
         const isGovPayment = receiptType === 'gov.' || receiptType === 'gov' || receiptType.startsWith('gov');
+        const isLedgerPayment = receiptType === 'ledger';
+        const drCrLower = String((payment as any).drCr || "").trim().toLowerCase();
+        const isLedgerCredit = isLedgerPayment && (drCrLower === "credit" || totalAmount < 0);
+        const isLedgerDebit = isLedgerPayment && !isLedgerCredit;
 
         // If it's a Gov payment, add to govDistribution instead of supplierCash
         if (isGovPayment) {
           record.govDistribution += totalAmount;
           record.supplierPayments += totalAmount;
           return; // Skip the normal cash/RTGS logic for Gov payments
+        }
+
+        // Ledger: Credit = income/charge, Debit = payment/expense
+        // Statement ke context me:
+        // - Ledger Debit ko supplierPayments + expenses me count karo (jaise adjustment/payment)
+        // - Ledger Credit ko incomes me count karo
+        if (isLedgerPayment) {
+          if (isLedgerDebit) {
+            record.supplierPayments += totalAmount;
+            record.expenses += totalAmount;
+          } else if (isLedgerCredit) {
+            record.incomes += totalAmount;
+          }
+          return; // Ledger ko cash/rtgs channel buckets me mat daalo
         }
 
         const addCash = (amount: number) => {

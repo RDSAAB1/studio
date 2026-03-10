@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,8 @@ interface GovReceiptSelectorProps {
     };
     selectPaymentAmount?: (option: any) => void;
     onSuggestionsChange?: (suggestions: Combination[]) => void;
+    /** When provided, keeps GovForm 'Extra' amount in sync with calculated Extra here */
+    onExtraAmountChange?: (extraAmount: number) => void;
 }
 
 export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
@@ -76,6 +78,7 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
     combination,
     selectPaymentAmount,
     onSuggestionsChange,
+    onExtraAmountChange,
 }) => {
     const instanceId = React.useId();
     const [targetGovAmount, setTargetGovAmount] = useState<number>(0);
@@ -238,6 +241,14 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
 
     const govRequiredAmount = calculatedBaseAmount + calculatedExtraAmount;
 
+    // Keep GovForm 'Extra' field in sync with the calculated Extra amount block
+    useEffect(() => {
+        if (onExtraAmountChange) {
+            const roundedExtra = Math.round(calculatedExtraAmount);
+            onExtraAmountChange(roundedExtra > 0 ? roundedExtra : 0);
+        }
+    }, [calculatedExtraAmount, onExtraAmountChange]);
+
     const handleCalculateCombinations = () => {
         if (targetGovAmount <= 0 || receiptCalculations.length === 0) return;
 
@@ -347,7 +358,7 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                 </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-2.5 pt-2 space-y-2 bg-white">
-                {/* 4 Summary cards - AVAILABLE, TOTAL GOV, NORMAL, EXTRA */}
+                {/* 4 Summary cards - AVAILABLE, TOTAL GOV, NORMAL, EXTRA + Entry-wise breakdown for balance */}
                 <div className="grid grid-cols-4 gap-1.5">
                     <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
                         <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
@@ -369,11 +380,23 @@ export const GovReceiptSelector: React.FC<GovReceiptSelectorProps> = ({
                     </div>
                     <div className="flex flex-col rounded-[10px] border border-border/70 bg-muted/30 px-2 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.12)]">
                         <span className="text-[8px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-0.5">
-                            <Coins className="h-2.5 w-2.5" /> Extra
+                            <Coins className="h-2.5 w-2.5" /> Gov Extra
                         </span>
                         <span className="mt-0.5 text-[11px] font-bold tabular-nums text-primary">{formatCurrency(calculatedExtraAmount)}</span>
                     </div>
                 </div>
+                {selectedReceiptCalculations.length > 0 && (
+                    <div className="text-[9px] text-muted-foreground border border-dashed border-border/60 rounded-md px-2 py-1 bg-muted/20">
+                        <span className="font-semibold">Entries: </span>
+                        {selectedReceiptCalculations.map((calc, i) => (
+                            <span key={calc.srNo || i}>
+                                {i > 0 && ", "}
+                                <span className="font-mono">{calc.srNo}</span>
+                                <span className="text-muted-foreground/80"> (Norm: {formatCurrency(calc.normalAmount)}, Extra: {formatCurrency(calc.extraAmount)})</span>
+                            </span>
+                        ))}
+                    </div>
+                )}
 
                 {/* Input fields - 3 per row, 2 rows */}
                 <div className="grid grid-cols-3 gap-1.5">

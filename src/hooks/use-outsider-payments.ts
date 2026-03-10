@@ -53,17 +53,18 @@ export const useOutsiderPayments = (data: any) => {
         form.setRtgsQuantity((payment as any).quantity || 0);
         form.setRtgsRate((payment as any).rate || 0);
         form.setRtgsAmount((payment as any).rtgsAmount || 0);
+        const p = payment as any;
         form.setSupplierDetails({
-            name: payment.supplierName || '',
-            fatherName: payment.supplierFatherName || '',
-            address: (payment as any).supplierAddress || '',
+            name: p.supplierName || p.supplierDetails?.name || '',
+            fatherName: p.supplierFatherName || p.supplierDetails?.fatherName || '',
+            address: p.supplierAddress || p.supplierDetails?.address || '',
             contact: '',
         });
         form.setBankDetails({
-            acNo: payment.bankAcNo || '',
-            ifscCode: payment.bankIfsc || '',
-            bank: payment.bankName || '',
-            branch: payment.bankBranch || '',
+            acNo: p.bankAcNo || p.bankDetails?.acNo || '',
+            ifscCode: p.bankIfsc || p.bankDetails?.ifscCode || '',
+            bank: p.bankName || p.bankDetails?.bank || '',
+            branch: p.bankBranch || p.bankDetails?.branch || '',
         });
         if (payment.date) {
             form.setPaymentDate(new Date(payment.date));

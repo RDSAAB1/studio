@@ -54,7 +54,7 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
         };
     }, []);
 
-    // Load directly from IndexedDB
+    // Load from IndexedDB payments table - filter by receiptType Gov (single collection for all payments)
     useEffect(() => {
         const loadGovPayments = async () => {
             try {
@@ -68,42 +68,23 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                     return;
                 }
                 
-                if (!db.governmentFinalizedPayments) {
-                    const errorMsg = 'governmentFinalizedPayments table not found';
-                    setError(errorMsg);
-                    setIsLoading(false);
-                    return;
-                }
-                
                 setError(null);
                 
-                // Get counts from all tables
-                const govCount = await db.governmentFinalizedPayments.count();
-                const regularCount = await db.payments.count();
-                const customerCount = await (db as any).customerPayments?.count() || 0;
-                
-                // Load ALL payments from governmentFinalizedPayments table - NO FILTERING
-                // Show all entries regardless of any conditions
-                // Sort by ID only in component (not by date, not in IndexedDB query)
+                // Load from payments table, filter by receiptType Gov
                 let payments: Payment[] = [];
                 try {
-                    // Get all without any ordering - we'll sort by ID in component
-                    payments = await db.governmentFinalizedPayments.toArray();
+                    const allPayments = await db.payments.toArray();
+                    const isGov = (p: Payment) => {
+                        const rt = String((p.receiptType || '')).trim().toLowerCase();
+                        return rt === 'gov.' || rt === 'gov' || rt.startsWith('gov') ||
+                            ((p as any).govQuantity != null || (p as any).govRate != null || (p as any).govAmount != null);
+                    };
+                    payments = allPayments.filter(isGov).map(p => ({ ...p, receiptType: 'Gov.' as const })) as Payment[];
                 } catch (error) {
                     payments = [];
                 }
                 
-                if (payments.length === 0) {
-                }
-                
-                // Show ALL payments from governmentFinalizedPayments - NO FILTERING
-                // Force set receiptType for all payments
-                const paymentsWithType = payments.map(p => ({
-                    ...p,
-                    receiptType: 'Gov.' as const
-                })) as Payment[];
-                
-                setGovPayments(paymentsWithType);
+                setGovPayments(payments);
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : 'Unknown error loading gov payments';
                 setError(errorMsg);

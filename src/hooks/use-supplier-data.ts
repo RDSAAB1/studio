@@ -172,40 +172,66 @@ export const useSupplierData = () => {
                 let totalCdForEntry = 0;
                 let totalGovExtraForEntry = 0;
                 let totalExtraForEntry = 0;
-                const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string }> = [];
+                const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string; drCr?: string }> = [];
 
                 // Simply sum all amounts directly from database without any calculation or normalization
                 paymentsForThisEntry.forEach(p => {
                     const paidForThisDetail = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
                     const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
                     const paidForExtraForThisEntry = Number((paidForThisDetail as any)?.extraAmount || 0);
+                    const amountAbs = Math.abs(Number((p as any).amount || 0));
+                    const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+                    const isLedger = receiptType === 'ledger';
+                    const isLedgerCredit = isLedger && (drCrLower === 'credit' || Number((p as any).amount || 0) < 0);
+
+                    const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+                    const parchiTokens = parchiNoRaw
+                        .split(/[,\s]+/g)
+                        .map(t => t.trim())
+                        .filter(Boolean);
+                    const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
+
+                    // Legacy/unlinked ledger payments: paidFor empty but parchiNo has SR# list.
+                    // Ledger concept: Debit = payment (Paid/Expense), Credit = charge (Extra/Income).
+                    if (isLedger && !paidForThisDetail && parchiMatch && amountAbs > 0) {
+                        const share =
+                            parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
+                        if (isLedgerCredit) totalExtraForEntry += share;
+                        else totalPaidForEntry += share;
+                        paymentBreakdown.push({
+                            paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
+                            amount: share,
+                            cdAmount: 0,
+                            receiptType: p.receiptType,
+                            date: p.date,
+                            drCr: (p as any).drCr,
+                        });
+                        return;
+                    }
+
+                    // Online payment-level extra (when not stored per paidFor)
                     const paymentLevelExtraRawFromFields =
                         (Number((p as any).extraAmount) || 0) + (Number((p as any).advanceAmount) || 0);
-                    const ledgerAmountFallback =
-                        receiptType === 'ledger' &&
-                        (p.paidFor?.length || 0) === 0 &&
-                        paymentLevelExtraRawFromFields === 0
-                            ? Math.abs(Number((p as any).amount || 0))
-                            : 0;
-                    const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
-                    const paymentLevelExtraSign =
-                        receiptType === 'ledger' && String((p as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
-                    const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
                     const shouldAttachPaymentLevelExtra =
-                        paymentLevelExtraRaw !== 0 &&
-                        (receiptType === 'ledger' || receiptType === 'online') &&
-                        String((p as any).parchiNo || '').trim().toLowerCase() === entrySrNo &&
+                        paymentLevelExtraRawFromFields !== 0 &&
+                        receiptType === 'online' &&
+                        parchiMatch &&
                         paidForExtraForThisEntry === 0;
 
                     if (shouldAttachPaymentLevelExtra) {
-                        totalExtraForEntry += paymentLevelExtra;
+                        totalExtraForEntry += paymentLevelExtraRawFromFields;
                     }
 
                     if (!paidForThisDetail) return;
                 
                     // Direct database value - no calculation
                     const paidAmount = Number(paidForThisDetail.amount || 0);
-                    totalPaidForEntry += paidAmount;
+                    // Ledger: Debit = payment => paid; Credit = charge => extra (amount side)
+                    if (receiptType === 'ledger' && isLedgerCredit) {
+                        totalExtraForEntry += paidAmount;
+                    } else {
+                        totalPaidForEntry += paidAmount;
+                    }
 
                     if (paidForExtraForThisEntry > 0) {
                         totalGovExtraForEntry += paidForExtraForThisEntry;
@@ -235,6 +261,7 @@ export const useSupplierData = () => {
                         cdAmount: Math.round(cdForThisDetail * 100) / 100,
                         receiptType: p.receiptType,
                         date: p.date,
+                        drCr: (p as any).drCr,
                     });
                 });
 
@@ -309,12 +336,14 @@ export const useSupplierData = () => {
         data.totalCashPaid = (data.allPayments || []).reduce((sum, p) => {
             const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
             if (receiptType !== 'cash') return sum;
+            if ((p as any).bankAccountId === 'Adjustment') return sum; // Adjustment: no real cash movement
             const linkedPaid = p.paidFor?.reduce((innerSum: number, pf: any) => innerSum + Number(pf.amount || 0), 0) || 0;
             return sum + linkedPaid;
         }, 0);
         data.totalRtgsPaid = (data.allPayments || []).reduce((sum, p) => {
             const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
             if (receiptType !== 'rtgs') return sum;
+            if ((p as any).bankAccountId === 'Adjustment') return sum; // Adjustment: no bank movement
             const linkedPaid = p.paidFor?.reduce((innerSum: number, pf: any) => innerSum + Number(pf.amount || 0), 0) || 0;
             return sum + linkedPaid;
         }, 0);

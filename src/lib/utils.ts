@@ -422,9 +422,18 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         }
     }
 
+    // CD is per-payment: ek payment par CD kati, doosri par nahi — CD sirf us amount ki hai jis par kati. So per payment: totalPaid += paidFor.amount, totalCd += paidFor.cdAmount (jahan CD kati wahi payment me cdAmount > 0).
     const paymentsForThisEntry = (paymentHistory || []).filter((p: SupplierPayment | CustomerPayment) => p.paidFor?.some((pf: PaidFor) => pf.srNo === values.srNo));
-    const totalPaid = paymentsForThisEntry.reduce((acc: number, p: SupplierPayment | CustomerPayment) => acc + p.amount, 0);
-    const netAmount = originalNetAmount - totalPaid;
+    let totalPaid = 0;
+    let totalCd = 0;
+    paymentsForThisEntry.forEach((p: SupplierPayment | CustomerPayment) => {
+        const pf = p.paidFor?.find((f: PaidFor) => f.srNo === values.srNo);
+        if (pf) {
+            totalPaid += Number(pf.amount || 0);
+            totalCd += Number((pf as any).cdAmount ?? 0);
+        }
+    });
+    const netAmount = originalNetAmount - totalPaid - totalCd;
 
     let entryDate: Date;
     if (values.date) {

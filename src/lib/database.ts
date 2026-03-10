@@ -6,12 +6,19 @@ import { logError } from './error-logger';
 import { firestoreDB } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { chunkedBulkPut } from './chunked-operations';
-import { getTenantCollectionPath } from './tenancy';
+import { getTenantCollectionPath, getStorageKeySuffix } from './tenancy';
 
 // Helper function to handle errors silently (for sync fallback scenarios)
 function handleSilentError(error: unknown, context: string): void {
   // Log error using error logging service
   logError(error, context, 'low');
+}
+
+/** Get lastSync localStorage key with tenant suffix so data is never mixed across companies */
+export function getLastSyncKey(collectionName: string): string {
+  if (typeof window === 'undefined') return `lastSync:${collectionName}`;
+  const suffix = getStorageKeySuffix();
+  return `lastSync:${collectionName}${suffix ? `_${suffix}` : ''}`;
 }
 
 export class AppDatabase extends Dexie {
@@ -45,8 +52,8 @@ export class AppDatabase extends Dexie {
     customerDocuments!: Table<CustomerDocument>; // Added
     accounts!: Table<Account>; // Added
 
-    constructor() {
-        super('bizsuiteDB_v2');
+    constructor(dbName?: string) {
+        super(dbName || 'bizsuiteDB_v2');
         this.version(1).stores({
             suppliers: '&id, &srNo, name, contact, date, customerId',
             customers: '++id, &srNo, name, contact, date, customerId',
@@ -230,13 +237,58 @@ export class AppDatabase extends Dexie {
     }
 }
 
-// Conditionally create the database instance only on the client-side
-let db: AppDatabase;
-if (typeof window !== 'undefined') {
-  db = new AppDatabase();
+// Per-company/tenant IndexedDB: each context gets its own DB so data stays local and we don't re-fetch from Firebase on next visit.
+function getDbName(): string {
+  const suffix = getStorageKeySuffix();
+  return suffix ? `bizsuiteDB_v2_${suffix}` : 'bizsuiteDB_v2';
 }
 
-// Export the db instance. It will be undefined on the server.
+let dbInstance: AppDatabase | null = null;
+let lastDbName = '';
+
+export function getDb(): AppDatabase {
+  if (typeof window === 'undefined') {
+    throw new Error('Database is only available on the client');
+  }
+  const name = getDbName();
+  if (dbInstance && lastDbName === name) return dbInstance;
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {}
+    dbInstance = null;
+  }
+  lastDbName = name;
+  dbInstance = new AppDatabase(name);
+  return dbInstance;
+}
+
+// Invalidate DB reference when company/tenant changes so next access opens the new context's DB.
+if (typeof window !== 'undefined') {
+  const invalidateDb = () => {
+    if (dbInstance) {
+      try {
+        dbInstance.close();
+      } catch {}
+      dbInstance = null;
+      lastDbName = '';
+    }
+  };
+  window.addEventListener('erp:selection-changed', invalidateDb);
+  window.addEventListener('tenant:changed', invalidateDb);
+}
+
+// Proxy so existing code using `db` always gets the current context's database.
+const dbProxy = typeof window !== 'undefined'
+  ? new Proxy({} as AppDatabase, {
+      get(_, prop) {
+        return (getDb() as Record<string, unknown>)[prop as string];
+      },
+    })
+  : (undefined as unknown as AppDatabase);
+
+// Export the db instance. Server gets undefined; client gets proxy to current context DB.
+const db = dbProxy;
 export { db };
 
 
@@ -753,12 +805,12 @@ export async function syncAllDataWithDetails(
   // Note: incomes and expenses are already handled in the main loop above
   // No need to add them again here - they're already in allCollectionConfigs
 
-  // Update lastSync times
+  // Update lastSync times (per-tenant keys)
   if (typeof window !== 'undefined') {
     const now = Date.now();
     collections.forEach(col => {
       if (col.status === 'success') {
-        localStorage.setItem(`lastSync:${col.collectionName}`, String(now));
+        localStorage.setItem(getLastSyncKey(col.collectionName), String(now));
       }
     });
   }
@@ -773,24 +825,10 @@ export async function hardSyncAllData() {
     
     try {
 
-        // ✅ Clear all lastSync times to force full sync on next realtime listener update
+        // ✅ Clear all lastSync times to force full sync on next realtime listener update (per-tenant keys)
         if (typeof window !== 'undefined') {
-            const syncKeys = [
-                'lastSync:suppliers',
-                'lastSync:customers',
-                'lastSync:payments',
-                'lastSync:customerPayments',
-                'lastSync:incomes',
-                'lastSync:expenses',
-                'lastSync:projects',
-                'lastSync:loans',
-                'lastSync:fundTransactions',
-                'lastSync:incomeCategories',
-                'lastSync:expenseCategories',
-                'lastSync:manufacturingCosting',
-            ];
-            syncKeys.forEach(key => localStorage.removeItem(key));
-
+            const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'projects', 'loans', 'fundTransactions', 'incomeCategories', 'expenseCategories', 'manufacturingCosting'];
+            collections.forEach(col => localStorage.removeItem(getLastSyncKey(col)));
         }
         
         // ✅ Fetch all data from Firestore in parallel
@@ -858,18 +896,12 @@ export async function hardSyncAllData() {
             }
         });
         
-        // ✅ Update lastSync times after successful sync
+        // ✅ Update lastSync times after successful sync (per-tenant keys)
         if (typeof window !== 'undefined') {
             const now = Date.now();
-            localStorage.setItem('lastSync:suppliers', String(now));
-            localStorage.setItem('lastSync:customers', String(now));
-            localStorage.setItem('lastSync:payments', String(now));
-            localStorage.setItem('lastSync:customerPayments', String(now));
-            localStorage.setItem('lastSync:incomes', String(now));
-            localStorage.setItem('lastSync:expenses', String(now));
-            localStorage.setItem('lastSync:manufacturingCosting', String(now));
-            localStorage.setItem('lastSync:incomeCategories', String(now));
-            localStorage.setItem('lastSync:expenseCategories', String(now));
+            ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'manufacturingCosting', 'incomeCategories', 'expenseCategories'].forEach(col => {
+                localStorage.setItem(getLastSyncKey(col), String(now));
+            });
         }
 
     } catch (e) {
@@ -880,11 +912,13 @@ export async function hardSyncAllData() {
 
 export async function ensureFirstFullSync() {
     if (typeof window === 'undefined') return;
-    const flag = localStorage.getItem('firstFullSyncDone');
+    const suffix = getStorageKeySuffix();
+    const flagKey = `firstFullSyncDone${suffix ? `_${suffix}` : ''}`;
+    const flag = localStorage.getItem(flagKey);
     if (flag === 'true') return;
     await hardSyncAllData();
-    localStorage.setItem('firstFullSyncDone', 'true');
-    localStorage.setItem('firstFullSyncAt', String(Date.now()));
+    localStorage.setItem(flagKey, 'true');
+    localStorage.setItem(`firstFullSyncAt${suffix ? `_${suffix}` : ''}`, String(Date.now()));
 }
 
 export interface SyncCountRow {

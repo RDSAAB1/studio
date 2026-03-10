@@ -12,6 +12,7 @@ import { format, parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { generateStatement, generateStatementAsync, type StatementData } from '../utils/statement-generator';
+import { SupplierSummaryCards } from '@/components/sales/supplier-payments/supplier-summary-cards';
 
 
 
@@ -112,8 +113,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 <head>
                     <title>Statement - ${deferredData?.name || ''}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        @page { margin: 10mm 8mm; }
+                        body { font-family: Arial, sans-serif; margin: 8px 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         th, td { border: 1px solid #999; padding: 6px; text-align: left; }
                         th { background-color: #e5e5e5 !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         thead tr { background-color: #e5e5e5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -132,13 +134,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         .preview-toolbar button.secondary:hover { background-color: #d1d5db; opacity: 1; }
                         @media print {
                             .preview-toolbar { display: none !important; }
-                            th, td { border: 1px solid #999 !important; font-size: 12px !important; padding: 1px 2px !important; line-height: 1.15 !important; }
+                            th, td { border: 1px solid #999 !important; font-size: 14px !important; padding: 3px 5px !important; line-height: 1.25 !important; color: #222222 !important; }
                             table { border: 1px solid #999 !important; }
-                            .statement-table th, .statement-table td { font-size: 11px !important; padding: 1px 2px !important; line-height: 1.15 !important; border: 1px solid #999 !important; }
-                            .particulars-column { width: 30% !important; font-size: 11px !important; line-height: 1.1 !important; }
-                            .hidden-table-container td { font-size: 11px !important; line-height: 1.1 !important; }
-                            .amount-columns { width: 17.5% !important; font-size: 11px !important; }
-                            .date-column { width: 17.5% !important; font-size: 11px !important; }
+                            .statement-table th, .statement-table td { font-size: 13px !important; padding: 3px 5px !important; line-height: 1.25 !important; border: 1px solid #999 !important; }
+                            .particulars-column { width: 30% !important; font-size: 13px !important; line-height: 1.25 !important; }
+                            .hidden-table-container td { font-size: 13px !important; line-height: 1.25 !important; }
+                            .amount-columns { width: 17.5% !important; font-size: 13px !important; }
+                            .date-column { width: 17.5% !important; font-size: 13px !important; }
                             .grid { display: grid !important; }
                             .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
                             .gap-4 { gap: 1rem !important; }
@@ -183,6 +185,85 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             hr { border: 1px solid #000 !important; }
                             .text-left { text-align: left !important; }
                             .header { text-align: left !important; }
+
+                            /* Dashboard summary (SupplierSummaryCards - print layout) */
+                            /* Flattened, professional summary block for print */
+                            .supplier-summary-dashboard-root {
+                                background-color: #ffffff !important;
+                                border-radius: 0.3rem !important;
+                                padding: 4px 4px 2px 4px !important;
+                                margin-bottom: 6px !important;
+                                border: none !important;
+                            }
+                            .supplier-summary-dashboard-top,
+                            .supplier-summary-dashboard-middle,
+                            .supplier-summary-dashboard-bottom {
+                                display: grid !important;
+                                gap: 0.5rem !important;
+                            }
+                            .supplier-summary-dashboard-top {
+                                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                            }
+                            .supplier-summary-dashboard-middle,
+                            .supplier-summary-dashboard-bottom {
+                                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                            }
+                            .supplier-summary-dashboard-card {
+                                border-radius: 0.25rem !important;
+                                border: none !important;
+                                padding: 2px 4px !important;
+                                background-color: transparent !important;
+                                box-shadow: none !important;
+                            }
+
+                            /* Top metric row: add subtle bottom border */
+                            .supplier-summary-dashboard-top .supplier-summary-dashboard-card {
+                                border-bottom: 1px solid #e5e7eb !important;
+                            }
+
+                            /* Compact typography for summary (print-only) */
+                            .supplier-summary-dashboard-root .text-base {
+                                font-size: 9px !important;
+                                line-height: 1.2 !important;
+                            }
+                            .supplier-summary-dashboard-root .text-[10px] {
+                                font-size: 7px !important;
+                                line-height: 1.2 !important;
+                            }
+
+                            /* Soften summary colours / weights for cleaner look */
+                            .supplier-summary-dashboard-root .text-slate-900 {
+                                color: #222222 !important;
+                                font-weight: 500 !important;
+                            }
+                            .supplier-summary-dashboard-root .text-slate-800,
+                            .supplier-summary-dashboard-root .text-slate-700,
+                            .supplier-summary-dashboard-root .text-slate-600 {
+                                color: #666666 !important;
+                                font-weight: 500 !important;
+                            }
+                            .supplier-summary-dashboard-root .font-bold {
+                                font-weight: 600 !important;
+                            }
+                            .supplier-summary-dashboard-root .font-semibold {
+                                font-weight: 500 !important;
+                            }
+
+                            /* Top 4 KPI cards – larger amount text for print */
+                            .supplier-summary-dashboard-top .text-base {
+                                font-size: 16px !important;
+                                font-weight: 700 !important;
+                                color: #111111 !important;
+                                line-height: 1.25 !important;
+                            }
+                            .supplier-summary-dashboard-top .text-[10px] {
+                                font-size: 10px !important;
+                                font-weight: 500 !important;
+                            }
+
+                            .header {
+                                margin-bottom: 0.5rem !important;
+                            }
                         }
                     </style>
                 </head>
@@ -299,7 +380,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
 
-                <h2 className="text-xl font-bold">Statement Preview</h2>
+                <h2 className="text-xl font-bold">Overall Statement</h2>
 
                 <div className="flex items-center gap-2">
 
@@ -479,259 +560,45 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                 `}</style>
 
-                <div className="header mb-6 text-left">
-
+                <div className="header mb-4 text-left">
                     <h1 className="text-2xl font-bold text-left">Account Statement</h1>
-
                     <p className="text-lg text-left">Customer: {deferredData?.name || ''}</p>
-
                     <p className="text-left">Contact: {deferredData?.contact || 'N/A'}</p>
-
                     <p className="text-left">Address: {deferredData?.address || 'N/A'}</p>
-
                 </div>
 
-
-
-                {/* Summary Cards */}
-
-                <div className="grid grid-cols-3 gap-4 mb-6">
-
-                    {/* Operational Summary */}
-
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2">
-
-                        <h3 className="text-sm font-semibold text-blue-400 mb-1.5">Operational Summary</h3>
-
-                        <div className="space-y-0.5 text-xs">
-
-                            <div className="flex justify-between">
-
-                                <span>Gross Wt:</span>
-
-                                <span className="font-medium">{deferredData?.totalGrossWeight?.toFixed(2) || '0.00'} kg</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Tier Wt:</span>
-
-                                <span className="font-medium">{deferredData?.totalTeirWeight?.toFixed(2) || '0.00'} kg</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Final Wt:</span>
-
-                                <span className="font-medium">{deferredData?.totalFinalWeight?.toFixed(2) || '0.00'} kg</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Karta Wt (@1.00%):</span>
-
-                                <span className="font-medium">{deferredData?.totalKartaWeight?.toFixed(2) || '0.00'} kg</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Net Wt:</span>
-
-                                <span className="font-medium">{deferredData?.totalNetWeight?.toFixed(2) || '0.00'} kg</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Average Rate:</span>
-
-                                <span className="font-medium">{formatRate(deferredData?.averageRate)}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Min Rate:</span>
-
-                                <span className="font-medium">₹{deferredData?.minRate?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Max Rate:</span>
-
-                                <span className="font-medium">₹{deferredData?.maxRate?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Transactions:</span>
-
-                                <span className="font-medium">{deferredData?.totalTransactions || 0} Entries</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Outstanding Entries:</span>
-
-                                <span className="font-medium">{deferredData?.outstandingEntryIds?.length || 0} Entries</span>
-
-                            </div>
-
-                        </div>
-
+                {/* New dashboard-style summary (same as Unified Payments screen) */}
+                {deferredData && (
+                    <div className="mb-6">
+                        <SupplierSummaryCards
+                            summary={deferredData as any}
+                            variant="dashboard"
+                            type="supplier"
+                        />
                     </div>
-
-
-
-                    {/* Deduction Summary */}
-
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2">
-
-                        <h3 className="text-sm font-semibold text-red-400 mb-1.5">Deduction Summary</h3>
-
-                        <div className="space-y-0.5 text-xs">
-
-                            <div className="flex justify-between">
-
-                                <span>Total Amount (@{formatRate(deferredData?.averageRate)}/kg):</span>
-
-                                <span className="font-medium">₹{deferredData?.totalAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Karta Amt (@{deferredData?.averageKartaPercentage?.toFixed(2) || '0.00'}%):</span>
-
-                                <span className="font-medium text-red-600">- ₹{deferredData?.totalKartaAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Laboury Amt (@{deferredData?.averageLabouryRate?.toFixed(2) || '0.00'}):</span>
-
-                                <span className="font-medium text-red-600">- ₹{deferredData?.totalLabouryAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Kanta:</span>
-
-                                <span className="font-medium text-red-600">- ₹{deferredData?.totalKanta?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Brokerage Amt:</span>
-
-                                <span className="font-medium text-red-600">- ₹{deferredData?.totalBrokerage?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <hr className="my-2" />
-
-                            <div className="flex justify-between font-semibold">
-
-                                <span>Total Original Amount:</span>
-
-                                <span className="font-bold text-sm">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-
-                    {/* Financial Summary */}
-
-                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2">
-
-                        <h3 className="text-sm font-semibold text-green-400 mb-1.5">Financial Summary</h3>
-
-                        <div className="space-y-0.5 text-xs">
-
-                            <div className="flex justify-between">
-
-                                <span>Total Net Payable:</span>
-
-                                <span className="font-medium">₹{deferredData?.totalOriginalAmount?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total Cash Paid:</span>
-
-                                <span className="font-medium text-green-600">₹{statementTotals.totalCashPaid?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total RTGS Paid:</span>
-
-                                <span className="font-medium text-green-600">₹{statementTotals.totalRtgsPaid?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <div className="flex justify-between">
-
-                                <span>Total CD Granted:</span>
-
-                                <span className="font-medium text-blue-600">₹{statementTotals.totalCd?.toLocaleString() || '0'}</span>
-
-                            </div>
-
-                            <hr className="my-2" />
-
-                            <div className="flex justify-between font-semibold">
-
-                                <span>Outstanding:</span>
-
-                                <span className="font-bold text-sm text-red-400">₹{statementOutstanding.toLocaleString()}</span>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
+                )}
 
 
 
                 <div className="w-full">
                 <div className="max-h-[600px] overflow-auto">
-                <table className="statement-table min-w-[1100px] border-collapse border-2 border-border text-xs leading-tight text-foreground">
+                <table className="statement-table min-w-[1100px] border-collapse border-2 border-border text-sm leading-tight text-foreground">
 
                     <thead>
 
                         <tr className="bg-muted leading-tight">
 
-                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-[11px] leading-tight w-[12%]">Date</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[12%]">Date</th>
 
-                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-[11px] leading-tight w-[40%]">Particulars</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[40%]">Particulars</th>
 
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Debit</th>
 
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Paid</th>
 
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-[11px] leading-tight">CD</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">CD</th>
 
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-[11px] leading-tight">Balance</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Balance</th>
 
                         </tr>
 
@@ -747,13 +614,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                 <tr key={index} className={`hover:bg-muted/50 ${index % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-[10px] leading-tight date-column text-blue-400 font-semibold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight date-column text-blue-400 font-semibold">
 
                                         {transaction.displayDate ?? formatDisplayDate(transaction.date, (transaction as any).referenceDate)}
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-[11px] leading-tight particulars-column w-[40%] text-foreground">
+                                    <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight particulars-column w-[40%] text-foreground">
 
                                         <div className="hidden-table-container">
 
@@ -775,25 +642,25 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-red-400 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-red-400 font-bold">
 
                                         {transaction.debit > 0 ? formatCurrency(transaction.debit) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-green-400 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-green-400 font-bold">
 
                                         {transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight amount-columns text-purple-400 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-purple-400 font-bold">
 
                                         {transaction.creditCd > 0 ? formatCurrency(transaction.creditCd) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight font-bold amount-columns text-orange-400">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-bold amount-columns text-orange-400">
 
                                         {formatCurrency(balance)}
 
@@ -811,25 +678,31 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
                         <tr className="bg-muted font-bold">
 
-                            <td className="border-2 border-border px-1 py-0.5 text-[10px] leading-tight text-foreground font-extrabold" colSpan={3}>
+                            <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight text-foreground font-extrabold" colSpan={2}>
 
                                 TOTALS
 
                             </td>
 
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold text-red-400">
+
+                                {formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))}
+
+                            </td>
+
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}
 
                             </td>
 
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}
 
                             </td>
 
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-[10px] leading-tight text-foreground font-extrabold">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
 
                                 {formatCurrency(statementOutstanding)}
 

@@ -100,9 +100,9 @@ export const usePaymentCombination = ({
             // Calculate max multiplier k such that k * step <= idealQ
             const maxK = Math.floor(idealQ / effectiveQtyStep);
             
-            // Check a range of k values downwards from maxK to find valid combinations
-            // Limit to top 50 closest matches per rate to ensure performance
-            const checks = 50;
+            // Check a wider range of k values downwards from maxK to find valid combinations
+            // Increased window so we can generate many more combinations (up to ~500+ overall)
+            const checks = 400;
             const startK = Math.max(1, maxK);
             const endK = Math.max(1, maxK - checks);
             
@@ -189,11 +189,10 @@ export const usePaymentCombination = ({
         });
 
         // Take top combinations sorted by priority
-        // Increase limit to show more options
-        const targetTotal = 2000; // Increased from 500 to 2000 for more options
+        // UI expectation: show up to ~500 best combinations
+        const targetTotal = 500;
         
-        // If we have enough options, take top 2000
-        // If less than 2000, take all available
+        // If we have enough options, take top N; otherwise take all available
         const limitedOptions = sortedOptions.length >= targetTotal 
             ? sortedOptions.slice(0, targetTotal)
             : sortedOptions;

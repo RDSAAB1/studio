@@ -17,6 +17,7 @@ import {
     refreshTenantFirestoreBindings
 } from "@/lib/firestore";
 import { db } from "@/lib/database";
+import { logError } from "@/lib/error-logger";
 import type { 
     Customer, 
     Payment, 
@@ -90,46 +91,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const mergePayments = (regular: Payment[], gov: Payment[]) => {
-            const uniquePayments = new Map<string, Payment>();
-
-            const getPaymentKey = (p: Payment) => {
-                const key = String((p as any).paymentId || (p as any).id || '').trim();
-                return key || null;
-            };
-
-            const getPaymentTime = (p: Payment) => {
-                const updatedAt = (p as any).updatedAt;
-                const updatedAtMs =
-                    updatedAt && typeof updatedAt === 'object' && typeof (updatedAt as any).toMillis === 'function'
-                        ? (updatedAt as any).toMillis()
-                        : (updatedAt ? new Date(updatedAt as any).getTime() : 0);
-                const dateMs = p.date ? new Date(p.date).getTime() : 0;
-                return Math.max(updatedAtMs || 0, dateMs || 0);
-            };
-
-            [...regular, ...gov].forEach((p) => {
-                const key = getPaymentKey(p);
-                if (!key) return;
-
-                const existing = uniquePayments.get(key);
-                if (!existing) {
-                    uniquePayments.set(key, p);
-                    return;
-                }
-
-                if (getPaymentTime(p) >= getPaymentTime(existing)) {
-                    uniquePayments.set(key, p);
-                }
-            });
-
-            return Array.from(uniquePayments.values()).sort((a, b) => {
-                const dateA = a.date ? new Date(a.date).getTime() : 0;
-                const dateB = b.date ? new Date(b.date).getTime() : 0;
-                return dateB - dateA;
-            });
-        };
-
         const refresh = async (collection: string) => {
             if (!db) return;
 
@@ -152,12 +113,41 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             }
 
             if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
-                const regularPayments = await db.payments.orderBy('date').reverse().toArray();
-                const govPayments = (await db.governmentFinalizedPayments.orderBy('date').reverse().toArray()).map((p: any) => ({
-                    ...p,
-                    receiptType: 'Gov.',
-                })) as Payment[];
-                updateState(setSupplierPayments, mergePayments(regularPayments as Payment[], govPayments));
+                const payments = await db.payments.orderBy('date').reverse().toArray();
+                updateState(setSupplierPayments, payments as Payment[]);
+                return;
+            }
+
+            if (collection === 'banks') {
+                const data = await db.banks.toArray();
+                updateState(setBanks, data);
+                return;
+            }
+            if (collection === 'bankBranches') {
+                const data = await db.bankBranches.toArray();
+                updateState(setBankBranches, data);
+                return;
+            }
+            if (collection === 'bankAccounts') {
+                const data = await db.bankAccounts.toArray();
+                updateState(setBankAccounts, data);
+                return;
+            }
+            if (collection === 'fundTransactions') {
+                const data = await db.fundTransactions.orderBy('date').reverse().toArray();
+                updateState(setFundTransactions, data);
+                return;
+            }
+            if (collection === 'incomes' && db.transactions) {
+                const data = await db.transactions.where('type').equals('Income').toArray();
+                data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setIncomes, data);
+                return;
+            }
+            if (collection === 'expenses' && db.transactions) {
+                const data = await db.transactions.where('type').equals('Expense').toArray();
+                data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setExpenses, data);
                 return;
             }
         };
@@ -204,12 +194,15 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     // ✅ CRITICAL: Re-setup listeners when company/tenant changes (erp:selection-changed) so we fetch correct company data
     useEffect(() => {
         let isSubscribed = true;
-        let unsubFunctions: Array<(() => void) | undefined> = [];
+        const unsubFunctions: Array<(() => void) | undefined> = [];
+        const staggerTimers: number[] = [];
         let supplierBankAccountsUnsub: (() => void) | undefined;
         
         const cleanupListeners = () => {
+            staggerTimers.forEach((t) => clearTimeout(t));
+            staggerTimers.length = 0;
             unsubFunctions.forEach((unsub) => { try { unsub?.(); } catch {} });
-            unsubFunctions = [];
+            unsubFunctions.length = 0;
         };
         
         const setupListeners = () => {
@@ -218,127 +211,37 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             // Cleanup existing listeners before re-setting up (needed when company changes)
             cleanupListeners();
             
-            // Setup all realtime listeners
-            unsubFunctions = [
-            // Supplier Entry Listeners
-            getSuppliersRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setSuppliers, data);
-                    }
-                },
-                (error) => {
-
+            // Collection name for IndexedDB refresh on fetch error (some map to same table)
+            const createErrorHandler = (collectionName: string) => (error: Error) => {
+                logError(error, `Data fetch failed: ${collectionName}`, 'medium', { collection: collectionName });
+                // Trigger IndexedDB refresh so user sees cached data if any
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                 }
-            ),
-            getPaymentsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setSupplierPayments, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
+            };
             
-            // Customer Entry Listeners
-            getCustomersRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setCustomers, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            getCustomerPaymentsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setCustomerPayments, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            
-            // Shared Listeners
-            getBanksRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setBanks, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            getBankBranchesRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setBankBranches, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            getBankAccountsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setBankAccounts, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            // ✅ OPTIMIZED: Defer supplierBankAccounts listener - only needed on supplier-bank-accounts page
-            // This prevents unnecessary data fetch when opening other pages like cash-bank
-            // Supplier bank accounts will be loaded lazily when actually needed
-            getFundTransactionsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setFundTransactions, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            getExpensesRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setExpenses, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
-            getIncomeRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setIncomes, data);
-                    }
-                },
-                (error) => {
-
-                }
-            ),
+            // Stagger listener setup (150ms apart) to reduce Firestore concurrency and avoid intermittent fetch failures
+            const listeners: Array<{ delay: number; setup: () => (() => void) | undefined }> = [
+                { delay: 0, setup: () => getSuppliersRealtime((d) => isSubscribed && updateState(setSuppliers, d), createErrorHandler('suppliers')) },
+                { delay: 150, setup: () => getPaymentsRealtime((d) => isSubscribed && updateState(setSupplierPayments, d), createErrorHandler('payments')) },
+                { delay: 300, setup: () => getCustomersRealtime((d) => isSubscribed && updateState(setCustomers, d), createErrorHandler('customers')) },
+                { delay: 450, setup: () => getCustomerPaymentsRealtime((d) => isSubscribed && updateState(setCustomerPayments, d), createErrorHandler('customerPayments')) },
+                { delay: 600, setup: () => getBanksRealtime((d) => isSubscribed && updateState(setBanks, d), createErrorHandler('banks')) },
+                { delay: 750, setup: () => getBankBranchesRealtime((d) => isSubscribed && updateState(setBankBranches, d), createErrorHandler('bankBranches')) },
+                { delay: 900, setup: () => getBankAccountsRealtime((d) => isSubscribed && updateState(setBankAccounts, d), createErrorHandler('bankAccounts')) },
+                { delay: 1050, setup: () => getFundTransactionsRealtime((d) => isSubscribed && updateState(setFundTransactions, d), createErrorHandler('fundTransactions')) },
+                { delay: 1200, setup: () => getExpensesRealtime((d) => isSubscribed && updateState(setExpenses, d), createErrorHandler('expenses')) },
+                { delay: 1350, setup: () => getIncomeRealtime((d) => isSubscribed && updateState(setIncomes, d), createErrorHandler('incomes')) },
             ];
+            
+            listeners.forEach(({ delay, setup }) => {
+                const timer = window.setTimeout(() => {
+                    if (!isSubscribed) return;
+                    const unsub = setup();
+                    if (unsub) unsubFunctions.push(unsub);
+                }, delay);
+                staggerTimers.push(timer);
+            });
             
             // ✅ OPTIMIZED: Defer receipt settings fetch (not critical for initialization)
             // Load receipt settings after a delay to avoid blocking
@@ -376,14 +279,14 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             setSupplierBankAccountsListenerSetup(true);
         };
         
-        // ✅ FIX: Defer listener setup to avoid blocking initialization
+        // Start listener setup soon so data fetch is reliable (retry inside listener handles transient failures)
         const runSetup = () => {
             if (isSubscribed) setupListeners();
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            (window as any).requestIdleCallback(runSetup, { timeout: 1000 });
+            (window as any).requestIdleCallback(runSetup, { timeout: 150 });
         } else {
-            setTimeout(runSetup, 100);
+            setTimeout(runSetup, 50);
         }
         
         // ✅ Re-setup listeners when company/tenant changes (skipReload case)
@@ -392,14 +295,22 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             refreshTenantFirestoreBindings();
             setupListeners();
         };
+        const onRefreshRequested = () => {
+            if (isSubscribed) {
+                refreshTenantFirestoreBindings();
+                setupListeners();
+            }
+        };
         if (typeof window !== 'undefined') {
             window.addEventListener('erp:selection-changed', onCompanyChanged);
+            window.addEventListener('data:refresh-requested', onRefreshRequested);
         }
         
         return () => {
             isSubscribed = false;
             if (typeof window !== 'undefined') {
                 window.removeEventListener('erp:selection-changed', onCompanyChanged);
+                window.removeEventListener('data:refresh-requested', onRefreshRequested);
             }
             cleanupListeners();
         };

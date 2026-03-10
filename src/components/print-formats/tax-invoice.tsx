@@ -146,15 +146,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     color: #000000 !important;
                     font-weight: 700 !important;
                 }
-                .printable-area .bg-gray-800,
-                .printable-area .bg-gray-800 *,
-                .printable-area .bg-gray-800 span,
-                .printable-area .print-bg-gray-800,
-                .printable-area .print-bg-gray-800 *,
-                .printable-area .print-bg-gray-800 span,
-                .printable-area div[style*="background-color: #1f2937"],
-                .printable-area div[style*="background-color: #1f2937"] *,
-                .printable-area div[style*="background-color: #1f2937"] span,
                 .printable-area .balance-due-section,
                 .printable-area .balance-due-section *,
                 .printable-area .balance-due-section span,
@@ -174,8 +165,16 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         color: #000 !important; 
                         border-color: #ccc !important;
                     }
-                    .print-bg-gray-800 {
-                        background-color: #f2f2f2 !important;
+                    .printable-area .balance-due-section,
+                    .printable-area .balance-due-section *,
+                    .printable-area .balance-due-section span {
+                        background-color: #000000 !important;
+                        color: #ffffff !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .print-bg-black {
+                        background-color: #000000 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
                     }
@@ -297,8 +296,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <div className="flex justify-between p-2 border-b border-gray-300" style={{ borderColor: '#cccccc' }}><span className="font-semibold" style={{ color: '#000000' }}>CGST ({taxRate/2}%):</span><span style={{ color: '#000000' }}>{formatCurrency(Math.round(cgstAmount))}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-300" style={{ borderColor: '#cccccc' }}><span className="font-semibold" style={{ color: '#000000' }}>SGST ({taxRate/2}%):</span><span style={{ color: '#000000' }}>{formatCurrency(Math.round(sgstAmount))}</span></div>
                          {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-300" style={{ borderColor: '#cccccc' }}><span className="font-semibold" style={{ color: '#000000' }}>Freight/Advance:</span><span style={{ color: '#000000' }}>{formatCurrency(advanceFreight)}</span></div>}
-                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800 balance-due-section" style={{ backgroundColor: '#1f2937' }}>
-                            <span className="balance-due-text" style={{ color: '#ffffff' }}>Balance Due:</span><span className="balance-due-text" style={{ color: '#ffffff' }}>{formatCurrency(Math.round(totalInvoiceValue))}</span>
+                        <div className="flex justify-between p-3 mt-1 bg-black text-white font-bold rounded-lg text-xl print-bg-black balance-due-section" style={{ backgroundColor: '#000000' }}>
+                            <span className="balance-due-text" style={{ color: '#ffffff' }}>Total Amount:</span><span className="balance-due-text" style={{ color: '#ffffff' }}>{formatCurrency(Math.round(totalInvoiceValue))}</span>
                         </div>
                     </div>
                 </div>

@@ -190,9 +190,8 @@ export default function CashBankClient() {
                             const customerPayments = await db.customerPayments.orderBy('date').reverse().toArray();
                             setCustomerPayments(customerPayments as CustomerPayment[]);
                         } else {
-                            const regularPayments = await db.payments.orderBy('date').reverse().toArray();
-                            const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
-                            setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
+                            const payments = await db.payments.orderBy('date').reverse().toArray();
+                            setSupplierPayments(payments as Payment[]);
                         }
                         // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically
                     } catch (error) {
@@ -214,9 +213,8 @@ export default function CashBankClient() {
                             const customerPayments = await db.customerPayments.orderBy('date').reverse().toArray();
                             setCustomerPayments(customerPayments as CustomerPayment[]);
                         } else {
-                            const regularPayments = await db.payments.orderBy('date').reverse().toArray();
-                            const govPayments = await db.governmentFinalizedPayments.orderBy('date').reverse().toArray();
-                            setSupplierPayments([...regularPayments, ...govPayments] as Payment[]);
+                            const payments = await db.payments.orderBy('date').reverse().toArray();
+                            setSupplierPayments(payments as Payment[]);
                         }
                         // ✅ OPTIMIZED: Removed refreshKey - useMemo will recalculate automatically
                     } catch (error) {

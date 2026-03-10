@@ -51,7 +51,12 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
         const filtered = (paymentHistory || []).filter(p => {
             const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            const parchiMatch = String((p as any).parchiNo || '').trim().toLowerCase() === targetSrNo;
+            const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+            const parchiTokens = parchiNoRaw
+                .split(/[,\s]+/g)
+                .map(t => t.trim())
+                .filter(Boolean);
+            const parchiMatch = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
             return Boolean(paidForMatch || parchiMatch);
         });
         return filtered.filter((p, index, self) => {
@@ -69,12 +74,34 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
         const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
         return paymentsForDetailsEntry.reduce((sum, p) => {
             const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            
-            if (!paidForThis) return sum;
+            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            const isLedger = receiptType === 'ledger';
+            const isLedgerCredit =
+                String((p as any).drCr || '').trim().toLowerCase() === 'credit' || Number((p as any).amount || 0) < 0;
 
-            // paidForThis.amount IS the actual paid amount (To Be Paid amount)
-            // This is the actual payment amount, NOT (To Be Paid - CD)
-            return sum + paidForThis.amount;
+            // Ledger: Debit (Expense) = payment → Total Paid mein; Credit (Income) mat jodo
+            if (paidForThis) {
+                if (isLedger && isLedgerCredit) return sum;
+                return sum + Number(paidForThis.amount || 0);
+            }
+
+            // Legacy/unlinked ledger: paidFor empty but parchiNo contains SR# list
+            if (isLedger) {
+                const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+                const parchiTokens = parchiNoRaw
+                    .split(/[,\s]+/g)
+                    .map(t => t.trim())
+                    .filter(Boolean);
+                const parchiMatch = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
+                if (parchiMatch && !isLedgerCredit) {
+                    const amountAbs = Math.abs(Number((p as any).amount || 0));
+                    const share =
+                        parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
+                    return sum + share;
+                }
+            }
+
+            return sum;
         }, 0);
     }, [paymentsForDetailsEntry, customer?.srNo]);
 
@@ -109,23 +136,39 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
             const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
             const paidForExtra = Number((paidForThis as any)?.extraAmount || 0);
             const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            const isLedger = receiptType === 'ledger';
+            const isLedgerCredit =
+                String((p as any).drCr || '').trim().toLowerCase() === 'credit' || Number((p as any).amount || 0) < 0;
+
+            const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+            const parchiTokens = parchiNoRaw
+                .split(/[,\s]+/g)
+                .map(t => t.trim())
+                .filter(Boolean);
+            const isPaymentAttachedToThisEntry = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
+
+            // Payment-level extra fields (Online extras) OR legacy/unlinked ledger Credit => charge (Income/Credit)
             const paymentLevelExtraRawFromFields =
                 Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
             const ledgerAmountFallback =
-                receiptType === 'ledger' &&
-                (p.paidFor?.length || 0) === 0 &&
-                paymentLevelExtraRawFromFields === 0
+                isLedger && (p.paidFor?.length || 0) === 0 && paymentLevelExtraRawFromFields === 0
                     ? Math.abs(Number((p as any).amount || 0))
                     : 0;
             const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
-            const paymentLevelExtraSign =
-                receiptType === 'ledger' && String((p as any).drCr || '').toLowerCase() === 'credit' ? -1 : 1;
-            const paymentLevelExtra = paymentLevelExtraRaw * paymentLevelExtraSign;
-            const isPaymentAttachedToThisEntry = String((p as any).parchiNo || '').trim().toLowerCase() === targetSrNo;
-            const includePaymentLevelExtra =
-                paidForExtra === 0 || !(receiptType === 'ledger' || receiptType === 'online');
+            const ledgerShare =
+                isLedger && isPaymentAttachedToThisEntry && ledgerAmountFallback > 0 && parchiTokens.length > 0
+                    ? Math.round((ledgerAmountFallback / parchiTokens.length) * 100) / 100
+                    : ledgerAmountFallback;
 
-            return sum + paidForExtra + (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0);
+            const includePaymentLevelExtra = paidForExtra === 0 || !(receiptType === 'ledger' || receiptType === 'online');
+            const paymentLevelExtra =
+                isPaymentAttachedToThisEntry && includePaymentLevelExtra
+                    ? (isLedger
+                          ? (isLedgerCredit ? (paymentLevelExtraRawFromFields + ledgerShare) : 0)
+                          : paymentLevelExtraRaw)
+                    : 0;
+
+            return sum + paidForExtra + paymentLevelExtra;
         }, 0);
     }, [paymentsForDetailsEntry, customer?.srNo]);
 
@@ -270,28 +313,39 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                 {totalExtraForThisEntry !== 0 ? (
                                     <>
                                         <div>
-                                            <p className="text-xs text-muted-foreground">Base Original Amount</p>
+                                            <p className="text-xs text-muted-foreground">Base Original (Income/Credit)</p>
                                             <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                         </div>
                                         <div className="flex items-center justify-center gap-2 text-teal-600">
-                                            <p className="text-xs font-medium">Extra Amount</p>
+                                            <p className="text-xs font-medium">Extra (Income/Credit)</p>
                                             <p className="text-sm font-bold font-mono">{formatCurrency(totalExtraForThisEntry)}</p>
                                         </div>
                                     </>
                                 ) : (
                                     <div>
-                                        <p className="text-xs text-muted-foreground">Base Original Amount</p>
+                                        <p className="text-xs text-muted-foreground">Base Original (Income/Credit)</p>
                                         <p className="text-lg font-semibold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                     </div>
                                 )}
                                 <Separator className="my-2"/>
                                 <div>
-                                    <p className="text-sm text-primary/80 font-medium">{isCustomer ? 'Adjusted Original Receivable' : 'Adjusted Original Payable'} Amount</p>
+                                    <p className="text-sm text-primary/80 font-medium">{isCustomer ? 'Adjusted Original Receivable' : 'Adjusted Original Payable'} (Income side)</p>
                                     <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(adjustedOriginal)}</p>
                                 </div>
                                 <Separator className="my-2"/>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <p className="text-muted-foreground">Paid (Expense/Debit)</p>
+                                        <p className="font-semibold font-mono text-slate-700">{formatCurrency(totalPaidForThisEntry)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-muted-foreground">CD (Expense/Debit)</p>
+                                        <p className="font-semibold font-mono text-slate-700">{formatCurrency(totalCdForThisEntry)}</p>
+                                    </div>
+                                </div>
+                                <Separator className="my-2"/>
                                 <div>
-                                    <p className="text-sm text-destructive font-medium">{isCustomer ? 'Final Receivable' : 'Final Outstanding'} Amount</p>
+                                    <p className="text-sm text-destructive font-medium">Outstanding (Net)</p>
                                     <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(finalOutstanding)}</p>
                                 </div>
                             </CardContent>

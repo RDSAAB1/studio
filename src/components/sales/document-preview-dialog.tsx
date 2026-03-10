@@ -443,7 +443,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                 #document-content .balance-due-section *,
                                 #document-content .balance-due-section span,
                                 #document-content .balance-due-text,
-                                #document-content span.balance-due-text {
+                                #document-content span.balance-due-text,
+                                #document-content .print-bg-black,
+                                #document-content .print-bg-black *,
+                                #document-content .print-bg-black span {
                                     color: #ffffff !important;
                                 }
                             `}</style>
@@ -472,13 +475,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                      </DialogHeader>
                     <ScrollArea className="flex-grow pr-3 -mr-3">
                         <div className="space-y-4">
-                            {documentType === 'tax-invoice' && (
                             <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3">
                                 <h3 className="text-base font-semibold">Tax & Invoice Info</h3>
                                     <div className="space-y-1"><Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label><Input id="hsnCode" name="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label><Input id="taxRate" name="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" /></div>
-                                    
-                                     <div className="flex items-center justify-center pt-2">
+                                    <div className="flex items-center justify-center pt-2">
                                         <button
                                             type="button"
                                             onClick={() => setInvoiceDetails({...invoiceDetails, isGstIncluded: !invoiceDetails.isGstIncluded})}
@@ -486,7 +487,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                                 "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                                 invoiceDetails.isGstIncluded ? 'bg-primary/20' : 'bg-secondary/20'
                                             )}
-                                            >
+                                        >
                                             <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", invoiceDetails.isGstIncluded ? 'text-primary' : 'text-muted-foreground')}>Included</span>
                                             <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !invoiceDetails.isGstIncluded ? 'text-primary' : 'text-muted-foreground')}>Excluded</span>
                                             <div
@@ -496,17 +497,16 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                                 )}
                                             >
                                                 <div className={cn(
-                                                        "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
-                                                        invoiceDetails.isGstIncluded ? 'bg-primary' : 'bg-secondary'
-                                                    )}>
+                                                    "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                                    invoiceDetails.isGstIncluded ? 'bg-primary' : 'bg-secondary'
+                                                )}>
                                                     <span className="text-sm font-bold text-primary-foreground">GST</span>
                                                 </div>
                                             </div>
                                         </button>
                                     </div>
                             </div>
-                            )}
-                             <div className="rounded-lg border border-border/50 bg-card p-3 grid grid-cols-2 gap-3">
+                            <div className="rounded-lg border border-border/50 bg-card p-3 grid grid-cols-2 gap-3">
                                 <h3 className="text-base font-semibold col-span-2">Additional Details</h3>
                                     <div className="space-y-1"><Label htmlFor="nineRNo" className="text-xs">9R No.</Label><Input id="nineRNo" name="nineRNo" value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label htmlFor="gatePassNo" className="text-xs">Gate Pass No.</Label><Input id="gatePassNo" name="gatePassNo" value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>

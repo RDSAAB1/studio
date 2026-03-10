@@ -169,16 +169,18 @@ export const TransactionTable = React.memo(
             ? "px-1 py-0.5 rounded-md text-[8px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
             : "px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200";
 
+        const isCustomer = type === 'customer';
         const tableColumnGroup = (
             <colgroup>
                 <col className="w-[4%]" />
-                <col className="w-[13%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
+                <col className={isCustomer ? "w-[11%]" : "w-[13%]"} />
+                <col className={isCustomer ? "w-[11%]" : "w-[12%]"} />
                 <col className="w-[13%]" />
                 <col className="w-[13%]" />
                 <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                {isCustomer && <col className="w-[10%]" />}
                 <col className="w-[6%]" />
             </colgroup>
         );
@@ -199,11 +201,12 @@ export const TransactionTable = React.memo(
                     </TableHead>
                     <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>Entry</TableHead>
                     <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>Date</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}>Original</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}>Extra</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}>Paid</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}>CD</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}>Outstanding</TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit – Total Amount">Original (Income)</TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit">Extra (Income)</TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit – Total Paid">Paid (Expense)</TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit">CD (Expense)</TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Net balance">Outstanding (Net)</TableHead>
+                    {isCustomer && <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Advance Freight taken (recover in payment)">Adv. Freight</TableHead>}
                     <TableHead className={`py-0 px-1 ${headCellBaseClass} text-center align-middle`}>Actions</TableHead>
                 </TableRow>
             </TableHeader>
@@ -336,13 +339,13 @@ export const TransactionTable = React.memo(
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                <div className={`${amountMainClass} font-semibold leading-tight text-slate-900`}>
-                                                    {formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}
+                                                <div className={`${amountMainClass} font-semibold leading-tight text-rose-700`}>
+                                                    - {formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                <div className={`${amountSubClass} font-semibold leading-tight text-slate-600`}>
-                                                    {formatCurrency((entry as any).totalCdForEntry || entry.totalCd || 0)}
+                                                <div className={`${amountSubClass} font-semibold leading-tight text-rose-700`}>
+                                                    - {formatCurrency((entry as any).totalCdForEntry || entry.totalCd || 0)}
                                                 </div>
                                             </TableCell>
                                             <TableCell
@@ -356,6 +359,13 @@ export const TransactionTable = React.memo(
                                             >
                                                 {formatCurrency(outstanding)}
                                             </TableCell>
+                                            {isCustomer && (
+                                                <TableCell className="text-right py-0 px-1.5 align-middle">
+                                                    <div className={`${amountSubClass} font-semibold leading-tight ${Number(entry.advanceFreight || 0) > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+                                                        {Number(entry.advanceFreight || 0) > 0 ? formatCurrency(Number(entry.advanceFreight)) : '-'}
+                                                    </div>
+                                                </TableCell>
+                                            )}
                                             <TableCell className="text-center py-0 px-1 align-middle">
                                                 <div className="flex items-center justify-center gap-1">
                                                     {onEditEntry && (
@@ -438,7 +448,7 @@ export const TransactionTable = React.memo(
                             })}
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="text-center py-1 h-6">
+                                    <TableCell colSpan={isCustomer ? 10 : 9} className="text-center py-1 h-6">
                                         <Loader2 className="h-3 w-3 animate-spin mx-auto inline-block" />
                                         <span className={`ml-1 ${compact ? "text-[9px]" : "text-[11px]"} text-muted-foreground`}>Loading more entries...</span>
                                     </TableCell>
@@ -446,14 +456,14 @@ export const TransactionTable = React.memo(
                             )}
                             {!hasMore && filteredSuppliers.length > 30 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className={`text-center py-0.5 ${compact ? "text-[9px]" : "text-[11px]"} text-muted-foreground h-6`}>
+                                    <TableCell colSpan={isCustomer ? 10 : 9} className={`text-center py-0.5 ${compact ? "text-[9px]" : "text-[11px]"} text-muted-foreground h-6`}>
                                         Showing all {filteredSuppliers.length} entries
                                     </TableCell>
                                 </TableRow>
                             )}
                             {filteredSuppliers.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className={`text-center text-muted-foreground h-12 ${compact ? "text-[9px]" : "text-[11px]"}`}>
+                                    <TableCell colSpan={isCustomer ? 10 : 9} className={`text-center text-muted-foreground h-12 ${compact ? "text-[9px]" : "text-[11px]"}`}>
                                         No {activeTab === "outstanding" ? "outstanding" : activeTab === "running" ? "running" : activeTab === "profitable" ? "profitable" : "paid"} transactions found.
                                     </TableCell>
                                 </TableRow>
@@ -518,13 +528,13 @@ export const TransactionTable = React.memo(
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                    <div className={`${amountMainClass} font-semibold leading-tight text-slate-900`}>
-                                                        {formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}
+                                                    <div className={`${amountMainClass} font-semibold leading-tight text-rose-700`}>
+                                                        - {formatCurrency((entry as any).totalPaidForEntry || entry.totalPaid || 0)}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                    <div className={`${amountSubClass} font-semibold leading-tight text-slate-600`}>
-                                                        {formatCurrency((entry as any).totalCdForEntry || entry.totalCd || 0)}
+                                                    <div className={`${amountSubClass} font-semibold leading-tight text-rose-700`}>
+                                                        - {formatCurrency((entry as any).totalCdForEntry || entry.totalCd || 0)}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell
@@ -538,6 +548,13 @@ export const TransactionTable = React.memo(
                                                 >
                                                     {formatCurrency(outstanding)}
                                                 </TableCell>
+                                                {isCustomer && (
+                                                    <TableCell className="text-right py-0 px-1.5 align-middle">
+                                                        <div className={`${amountSubClass} font-semibold leading-tight ${Number(entry.advanceFreight || 0) > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+                                                            {Number(entry.advanceFreight || 0) > 0 ? formatCurrency(Number(entry.advanceFreight)) : '-'}
+                                                        </div>
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="text-center py-0 px-1 align-middle">
                                                     <div className="flex items-center justify-center gap-1">
                                                         {onEditEntry && (
@@ -570,6 +587,11 @@ export const TransactionTable = React.memo(
                                                             ? format(new Date(payment.date), "dd-MMM-yy")
                                                             : 'N/A';
 
+                                                    const receiptTypeLower = String(payment.receiptType || "").trim().toLowerCase();
+                                                    const drCrLower = String((payment as any).drCr || "").trim().toLowerCase();
+                                                    const isLedger = receiptTypeLower === "ledger";
+                                                    const isLedgerCredit = isLedger && drCrLower === "credit";
+
                                                     return (
                                                         <TableRow key={`${entry.id}-payment-${idx}`} className="bg-slate-50/60">
                                                             <TableCell className="py-0 px-1 align-middle" />
@@ -588,16 +610,20 @@ export const TransactionTable = React.memo(
                                                                 <div className={`${amountMainClass} font-bold leading-tight text-slate-400`}>-</div>
                                                             </TableCell>
                                                             <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                                <div className={`${amountSubClass} font-semibold leading-tight text-slate-400`}>-</div>
-                                                            </TableCell>
-                                                            <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                                <div className={`${amountMainClass} font-semibold leading-tight text-slate-900`}>
-                                                                    {formatCurrency(payment.amount || 0)}
+                                                                <div className={`${amountSubClass} font-semibold leading-tight ${
+                                                                    isLedgerCredit ? "text-emerald-700" : "text-slate-400"
+                                                                }`}>
+                                                                    {isLedgerCredit ? formatCurrency(Math.abs(payment.amount || 0)) : "-"}
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right py-0 px-1.5 align-middle">
-                                                                <div className={`${amountSubClass} font-semibold leading-tight text-slate-600`}>
-                                                                    {formatCurrency(payment.cdAmount || 0)}
+                                                                <div className={`${amountMainClass} font-semibold leading-tight ${isLedgerCredit ? "text-slate-400" : "text-rose-700"}`}>
+                                                                    {isLedgerCredit ? "-" : `- ${formatCurrency(Math.abs(payment.amount || 0))}`}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right py-0 px-1.5 align-middle">
+                                                                <div className={`${amountSubClass} font-semibold leading-tight text-rose-700`}>
+                                                                    - {formatCurrency(payment.cdAmount || 0)}
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right py-0 px-2 align-middle">
@@ -612,7 +638,7 @@ export const TransactionTable = React.memo(
                                 })}
                                 {isLoading && (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="text-center py-1 h-6">
+                                        <TableCell colSpan={isCustomer ? 10 : 9} className="text-center py-1 h-6">
                                             <Loader2 className="h-3 w-3 animate-spin mx-auto inline-block" />
                                             <span className="ml-1 text-[11px] text-muted-foreground">Loading more entries...</span>
                                         </TableCell>
@@ -620,14 +646,14 @@ export const TransactionTable = React.memo(
                                 )}
                                 {!hasMore && filteredSuppliers.length > 30 && (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="text-center py-0.5 text-[11px] text-muted-foreground h-6">
+                                        <TableCell colSpan={isCustomer ? 10 : 9} className="text-center py-0.5 text-[11px] text-muted-foreground h-6">
                                             Showing all {filteredSuppliers.length} entries
                                         </TableCell>
                                     </TableRow>
                                 )}
                                 {filteredSuppliers.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="text-center text-muted-foreground h-12 text-[11px]">
+                                        <TableCell colSpan={isCustomer ? 10 : 9} className="text-center text-muted-foreground h-12 text-[11px]">
                                             No {activeTab === "outstanding" ? "outstanding" : activeTab === "running" ? "running" : activeTab === "profitable" ? "profitable" : "paid"} transactions found.
                                         </TableCell>
                                     </TableRow>

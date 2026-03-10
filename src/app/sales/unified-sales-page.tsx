@@ -22,9 +22,6 @@ const SixRReportPage = dynamic(() => import("./6r-report/page"));
 const VoucherImportTool = dynamic(() => import("@/app/tools/voucher-import/page"));
 const MandiReportHistory = dynamic(() => import("@/components/sales/mandi-report-history").then(m => m.MandiReportHistory));
 const FirestoreMonitorPage = dynamic(() => import("@/app/admin/firestore-monitor/page"));
-const SalesReportsPage = dynamic(() => import("@/app/sales/sales-reports/page"));
-const OrderTrackingPage = dynamic(() => import("@/app/sales/order-tracking/page"));
-const ProductCatalogPage = dynamic(() => import("@/app/sales/product-catalog/page"));
 
 // HR Modules
 const EmployeeDatabasePage = dynamic(() => import("@/app/hr/employee-database/page"));
@@ -55,7 +52,7 @@ type SalesTab =
   | "dashboard" 
   | "supplier-entry" | "customer-entry" 
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
-  | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor" | "sales-reports" | "order-tracking" | "product-catalog"
+  | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor"
   | "hr-employee-database" | "hr-payroll-management" | "hr-attendance-tracking" | "hr-contract-payments"
   | "inventory-management"
   | "project-dashboard" | "project-tasks" | "project-collaboration"
@@ -81,9 +78,6 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "voucher-import": "Mandi Import",
   "mandi-report-history": "Mandi History",
   "firestore-monitor": "Firestore Monitor",
-  "sales-reports": "Sales Reports",
-  "order-tracking": "Order Tracking",
-  "product-catalog": "Product Catalog",
   
   // HR
   "hr-employee-database": "Employee Database",
@@ -145,9 +139,6 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
             'rtgs-report', 
             'daily-supplier-report',
             '6r-report',
-            'sales-reports',
-            'order-tracking',
-            'product-catalog',
             'mandi-report-history',
             'voucher-import',
             'firestore-monitor'
@@ -215,7 +206,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
     else if (['supplier-entry', 'customer-entry', 'inventory-management'].includes(value)) newMenuType = 'entry';
-    else if (['daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor', 'sales-reports', 'order-tracking', 'product-catalog'].includes(value)) newMenuType = 'reports';
+    else if (['daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor'].includes(value)) newMenuType = 'reports';
     else if (['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'].includes(value)) newMenuType = 'hr';
     else if (['project-dashboard', 'project-tasks', 'project-collaboration'].includes(value)) newMenuType = 'projects';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
@@ -242,9 +233,6 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
         { value: "daily-supplier-report" as const, label: TAB_LABELS["daily-supplier-report"] },
         { value: "6r-report" as const, label: TAB_LABELS["6r-report"] },
-        { value: "sales-reports" as const, label: TAB_LABELS["sales-reports"] },
-        { value: "order-tracking" as const, label: TAB_LABELS["order-tracking"] },
-        { value: "product-catalog" as const, label: TAB_LABELS["product-catalog"] },
         { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
         { value: "mandi-report-history" as const, label: TAB_LABELS["mandi-report-history"] },
         { value: "firestore-monitor" as const, label: TAB_LABELS["firestore-monitor"] },
@@ -351,12 +339,6 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <MandiReportHistory />;
         case "firestore-monitor":
           return <FirestoreMonitorPage />;
-        case "sales-reports":
-          return <SalesReportsPage />;
-        case "order-tracking":
-          return <OrderTrackingPage />;
-        case "product-catalog":
-          return <ProductCatalogPage />;
         // HR
         case "hr-employee-database":
           return <EmployeeDatabasePage />;

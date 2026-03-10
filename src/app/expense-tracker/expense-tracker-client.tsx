@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
 import { SummaryMetricsCard } from "./components/summary-metrics-card";
@@ -358,11 +358,8 @@ export default function IncomeExpenseClient() {
       return options;
   }, [uniquePayees, accounts]);
   
-  // Use useWatch to efficiently watch multiple fields at once (single subscription)
-  const watchedValues = useWatch({
-    control: form.control,
-    name: ['transactionType', 'paymentMethod', 'expenseNature', 'category', 'subCategory', 'incomeAmount', 'expenseAmount', 'payee']
-  });
+  // Watch form fields (avoids useWatch to prevent conditional-hook issues with dynamic import / Strict Mode)
+  const watchedValues = form.watch(['transactionType', 'paymentMethod', 'expenseNature', 'category', 'subCategory', 'incomeAmount', 'expenseAmount', 'payee']);
 
   const [
     selectedTransactionType,
@@ -373,7 +370,16 @@ export default function IncomeExpenseClient() {
     incomeAmountValue,
     expenseAmountValue,
     payeeValue
-  ] = watchedValues;
+  ] = (watchedValues ?? []) as [
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+    number | undefined,
+    number | undefined,
+    string | undefined
+  ];
 
 
   useEffect(() => {
@@ -754,7 +760,7 @@ export default function IncomeExpenseClient() {
         }
         
         if (amountToCheck > availableBalance) {
-            const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash in Hand';
+            const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash In Hand';
             toast({
                 title: "Insufficient Balance",
                 description: `This transaction exceeds the available balance in ${accountName}.`,
@@ -834,8 +840,8 @@ export default function IncomeExpenseClient() {
       
       handleNew();
     } catch (error) {
-
-        toast({ title: "Failed to save transaction.", variant: "destructive" });
+        const message = error instanceof Error ? error.message : "Transaction could not be saved.";
+        toast({ title: "Failed to save transaction", description: message, variant: "destructive" });
     } finally {
         setIsSubmitting(false);
     }

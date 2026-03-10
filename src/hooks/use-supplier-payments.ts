@@ -136,9 +136,9 @@ export const useSupplierPayments = () => {
                 });
 
                 // Calculate outstanding using SAME formula as use-supplier-summary
-                // Outstanding = Original - (Total Paid + Total CD)
+                // Outstanding = Original - (Total Paid + Total CD) — allow negative (Ledger overpayment)
                 const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-                return sum + Math.max(0, currentOutstanding);
+                return sum + Math.round(currentOutstanding * 100) / 100;
             }, 0);
         }
         
@@ -177,9 +177,9 @@ export const useSupplierPayments = () => {
                 }
             });
             
-            // Outstanding = Original - (Paid + CD) - SAME formula as use-supplier-summary
+            // Outstanding = Original - (Paid + CD) - SAME formula as use-supplier-summary (allow negative)
             const outstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-            return sum + Math.max(0, Math.round(outstanding * 100) / 100);
+            return sum + Math.round(outstanding * 100) / 100;
         }, 0);
 
         return totalOutstanding;
@@ -275,6 +275,7 @@ export const useSupplierPayments = () => {
     // For Full payments, use settleAmount
     const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountDebounced : settleAmount;
 
+    // CD at finalize (concepts): (1) Only apply when cdEnabled. (2) Full: To Be Paid = settleAmount − CD; Partial: To Be Paid = user amount, settle = To Be Paid + CD. (3) effectiveCdAmount passed to processPaymentLogic so DB gets 0 CD when disabled. (4) paidFor[].amount = cash only, paidFor[].cdAmount = CD only; outstanding = original − paid − cd.
     const { calculatedCdAmount, setCdAmount, ...cdProps } = useCashDiscount({
         paymentType: form.paymentType,
         totalOutstanding: totalOutstandingForSelected,
@@ -372,11 +373,11 @@ export const useSupplierPayments = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [toBePaidAmountDebounced, effectiveCdAmount, form.paymentType]);
 
-    // Auto-update To Be Paid amount when Gov Amount or Extra Amount changes
+    // Auto-update To Be Paid amount when Gov Amount/Extra changes - full amount as-is (Normal + Extra)
     useEffect(() => {
         if (form.paymentMethod === 'Gov.') {
-            const total = (form.govAmount || 0) + (form.govExtraAmount || 0);
-            handleToBePaidChange(total);
+            const toBePaid = (form.govAmount || 0) + (form.govExtraAmount || 0);
+            handleToBePaidChange(toBePaid);
         }
     }, [form.govAmount, form.govExtraAmount, form.paymentMethod]);
 
@@ -539,13 +540,16 @@ export const useSupplierPayments = () => {
                 }
             }
             
+            const pd = paymentData as any;
             setSupplierDetails({
-                name: paymentData.supplierName || '', fatherName: paymentData.supplierFatherName || '',
-                address: paymentData.supplierAddress || '', contact: contactNumber
+                name: pd.supplierName || pd.supplierDetails?.name || '', fatherName: pd.supplierFatherName || pd.supplierDetails?.fatherName || '',
+                address: pd.supplierAddress || pd.supplierDetails?.address || '', contact: contactNumber
             });
             setBankDetails({
-                acNo: paymentData.bankAcNo || '', ifscCode: paymentData.bankIfsc || '',
-                bank: paymentData.bankName || '', branch: paymentData.bankBranch || '',
+                acNo: pd.bankAcNo || pd.bankDetails?.acNo || '',
+                ifscCode: pd.bankIfsc || pd.bankDetails?.ifscCode || '',
+                bank: pd.bankName || pd.bankDetails?.bank || '',
+                branch: pd.bankBranch || pd.bankDetails?.branch || '',
             });
             
             if (paymentData.date) {
@@ -653,13 +657,18 @@ export const useSupplierPayments = () => {
         if (form.paymentMethod === 'Gov.') {
             form.setGovQuantity(option.quantity);
             form.setGovRate(option.rate);
-            form.setGovAmount(roundedAmount);
+            const govExtra = form.govExtraAmount || 0;
+            const govNormal = Math.max(0, roundedAmount - govExtra);
+            form.setGovAmount(govNormal);
+            form.setGovExtraAmount(govExtra);
+            // To Be Paid = full amount as-is (Normal + Extra), not reduced
+            setToBePaidAmountManual(roundedAmount);
+            setSettleAmountManual(roundedAmount);
+        } else {
+            setToBePaidAmountManual(roundedAmount);
+            setSettleAmountManual(roundedAmount);
         }
         form.setPaymentType('Partial'); // Set to Partial first
-        
-        // For Partial mode, manually set the amounts (always use rounded amount)
-        setToBePaidAmountManual(roundedAmount);
-        setSettleAmountManual(roundedAmount);
         // Don't change calcTargetAmount - keep original targeted amount
         // form.setCalcTargetAmount(roundedAmount);
         
@@ -670,13 +679,49 @@ export const useSupplierPayments = () => {
         if (isProcessing) return;
         setIsProcessing(true);
         try {
+            // Balance check: selected "Payment From" must have enough balance (skip for Gov. – no from account)
+            if (form.paymentMethod !== 'Gov.') {
+                // Ledger Credit = charge (Income/Credit) — no actual cash/bank outflow.
+                // Adjustment = no account movement.
+                const isLedgerCredit = form.paymentMethod === 'Ledger' && form.drCr === 'Credit';
+                const isAdjustment = form.selectedAccountId === 'Adjustment';
+                if (!(isLedgerCredit || isAdjustment)) {
+                    const balanceKey = form.paymentMethod === 'Cash'
+                        ? (form.selectedAccountId || 'CashInHand')
+                        : form.selectedAccountId;
+                    if (!balanceKey && (form.paymentMethod === 'Online' || form.paymentMethod === 'RTGS' || form.paymentMethod === 'Ledger')) {
+                        toast({ title: "Select account", description: "Please select Payment From account.", variant: "destructive" });
+                        setIsProcessing(false);
+                        return;
+                    }
+                    const balances = data.financialState?.balances;
+                    const available = balances && balanceKey ? (balances.get(balanceKey) ?? 0) : 0;
+                    if (available < finalAmountToPay) {
+                        toast({ title: "Not enough balance", description: "Selected account does not have sufficient balance for this payment.", variant: "destructive" });
+                        setIsProcessing(false);
+                        return;
+                    }
+                }
+            }
 
+            // CD at finalize: only apply when cdEnabled; actual cash = finalAmountToPay, CD stored separately in paidFor[].cdAmount
+            // effectiveCdAmount = 0 when CD disabled so distribution and DB get zero CD; cdAt/cdPercent/paymentHistory drive distribution mode
             const context: ProcessPaymentContext = {
                 selectedCustomerKey: form.selectedCustomerKey,
                 selectedEntries,
                 notes: form.notes || '',
                 paidForDetails:
-                    form.paymentMethod !== 'Ledger' && form.extraAmount > 0
+                    form.paymentMethod === 'Gov.' && (form.govExtraAmount || 0) > 0
+                        ? (() => {
+                              // Gov Extra: put on first selected entry (extra paid separately, increases Total Amount in summary)
+                              const firstSrNo = selectedEntries.length >= 1
+                                  ? ((selectedEntries[0] as any)?.srNo || (selectedEntries[0] as any)?.entry?.srNo || '')
+                                  : (form.parchiNo || '').split(/[,\s]+/)[0] || '';
+                              const srNo = String(firstSrNo).trim();
+                              if (!srNo) return undefined;
+                              return [{ srNo, amount: 0, cdAmount: 0, extraAmount: form.govExtraAmount || 0 }];
+                          })()
+                        : form.paymentMethod !== 'Ledger' && (form.extraAmount || 0) > 0
                         ? (() => {
                               const srNo = String(
                                   form.parchiNo ||
@@ -692,6 +737,7 @@ export const useSupplierPayments = () => {
                 paymentMethod: form.paymentMethod,
                 selectedAccountId: form.selectedAccountId,
                 cdEnabled: cdProps.cdEnabled,
+                effectiveCdAmount: effectiveCdAmount,
                 calculatedCdAmount: effectiveCdAmount,
                 settleAmount,
                 totalOutstandingForSelected,
@@ -700,10 +746,10 @@ export const useSupplierPayments = () => {
                 extraAmount: form.extraAmount,
                 financialState: { ...(data.financialState as any), bankAccounts: data.bankAccounts },
                 paymentId: form.paymentId,
-                rtgsSrNo: form.rtgsSrNo,
+                rtgsSrNo: form.paymentMethod === 'Gov.' ? '' : form.rtgsSrNo,
                 paymentDate: form.paymentDate,
                 utrNo: form.utrNo,
-                checkNo: form.checkNo,
+                checkNo: form.paymentMethod === 'Gov.' ? '' : form.checkNo,
                 sixRNo: form.sixRNo,
                 sixRDate: form.sixRDate,
                 parchiNo: form.parchiNo,
@@ -717,10 +763,11 @@ export const useSupplierPayments = () => {
                 supplierDetails: form.supplierDetails,
                 bankDetails: form.bankDetails,
                 cdAt: cdProps.cdAt,
+                cdPercent: cdProps.cdPercent ?? 2,
+                paymentHistory: data.paymentHistory ?? [],
                 isCustomer: false,
                 centerName: form.centerName,
                 suppliers: data.suppliers,
-
             };
 
             const result = await processPaymentLogic(context);

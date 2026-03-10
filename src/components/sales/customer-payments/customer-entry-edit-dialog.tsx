@@ -22,6 +22,8 @@ import {
   nonNegativeNumber,
 } from "@/lib/form-validation";
 import { formatDate } from "@/lib/date-utils";
+import { formatCurrency } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   srNo: requiredString(),
@@ -543,28 +545,35 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle>Edit Customer Entry - {entry.srNo}</DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="customer-entry-edit-form"
-                disabled={isSubmitting}
-              >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Update Entry
-              </Button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle>Edit Customer Entry - {entry.srNo}</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  form="customer-entry-edit-form"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Update Entry
+                </Button>
+              </div>
             </div>
+            {(Number(currentCustomer?.advanceFreight ?? entry?.advanceFreight ?? 0) > 0) && (
+              <Badge variant="secondary" className="w-fit bg-amber-100 text-amber-800 border-amber-300 font-semibold">
+                Advance Freight: {formatCurrency(Number(currentCustomer?.advanceFreight ?? entry?.advanceFreight ?? 0))} — recover from customer at payment
+              </Badge>
+            )}
           </div>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-6">
