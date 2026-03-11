@@ -138,6 +138,9 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       try {
         await signInWithEmailAndPassword(auth, data.identifier, data.password);
         toast({ title: "Login Successful", variant: "success" });
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
+        }
       } catch (error: unknown) {
         const err = error as { code?: string };
         let msg = "Invalid email or password.";

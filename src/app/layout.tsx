@@ -310,16 +310,13 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                     router.replace('/settings/erp-migration');
                     redirectHandledRef.current = true;
                 }
-            } else if (isSetupComplete && isAuthPublicPage) {
-                // ✅ FIX: Setup complete and on login page - redirect to dashboard (/)
-                // Force redirect immediately - always redirect if on public page
+            } else if (isSetupComplete && (isAuthPublicPage || isIntroPage)) {
+                // ✅ FIX: Setup complete and on login/intro page - redirect to dashboard (/)
                 if (normalizedPathname !== '/') {
-                    // Use window.location as fallback if router.replace doesn't work
                     if (typeof window !== 'undefined') {
                         router.replace('/');
-                        // Force URL update if router doesn't work
                         setTimeout(() => {
-                            if (window.location.pathname !== '/') {
+                            if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/company-setup')) {
                                 window.location.href = '/';
                             }
                         }, 100);
