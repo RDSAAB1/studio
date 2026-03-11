@@ -366,7 +366,10 @@ export function ErpCompanySelector({
                   ))}
                   <DropdownMenuItem
                     className="cursor-pointer focus:bg-white/10 text-white/80"
-                    onClick={() => setAddSubOpen(true)}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setAddSubOpen(true);
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add new sub company
@@ -410,7 +413,10 @@ export function ErpCompanySelector({
                   ))}
                   <DropdownMenuItem
                     className="cursor-pointer focus:bg-white/10 text-white/80"
-                    onClick={() => setAddSeasonOpen(true)}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setAddSeasonOpen(true);
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add new season
@@ -575,8 +581,8 @@ export function ErpCompanySelector({
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddSubOpen(false)} disabled={adding}>Cancel</Button>
-            <Button onClick={handleAddSubCompany} disabled={adding || !newSubName.trim()}>Add</Button>
+            <Button type="button" variant="outline" onClick={() => setAddSubOpen(false)} disabled={adding}>Cancel</Button>
+            <Button type="button" onClick={handleAddSubCompany} disabled={adding || !newSubName.trim()}>Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -596,8 +602,8 @@ export function ErpCompanySelector({
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddSeasonOpen(false)} disabled={adding}>Cancel</Button>
-            <Button onClick={handleAddSeason} disabled={adding || !newSeasonName.trim()}>Add</Button>
+            <Button type="button" variant="outline" onClick={() => setAddSeasonOpen(false)} disabled={adding}>Cancel</Button>
+            <Button type="button" onClick={handleAddSeason} disabled={adding || !newSeasonName.trim()}>Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -614,7 +620,11 @@ export function ErpCompanySelector({
             <div className="flex flex-col gap-2 pt-2">
               {!selectedSubCompany ? (
                 <Button
-                  onClick={() => setAddSubOpen(true)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setAddSubOpen(true);
+                  }}
                   disabled={adding}
                   className="w-full"
                 >
@@ -623,7 +633,11 @@ export function ErpCompanySelector({
                 </Button>
               ) : (
                 <Button
-                  onClick={() => setAddSeasonOpen(true)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setAddSeasonOpen(true);
+                  }}
                   disabled={adding}
                   className="w-full"
                 >

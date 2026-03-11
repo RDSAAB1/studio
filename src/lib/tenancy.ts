@@ -263,6 +263,33 @@ export async function ensureTenantForUser(user: User): Promise<{
         setCachedTenants([]);
         return { active: fallback, tenants: [] };
       }
+      // Company exists but no sub/season - redirect to setup so user can create (only if not already there to avoid refresh loop)
+      if (first && typeof window !== "undefined") {
+        const isAlreadyOnSetup = window.location.pathname === "/company-setup" || window.location.pathname === "/company-setup/";
+        if (isAlreadyOnSetup) {
+          setErpMode(true);
+          const subId = subFallback?.id ?? first.subCompanies[0]?.id ?? "main";
+          setErpSelectionStorage({
+            companyId: first.id,
+            subCompanyId: subId,
+            seasonKey: String(new Date().getFullYear()),
+          });
+          setActiveTenant({ id: "root", storageMode: "root" });
+          setCachedTenants([]);
+          return { active: { id: "root", storageMode: "root" }, tenants: [] };
+        }
+        setErpMode(true);
+        const subId = subFallback?.id ?? first.subCompanies[0]?.id ?? "main";
+        setErpSelectionStorage({
+          companyId: first.id,
+          subCompanyId: subId,
+          seasonKey: String(new Date().getFullYear()),
+        });
+        setActiveTenant({ id: "root", storageMode: "root" });
+        setCachedTenants([]);
+        window.location.href = "/company-setup?login=1";
+        return { active: { id: "root", storageMode: "root" }, tenants: [] };
+      }
     }
 
     const preferredName = deriveTenantName(user);

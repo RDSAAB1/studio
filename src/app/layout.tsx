@@ -275,6 +275,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         );
         const isPublicPage = isAuthPublicPage || isIntroPage;
         const isSettingsPage = normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/');
+        const isCompanySetupPage = normalizedPathname === '/company-setup' || normalizedPathname.startsWith('/company-setup/');
         
         if (user) { // User is logged in
             // ✅ FIX: Wait for initialization to complete before redirecting
@@ -303,8 +304,8 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             }
 
             // Setup status is determined (true or false) - proceed with redirect logic
-            if (!isSetupComplete && !isSettingsPage) {
-                // No company yet - redirect to ERP Migration so user can create company
+            if (!isSetupComplete && !isSettingsPage && !isCompanySetupPage) {
+                // No company yet - redirect to ERP Migration so user can create company (skip if already on company-setup)
                 if (!redirectHandledRef.current) {
                     router.replace('/settings/erp-migration');
                     redirectHandledRef.current = true;
@@ -329,6 +330,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 }
             } else if (isSetupComplete && normalizedPathname === '/') {
                 // User is on dashboard - mark as handled
+                redirectHandledRef.current = true;
+            } else if (isCompanySetupPage) {
+                // User is on company-setup - allow them to stay, don't redirect
                 redirectHandledRef.current = true;
             } else {
                 // User is on a valid protected page - mark as handled

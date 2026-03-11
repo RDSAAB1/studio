@@ -26,7 +26,14 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { setPendingCompanyName } from "@/lib/tenancy";
+import {
+  setErpMode,
+  setErpSelectionStorage,
+  setActiveTenant,
+  setCachedTenants,
+  clearLocalDataForContextSwitch,
+} from "@/lib/tenancy";
+import { createCompanyForNewUser } from "@/lib/create-company";
 import { AuthTransitionScreen } from "@/components/auth/auth-transition-screen";
 
 const unifiedLoginSchema = z.object({
@@ -186,7 +193,11 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
           const subId = firstSub?.[0] || "main";
           const seasons = firstSub?.[1]?.seasons || {};
           const seasonKey = Object.keys(seasons)[0] || String(new Date().getFullYear());
+          const hasValidSubSeason = firstSub && Object.keys(seasons).length > 0;
           setErpSelectionStorage({ companyId: result.companyId, subCompanyId: subId, seasonKey });
+          toast({ title: "Login Successful", variant: "success" });
+          window.location.href = hasValidSubSeason ? "/" : "/company-setup?login=1";
+          return;
         }
         toast({ title: "Login Successful", variant: "success" });
         window.location.href = "/";
@@ -204,16 +215,31 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
     setLoading(true);
     setShowTransitionScreen(true);
     const auth = getFirebaseAuth();
+    const companyName = data.companyName.trim() || "Company";
     try {
-      setPendingCompanyName(data.companyName.trim() || "Company");
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userId = userCred.user?.uid;
+      if (!userId) throw new Error("User created but no UID");
+
+      // Directly create company + subCompany (MAIN) + season - no reliance on sessionStorage
+      const { companyId, subCompanyId, seasonKey } = await createCompanyForNewUser(companyName, userId);
+
+      setErpMode(true);
+      setErpSelectionStorage({ companyId, subCompanyId, seasonKey });
+      setActiveTenant({ id: "root", storageMode: "root" });
+      setCachedTenants([]);
+
       toast({
         title: "Company Created",
         description: "Your account and company have been created successfully.",
         variant: "success",
       });
+
+      if (typeof window !== "undefined") {
+        await clearLocalDataForContextSwitch();
+        window.location.href = "/company-setup?new=1";
+      }
     } catch (error: unknown) {
-      setPendingCompanyName("");
       setShowTransitionScreen(false);
       const err = error as { code?: string };
       let msg = "An unexpected error occurred.";
