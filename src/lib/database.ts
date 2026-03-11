@@ -1,6 +1,6 @@
 
 import Dexie, { type Table } from 'dexie';
-import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings } from './definitions';
+import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings } from './definitions';
 import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
 import { logError } from './error-logger';
 import { firestoreDB } from './firebase';
@@ -51,6 +51,7 @@ export class AppDatabase extends Dexie {
     expenseCategories!: Table<ExpenseCategory>;
     customerDocuments!: Table<CustomerDocument>; // Added
     accounts!: Table<Account>; // Added
+    inventoryAddEntries!: Table<InventoryAddEntry>;
 
     constructor(dbName?: string) {
         super(dbName || 'bizsuiteDB_v2');
@@ -233,6 +234,10 @@ export class AppDatabase extends Dexie {
             payments: '++id, paymentId, customerId, date',
             customerPayments: '++id, paymentId, customerId, date',
             governmentFinalizedPayments: '++id, paymentId, customerId, date',
+        });
+
+        this.version(15).stores({
+            inventoryAddEntries: '&id, date, variety',
         });
     }
 }

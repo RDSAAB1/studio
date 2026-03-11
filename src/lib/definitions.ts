@@ -526,6 +526,20 @@ export type InventoryItem = {
     updatedAt?: string;
 };
 
+/** Inventory Add Entry - variety-wise stock entries with bags, weight, rate */
+export type InventoryAddEntry = {
+    id: string;
+    date: string;
+    variety: string;
+    rate: number;
+    bagsQuantity: number;
+    bagsWeight: number;
+    quantity: number;  // bagsQuantity × bagsWeight
+    amount: number;   // rate × bagsQuantity
+    createdAt?: string;
+    updatedAt?: string;
+};
+
 export type LedgerAccount = {
   id: string;
   name: string;

@@ -31,6 +31,7 @@ const ContractPaymentsPage = dynamic(() => import("@/app/hr/contract-payments/pa
 
 // Inventory Modules
 const InventoryManagementPage = dynamic(() => import("@/app/inventory/inventory-management/page"));
+const InventoryAddPage = dynamic(() => import("@/app/inventory/inventory-add/page"));
 
 // Project Management Modules
 const ProjectDashboardPage = dynamic(() => import("@/app/projects/dashboard/page"));
@@ -54,7 +55,7 @@ type SalesTab =
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
   | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor"
   | "hr-employee-database" | "hr-payroll-management" | "hr-attendance-tracking" | "hr-contract-payments"
-  | "inventory-management"
+  | "inventory-management" | "inventory-add"
   | "project-dashboard" | "project-tasks" | "project-collaboration"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
@@ -87,6 +88,7 @@ const TAB_LABELS: Record<SalesTab, string> = {
   
   // Inventory
   "inventory-management": "Inventory Management",
+  "inventory-add": "Inventory Add",
   
   // Projects
   "project-dashboard": "Project Dashboard",
@@ -129,7 +131,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         let tabsToMount: SalesTab[] = [];
         
         if (menuParam === 'entry') {
-          tabsToMount = ['supplier-entry', 'customer-entry', 'inventory-management'];
+          tabsToMount = ['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'];
         } else if (menuParam === 'payments') {
           tabsToMount = ['supplier-payments', 'customer-payments', 'rtgs-outsider', 'income-expense', 'ledger'];
         } else if (menuParam === 'reports') {
@@ -172,9 +174,10 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       setMountedTabs(prev => {
         const criticalTabs: SalesTab[] = [
           "supplier-entry", 
-          "customer-entry", 
+          "customer-entry",
           "inventory-management",
-          "supplier-payments", 
+          "inventory-add",
+          "supplier-payments",
           "customer-payments",
           "ledger",
           "daily-payments"
@@ -205,7 +208,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     // Determine menu type based on tab (for top bar highlighting)
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
-    else if (['supplier-entry', 'customer-entry', 'inventory-management'].includes(value)) newMenuType = 'entry';
+    else if (['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'].includes(value)) newMenuType = 'entry';
     else if (['daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor'].includes(value)) newMenuType = 'reports';
     else if (['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'].includes(value)) newMenuType = 'hr';
     else if (['project-dashboard', 'project-tasks', 'project-collaboration'].includes(value)) newMenuType = 'projects';
@@ -226,7 +229,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
-    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }, { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] }];
+    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }, { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] }, { value: "inventory-add" as const, label: TAB_LABELS["inventory-add"] }];
     if (menuType === "reports") {
       return [
         { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
@@ -351,6 +354,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         // Inventory
         case "inventory-management":
           return <InventoryManagementPage />;
+        case "inventory-add":
+          return <InventoryAddPage />;
         // Projects
         case "project-dashboard":
           return <ProjectDashboardPage />;
