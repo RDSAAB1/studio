@@ -393,7 +393,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     const totalKartaWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaWeight) || 0), 0);
     const totalNetWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.netWeight) || 0), 0);
     
-    const totalAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const totalKartaAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaAmount) || 0), 0);
     const totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryAmount) || 0), 0);
     const totalKanta = filteredTransactions.reduce((sum, t) => sum + (Number(t.kanta) || 0), 0);
@@ -402,6 +401,16 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       const base = Number(t.originalNetAmount) || 0;
       const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
       return sum + base + advance;
+    }, 0);
+
+    // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
+    const totalAmountBinaDeduction = filteredTransactions.reduce((sum, t) => {
+      const amt = Number(t.amount) || 0;
+      if (amt > 0) return sum + amt;
+      const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
+        ? Number((t as any).calculatedRate) || 0
+        : Number(t.rate) || 0;
+      return sum + Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
     }, 0);
     
     // Calculate paid amounts from payment history for filtered transactions
@@ -429,6 +438,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     let totalCashPaid = 0;
     let totalRtgsPaid = 0;
     let totalGovExtraAmount = 0;
+    let totalLinkedLedgerCredit = 0;
 
     filteredTransactions.forEach((entry: Customer) => {
       const entrySrNo = (entry.srNo || "").toLowerCase();
@@ -450,10 +460,13 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
         const ledgerCredit = isLedger && isLedgerCredit(payment);
 
         // Legacy parchiNo-only ledger (no paidFor)
+        // Ledger Credit = charge (bill badha) → goes to ledgerCreditAmount only, NOT totalGovExtraAmount
+        // (Gov Extra = sirf Gov. payments ka extra; ledger credit alag concept hai)
         if (isLedger && !paidForEntry && parchiMatch && amountAbs > 0) {
           const share = parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
           if (ledgerCredit) {
-            totalGovExtraAmount += share;
+            // Ledger credit: charge hai, totalGovExtra mein nahi — ledgerAdjustment.credit mein aayega
+            // (double count avoid: netBill = base + govExtra + ledgerCredit, dono jagah add nahi)
           } else {
             totalPaid += share;
           }
@@ -465,6 +478,9 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
           const isLedger = receiptTypeOf(payment) === "ledger";
           if (!isLedger || !isLedgerCredit(payment)) {
             totalPaid += Number(paidForEntry.amount || 0);
+          } else if (isLedger && ledgerCredit) {
+            // Ledger credit with paidFor: charge hai, bill badhata hai (linked ledger credit)
+            totalLinkedLedgerCredit += Number(paidForEntry.amount || 0);
           }
 
           if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
@@ -516,13 +532,15 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       }
     }
     
-    // Calculate adjusted original (base original + extra amount from Gov. payments)
-    const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount;
+    // Calculate adjusted original (base original + Gov extra + linked ledger credit)
+    const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount + totalLinkedLedgerCredit;
     const totalAdjustedOriginal = totalOriginalAmount;
     
     // Outstanding = Adjusted Original - Paid - CD
     const baseOutstanding = totalAdjustedOriginal - totalPaid - totalCd;
 
+    // Ledger: sirf selected receipt ke sath — paidFor ya parchiNo se link hona chahiye
+    // supplierMatch/supplierDetailsMatch hata diya: doosri receipt ka ledger extra show na ho
     const ledgerCandidatePayments = (hook.paymentHistory || []).filter((p: Payment) => {
       const receiptType = ((p as any).receiptType || (p as any).type || "").toString().trim().toLowerCase();
       if (receiptType !== "ledger") return false;
@@ -534,22 +552,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
         .map((t) => t.trim())
         .filter(Boolean);
       const parchiMatch = parchiTokens.some((token) => filteredSrNosSet.has(token));
-      const supplierKey = hook.selectedCustomerKey || "";
-      const supplierMatch =
-        Boolean(supplierKey) &&
-        (String((p as any).supplierId || "") === supplierKey || String((p as any).customerId || "") === supplierKey);
 
-      const selectedName = String((selectedSupplierSummary as any)?.name || "").trim().toLowerCase();
-      const selectedFather = String(((selectedSupplierSummary as any)?.so || (selectedSupplierSummary as any)?.fatherName || "")).trim().toLowerCase();
-      const paymentName = String((p as any).supplierName || (p as any).parchiName || "").trim().toLowerCase();
-      const paymentFather = String((p as any).supplierFatherName || "").trim().toLowerCase();
-      const supplierDetailsMatch =
-        Boolean(selectedName) &&
-        Boolean(paymentName) &&
-        paymentName === selectedName &&
-        (!selectedFather || !paymentFather || paymentFather === selectedFather);
-
-      return paidForMatch || parchiMatch || supplierMatch || supplierDetailsMatch;
+      return paidForMatch || parchiMatch;
     });
 
     const uniqueLedgerPayments = Array.from(
@@ -580,7 +584,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       { debit: 0, credit: 0 }
     );
 
-    const ledgerCreditAmount = Math.round(ledgerAdjustment.credit * 100) / 100;
+    // Ledger credit = linked (paidFor) + unlinked; Net Bill = base + govExtra + full ledger credit
+    const ledgerCreditAmount = Math.round((totalLinkedLedgerCredit + ledgerAdjustment.credit) * 100) / 100;
     // Ledger Debit (payment side) = linked debit payments + unlinked debit (for display),
     // but outstanding formula should only use UNLINKED debit (linked debit already in totalPaid).
     const linkedLedgerDebitPaid = filteredPayments.reduce((sum: number, p: Payment) => {
@@ -595,10 +600,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     }, 0);
     const unlinkedLedgerDebit = Math.round(ledgerAdjustment.debit * 100) / 100;
     const ledgerDebitAmount = Math.round((linkedLedgerDebitPaid + unlinkedLedgerDebit) * 100) / 100;
-    // Credit = charge → Total Amount badhe; Debit (linked) already Total Paid me hai; outstanding ke liye sirf UNLINKED debit use karo.
-    const totalAmountIncludingLedger = Math.round((totalAmount + ledgerCreditAmount) * 100) / 100;
-    // Outstanding: baseOutstanding (all normal payments incl. linked ledger debits) + unlinked ledger Credit − unlinked ledger Debit
-    const totalOutstanding = Math.round((baseOutstanding + ledgerCreditAmount - unlinkedLedgerDebit) * 100) / 100;
+    // Total Amount = Final Net Bill (original already includes linked ledger credit)
+    const totalAmountIncludingLedger = Math.round((totalOriginalAmount + ledgerAdjustment.credit) * 100) / 100;
+    // Outstanding: baseOutstanding (incl. linked ledger credit) + unlinked ledger Credit − unlinked ledger Debit
+    const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.credit - unlinkedLedgerDebit) * 100) / 100;
     
     // Calculate outstanding entry IDs — use summary's outstandingForEntry when available (consistent with display)
     const outstandingEntryIds = filteredTransactions
@@ -654,7 +659,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       totalFinalWeight,
       totalKartaWeight,
       totalNetWeight,
-      totalAmount: totalAmountIncludingLedger,
+      // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount
+      totalAmount: totalAmountBinaDeduction,
       totalKartaAmount,
       totalLabouryAmount,
       totalKanta,
@@ -1384,7 +1390,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                       {filteredSupplierSummary ? (
                         (() => {
                           const summary: any = filteredSupplierSummary;
-                          const totalAmount = summary.totalAmount || 0;
                           const totalOutstanding = summary.totalOutstanding || 0;
                           const totalNetWeight = summary.totalNetWeight || 0;
                           const totalGrossWeight = summary.totalGrossWeight || 0;
@@ -1442,7 +1447,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
 
                           const paidShareDenom = totalPaid > 0 ? totalPaid : 1;
                           const netLedgerImpact = ledgerDebitAmount - ledgerCreditAmount;
-                          const netBillAfterDeductions = adjustedOriginalAmount - totalDeductions;
+                          // Net Bill = Base Original + Gov Extra + Ledger Credit (Base Original is already post-deduction)
+                          const netBillAmount = baseOriginalAmount + govExtraAmount + ledgerCreditAmount;
                           const cashPct = Math.max(
                             0,
                             Math.min(100, (totalCashPaid / paidShareDenom) * 100)
@@ -1463,10 +1469,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                 <Card className="border-emerald-200 bg-emerald-50/90 shadow-sm">
                                   <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
                                     <div className="text-[11px] font-medium text-emerald-900/90">
-                                      Total Amount
+                                      Net Bill Amount
                                     </div>
                                     <div className="mt-1 text-lg sm:text-xl font-semibold text-emerald-950 tabular-nums">
-                                      {formatCurrency(totalAmount)}
+                                      {formatCurrency(netBillAmount)}
                                     </div>
                                   </CardContent>
                                 </Card>
@@ -1548,7 +1554,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                   </CardContent>
                                 </Card>
 
-                                {/* Bill Amounts (Original vs Final) */}
+                                {/* Bill Amounts: Total Amount (primary) → breakdown: Deductions, Base Original, Gov Extra, Ledger Credit */}
                                 <Card className="border-slate-200 bg-white shadow-sm">
                                   <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
                                     <CardTitle className="text-xs font-semibold text-slate-800">
@@ -1556,6 +1562,18 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                     </CardTitle>
                                   </CardHeader>
                                   <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
+                                    <div className="flex justify-between">
+                                      <span>Total Amount</span>
+                                      <span className="font-semibold tabular-nums">
+                                        {formatCurrency(summary.totalAmount ?? 0)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Total Deductions</span>
+                                      <span className="font-semibold tabular-nums text-rose-700">
+                                        - {formatCurrency(totalDeductions)}
+                                      </span>
+                                    </div>
                                     <div className="flex justify-between">
                                       <span>Base Original</span>
                                       <span className="font-semibold tabular-nums">
@@ -1568,24 +1586,14 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                         {formatCurrency(govExtraAmount)}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between">
-                                      <span>Adjusted Original</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(adjustedOriginalAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Net Bill Amount</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Total Deductions</span>
-                                      <span className="font-semibold tabular-nums text-rose-700">
-                                        {formatCurrency(totalDeductions)}
-                                      </span>
-                                    </div>
+                                    {ledgerCreditAmount > 0 && (
+                                      <div className="flex justify-between">
+                                        <span>Ledger Credit</span>
+                                        <span className="font-semibold tabular-nums">
+                                          {formatCurrency(ledgerCreditAmount)}
+                                        </span>
+                                      </div>
+                                    )}
                                   </CardContent>
                                 </Card>
 

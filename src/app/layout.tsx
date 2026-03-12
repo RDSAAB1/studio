@@ -403,6 +403,24 @@ export default function RootLayout({ children, params }: LayoutProps) {
   const { toast } = useToast();
     useSyncQueue();
 
+    // Handle Webpack/Next.js stale chunk error - auto-reload when detected
+    useEffect(() => {
+        const handleUnhandled = (e: ErrorEvent | PromiseRejectionEvent) => {
+            const msg = (e instanceof PromiseRejectionEvent ? (e.reason?.message ?? String(e.reason)) : e.message) || '';
+            if (msg.includes("reading 'call'") || msg.includes('reading "call"')) {
+                if (typeof window !== 'undefined') {
+                    window.location.reload();
+                }
+            }
+        };
+        window.addEventListener('error', handleUnhandled);
+        window.addEventListener('unhandledrejection', handleUnhandled);
+        return () => {
+            window.removeEventListener('error', handleUnhandled);
+            window.removeEventListener('unhandledrejection', handleUnhandled);
+        };
+    }, []);
+
     // ✅ OPTIMIZED: Combined service worker registration and message handling
     useEffect(() => {
         if (process.env.NODE_ENV !== 'production') {

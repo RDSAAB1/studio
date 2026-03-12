@@ -198,7 +198,7 @@ export const useCustomerData = () => {
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
                 // Outstanding: (Original + Advance Freight) - (Payment + CD). Advance freight increases total receivable.
-                const baseOriginal = (transaction.originalNetAmount || 0) + (Number(transaction.advanceFreight) || 0);
+                const baseOriginal = (Number(transaction.originalNetAmount ?? transaction.netAmount ?? 0)) + (Number(transaction.advanceFreight) || 0);
                 const calculatedNetAmount = baseOriginal - totalPaidForEntry - totalCdForEntry;
                 
                 // Handle very small negative amounts due to rounding - treat as zero
@@ -211,8 +211,17 @@ export const useCustomerData = () => {
                 (transaction as any).adjustedOriginal = baseOriginal;
         });
         
-        data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0) + (Number(t.advanceFreight) || 0), 0);
+        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0), 0);
+        // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
+        data.totalAmount = data.allTransactions!.reduce((sum, t) => {
+          const amt = Number(t.amount) || 0;
+          if (amt > 0) return sum + amt;
+          // Fallback for legacy: rate × weight (same as bill)
+          const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
+            ? Number((t as any).calculatedRate) || 0
+            : Number(t.rate) || 0;
+          return sum + Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
+        }, 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
         data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);

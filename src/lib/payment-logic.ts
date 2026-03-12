@@ -244,6 +244,37 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 plan.push({ entryRef, item, entryData, currentPaid, currentCd, netAmount, outstanding, amountToPay: 0, roomForCd });
             }
 
+            // Gov: Extra amount pehle entries ki capacity mein add karo, PHIR To Be Paid distribute. Isse full amount distribute ho jata hai.
+            // Pehle extra add karo → capacity badh jati hai → phir cash distribute karo.
+            const govExtraSharePerEntry: number[] = plan.map(() => 0);
+            if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0 && plan.length > 0) {
+                const totalBaseOutstanding = plan.reduce((s, p) => s + p.outstanding, 0);
+                const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
+                if (totalBaseOutstanding > 0) {
+                    let extraAssigned = 0;
+                    for (let i = 0; i < plan.length; i++) {
+                        const p = plan[i];
+                        const isLast = i === plan.length - 1;
+                        const share = isLast
+                            ? Math.round((extraTotal - extraAssigned) * 100) / 100
+                            : Math.round((extraTotal * p.outstanding / totalBaseOutstanding) * 100) / 100;
+                        const extraShare = Math.max(0, share);
+                        govExtraSharePerEntry[i] = extraShare;
+                        p.outstanding = Math.round((p.outstanding + extraShare) * 100) / 100;
+                        p.roomForCd = Math.round(Math.max(0, p.outstanding) * 100) / 100;
+                        extraAssigned += extraShare;
+                    }
+                } else {
+                    // Equal split when no outstanding
+                    const perEntry = Math.round((extraTotal / plan.length) * 100) / 100;
+                    for (let i = 0; i < plan.length; i++) {
+                        govExtraSharePerEntry[i] = perEntry;
+                        plan[i].outstanding = Math.round((plan[i].outstanding + perEntry) * 100) / 100;
+                        plan[i].roomForCd = Math.round(Math.max(0, plan[i].outstanding) * 100) / 100;
+                    }
+                }
+            }
+
             // Phase 2b: Pehle CD distribute karo (har entry ko uske hisse ki CD); room = outstanding abhi, so sabko CD milne ka mauka. CD allocation/distribution usi hisaab se; paid + CD ≤ outstanding (jab CD de rahe hain to paid amount kam hoga tabhi proper, nahi to outstanding negative ho jayegi).
             // - on_previously_paid_no_cd: CD ONLY on previously paid amount that had no CD (no CD on current payment); per entry = cdPercent% of previouslyPaidNoCd, capped by room; "Ensure full CD" pass skipped.
             // - partial_on_paid: First CD on "previously paid without CD" (by earliest date), then remainder by current amountToPay; cap by room.
@@ -582,9 +613,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 });
 
                 // amount = cash (Paid Amount) only; cdAmount = CD only — keep separate so calculations are correct
-                if (amountToPay > 0 || cdToPay > 0 || (initialPaidForDetails.find(x => x.srNo === p.entryData.srNo)?.extraAmount || 0) > 0) {
-                    const existingDetail = initialPaidForDetails.find(x => x.srNo === p.entryData.srNo);
-                    const extraAmount = existingDetail?.extraAmount || 0;
+                // Gov: use proportional extra per entry (from govExtraSharePerEntry); others: use existingDetail from initialPaidForDetails
+                const existingDetail = initialPaidForDetails.find(x => x.srNo === p.entryData.srNo);
+                const extraAmount = (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0)
+                    ? (govExtraSharePerEntry[i] ?? 0)
+                    : (existingDetail?.extraAmount || 0);
+                if (amountToPay > 0 || cdToPay > 0 || extraAmount > 0) {
                     processedEntries.push({
                         srNo: p.entryData.srNo || p.item.entry.srNo,
                         amount: amountToPay,

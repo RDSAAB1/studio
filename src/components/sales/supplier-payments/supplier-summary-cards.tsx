@@ -309,7 +309,8 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
   const govPct = Math.max(0, Math.min(100, (govPaid / paidShareDenom) * 100));
 
   const netLedgerImpact = (summary.ledgerDebitAmount || 0) - (summary.ledgerCreditAmount || 0);
-  const netBillAmount = (summary.totalOriginalAmount || 0) - totalDeductions;
+  // Net Bill = Base Original + Gov Extra + Ledger Credit (Base Original is already post-deduction)
+  const netBillAmount = baseOriginalAmount + govExtraAmount + (summary.ledgerCreditAmount || 0);
 
   // Compact, modern card style – subtle borders, minimal shadow
   const card3d =
@@ -322,8 +323,8 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
         {/* Top row: 4 cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 supplier-summary-dashboard-top">
           <div className={`${card3d} supplier-summary-dashboard-card`}>
-            <div className="text-[10px] font-medium text-slate-600">Total Amount</div>
-            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatCurrency(summary.totalAmount || 0)}</div>
+            <div className="text-[10px] font-medium text-slate-600">Net Bill Amount</div>
+            <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatCurrency(netBillAmount)}</div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
             <div className="text-[10px] font-medium text-slate-600">Outstanding</div>
@@ -355,15 +356,11 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
               {summaryType === "customer" ? "Receivable (incl. Adv. Freight)" : "Bill Amounts (Original vs Final)"}
             </div>
             <div className="space-y-1.5">
+              <StatementMetric label="Total Amount" value={formatCurrency(summary.totalAmount || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Total Deductions" value={`- ${formatCurrency(totalDeductions)}`} valueClassName="text-rose-700" />
               <StatementMetric label="Base Original" value={formatCurrency(baseOriginalAmount)} valueClassName="text-slate-900" />
               {summaryType !== "customer" && <StatementMetric label="Gov Extra" value={formatCurrency(govExtraAmount)} valueClassName="text-slate-900" />}
-              <StatementMetric 
-                label={summaryType === "customer" ? "Total Receivable" : "Adjusted Original"} 
-                value={formatCurrency(summary.totalOriginalAmount || 0)} 
-                valueClassName="text-slate-900" 
-              />
-              <StatementMetric label="Net Bill Amount" value={formatCurrency(netBillAmount)} valueClassName="text-slate-900" />
-              <StatementMetric label="Total Deductions" value={formatCurrency(totalDeductions)} valueClassName="text-rose-700" />
+              {(summary.ledgerCreditAmount || 0) > 0 && <StatementMetric label="Ledger Credit" value={formatCurrency(summary.ledgerCreditAmount || 0)} valueClassName="text-slate-900" />}
             </div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
@@ -450,7 +447,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
               <div className="col-span-12 md:col-span-4">
                 <StatementTile
                   title="Overall Summary"
-                  value={formatCurrency(summary.totalAmount || 0)}
+                  value={formatCurrency(netBillAmount)}
                   valueClassName="text-slate-900"
                   icon={<FileText size={13} className="text-slate-700" />}
                   iconWrapClassName="bg-card border-border/60"
@@ -536,7 +533,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
               <div className="col-span-12 md:col-span-6">
                 <StatementTile
                   title="Amounts"
-                  value={formatCurrency(summary.totalAmount || 0)}
+                  value={formatCurrency(netBillAmount)}
                   valueClassName="text-slate-900"
                   icon={<FileText size={14} className="text-slate-700" />}
                   iconWrapClassName="bg-card border-border/60"
@@ -544,11 +541,12 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                 >
                   <div className="grid grid-cols-1 gap-y-2 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
                     <StatementPanel
-                      title={summaryType === "customer" ? "Receivable" : "Originals"}
+                      title={summaryType === "customer" ? "Receivable" : "Bill Amounts"}
                       className="p-0"
                     >
                       <div className="grid grid-cols-1 gap-y-0.5">
-                        <StatementMetric label="Base" value={formatCurrency(baseOriginalAmount)} valueClassName="text-emerald-900" />
+                        <StatementMetric label="Total Amount" value={formatCurrency(summary.totalAmount || 0)} valueClassName="text-emerald-900" />
+                        <StatementMetric label="Base Original" value={formatCurrency(baseOriginalAmount)} valueClassName="text-emerald-900" />
                         {summaryType !== "customer" && (
                           <StatementMetric
                             label="Gov Extra"
@@ -556,11 +554,9 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                             valueClassName="text-emerald-900"
                           />
                         )}
-                        <StatementMetric
-                          label={summaryType === "customer" ? "Total Receivable" : "Adjusted"}
-                          value={formatCurrency(summary.totalOriginalAmount || 0)}
-                          valueClassName="text-emerald-900"
-                        />
+                        {(summary.ledgerCreditAmount || 0) > 0 && (
+                          <StatementMetric label="Ledger Credit" value={formatCurrency(summary.ledgerCreditAmount || 0)} valueClassName="text-emerald-900" />
+                        )}
                         {(Number(summary.ledgerCreditAmount || 0) > 0 || Number(summary.ledgerDebitAmount || 0) > 0) ? (
                           <StatementMetric
                             label="Ledger (Income · Expense → Net)"

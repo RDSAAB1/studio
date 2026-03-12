@@ -272,7 +272,7 @@ export const useSupplierData = () => {
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                const baseOutstanding = Number(transaction.originalNetAmount || 0);
+                const baseOutstanding = Number(transaction.originalNetAmount ?? transaction.netAmount ?? 0);
                 const totalPayableAmount = baseOutstanding + totalExtraForEntry;
                 const calculatedNetAmount = totalPayableAmount - totalPaidForEntry - totalCdForEntry;
                 
@@ -288,7 +288,6 @@ export const useSupplierData = () => {
                 (transaction as any).totalExtraForEntry = Math.round(totalExtraForEntry * 100) / 100;
         });
         
-        data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
@@ -348,6 +347,15 @@ export const useSupplierData = () => {
             return sum + linkedPaid;
         }, 0);
         (data as any).totalGovExtraAmount = data.allTransactions!.reduce((sum, t) => sum + Number((t as any).totalGovExtraForEntry || 0), 0);
+        // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
+        data.totalAmount = data.allTransactions!.reduce((sum, t) => {
+          const amt = Number(t.amount) || 0;
+          if (amt > 0) return sum + amt;
+          const rate = (t as any).variety?.toLowerCase?.() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
+            ? Number((t as any).calculatedRate) || 0
+            : Number(t.rate) || 0;
+          return sum + Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
+        }, 0);
         data.outstandingEntryIds = (data.allTransactions || []).filter(t => Number((t as any).outstandingForEntry || t.netAmount || 0) > 0).map(t => String(t.srNo || '')).filter(Boolean);
         
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => Number(t.netAmount || 0) >= 1).length;

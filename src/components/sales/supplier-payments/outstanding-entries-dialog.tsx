@@ -92,7 +92,7 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                         <TableHead>Name</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -103,7 +103,7 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                             <TableCell>{entry.name}</TableCell>
                             <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
                             <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.outstandingForEntry ?? entry.netAmount ?? 0)))}</TableCell>
                         </TableRow>
                     ))}
                      {entries.length === 0 && (

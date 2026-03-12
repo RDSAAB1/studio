@@ -37,8 +37,9 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
         extraAmountFromPaymentFields === 0
             ? Math.abs(Number((payment as any).amount || 0))
             : 0;
+    // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
     const includePaymentLevelExtra =
-        extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online');
+        extraAmountFromPaidFor === 0 && (extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online'));
     const extraAmount =
         extraAmountFromPaidFor + (((includePaymentLevelExtra ? extraAmountFromPaymentFields : 0) + ledgerAmountFallback) * extraAmountSign);
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
+import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "../utils/fuzzy-matching";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
@@ -149,183 +150,37 @@ export const useSupplierSummary = (
     }
 
 
+    // Use shared calculator - SAME logic as DetailsDialog so table matches "Details for SR No"
     const processedSuppliers = suppliers.map(s => {
-      // Find all payments for this specific purchase (srNo)
-      const entrySrNo = String(s.srNo || '').trim().toLowerCase();
-      const paymentsForEntry = paymentHistory.filter(p => {
-        const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
-        const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
-        const parchiTokens = parchiNoRaw
-          .split(/[,\s]+/g)
-          .map(t => t.trim())
-          .filter(Boolean);
-        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
-        return Boolean(paidForMatch || parchiMatch);
-      });
-      
-      let totalPaidForEntry = 0;
-      let totalCdForEntry = 0;
+      const result = calculateOutstandingForEntry(s, paymentHistory);
+
+      // Cash/RTGS breakdown for display (from payments)
       let totalCashPaidForEntry = 0;
       let totalRtgsPaidForEntry = 0;
-      let totalGovExtraForEntry = 0;
-      let totalExtraForEntry = 0;
-
-      // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
-      paymentsForEntry.forEach(payment => {
-        const paidForThisPurchase = payment.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
-        const receiptType = (payment.receiptType || '').toString().trim().toLowerCase();
-        const isLedger = receiptType === 'ledger';
-        const drCrLower = String((payment as any).drCr || '').trim().toLowerCase();
-        const isLedgerCredit = isLedger && (drCrLower === 'credit' || Number((payment as any).amount || 0) < 0);
-
-        const paidForExtraForThisEntry = Number((paidForThisPurchase as any)?.extraAmount || 0);
-        const paymentLevelExtraRawFromFields =
-          (Number((payment as any).extraAmount) || 0) + (Number((payment as any).advanceAmount) || 0);
-
-        const parchiNoRaw = String((payment as any).parchiNo || '').trim().toLowerCase();
-        const parchiTokens = parchiNoRaw
-          .split(/[,\s]+/g)
-          .map(t => t.trim())
-          .filter(Boolean);
-        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
-
-        const amountAbs = Math.abs(Number((payment as any).amount || 0));
-
-        // Legacy/unlinked ledger payments: paidFor empty but parchiNo has SR# list.
-        // Ledger concept: Debit = payment (Paid/Expense), Credit = charge (Extra/Income).
-        if (isLedger && !paidForThisPurchase && parchiMatch && amountAbs > 0) {
-          const share =
-            parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
-          if (isLedgerCredit) totalExtraForEntry += share;
-          else totalPaidForEntry += share;
-          return;
-        }
-
-        // Payment-level extra (Online extras) or ledger credit charge (when not stored per paidFor)
-        const shouldAttachPaymentLevelExtra =
-          (paymentLevelExtraRawFromFields !== 0 || amountAbs > 0) &&
-          (receiptType === 'ledger' || receiptType === 'online') &&
-          parchiMatch &&
-          paidForExtraForThisEntry === 0;
-
-        if (shouldAttachPaymentLevelExtra) {
-          if (isLedger && isLedgerCredit && amountAbs > 0 && payment.paidFor?.length === 0 && paymentLevelExtraRawFromFields === 0) {
-            const share =
-              parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
-            totalExtraForEntry += share;
-          } else if (!isLedger) {
-            totalExtraForEntry += paymentLevelExtraRawFromFields;
-          }
-        }
-
-        if (paidForThisPurchase) {
-          // Direct database value - no calculation
-          const paidAmount = Number(paidForThisPurchase.amount || 0);
-          if (isLedger && isLedgerCredit) {
-            // Ledger Credit = charge → income side, not paid
-            totalExtraForEntry += paidAmount;
-          } else {
-            totalPaidForEntry += paidAmount;
-          }
-          
-          // Calculate Gov Extra Amount share for this entry
-          // Use extraAmount from paidFor details if available (highest priority as it's specific to this entry)
-          // This matches the data structure where extraAmount is stored in paidFor array
-          if (paidForExtraForThisEntry > 0) {
-            totalGovExtraForEntry += paidForExtraForThisEntry;
-          }
-          // Fallback logic (only if no specific extra amount in paidFor but parent has it - unlikely with new logic)
-          else if (payment.govExtraAmount && payment.govExtraAmount > 0) {
-            const totalPaidInPayment = payment.paidFor!.reduce((sum, pf) => sum + Number(pf.amount || 0), 0);
-            if (totalPaidInPayment > 0) {
-              const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidInPayment;
-              totalGovExtraForEntry += (payment.govExtraAmount * proportion);
-            }
-          }
-
-          // CD amount calculation: First check if directly stored in paidFor (new format), else calculate proportionally
-          if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
-            // New format: CD amount directly stored in paidFor
-            totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
-          } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-            // Old format: Calculate proportionally from payment.cdAmount
-            // Check cdAmount even if cdApplied is not explicitly set (for cash payments)
-            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-            if (totalPaidForInPayment > 0) {
-              const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidForInPayment;
-              totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
-            }
-          }
-          
-          // Calculate payment amount based on type (for cash/rtgs breakdown)
-          // IMPORTANT: Always use paidFor.amount for outstanding calculation
-          // RTGS amount is only for display/tracking, not for outstanding calculation
-          const receiptTypeForBreakdown = payment.receiptType?.toLowerCase();
-          const actualPaidAmount = Number(paidForThisPurchase.amount || 0);
-          
-          if (receiptTypeForBreakdown === 'cash') {
-            // For cash, use actual paid amount
-            totalCashPaidForEntry += actualPaidAmount;
-          } else if (receiptTypeForBreakdown === 'rtgs') {
-            // IMPORTANT: For RTGS, use actual paid amount (paidFor.amount), NOT rtgsAmount
-            // rtgsAmount is only for display/tracking purposes (cash vs RTGS breakdown)
-            // Outstanding calculation should always use paidFor.amount
-            totalRtgsPaidForEntry += actualPaidAmount;
-          }
+      const entrySrNo = String(s.srNo || '').trim().toLowerCase();
+      result.paymentsForEntry.forEach((p: Payment) => {
+        const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
+        if (paidForThis) {
+          const amt = Number(paidForThis.amount || 0);
+          const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+          if (receiptType === 'cash') totalCashPaidForEntry += amt;
+          else if (receiptType === 'rtgs') totalRtgsPaidForEntry += amt;
         }
       });
 
-      totalExtraForEntry += totalGovExtraForEntry;
-
-      // Removed debug logging for performance
-
-      // Direct database sum - no calculation
-      const finalTotalPaid = Math.round(totalPaidForEntry * 100) / 100;
-      const finalTotalCd = Math.round(totalCdForEntry * 100) / 100;
-      
-      // Initialize variables (will be calculated in outstanding calculation)
-      // Outstanding calculation using new method:
-      // 1. Get base outstanding from supplier data (originalNetAmount - this is the actual outstanding before any payments)
-      // 2. Add all extra amounts from Gov payments (chronologically by payment ID order)
-      // 3. This gives Total Payable Amount
-      // 4. Subtract all payments made (chronologically by payment ID order) from Total Payable Amount
-      // 5. Result = Outstanding (no capping needed)
-      
-      // Step 1: Get base outstanding from supplier entry
-      // IMPORTANT: Use originalNetAmount as the base (original amount before any payments)
-      // This is the "actual outstanding" from supplier data as per user's requirement
-      const baseOutstanding = s.originalNetAmount || 0;
-      
-      // Step 2: Calculate Total Payable Amount = Base Outstanding + Gov Extra Amount
-      // Gov Extra Amount increases the amount payable to the supplier (e.g. bonus)
-      const totalPayableAmount = baseOutstanding + totalExtraForEntry;
-      
-      // Step 3: Subtract all payments made
-      // Step 4: Use finalTotalPaid (already calculated) for consistency
-      
-      // This ensures we use the same payment amount that was used for totalPaidForEntry
-      // IMPORTANT: finalTotalPaid is the direct sum from all payments, which is more reliable
-      // than recalculating from sorted payments which might have rounding differences
-      
-      // Step 5: Calculate Outstanding = Total Payable - All Payments - All CD (no capping)
-      // Use finalTotalPaid instead of recalculating totalPaidAmount to ensure consistency
-      let finalOutstanding = totalPayableAmount - finalTotalPaid - finalTotalCd;
-      
       return {
         ...s,
-        totalPaidForEntry: finalTotalPaid,
-        totalGovExtraForEntry,
-        totalExtraForEntry,
-        totalCdForEntry: finalTotalCd,
-        totalCd: finalTotalCd, // Map totalCdForEntry to totalCd for compatibility
-        totalPaid: finalTotalPaid, // Direct database sum
+        totalPaidForEntry: result.totalPaid,
+        totalGovExtraForEntry: result.totalExtra,
+        totalExtraForEntry: result.totalExtra,
+        totalCdForEntry: result.totalCd,
+        totalCd: result.totalCd,
+        totalPaid: result.totalPaid,
         totalCashPaidForEntry,
         totalRtgsPaidForEntry,
-        paymentsForEntry,
-        // Outstanding: Adjusted Original - (Paid + CD)
-        outstandingForEntry: Math.round(finalOutstanding * 100) / 100,
-        // netAmount mirrors outstandingForEntry for downstream logic
-        netAmount: Math.round(finalOutstanding * 100) / 100,
+        paymentsForEntry: result.paymentsForEntry,
+        outstandingForEntry: result.outstanding,
+        netAmount: result.outstanding,
       };
     });
 
@@ -404,7 +259,37 @@ export const useSupplierSummary = (
       // Merge all suppliers in the group with proper payment calculations
       const totalBaseOriginalAmount = groupSuppliers.reduce((sum, s) => sum + toNumber(s.originalNetAmount), 0);
       const totalGovExtraAmount = groupSuppliers.reduce((sum, s) => sum + toNumber((s as any).totalGovExtraForEntry || 0), 0);
-      const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount;
+      
+      // Ledger credit: linked (paidFor) + unlinked. Linked with paidFor NOT in totalGovExtraForEntry (calcTotalExtra).
+      const groupSrNosSet = new Set(
+        groupSuppliers.map((s) => String(s.srNo || '').trim().toLowerCase()).filter(Boolean)
+      );
+      const totalLinkedLedgerCredit = uniquePayments.reduce((sum, p) => {
+        const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
+        if (receiptType !== 'ledger') return sum;
+        const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+        const amountRaw = Number((p as any).amount || 0);
+        const isLedgerCredit = drCrLower === 'credit' || amountRaw < 0;
+        if (!isLedgerCredit) return sum;
+        const linkedToGroup = (p.paidFor || []).filter(
+          (pf: any) => groupSrNosSet.has(String(pf.srNo || '').trim().toLowerCase())
+        );
+        return sum + linkedToGroup.reduce((s: number, pf: any) => s + Number(pf.amount || 0), 0);
+      }, 0);
+      const totalLinkedLedgerDebit = uniquePayments.reduce((sum, p) => {
+        const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
+        if (receiptType !== 'ledger') return sum;
+        const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+        const amountRaw = Number((p as any).amount || 0);
+        const isLedgerCredit = drCrLower === 'credit' || amountRaw < 0;
+        if (isLedgerCredit) return sum;
+        const linkedToGroup = (p.paidFor || []).filter(
+          (pf: any) => groupSrNosSet.has(String(pf.srNo || '').trim().toLowerCase())
+        );
+        return sum + linkedToGroup.reduce((s: number, pf: any) => s + Number(pf.amount || 0), 0);
+      }, 0);
+      
+      const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount + totalLinkedLedgerCredit;
       const totalCdAmount = groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalCdForEntry), 0);
       
       // IMPORTANT: Use totalPaid (from paidFor.amount) for outstanding calculation, not totalCashPaid + totalRtgsPaid
@@ -412,10 +297,17 @@ export const useSupplierSummary = (
       // totalCashPaid and totalRtgsPaid are for display/tracking only
       const totalPaid = groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalPaidForEntry), 0);
 
+      // Ledger adjustment: sirf UNLINKED ledger (no paidFor, no parchiNo match)
+      // ParchiNo-matched ledger already in totalGovExtraForEntry via calcTotalExtra — double count avoid
       const ledgerAdjustment = uniquePayments.reduce(
         (acc, p) => {
           const receiptType = (p as any).receiptType?.toLowerCase() || (p as any).type?.toLowerCase();
           if (receiptType !== 'ledger') return acc;
+
+          const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
+          const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t) => t.trim()).filter(Boolean);
+          const parchiMatch = parchiTokens.some((token) => groupSrNosSet.has(token));
+          if (parchiMatch) return acc; // Already in totalGovExtraForEntry via calcTotalExtra
 
           const amountRaw = Number((p as any).amount || 0);
           const amountAbs = Math.abs(amountRaw);
@@ -438,14 +330,28 @@ export const useSupplierSummary = (
       );
 
       const baseOutstanding = groupSuppliers.reduce((sum, s) => sum + toNumber(s.outstandingForEntry), 0);
-      const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.debit - ledgerAdjustment.credit) * 100) / 100;
+      // Credit = charge (outstanding badhe), Debit = payment (outstanding ghathe)
+      // totalLinkedLedgerCredit: paidFor wala ledger credit outstandingForEntry mein nahi (calcTotalExtra skip karta hai)
+      const totalOutstanding = Math.round((baseOutstanding + totalLinkedLedgerCredit + ledgerAdjustment.credit - ledgerAdjustment.debit) * 100) / 100;
+
+      // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
+      const totalAmountFromEntries = groupSuppliers.reduce((sum, s) => {
+        const amt = toNumber(s.amount);
+        if (amt > 0) return sum + amt;
+        // Fallback for legacy entries: rate × weight (same as bill calculation)
+        const rate = (s as any).variety?.toLowerCase?.() === 'rice bran' && toNumber((s as any).calculatedRate) > 0
+          ? toNumber((s as any).calculatedRate)
+          : toNumber(s.rate);
+        return sum + Math.round(rate * toNumber(s.weight) * 100) / 100;
+      }, 0);
       
       const mergedData: CustomerSummary = {
         ...firstSupplier,
         name: displayName,
         so: displayFather,
         address: displayAddress,
-        totalAmount: groupSuppliers.reduce((sum, s) => sum + toNumber(s.amount) + toNumber((s as any).totalGovExtraForEntry || 0), 0),
+        // Same logic as Details for SR No: Total Amount = sum of entry.amount
+        totalAmount: totalAmountFromEntries,
         totalOriginalAmount,
         totalBaseOriginalAmount,
         totalGovExtraAmount,
@@ -457,6 +363,8 @@ export const useSupplierSummary = (
         // IMPORTANT: Final Outstanding = Sum of all individual entry outstanding amounts
         // This ensures consistency: Final Outstanding = Sum of all Outstanding column values
         totalOutstanding,
+        ledgerCreditAmount: Math.round((totalLinkedLedgerCredit + ledgerAdjustment.credit) * 100) / 100,
+        ledgerDebitAmount: Math.round((totalLinkedLedgerDebit + ledgerAdjustment.debit) * 100) / 100,
         paymentHistory: [...groupSuppliers.flatMap(s => s.paymentsForEntry)].sort(sortPaymentByIdDescending),
         outstandingEntryIds: groupSuppliers.filter(s => s.outstandingForEntry > 0).map(s => s.srNo),
         allTransactions: groupSuppliers,
@@ -551,9 +459,11 @@ export const useSupplierSummary = (
         totalCd: groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalCdForEntry), 0),
       };
 
-      // Calculate averages and rates
+      // Calculate averages and rates (use effective rate: calculatedRate for RICE BRAN)
       const totalWeightedRate = groupSuppliers.reduce((sum, s) => {
-        const rate = toNumber(s.rate);
+        const rate = (s as any).variety?.toLowerCase?.() === 'rice bran' && toNumber((s as any).calculatedRate) > 0
+          ? toNumber((s as any).calculatedRate)
+          : toNumber(s.rate);
         const netWeight = toNumber(s.netWeight);
         return sum + rate * netWeight;
       }, 0);
@@ -608,6 +518,8 @@ export const useSupplierSummary = (
       acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
       acc.totalAmount += s.totalAmount;
       acc.totalBrokerage! += s.totalBrokerage!;
+      acc.ledgerCreditAmount = (acc.ledgerCreditAmount || 0) + (s.ledgerCreditAmount || 0);
+      acc.ledgerDebitAmount = (acc.ledgerDebitAmount || 0) + (s.ledgerDebitAmount || 0);
 
       // Aggregate all payment history and outstanding entries
       acc.paymentHistory = [...acc.paymentHistory, ...s.paymentHistory];
@@ -647,9 +559,11 @@ export const useSupplierSummary = (
       .filter(s => s.outstandingForEntry > 0)
       .map(s => s.srNo);
 
-    // Calculate averages and min/max for mill overview
+    // Calculate averages and min/max for mill overview (use effective rate for RICE BRAN)
     const millWeightedRate = millSummary.allTransactions.reduce((sum, s) => {
-      const rate = toNumber(s.rate);
+      const rate = (s as any).variety?.toLowerCase?.() === 'rice bran' && toNumber((s as any).calculatedRate) > 0
+        ? toNumber((s as any).calculatedRate)
+        : toNumber(s.rate);
       const netWeight = toNumber(s.netWeight);
       return sum + rate * netWeight;
     }, 0);

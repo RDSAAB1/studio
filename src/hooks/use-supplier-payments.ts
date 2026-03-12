@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { addBank, getOptionsRealtime } from '@/lib/firestore';
 import type { Customer, OptionItem } from "@/lib/definitions";
+import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "@/app/sales/supplier-profile/utils/fuzzy-matching";
 
 const normalizeProfileField = (value: unknown): string => {
@@ -98,92 +99,18 @@ export const useSupplierPayments = () => {
         return [];
     }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
+    // Use SAME calculation as outstanding table - so Full payment To Be Paid shows exact outstanding amount
     const totalOutstandingForSelected = useMemo(() => {
-        if (form.editingPayment) {
-            // EDIT MODE: Calculate the maximum amount this payment can be.
-            // Use the SAME logic as use-supplier-summary to ensure consistency
-            const editingPayment = form.editingPayment; // Store reference to avoid null checks
-            return selectedEntries.reduce((sum, entry) => {
-                const originalAmount = Number(entry.originalNetAmount) || 0;
-                
-                // Find all payments for this entry *except* the one being edited
-                const otherPaymentsForThisEntry = (data.paymentHistory || [])
-                    .filter(p => p.id !== editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
+        const paymentHistory = data.paymentHistory || [];
+        // Edit mode: exclude the payment being edited so we get correct "max payable" for this payment
+        const historyToUse = form.editingPayment
+            ? paymentHistory.filter((p: Payment) => p.id !== form.editingPayment!.id)
+            : paymentHistory;
 
-                // Use SAME logic as use-supplier-summary: Calculate totalPaid and totalCd separately
-                let totalPaidForEntry = 0;
-                let totalCdForEntry = 0;
-
-                otherPaymentsForThisEntry.forEach(payment => {
-                    const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === entry.srNo);
-                    if (paidForThisPurchase) {
-                        // Direct database value - no calculation
-                        totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
-                        
-                        // CD amount calculation: First check if directly stored in paidFor (new format), else calculate proportionally
-                        if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
-                            // New format: CD amount directly stored in paidFor
-                            totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
-                        } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                            // Old format: Calculate proportionally from payment.cdAmount
-                            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                            if (totalPaidForInPayment > 0) {
-                                const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidForInPayment;
-                                totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
-                            }
-                        }
-                    }
-                });
-
-                // Calculate outstanding using SAME formula as use-supplier-summary
-                // Outstanding = Original - (Total Paid + Total CD) — allow negative (Ledger overpayment)
-                const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-                return sum + Math.round(currentOutstanding * 100) / 100;
-            }, 0);
-        }
-        
-        // NEW PAYMENT MODE (Supplier): Use SAME logic as use-supplier-summary
-        // Calculate outstanding from payment history to ensure consistency
-        const totalOutstanding = selectedEntries.reduce((sum, entry) => {
-            // Use outstandingForEntry if available (from use-supplier-summary), otherwise calculate
-            if ('outstandingForEntry' in entry && entry.outstandingForEntry !== undefined) {
-                return sum + Number(entry.outstandingForEntry || 0);
-            }
-            
-            // Fallback: Calculate using same logic as use-supplier-summary
-            const originalAmount = Number(entry.originalNetAmount) || 0;
-            const paymentsForEntry = (data.paymentHistory || []).filter(p => 
-                p.paidFor?.some(pf => pf.srNo === entry.srNo)
-            );
-            
-            let totalPaidForEntry = 0;
-            let totalCdForEntry = 0;
-            
-            paymentsForEntry.forEach(payment => {
-                const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === entry.srNo);
-                if (paidForThisPurchase) {
-                    totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
-                    
-                    // CD amount calculation: Same as use-supplier-summary
-                    if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
-                        totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
-                    } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                        const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                        if (totalPaidForInPayment > 0) {
-                            const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidForInPayment;
-                            totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
-                        }
-                    }
-                }
-            });
-            
-            // Outstanding = Original - (Paid + CD) - SAME formula as use-supplier-summary (allow negative)
-            const outstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-            return sum + Math.round(outstanding * 100) / 100;
+        return selectedEntries.reduce((sum, entry) => {
+            const result = calculateOutstandingForEntry(entry, historyToUse);
+            return sum + result.outstanding;
         }, 0);
-
-        return totalOutstanding;
-
     }, [selectedEntries, data.paymentHistory, form.editingPayment]);
 
     const supplierIdToProfileKey = useMemo(() => {

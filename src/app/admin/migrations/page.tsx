@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, AlertCircle, Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +24,8 @@ import {
     bulkUpsertLedgerEntries,
     bulkUpsertLedgerCashAccounts,
     bulkUpsertMandiReports,
+    migrateGovFinalizedPaymentsToPayments,
+    type MigrateGovFinalizedToPaymentsResult,
 } from '@/lib/firestore';
 import { calculateSupplierEntry } from '@/lib/utils';
 import { syncAllData } from '@/lib/database';
@@ -274,6 +277,30 @@ export default function MigrationsPage() {
 
     const [isRunning5, setIsRunning5] = useState(false);
     const [result5, setResult5] = useState<MigrationResult[] | null>(null);
+
+    const [isRunning6, setIsRunning6] = useState(false);
+    const [result6, setResult6] = useState<MigrateGovFinalizedToPaymentsResult | null>(null);
+    const [govMigrateDeleteSource, setGovMigrateDeleteSource] = useState(false);
+
+    const handleMigrateGovFinalizedToPayments = async () => {
+        if (!confirm('Gov Finalized payments ko Payments collection mein copy karenge. Continue?')) return;
+        setIsRunning6(true);
+        setResult6(null);
+        try {
+            const res = await migrateGovFinalizedPaymentsToPayments({ deleteFromSource: govMigrateDeleteSource });
+            setResult6(res);
+            if (res.success) {
+                toast({ title: 'Migration Complete', description: `${res.migrated} payment(s) migrated to Payments.` });
+            } else {
+                toast({ title: 'Migration Failed', description: res.error, variant: 'destructive' });
+            }
+        } catch (e) {
+            toast({ title: 'Migration Failed', description: String(e), variant: 'destructive' });
+            setResult6({ success: false, migrated: 0, skipped: 0, error: String(e) });
+        } finally {
+            setIsRunning6(false);
+        }
+    };
 
     const handleUpdatedAtMigration = async () => {
         if (!confirm("This will update ALL documents in ALL collections with a new 'updatedAt' timestamp. This ensures all data syncs correctly but will cause a one-time re-download on other devices. Continue?")) return;
@@ -935,6 +962,72 @@ export default function MigrationsPage() {
                             <li>Creates unique srNo/ID values for duplicates</li>
                             <li>Safe to run multiple times</li>
                             <li>Check browser console for detailed logs</li>
+                        </ul>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Gov Finalized → Payments Migration</CardTitle>
+                    <CardDescription>
+                        Gov finalized payment collection ke payments ko main Payments collection mein le jata hai.
+                        Payments page par sab payments ek saath dikhenge.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="gov-migrate-delete"
+                            checked={govMigrateDeleteSource}
+                            onChange={(e) => setGovMigrateDeleteSource(e.target.checked)}
+                            className="rounded border-gray-300"
+                        />
+                        <Label htmlFor="gov-migrate-delete" className="text-sm cursor-pointer">
+                            Migration ke baad Gov Finalized collection se delete karein
+                        </Label>
+                    </div>
+                    <Button
+                        onClick={handleMigrateGovFinalizedToPayments}
+                        disabled={isRunning6}
+                        className="w-full sm:w-auto"
+                    >
+                        {isRunning6 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isRunning6 ? 'Migrating...' : 'Migrate Gov Finalized to Payments'}
+                    </Button>
+
+                    {result6 && (
+                        <div className={`p-4 rounded-lg border ${result6.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                            <div className="flex items-start gap-3">
+                                {result6.success ? (
+                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                                ) : (
+                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                    <p className={`font-semibold ${result6.success ? 'text-green-900' : 'text-red-900'}`}>
+                                        {result6.success ? 'Migration Completed!' : 'Migration Failed'}
+                                    </p>
+                                    {result6.success && (
+                                        <p className="text-sm text-green-700 mt-1">
+                                            {result6.migrated} payment(s) migrated to Payments collection.
+                                        </p>
+                                    )}
+                                    {!result6.success && result6.error && (
+                                        <p className="text-sm text-red-700 mt-1">{result6.error}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <p className="text-sm text-amber-900 font-medium">Notes:</p>
+                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
+                            <li>Gov Finalized collection ke sab payments copy honge Payments mein</li>
+                            <li>IndexedDB bhi update hoga — refresh ki zaroorat nahi</li>
+                            <li>Optional: &quot;Delete from source&quot; check karke Gov Finalized se hata sakte hain</li>
                         </ul>
                     </div>
                 </CardContent>

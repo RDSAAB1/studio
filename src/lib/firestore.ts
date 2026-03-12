@@ -4615,6 +4615,65 @@ export async function bulkUpsertPayments(payments: Payment[], chunkSize = 400) {
     }
 }
 
+/** Gov Finalized → Payments migration: move payments from governmentFinalizedPayments to payments collection */
+export interface MigrateGovFinalizedToPaymentsResult {
+    success: boolean;
+    migrated: number;
+    skipped: number;
+    error?: string;
+}
+
+export async function migrateGovFinalizedPaymentsToPayments(options?: {
+    deleteFromSource?: boolean;
+}): Promise<MigrateGovFinalizedToPaymentsResult> {
+    try {
+        const snapshot = await getDocs(governmentFinalizedPaymentsCollection);
+        const govPayments: Payment[] = snapshot.docs.map((d) => {
+            const data = d.data() as Record<string, unknown>;
+            return { id: d.id, ...data, paymentId: data.paymentId || d.id } as Payment;
+        });
+
+        if (govPayments.length === 0) {
+            return { success: true, migrated: 0, skipped: 0 };
+        }
+
+        await bulkUpsertPayments(govPayments, 100);
+
+        if (db) {
+            const { chunkedBulkPut } = await import('./chunked-operations');
+            await chunkedBulkPut(db.payments, govPayments, 100);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+            }
+        }
+
+        if (options?.deleteFromSource && govPayments.length > 0) {
+            const batch = writeBatch(firestoreDB);
+            govPayments.forEach((p) => {
+                const ref = doc(governmentFinalizedPaymentsCollection, p.id);
+                batch.delete(ref);
+            });
+            await batch.commit();
+            if (db) {
+                const idsToDelete = govPayments.map((p) => p.id);
+                await db.governmentFinalizedPayments.bulkDelete(idsToDelete);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'governmentFinalizedPayments' } }));
+                }
+            }
+        }
+
+        return { success: true, migrated: govPayments.length, skipped: 0 };
+    } catch (error) {
+        return {
+            success: false,
+            migrated: 0,
+            skipped: 0,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
 export async function bulkUpsertCustomerPayments(payments: CustomerPayment[], chunkSize = 400) {
     if (!payments.length) return;
     const chunks = chunkArray(payments, chunkSize);

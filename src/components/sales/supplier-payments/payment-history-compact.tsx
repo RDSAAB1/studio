@@ -266,8 +266,9 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                         ? Math.abs(Number((payment as any).amount || 0))
                         : 0;
                     const extraAmountFromPayment = extraAmountFromPaymentFields + ledgerAmountFallback;
+                    // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
                     const includePaymentLevelExtra =
-                      extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online');
+                      extraAmountFromPaidFor === 0 && (extraAmountFromPaidFor === 0 || !(paymentReceiptType === 'ledger' || paymentReceiptType === 'online'));
                     const extraAmount = extraAmountFromPaidFor + ((includePaymentLevelExtra ? extraAmountFromPayment : 0) * extraAmountSign);
                     const accountHolderName = getAccountHolderName(payment);
                     const bankDetails = getBankDetails(payment);

@@ -412,8 +412,9 @@ export const generateStatementTransactions = async (
                 p.paidFor?.reduce((sum: number, pf: any) => sum + (Number(pf.extraAmount) || 0), 0) || 0;
             const paymentLevelExtraFromFields =
                 Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
+            // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
             const includePaymentLevelExtra =
-                paidForExtraAmount === 0 || !(paymentTypeLower === 'ledger' || paymentTypeLower === 'online');
+                paidForExtraAmount === 0 && (paidForExtraAmount === 0 || !(paymentTypeLower === 'ledger' || paymentTypeLower === 'online'));
 
             // Calculate total paid amount from paidFor entries
             const totalPaidForPayment = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;

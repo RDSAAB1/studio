@@ -71,11 +71,23 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   };
 
+  handleRefresh = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
   handleGoHome = () => {
     this.handleReset();
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }
+  };
+
+  /** Webpack/Next.js stale chunk error - needs full reload */
+  isWebpackChunkError = () => {
+    const msg = this.state.error?.message || '';
+    return msg.includes("reading 'call'") || msg.includes("reading \"call\"");
   };
 
   render() {
@@ -95,7 +107,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 <CardTitle>Something went wrong</CardTitle>
               </div>
               <CardDescription>
-                An unexpected error occurred. Please try again.
+                {this.isWebpackChunkError()
+                  ? "The app may have been updated. Please refresh the page to load the latest version."
+                  : "An unexpected error occurred. Please try again."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -119,9 +133,13 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={this.handleReset} variant="default" className="flex-1">
+                <Button
+                  onClick={this.isWebpackChunkError() ? this.handleRefresh : this.handleReset}
+                  variant="default"
+                  className="flex-1"
+                >
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Try Again
+                  {this.isWebpackChunkError() ? "Refresh Page" : "Try Again"}
                 </Button>
                 <Button onClick={this.handleGoHome} variant="outline" className="flex-1">
                   <Home className="mr-2 h-4 w-4" />

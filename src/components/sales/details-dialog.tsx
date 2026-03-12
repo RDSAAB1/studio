@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
+import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,148 +46,22 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     const { toast } = useToast();
     const [paymentToDelete, setPaymentToDelete] = useState<Payment | CustomerPayment | null>(null);
 
-    // All hooks must be called before any conditional returns
-    const paymentsForDetailsEntry = useMemo(() => {
-        if (!customer) return [];
-        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
-        const filtered = (paymentHistory || []).filter(p => {
-            const paidForMatch = p.paidFor?.some(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
-            const parchiTokens = parchiNoRaw
-                .split(/[,\s]+/g)
-                .map(t => t.trim())
-                .filter(Boolean);
-            const parchiMatch = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
-            return Boolean(paidForMatch || parchiMatch);
-        });
-        return filtered.filter((p, index, self) => {
-            const pKey = String((p as any).paymentId || (p as any).id || '').trim();
-            if (!pKey) return false;
-            return index === self.findIndex((t) => {
-                const tKey = String((t as any).paymentId || (t as any).id || '').trim();
-                return tKey === pKey;
-            });
-        });
-    }, [paymentHistory, customer?.srNo]);
+    // Use shared calculator - same logic as outstanding entries table
+    const outstandingResult = useMemo(() => {
+        if (!customer) return null;
+        return calculateOutstandingForEntry(customer, paymentHistory || []);
+    }, [customer, paymentHistory]);
 
-    const totalPaidForThisEntry = useMemo(() => {
-        if (!customer) return 0;
-        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
-        return paymentsForDetailsEntry.reduce((sum, p) => {
-            const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
-            const isLedger = receiptType === 'ledger';
-            const isLedgerCredit =
-                String((p as any).drCr || '').trim().toLowerCase() === 'credit' || Number((p as any).amount || 0) < 0;
+    const paymentsForDetailsEntry = outstandingResult?.paymentsForEntry ?? [];
 
-            // Ledger: Debit (Expense) = payment → Total Paid mein; Credit (Income) mat jodo
-            if (paidForThis) {
-                if (isLedger && isLedgerCredit) return sum;
-                return sum + Number(paidForThis.amount || 0);
-            }
-
-            // Legacy/unlinked ledger: paidFor empty but parchiNo contains SR# list
-            if (isLedger) {
-                const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
-                const parchiTokens = parchiNoRaw
-                    .split(/[,\s]+/g)
-                    .map(t => t.trim())
-                    .filter(Boolean);
-                const parchiMatch = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
-                if (parchiMatch && !isLedgerCredit) {
-                    const amountAbs = Math.abs(Number((p as any).amount || 0));
-                    const share =
-                        parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
-                    return sum + share;
-                }
-            }
-
-            return sum;
-        }, 0);
-    }, [paymentsForDetailsEntry, customer?.srNo]);
-
-    const totalCdForThisEntry = useMemo(() => {
-        if (!customer) return 0;
-        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
-        return paymentsForDetailsEntry.reduce((sum, p) => {
-            const paidForThisDetail = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            if (!paidForThisDetail) return sum;
-
-            // First check if CD amount is directly stored in paidFor (new format - more accurate)
-            if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
-                return sum + Number(paidForThisDetail.cdAmount || 0);
-            }
-            
-            // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
-            if ((p as any).cdAmount && p.paidFor && p.paidFor.length > 0) {
-                const totalAmountInPayment = p.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
-                if (totalAmountInPayment > 0) {
-                    const proportion = Number(paidForThisDetail.amount || 0) / totalAmountInPayment;
-                    return sum + Math.round((p as any).cdAmount * proportion * 100) / 100;
-                }
-            }
-            return sum;
-        }, 0);
-    }, [paymentsForDetailsEntry, customer?.srNo]);
-
-    const totalExtraForThisEntry = useMemo(() => {
-        if (!customer) return 0;
-        const targetSrNo = String(customer.srNo || '').trim().toLowerCase();
-        return paymentsForDetailsEntry.reduce((sum, p) => {
-            const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === targetSrNo);
-            const paidForExtra = Number((paidForThis as any)?.extraAmount || 0);
-            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
-            const isLedger = receiptType === 'ledger';
-            const isLedgerCredit =
-                String((p as any).drCr || '').trim().toLowerCase() === 'credit' || Number((p as any).amount || 0) < 0;
-
-            const parchiNoRaw = String((p as any).parchiNo || '').trim().toLowerCase();
-            const parchiTokens = parchiNoRaw
-                .split(/[,\s]+/g)
-                .map(t => t.trim())
-                .filter(Boolean);
-            const isPaymentAttachedToThisEntry = parchiTokens.includes(targetSrNo) || parchiNoRaw === targetSrNo;
-
-            // Payment-level extra fields (Online extras) OR legacy/unlinked ledger Credit => charge (Income/Credit)
-            const paymentLevelExtraRawFromFields =
-                Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
-            const ledgerAmountFallback =
-                isLedger && (p.paidFor?.length || 0) === 0 && paymentLevelExtraRawFromFields === 0
-                    ? Math.abs(Number((p as any).amount || 0))
-                    : 0;
-            const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
-            const ledgerShare =
-                isLedger && isPaymentAttachedToThisEntry && ledgerAmountFallback > 0 && parchiTokens.length > 0
-                    ? Math.round((ledgerAmountFallback / parchiTokens.length) * 100) / 100
-                    : ledgerAmountFallback;
-
-            const includePaymentLevelExtra = paidForExtra === 0 || !(receiptType === 'ledger' || receiptType === 'online');
-            const paymentLevelExtra =
-                isPaymentAttachedToThisEntry && includePaymentLevelExtra
-                    ? (isLedger
-                          ? (isLedgerCredit ? (paymentLevelExtraRawFromFields + ledgerShare) : 0)
-                          : paymentLevelExtraRaw)
-                    : 0;
-
-            return sum + paidForExtra + paymentLevelExtra;
-        }, 0);
-    }, [paymentsForDetailsEntry, customer?.srNo]);
-
-
-    // Calculate adjusted original (just use original net amount now)
-    const { adjustedOriginal, govPaymentDetails } = useMemo(() => {
-        if (!customer) return { adjustedOriginal: 0, govPaymentDetails: null };
-        
-        const baseOriginal = Number(customer.originalNetAmount || 0);
-        const adjustedOriginal = baseOriginal + totalExtraForThisEntry;
-        const govPaymentDetails = null;
-
-        return { adjustedOriginal, govPaymentDetails };
-    }, [customer, totalExtraForThisEntry]);
-    
-    // Calculate derived values (not hooks, so safe to be after early return check)
-    // Outstanding = Adjusted Original - Total Paid - Total CD
-    const finalOutstanding = customer ? adjustedOriginal - totalPaidForThisEntry - totalCdForThisEntry : 0;
+    const totalPaidForThisEntry = outstandingResult?.totalPaid ?? 0;
+    const totalCdForThisEntry = outstandingResult?.totalCd ?? 0;
+    const totalExtraForThisEntry = outstandingResult?.totalExtra ?? 0;
+    const adjustedOriginal = customer
+        ? Number(customer.originalNetAmount ?? customer.netAmount ?? 0) + totalExtraForThisEntry
+        : 0;
+    const govPaymentDetails = null;
+    const finalOutstanding = outstandingResult?.outstanding ?? 0;
     const isCustomer = entryType === 'Customer';
     const totalBagWeightKg = customer ? (customer.bags || 0) * (customer.bagWeightKg || 0) : 0;
     // Calculate brokerage amount: Final Weight × Brokerage Rate (for both suppliers and customers)
@@ -392,8 +267,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                         String((payment as any).parchiNo || '').trim().toLowerCase() ===
                                                         String(customer?.srNo || '').trim().toLowerCase();
                                                     const paidForExtraForThisEntry = Number((paidForThis as any)?.extraAmount || 0);
+                                                    // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
                                                     const includePaymentLevelExtra =
-                                                        paidForExtraForThisEntry === 0 || !(receiptType === 'ledger' || receiptType === 'online');
+                                                        paidForExtraForThisEntry === 0 && (paidForExtraForThisEntry === 0 || !(receiptType === 'ledger' || receiptType === 'online'));
                                                     const extraForThisEntry =
                                                         paidForExtraForThisEntry +
                                                         (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0);

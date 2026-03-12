@@ -9,6 +9,7 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerData } from './use-customer-data';
+import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
 import type { Customer } from "@/lib/definitions";
 
 export const useCustomerPayments = () => {
@@ -84,78 +85,15 @@ export const useCustomerPayments = () => {
     }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
     const totalOutstandingForSelected = useMemo(() => {
-        if (form.editingPayment) {
-            const editingPayment = form.editingPayment;
-            return selectedEntries.reduce((sum, entry) => {
-                const originalAmount = (Number(entry.originalNetAmount || entry.netAmount) || 0) + (Number(entry.advanceFreight) || 0);
-                
-                const otherPaymentsForThisEntry = (data.paymentHistory || [])
-                    .filter(p => p.id !== editingPayment.id && p.paidFor?.some(pf => pf.srNo === entry.srNo));
+        const paymentHistory = data.paymentHistory || [];
+        const historyToUse = form.editingPayment
+            ? paymentHistory.filter(p => p.id !== form.editingPayment!.id)
+            : paymentHistory;
 
-                let totalPaidForEntry = 0;
-                let totalCdForEntry = 0;
-
-                otherPaymentsForThisEntry.forEach(payment => {
-                    const paidForThisPurchase = payment.paidFor!.find(pf => pf.srNo === entry.srNo);
-                    if (paidForThisPurchase) {
-                        totalPaidForEntry += Number(paidForThisPurchase.amount || 0);
-                        
-                        if ('cdAmount' in paidForThisPurchase && paidForThisPurchase.cdAmount !== undefined && paidForThisPurchase.cdAmount !== null) {
-                            totalCdForEntry += Number(paidForThisPurchase.cdAmount || 0);
-                        } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                            if (totalPaidForInPayment > 0) {
-                                const proportion = Number(paidForThisPurchase.amount || 0) / totalPaidForInPayment;
-                                totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
-                            }
-                        }
-                    }
-                });
-
-                const currentOutstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-                return sum + Math.round(currentOutstanding * 100) / 100;
-            }, 0);
-        }
-        
-        // NEW PAYMENT MODE (Customer): Calculate outstanding from payment history
-        const totalOutstanding = selectedEntries.reduce((sum, entry) => {
-            if ('outstandingForEntry' in entry && entry.outstandingForEntry !== undefined) {
-                return sum + Number(entry.outstandingForEntry || 0);
-            }
-            
-            const originalAmount = (Number(entry.originalNetAmount || entry.netAmount) || 0) + (Number(entry.advanceFreight) || 0);
-            const entrySrNo = entry.srNo?.toLowerCase();
-            if (!entrySrNo) return sum;
-            
-            const paymentsForEntry = (data.paymentHistory || []).filter((p: Payment) => 
-                p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo)
-            );
-            
-            let totalPaidForEntry = 0;
-            let totalCdForEntry = 0;
-            
-            paymentsForEntry.forEach((payment: Payment) => {
-                const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-                if (paidForEntry) {
-                    totalPaidForEntry += Number(paidForEntry.amount || 0);
-                    
-                    if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
-                        totalCdForEntry += Number(paidForEntry.cdAmount || 0);
-                    } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                        const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                        if (totalPaidForInPayment > 0) {
-                            const proportion = Number(paidForEntry.amount || 0) / totalPaidForInPayment;
-                            totalCdForEntry += Math.round(payment.cdAmount * proportion * 100) / 100;
-                        }
-                    }
-                }
-            });
-            
-            const outstanding = originalAmount - totalPaidForEntry - totalCdForEntry;
-            return sum + Math.round(outstanding * 100) / 100;
+        return selectedEntries.reduce((sum, entry) => {
+            const { outstanding } = calculateOutstandingForEntry(entry, historyToUse);
+            return sum + outstanding;
         }, 0);
-        
-        return totalOutstanding;
     }, [selectedEntries, form.editingPayment, data.paymentHistory]);
 
     // Use useMemo to derive values instead of useState to avoid infinite loops
