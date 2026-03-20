@@ -18,7 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { electronNavigate } from '@/lib/electron-navigate';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 import { bankNames } from '@/lib/data';
-import { migrateTenantDataToSeason, type MigrationResult } from "@/lib/erp-migration";
+import { DataMigrationCard } from "@/components/settings/data-migration-card";
 import { AddCompanyUserCard } from "@/components/settings/add-company-user-card";
 import { ChangePasswordCard } from "@/components/settings/change-password-card";
 import { CompanyUserList } from "@/components/settings/company-user-list";
@@ -173,10 +173,6 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
 
     // ERP migration state
     const [migrationCompanyName, setMigrationCompanyName] = useState<string>("");
-    const [migrationSubCompanyName, setMigrationSubCompanyName] = useState<string>("MAIN");
-    const [migrationSeasonName, setMigrationSeasonName] = useState<string>(`${new Date().getFullYear()} A`);
-    const [migrationRunning, setMigrationRunning] = useState(false);
-    const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
     const [teamRefreshTrigger, setTeamRefreshTrigger] = useState(0);
 
 
@@ -577,41 +573,6 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         toast({ title: "Holiday removed.", variant: "success" });
     };
 
-    const handleMigrationRun = async () => {
-        if (!migrationCompanyName.trim() || !migrationSubCompanyName.trim() || !migrationSeasonName.trim()) {
-            toast({
-                title: "Missing details",
-                description: "Please enter Company, Sub Company and Season before migrating.",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        setMigrationRunning(true);
-        setMigrationResult(null);
-
-        try {
-            const result = await migrateTenantDataToSeason({
-                companyName: migrationCompanyName.trim(),
-                subCompanyName: migrationSubCompanyName.trim(),
-                seasonName: migrationSeasonName.trim()
-            });
-            setMigrationResult(result);
-            toast({
-                title: "Migration complete",
-                description: `Migrated ${result.totalMigrated} records to ${migrationSeasonName}.`,
-                variant: "success"
-            });
-        } catch (error: any) {
-            toast({
-                title: "Migration failed",
-                description: error?.message || "Could not migrate data.",
-                variant: "destructive"
-            });
-        } finally {
-            setMigrationRunning(false);
-        }
-    };
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
     const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
@@ -881,67 +842,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                                     ))}
                                 </ScrollArea>
                             </SettingsCard>
-                            <SettingsCard
-                                title="ERP Data Migration"
-                                description="Move all existing data of the current company into a single Company → Sub Company → Season structure for the new ERP system."
-                                footer={
-                                    <Button type="button" onClick={handleMigrationRun} disabled={migrationRunning}>
-                                        {migrationRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Migrate Existing Data
-                                    </Button>
-                                }
-                            >
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-1">
-                                            <Label>Company Name</Label>
-                                            <Input
-                                                value={migrationCompanyName}
-                                                onChange={(e) => setMigrationCompanyName(e.target.value)}
-                                                placeholder="e.g. JRMD Agro"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label>Sub Company</Label>
-                                            <Input
-                                                value={migrationSubCompanyName}
-                                                onChange={(e) => setMigrationSubCompanyName(e.target.value)}
-                                                placeholder="e.g. MAIN BRANCH"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label>Season / Year Label</Label>
-                                            <Input
-                                                value={migrationSeasonName}
-                                                onChange={(e) => setMigrationSeasonName(e.target.value)}
-                                                placeholder="e.g. 2024 A"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        This will copy all existing data of the active company into the selected Sub Company and
-                                        Season. Old data is not deleted; a marker is added so you can safely run migration again
-                                        without duplicating records.
-                                    </p>
-                                    {migrationRunning && (
-                                        <div className="space-y-2">
-                                            <Progress value={100} className="h-2 animate-pulse" />
-                                            <p className="text-xs text-muted-foreground">
-                                                Migrating data… please keep this tab open.
-                                            </p>
-                                        </div>
-                                    )}
-                                    {migrationResult && !migrationRunning && (
-                                        <div className="space-y-1 text-xs text-muted-foreground">
-                                            <p>
-                                                Migrated <span className="font-semibold">{migrationResult.totalMigrated}</span> records
-                                                to <span className="font-semibold">{migrationSeasonName}</span> in Sub Company{" "}
-                                                <span className="font-semibold">{migrationSubCompanyName}</span>.
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </SettingsCard>
+                            <DataMigrationCard initialCompanyName={migrationCompanyName} />
                         </div>
                      </div>
                  </TabsContent>

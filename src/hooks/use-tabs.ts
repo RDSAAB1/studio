@@ -115,10 +115,9 @@ export const allMenuItems: MenuItem[] = [
     icon: Wrench,
     subMenus: [
         // All admin tools now live inside unified /sales SPA (single route)
-        { id: "admin/migrations", name: "Database Migrations", icon: Database, href: "/sales?menu=admin&tab=admin-migrations" },
+        { id: "admin/migrations", name: "Data Migration", icon: Database, href: "/sales?menu=admin&tab=admin-migrations" },
         { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search, href: "/sales?menu=admin&tab=admin-diagnostics" },
         { id: "admin/tasks", name: "Task Progress", icon: ClipboardCheck, href: "/sales?menu=admin&tab=admin-tasks" },
-        { id: "settings-data-migration", name: "Data Migration", icon: Database, href: "/sales?menu=admin&tab=settings-data-migration" },
     ]
   },
 ];

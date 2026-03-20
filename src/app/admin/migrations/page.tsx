@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, AlertCircle, Download, Upload, FolderOpen, FolderInput } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     getAllSuppliers,
     getAllCustomers,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/firestore';
 import { calculateSupplierEntry } from '@/lib/utils';
 import { syncAllData } from '@/lib/database';
+import { Wrench, ArrowRightLeft, DatabaseZap, FileSpreadsheet } from 'lucide-react';
 import type { Customer, Payment, CustomerPayment, LedgerAccount, LedgerEntry, LedgerCashAccount, MandiReport } from '@/lib/definitions';
 import { fixRtgsPaymentIds } from '@/scripts/fix-rtgs-payment-ids';
 import { fixTransactionIdMismatch, type FixTransactionIdMismatchResult } from '@/scripts/fix-transaction-id-mismatch';
@@ -37,8 +39,9 @@ import type { FixResult } from '@/scripts/fix-supplier-serial-duplicates';
 import { fixSupplierSerialDuplicates } from '@/scripts/fix-supplier-serial-duplicates';
 import { MigrationResult, migrateUpdatedAt } from '@/lib/migration-utils';
 import { exportToFolder, importFromFolder } from '@/lib/folder-structure-export';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { DataMigrationCard } from '@/components/settings/data-migration-card';
+import { SqliteMigrationCard } from '@/components/admin/sqlite-migration-card';
 
 type MigrationError = { message?: string } | string;
 
@@ -666,9 +669,9 @@ export default function MigrationsPage() {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Database Migrations</h1>
-                <p className="text-muted-foreground mt-2">Run data fixes and migrations</p>
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold">Data Migration</h1>
+                <p className="text-muted-foreground mt-2">Run data fixes, ERP migrations and backups</p>
             </div>
 
             <input
@@ -679,526 +682,259 @@ export default function MigrationsPage() {
                 onChange={handleFileChange}
             />
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Backup & Sync</CardTitle>
-                    <CardDescription>
-                        Export all Firestore collections to Excel or import curated workbooks. Supplier amounts and ledger balances are recalculated automatically before saving.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-3">
-                        <Button
-                            onClick={handleExport}
-                            disabled={isExporting || isImporting}
-                            className="w-full sm:w-auto"
-                        >
-                            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isExporting ? 'Exporting...' : (
-                                <>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export to Excel
-                                </>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Left Column: ERP & SQLite */}
+                <div className="space-y-8">
+                    <section>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <ArrowRightLeft className="h-6 w-6 text-primary" />
+                            ERP Season Migration
+                        </h2>
+                        <DataMigrationCard />
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <DatabaseZap className="h-6 w-6 text-primary" />
+                            SQLite Database Management
+                        </h2>
+                        <SqliteMigrationCard />
+                    </section>
+                </div>
+
+                {/* Right Column: Excel & Folder Backup */}
+                <div className="space-y-8">
+                    <section>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <FileSpreadsheet className="h-6 w-6 text-primary" />
+                            Excel Backup & Sync
+                        </h2>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Backup & Sync</CardTitle>
+                                <CardDescription>
+                                    Export all Firestore collections to Excel or import curated workbooks. 
+                                    Supplier amounts and ledger balances are recalculated automatically.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex flex-wrap gap-3">
+                                    <Button
+                                        onClick={handleExport}
+                                        disabled={isExporting || isImporting}
+                                        size="sm"
+                                    >
+                                        {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isExporting ? 'Exporting...' : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Export to Excel
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        onClick={handleImportClick}
+                                        disabled={isImporting || isExporting}
+                                        variant="secondary"
+                                        size="sm"
+                                    >
+                                        {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isImporting ? 'Importing...' : (
+                                            <>
+                                                <Upload className="mr-2 h-4 w-4" />
+                                                Import from Excel
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+
+                                {importSummary && (
+                                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                                        {importSummary}
+                                    </div>
+                                )}
+
+                                {importErrors.length > 0 && (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1">
+                                        <p className="font-semibold text-xs uppercase tracking-wider opacity-70">Warnings</p>
+                                        {importErrors.map((error, index) => (
+                                            <p key={index}>• {error}</p>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <FolderOpen className="h-6 w-6 text-primary" />
+                            Local Folder Backup
+                        </h2>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Folder Export / Import</CardTitle>
+                                <CardDescription>
+                                    Export data to a folder with menu-based structure (Entry, Payments, etc.). 
+                                    Requires Electron desktop app.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex flex-wrap gap-3">
+                                    <Button
+                                        onClick={handleExportToFolder}
+                                        disabled={isFolderExporting || isFolderImporting}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        {isFolderExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isFolderExporting ? 'Exporting...' : (
+                                            <>
+                                                <FolderOpen className="mr-2 h-4 w-4" />
+                                                Export to Folder
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        onClick={handleImportFromFolder}
+                                        disabled={isFolderImporting || isFolderExporting}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        {isFolderImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isFolderImporting ? 'Importing...' : (
+                                            <>
+                                                <FolderInput className="mr-2 h-4 w-4" />
+                                                Import from Folder
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+
+                                {folderResult && (
+                                    <div className={cn(
+                                        "rounded-lg border p-4 text-sm",
+                                        folderResult.success ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"
+                                    )}>
+                                        <p className="font-semibold">{folderResult.success ? 'Success' : 'Failed'}</p>
+                                        <p>{folderResult.message}</p>
+                                        {folderResult.details && <p className="mt-1 text-xs opacity-80">{folderResult.details}</p>}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </section>
+                </div>
+            </div>
+
+            <div className="border-t pt-8 mt-4">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <Wrench className="h-7 w-7 text-primary" />
+                    Database Utilities & Fixes
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Fix RTGS Payment IDs</CardTitle>
+                            <CardDescription>Updates paymentId field to match rtgsSrNo.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Button onClick={handleFixRtgsPaymentIds} disabled={isRunning1} size="sm" className="w-full">
+                                {isRunning1 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Run Migration'}
+                            </Button>
+                            {result1 && (
+                                <div className={cn("p-3 rounded-lg border text-[10px]", result1.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800')}>
+                                    {result1.success ? `Success: ${result1.count || 0} updated` : `Error: ${typeof result1.error === 'string' ? result1.error : (result1.error as any)?.message || 'Unknown'}`}
+                                </div>
                             )}
-                        </Button>
-                        <Button
-                            onClick={handleImportClick}
-                            disabled={isImporting || isExporting}
-                            variant="secondary"
-                            className="w-full sm:w-auto"
-                        >
-                            {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isImporting ? 'Importing...' : (
-                                <>
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    Import from Excel
-                                </>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Fix Transaction ID Mismatch</CardTitle>
+                            <CardDescription>Resolves "already exists" errors in history.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Button onClick={handleFixTransactionIdMismatch} disabled={isRunning2} size="sm" className="w-full">
+                                {isRunning2 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Run Migration'}
+                            </Button>
+                            {result2 && (
+                                <div className={cn("p-3 rounded-lg border text-[10px]", result2.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800')}>
+                                    {result2.success ? `Success: ${result2.count || 0} fixed` : `Error: ${result2.error || 'Unknown'}`}
+                                </div>
                             )}
-                        </Button>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    {importSummary && (
-                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                            {importSummary}
-                        </div>
-                    )}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Check/Fix Supplier Duplicates</CardTitle>
+                            <CardDescription>Finds and fixes duplicate srNo or ID values.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Button onClick={handleCheckSupplierDuplicates} disabled={isRunning3} size="sm" variant="outline" className="flex-1">
+                                    Check
+                                </Button>
+                                <Button onClick={handleFixSupplierDuplicates} disabled={isRunning4} size="sm" className="flex-1">
+                                    Fix
+                                </Button>
+                            </div>
+                            {result3 && <div className="text-[10px] text-muted-foreground bg-muted p-2 rounded">{result3.analysis?.summary}</div>}
+                            {result4 && <div className="text-[10px] text-green-700 font-medium">{result4.summary}</div>}
+                        </CardContent>
+                    </Card>
 
-                    {importErrors.length > 0 && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1">
-                            <p className="font-semibold">Warnings</p>
-                            {importErrors.map((error, index) => (
-                                <p key={index}>• {error}</p>
-                            ))}
-                        </div>
-                    )}
-
-                    <p className="text-xs text-muted-foreground">
-                        Export includes suppliers, customers, payments, ledger accounts, ledger entries, cash accounts, and mandi reports. Import recalculates financial fields, writes to Firestore in batches, and refreshes the local IndexedDB cache.
-                    </p>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Folder Export / Import (Menu Structure)</CardTitle>
-                    <CardDescription>
-                        Export data to a folder with menu-based structure (Entry, Payments, CashAndBank, Reports, HR, Projects, Settings). Excel experts can edit files directly. Import reads from the same structure. Requires Electron desktop app.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-3">
-                        <Button
-                            onClick={handleExportToFolder}
-                            disabled={isFolderExporting || isFolderImporting}
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                        >
-                            {isFolderExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isFolderExporting ? 'Exporting...' : (
-                                <>
-                                    <FolderOpen className="mr-2 h-4 w-4" />
-                                    Export to Folder
-                                </>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gov Finalized \u2192 Payments</CardTitle>
+                            <CardDescription>Copies Gov Payments to main Payments collection.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <input type="checkbox" id="gov-migrate-delete" checked={govMigrateDeleteSource} onChange={(e) => setGovMigrateDeleteSource(e.target.checked)} className="rounded border-gray-300 h-3 w-3" />
+                                <Label htmlFor="gov-migrate-delete" className="text-[10px] cursor-pointer">Delete from source</Label>
+                            </div>
+                            <Button onClick={handleMigrateGovFinalizedToPayments} disabled={isRunning6} size="sm" className="w-full">
+                                Migrate
+                            </Button>
+                            {result6 && (
+                                <div className={cn("p-2 rounded border text-[10px]", result6.success ? "bg-green-50" : "bg-red-50")}>
+                                    {result6.success ? `${result6.migrated} migrated` : result6.error}
+                                </div>
                             )}
-                        </Button>
-                        <Button
-                            onClick={handleImportFromFolder}
-                            disabled={isFolderImporting || isFolderExporting}
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                        >
-                            {isFolderImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isFolderImporting ? 'Importing...' : (
-                                <>
-                                    <FolderInput className="mr-2 h-4 w-4" />
-                                    Import from Folder
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                    {folderResult && (
-                        <div className={cn(
-                            'rounded-lg border p-4 text-sm',
-                            folderResult.success ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'
-                        )}>
-                            <p className="font-semibold">{folderResult.success ? 'Success' : 'Completed with issues'}</p>
-                            <p>{folderResult.message}</p>
-                            {folderResult.details && <p className="mt-1 text-xs opacity-90">{folderResult.details}</p>}
-                        </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                        Structure: BizSuiteData/Entry/, Payments/, CashAndBank/, Reports/, HR/, Projects/, Settings/ — each with Excel files. Run: npm run electron:dev
-                    </p>
-                </CardContent>
-            </Card>
+                        </CardContent>
+                    </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Fix RTGS Payment IDs</CardTitle>
-                    <CardDescription>
-                        Updates paymentId field to match rtgsSrNo for all RTGS payments.
-                        This fixes the issue where RTGS payment IDs were showing incorrectly.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button 
-                        onClick={handleFixRtgsPaymentIds} 
-                        disabled={isRunning1}
-                        className="w-full sm:w-auto"
-                    >
-                        {isRunning1 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning1 ? 'Running Migration...' : 'Run Migration'}
-                    </Button>
-
-                    {result1 && (
-                        <div className={`p-4 rounded-lg border ${result1.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div className="flex items-start gap-3">
-                                {result1.success ? (
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                ) : (
-                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${result1.success ? 'text-green-900' : 'text-red-900'}`}>
-                                        {result1.success ? 'Migration Completed Successfully!' : 'Migration Failed'}
-                                    </p>
-                                    {result1.success && result1.count !== undefined && (
-                                        <div className="text-sm text-green-700 mt-1">
-                                            {result1.count === 0 ? (
-                                                <p>No payments needed updating - all RTGS payments are already correct!</p>
-                                            ) : (
-                                                <>
-                                                    <p>✅ Updated {result1.count} RTGS payment{result1.count > 1 ? 's' : ''}</p>
-                                                    {result1.renamed && result1.renamed > 0 && (
-                                                        <p className="text-green-700 mt-1">✅ Renamed {result1.renamed} document{result1.renamed > 1 ? 's' : ''} (R##### → RT#####)</p>
-                                                    )}
-                                                    {result1.duplicatesFixed && result1.duplicatesFixed > 0 && (
-                                                        <p className="text-green-700 mt-1">✅ Fixed {result1.duplicatesFixed} duplicate ID{result1.duplicatesFixed > 1 ? 's' : ''}</p>
-                                                    )}
-                                                    {result1.skipped && result1.skipped > 0 && (
-                                                        <p className="text-amber-700 mt-1">⚠️ Skipped {result1.skipped} payment{result1.skipped > 1 ? 's' : ''} (invalid format)</p>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
-                                    {!result1.success && result1.error && (
-                                        <p className="text-sm text-red-700 mt-1">
-                                            Error: {typeof result1.error === 'string' ? result1.error : result1.error.message || 'Unknown error occurred'}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-sm text-amber-900 font-medium">⚠️ Important Notes:</p>
-                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>This migration is safe to run multiple times</li>
-                            <li>Fixes IDs starting with "R" to "RT" format (e.g., R00001 → RT00001)</li>
-                            <li>Detects and fixes duplicate RTGS IDs by assigning unique sequential IDs</li>
-                            <li>Renames document IDs to match corrected paymentId and rtgsSrNo</li>
-                            <li>Check the browser console for detailed logs</li>
-                            <li>Refresh the payments page after running to see updated data</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Fix Transaction ID Mismatches</CardTitle>
-                    <CardDescription>
-                        Fixes expenses/incomes where the transactionId field doesn't match the document ID.
-                        This resolves "already exists" errors and ghost entries in history.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button 
-                        onClick={handleFixTransactionIdMismatch} 
-                        disabled={isRunning2}
-                        className="w-full sm:w-auto"
-                    >
-                        {isRunning2 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning2 ? 'Running Migration...' : 'Run Migration'}
-                    </Button>
-
-                    {result2 && (
-                        <div className={`p-4 rounded-lg border ${result2.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div className="flex items-start gap-3">
-                                {result2.success ? (
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                ) : (
-                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${result2.success ? 'text-green-900' : 'text-red-900'}`}>
-                                        {result2.success ? 'Migration Completed Successfully!' : 'Migration Failed'}
-                                    </p>
-                                    {result2.success && result2.count !== undefined && (
-                                        <div className="text-sm text-green-700 mt-1">
-                                            {result2.count === 0 ? (
-                                                <p>No mismatches found - all transaction IDs are correct!</p>
-                                            ) : (
-                                                <p>✅ Fixed {result2.count} transaction ID mismatch{result2.count > 1 ? 'es' : ''}</p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {!result2.success && (result2.error || (result2.errors && result2.errors.length > 0)) && (
-                                        <p className="text-sm text-red-700 mt-1">
-                                            Error: {result2.error || result2.errors?.[0] || 'Unknown error occurred'}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-sm text-amber-900 font-medium">⚠️ Important Notes:</p>
-                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>Fixes entries where document ID ≠ transactionId field</li>
-                            <li>Updates transactionId field to match document ID</li>
-                            <li>Resolves "ID already exists" errors</li>
-                            <li>Makes ghost entries visible in history</li>
-                            <li>Safe to run multiple times</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Check Supplier Serial Number Duplicates</CardTitle>
-                    <CardDescription>
-                        Analyze all suppliers to find duplicate srNo or id values that cause ConstraintError in bulkPut operations.
-                        This will show you exactly which records have duplicate values.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button 
-                        onClick={handleCheckSupplierDuplicates} 
-                        disabled={isRunning3}
-                        className="w-full sm:w-auto"
-                    >
-                        {isRunning3 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning3 ? 'Analyzing...' : 'Check for Duplicates'}
-                    </Button>
-
-                    {result3 && (
-                        <div className={`p-4 rounded-lg border ${result3.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div className="flex items-start gap-3">
-                                {result3.success ? (
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                ) : (
-                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${result3.success ? 'text-green-900' : 'text-red-900'}`}>
-                                        {result3.success ? 'Analysis Completed!' : 'Analysis Failed'}
-                                    </p>
-                                    {result3.success && result3.analysis && (
-                                        <div className="text-sm text-green-700 mt-1">
-                                            <p className="font-medium">{result3.analysis.summary}</p>
-                                            {Object.keys(result3.analysis.duplicateSrNos).length > 0 && (
-                                                <div className="mt-2">
-                                                    <p className="text-red-700 font-medium">🚨 Duplicate Serial Numbers Found:</p>
-                                                    {Object.entries(result3.analysis.duplicateSrNos).slice(0, 3).map(([srNo, records]: [string, any[]]) => (
-                                                        <p key={srNo} className="text-xs">• {srNo}: {records.length} records</p>
-                                                    ))}
-                                                    {Object.keys(result3.analysis.duplicateSrNos).length > 3 && (
-                                                        <p className="text-xs">... and {Object.keys(result3.analysis.duplicateSrNos).length - 3} more</p>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {Object.keys(result3.analysis.duplicateIds).length > 0 && (
-                                                <div className="mt-2">
-                                                    <p className="text-red-700 font-medium">🚨 Duplicate IDs Found:</p>
-                                                    {Object.entries(result3.analysis.duplicateIds).slice(0, 3).map(([id, records]: [string, any[]]) => (
-                                                        <p key={id} className="text-xs">• {id}: {records.length} records</p>
-                                                    ))}
-                                                    {Object.keys(result3.analysis.duplicateIds).length > 3 && (
-                                                        <p className="text-xs">... and {Object.keys(result3.analysis.duplicateIds).length - 3} more</p>
-                                                    )}
-                                                </div>
-                                            )}
-                                            <p className="text-xs mt-2 text-amber-700">Check browser console for detailed analysis</p>
-                                        </div>
-                                    )}
-                                    {!result3.success && result3.error && (
-                                        <p className="text-sm text-red-700 mt-1">
-                                            Error: {typeof result3.error === 'string' ? result3.error : result3.error.message || 'Unknown error occurred'}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p className="text-sm text-blue-900 font-medium">ℹ️ What this does:</p>
-                        <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>Scans all suppliers in the database</li>
-                            <li>Identifies duplicate srNo values</li>
-                            <li>Identifies duplicate id values</li>
-                            <li>Shows empty/missing values</li>
-                            <li>Provides detailed console logs</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Fix Supplier Serial Number Duplicates</CardTitle>
-                    <CardDescription>
-                        Automatically fix duplicate srNo and id values by generating unique values.
-                        Run the check first to see what will be fixed.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button 
-                        onClick={handleFixSupplierDuplicates} 
-                        disabled={isRunning4}
-                        className="w-full sm:w-auto"
-                    >
-                        {isRunning4 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning4 ? 'Fixing Duplicates...' : 'Fix Duplicates'}
-                    </Button>
-
-                    {result4 && (
-                        <div className={`p-4 rounded-lg border ${result4.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div className="flex items-start gap-3">
-                                {result4.success ? (
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                ) : (
-                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${result4.success ? 'text-green-900' : 'text-red-900'}`}>
-                                        {result4.success ? 'Fix Completed Successfully!' : 'Fix Failed'}
-                                    </p>
-                                    {result4.success && (
-                                        <div className="text-sm text-green-700 mt-1">
-                                            <p className="font-medium">{result4.summary}</p>
-                                            {result4.fixedSrNos! > 0 && (
-                                                <p>✅ Fixed {result4.fixedSrNos} duplicate serial numbers</p>
-                                            )}
-                                            {result4.fixedIds! > 0 && (
-                                                <p>✅ Fixed {result4.fixedIds} duplicate IDs</p>
-                                            )}
-                                            {result4.errors && result4.errors.length > 0 && (
-                                                <div className="mt-2">
-                                                    <p className="text-red-700 font-medium">⚠️ Errors:</p>
-                                                    {result4.errors.slice(0, 3).map((error, index) => (
-                                                        <p key={index} className="text-xs text-red-600">• {error}</p>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <p className="text-xs mt-2 text-amber-700">Check browser console for detailed logs</p>
-                                        </div>
-                                    )}
-                                    {!result4.success && result4.error && (
-                                        <p className="text-sm text-red-700 mt-1">
-                                            Error: {result4.error || 'Unknown error occurred'}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-sm text-amber-900 font-medium">⚠️ Important Notes:</p>
-                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>Run the check first to see what will be fixed</li>
-                            <li>This will modify your supplier data</li>
-                            <li>Creates unique srNo/ID values for duplicates</li>
-                            <li>Safe to run multiple times</li>
-                            <li>Check browser console for detailed logs</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gov Finalized → Payments Migration</CardTitle>
-                    <CardDescription>
-                        Gov finalized payment collection ke payments ko main Payments collection mein le jata hai.
-                        Payments page par sab payments ek saath dikhenge.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="gov-migrate-delete"
-                            checked={govMigrateDeleteSource}
-                            onChange={(e) => setGovMigrateDeleteSource(e.target.checked)}
-                            className="rounded border-gray-300"
-                        />
-                        <Label htmlFor="gov-migrate-delete" className="text-sm cursor-pointer">
-                            Migration ke baad Gov Finalized collection se delete karein
-                        </Label>
-                    </div>
-                    <Button
-                        onClick={handleMigrateGovFinalizedToPayments}
-                        disabled={isRunning6}
-                        className="w-full sm:w-auto"
-                    >
-                        {isRunning6 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning6 ? 'Migrating...' : 'Migrate Gov Finalized to Payments'}
-                    </Button>
-
-                    {result6 && (
-                        <div className={`p-4 rounded-lg border ${result6.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div className="flex items-start gap-3">
-                                {result6.success ? (
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                ) : (
-                                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${result6.success ? 'text-green-900' : 'text-red-900'}`}>
-                                        {result6.success ? 'Migration Completed!' : 'Migration Failed'}
-                                    </p>
-                                    {result6.success && (
-                                        <p className="text-sm text-green-700 mt-1">
-                                            {result6.migrated} payment(s) migrated to Payments collection.
-                                        </p>
-                                    )}
-                                    {!result6.success && result6.error && (
-                                        <p className="text-sm text-red-700 mt-1">{result6.error}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-sm text-amber-900 font-medium">Notes:</p>
-                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>Gov Finalized collection ke sab payments copy honge Payments mein</li>
-                            <li>IndexedDB bhi update hoga — refresh ki zaroorat nahi</li>
-                            <li>Optional: &quot;Delete from source&quot; check karke Gov Finalized se hata sakte hain</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Data Integrity: UpdatedAt Migration</CardTitle>
-                    <CardDescription>
-                        Update all documents in all collections with an 'updatedAt' field. 
-                        This ensures efficient sync by enabling metadata-based filtering.
-                        Only use this if you are experiencing sync issues.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button 
-                        onClick={handleUpdatedAtMigration} 
-                        disabled={isRunning5}
-                        className="w-full sm:w-auto"
-                        variant="default"
-                    >
-                        {isRunning5 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isRunning5 ? 'Migrating...' : 'Run Update Migration'}
-                    </Button>
-
-                    {result5 && (
-                        <div className="mt-4 border rounded-md overflow-hidden">
-                            <div className="bg-muted p-2 font-medium text-xs uppercase tracking-wider">Migration Results</div>
-                            <ScrollArea className="h-64">
-                                <div className="divide-y">
-                                    {result5.map((res, i) => (
-                                        <div key={i} className="p-2 text-sm flex justify-between items-center">
-                                            <div>
-                                                <span className="font-medium">{res.collection}</span>
-                                                <span className="text-muted-foreground ml-2">({res.total} docs)</span>
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle>Sync Metadata: UpdatedAt Migration</CardTitle>
+                            <CardDescription>Updates all docs with 'updatedAt' for efficient syncing.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Button onClick={handleUpdatedAtMigration} disabled={isRunning5} size="sm">
+                                {isRunning5 ? 'Migrating...' : 'Run Update Migration'}
+                            </Button>
+                            {result5 && (
+                                <ScrollArea className="h-32 mt-2 rounded border bg-white">
+                                    <div className="divide-y text-[10px]">
+                                        {result5.map((res, i) => (
+                                            <div key={i} className="p-1 px-3 flex justify-between">
+                                                <span className="font-medium text-muted-foreground">{res.collection}</span>
+                                                <span className={res.status === 'success' ? 'text-green-600 font-bold' : 'text-red-600'}>
+                                                    {res.status === 'success' ? res.updated : 'Err'}
+                                                </span>
                                             </div>
-                                            <div className={cn("text-xs px-2 py-0.5 rounded-full", res.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                                                {res.status === 'success' ? `Updated ${res.updated}` : res.message}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-sm text-amber-900 font-medium">⚠️ Impact:</p>
-                        <ul className="text-sm text-amber-800 mt-2 space-y-1 list-disc list-inside">
-                            <li>Updates every single document in the database</li>
-                            <li>Will trigger a full sync on all connected devices</li>
-                            <li>Use during off-hours to minimize disruption</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </div>
     );
 }
