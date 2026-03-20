@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { hash } from "bcryptjs";
 
+export const dynamic = 'force-static';
+
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
 
 function randomPassword(length = 10): string {

@@ -6,7 +6,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch, getHolidays, addHoliday, deleteHoliday, getBankAccountsRealtime, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings, getCompanyEmailSettings, saveCompanyEmailSettings, deleteCompanyEmailSettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch, getHolidays, addHoliday, deleteHoliday, getBankAccountsRealtime, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { useErpSelection } from '@/hooks/use-erp-selection';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch, Holiday } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
@@ -14,17 +15,20 @@ import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { electronNavigate } from '@/lib/electron-navigate';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 import { bankNames } from '@/lib/data';
 import { migrateTenantDataToSeason, type MigrationResult } from "@/lib/erp-migration";
 import { AddCompanyUserCard } from "@/components/settings/add-company-user-card";
+import { ChangePasswordCard } from "@/components/settings/change-password-card";
+import { CompanyUserList } from "@/components/settings/company-user-list";
 
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Users2, Calendar as CalendarIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -138,10 +142,11 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
 
 type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
 export default function SettingsPage({ searchParams: searchParamsProp }: PageProps) {
+  const erp = useErpSelection();
   const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
   const searchParams = useSearchParams();
   const tabFromUrl = (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
-  const activeTab = (tabFromUrl && ["general", "team", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "general";
+  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
   const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -172,6 +177,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
     const [migrationSeasonName, setMigrationSeasonName] = useState<string>(`${new Date().getFullYear()} A`);
     const [migrationRunning, setMigrationRunning] = useState(false);
     const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
+    const [teamRefreshTrigger, setTeamRefreshTrigger] = useState(0);
 
 
     // Form Hooks
@@ -233,9 +239,12 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                     }
                 }
                 
-                const emailSettings = await getCompanySettings(currentUser.uid);
+                const emailSettings = await getCompanyEmailSettings(erp);
                 if(emailSettings) {
-                    emailForm.reset({ email: emailSettings.email || currentUser.email || '', appPassword: emailSettings.appPassword || '' });
+                    emailForm.reset({ 
+                        email: emailSettings.email || currentUser.email || '', 
+                        appPassword: '••••••••••••••••' // Placeholder for UI
+                    });
                 } else {
                     emailForm.reset({ email: currentUser.email || '', appPassword: '' });
                 }
@@ -256,15 +265,21 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                 const unsubBanks = getBanksRealtime(setBanks, handleRealtimeError);
                 const unsubBranches = getBankBranchesRealtime(setBankBranches, handleRealtimeError);
                 
-                navigator.serviceWorker.ready.then(async (registration) => {
-                    if ('periodicSync' in registration) {
-                        const tags = await (registration as any).periodicSync.getTags();
-                        if (tags.includes('periodic-sync-6h')) setAutoSyncInterval('6h');
-                        else if (tags.includes('periodic-sync-12h')) setAutoSyncInterval('12h');
-                        else if (tags.includes('periodic-sync-24h')) setAutoSyncInterval('24h');
-                        else setAutoSyncInterval('never');
+                try {
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.ready.then(async (registration) => {
+                            if ('periodicSync' in registration) {
+                                const tags = await (registration as any).periodicSync.getTags();
+                                if (tags.includes('periodic-sync-6h')) setAutoSyncInterval('6h');
+                                else if (tags.includes('periodic-sync-12h')) setAutoSyncInterval('12h');
+                                else if (tags.includes('periodic-sync-24h')) setAutoSyncInterval('24h');
+                                else setAutoSyncInterval('never');
+                            }
+                        }).catch(() => {});
                     }
-                });
+                } catch {
+                    // Document in invalid state (e.g. Electron)
+                }
 
                 setLoading(false);
 
@@ -290,6 +305,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
 
         void (async () => {
             try {
+                if (!('serviceWorker' in navigator)) return;
                 const registration = await navigator.serviceWorker.ready;
                 if ('periodicSync' in registration) {
                     await (registration as any).periodicSync.unregister('periodic-sync-6h');
@@ -338,17 +354,17 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         if (!user) return;
         setSaving(true);
         try {
-            await saveCompanySettings(user.uid, { email: data.email, appPassword: data.appPassword.replace(/\s/g, '') });
+            await saveCompanyEmailSettings({ email: data.email, appPassword: data.appPassword.replace(/\s/g, '') }, erp);
             toast({ title: "Email settings connected successfully", variant: "success" });
         } catch(e) { toast({ title: "Failed to connect email", variant: "destructive" }); }
         finally { setSaving(false); }
     };
-    
+
     const handleEmailDisconnect = async () => {
         if (!user) return;
         setSaving(true);
         try {
-            await deleteCompanySettings(user.uid);
+            await deleteCompanyEmailSettings(erp);
             emailForm.reset({ email: user.email || '', appPassword: '' });
             toast({ title: "Email disconnected successfully", variant: "success" });
         } catch (e) { toast({ title: "Failed to disconnect email", variant: "destructive" }); }
@@ -376,7 +392,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         try {
             await signOut(getFirebaseAuth());
             setUser(null); // Update local state
-            router.push('/login');
+            electronNavigate('/login', router);
         } catch (error) {
 
             toast({ title: "Failed to sign out", variant: "destructive" });
@@ -609,130 +625,143 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         <div className="space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
             <Tabs value={activeTab} onValueChange={(v) => { const p = new URLSearchParams(searchParams.toString()); p.set("tab", v); router.replace(`/settings?${p.toString()}`); }} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6">
-                    <TabsTrigger value="general">General</TabsTrigger>
-                    <TabsTrigger value="team">Team</TabsTrigger>
-                    <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
-                    <TabsTrigger value="receipts">Receipts</TabsTrigger>
-                    <TabsTrigger value="formats">Formats & Data</TabsTrigger>
-                    <TabsTrigger value="account">Account</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9 h-auto">
+                    <TabsTrigger value="company" className="flex items-center gap-1.5 py-2"><Building className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Company</span></TabsTrigger>
+                    <TabsTrigger value="email" className="flex items-center gap-1.5 py-2"><Mail className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Email</span></TabsTrigger>
+                    <TabsTrigger value="team" className="flex items-center gap-1.5 py-2"><Users2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Team</span></TabsTrigger>
+                    <TabsTrigger value="security" className="flex items-center gap-1.5 py-2"><ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span></TabsTrigger>
+                    <TabsTrigger value="general" className="flex items-center gap-1.5 py-2"><Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">General</span></TabsTrigger>
+                    <TabsTrigger value="banks" className="flex items-center gap-1.5 py-2"><Landmark className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Banks</span></TabsTrigger>
+                    <TabsTrigger value="receipts" className="flex items-center gap-1.5 py-2"><FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Receipts</span></TabsTrigger>
+                    <TabsTrigger value="formats" className="flex items-center gap-1.5 py-2"><List className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Formats</span></TabsTrigger>
+                    <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
                 </TabsList>
+                <TabsContent value="company" className="mt-6">
+                    <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
+                        <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
+                                <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
+                                <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
+                                <div className="space-y-1"><Label>Daily Payment Limit</Label><Input type="number" {...companyForm.register("dailyPaymentLimit")} /></div>
+                                <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
+                                <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="companyGstin">GSTIN</Label>
+                                    <Input {...companyForm.register("companyGstin")} className="uppercase" />
+                                    {companyForm.formState.errors.companyGstin && <p className="text-xs text-destructive">{companyForm.formState.errors.companyGstin.message}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="panNo">PAN</Label>
+                                    <Input {...companyForm.register("panNo")} readOnly disabled className="bg-muted"/>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>State Name</Label>
+                                    <CustomDropdown options={stateNameOptions} value={companyForm.watch('companyStateName') ?? null} onChange={handleStateNameChange} placeholder="Select State"/>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>State Code</Label>
+                                    <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode') ?? null} onChange={handleStateCodeChange} placeholder="Select Code"/>
+                                </div>
+                                <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
+                                    <Label htmlFor="bankHeaderLine1" className="font-semibold">BANK LOGO HEADER</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <Input id="bankHeaderLine1" {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
+                                    <Input id="bankHeaderLine2" {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
+                                    <Input id="bankHeaderLine3" {...companyForm.register("bankHeaderLine3")} placeholder="Header Line 3" />
+                                    </div>
+                                </div>
+                            </div>
+                        </SettingsCard>
+                    </form>
+                </TabsContent>
+                <TabsContent value="email" className="mt-6">
+                    <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
+                        <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
+                            <div className="space-y-4">
+                                <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
+                                <div className="space-y-1"><Label>Google App Password</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx" />
+                                        <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
+                                            <DialogContent className="sm:max-w-lg">
+                                                <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
+                                                <ScrollArea className="max-h-[60vh] pr-4">
+                                                    <div className="space-y-4 text-sm">
+                                                            <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                                <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                                <p className="text-xs text-primary/90">To create an App Password, you first need to enable 2-Step Verification on your Google Account.</p>
+                                                            </div>
+                                                            <Card>
+                                                                <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">This adds an extra layer of security to your account.</CardDescription></CardHeader>
+                                                                <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
+                                                                    <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                                </CardFooter>
+                                                            </Card>
+                                                            
+                                                            <Card>
+                                                                <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
+                                                                <CardContent className="p-4 pt-0 space-y-2 text-xs">
+                                                                    <p className="font-bold">Follow these steps carefully on the Google page:</p>
+                                                                    <ul className="list-decimal pl-5 space-y-1">
+                                                                        <li>Under "Select app", choose <strong>"Other (Custom name)"</strong>.</li>
+                                                                        <li>Enter a name like <strong>"BizSuite DataFlow"</strong> and click "CREATE".</li>
+                                                                        <li>Google will show you a 16-character password. <strong>Copy this password.</strong></li>
+                                                                    </ul>
+                                                                </CardContent>
+                                                                <CardFooter className="p-4 pt-0">
+                                                                    <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                                        <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                                    </a>
+                                                                </CardFooter>
+                                                            </Card>
+                                                        </div>
+                                                </ScrollArea>
+                                                    <DialogFooter className="sm:justify-start mt-4">
+                                                    <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
+                                                    </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+                                </div>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild><Button variant="destructive" type="button" disabled={saving || !emailForm.watch('appPassword')}><Trash2 className="mr-2 h-4 w-4"/>Disconnect</Button></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><AlertDialogTitle>Disconnect Email?</AlertDialogTitle><AlertDialogDescription>This will remove your saved App Password. You will need to reconnect to send emails.</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleEmailDisconnect}>Disconnect</AlertDialogAction></AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        </SettingsCard>
+                    </form>
+                </TabsContent>
                 <TabsContent value="general" className="mt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                         <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
-                            <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
-                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                   <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
-                                   <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
-                                   <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
-                                   <div className="space-y-1"><Label>Daily Payment Limit</Label><Input type="number" {...companyForm.register("dailyPaymentLimit")} /></div>
-                                   <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
-                                   <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
-                                   <div className="space-y-1">
-                                        <Label htmlFor="companyGstin">GSTIN</Label>
-                                        <Input {...companyForm.register("companyGstin")} className="uppercase" />
-                                        {companyForm.formState.errors.companyGstin && <p className="text-xs text-destructive">{companyForm.formState.errors.companyGstin.message}</p>}
-                                   </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="panNo">PAN</Label>
-                                        <Input {...companyForm.register("panNo")} readOnly disabled className="bg-muted"/>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label>State Name</Label>
-                                        <CustomDropdown options={stateNameOptions} value={companyForm.watch('companyStateName') ?? null} onChange={handleStateNameChange} placeholder="Select State"/>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label>State Code</Label>
-                                        <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode') ?? null} onChange={handleStateCodeChange} placeholder="Select Code"/>
-                                    </div>
-                                    <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
-                                        <Label htmlFor="bankHeaderLine1" className="font-semibold">BANK LOGO</Label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                        <Input id="bankHeaderLine1" {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
-                                        <Input id="bankHeaderLine2" {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
-                                        <Input id="bankHeaderLine3" {...companyForm.register("bankHeaderLine3")} placeholder="Header Line 3" />
-                                        </div>
-                                    </div>
-                               </div>
-                            </SettingsCard>
-                        </form>
-                         <div className="space-y-6">
-                            <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
-                                <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
-                                    <div className="space-y-4">
-                                        <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
-                                        <div className="space-y-1"><Label>Google App Password</Label>
-                                            <div className="flex items-center gap-2">
-                                                <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx" />
-                                                <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
-                                                    <DialogContent className="sm:max-w-lg">
-                                                        <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
-                                                        <ScrollArea className="max-h-[60vh] pr-4">
-                                                            <div className="space-y-4 text-sm">
-                                                                    <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
-                                                                        <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
-                                                                        <p className="text-xs text-primary/90">To create an App Password, you first need to enable 2-Step Verification on your Google Account.</p>
-                                                                    </div>
-                                                                    <Card>
-                                                                        <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">This adds an extra layer of security to your account.</CardDescription></CardHeader>
-                                                                        <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                                            <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                                        </CardFooter>
-                                                                    </Card>
-                                                                    
-                                                                    <Card>
-                                                                        <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
-                                                                        <CardContent className="p-4 pt-0 space-y-2 text-xs">
-                                                                            <p className="font-bold">Follow these steps carefully on the Google page:</p>
-                                                                            <ul className="list-decimal pl-5 space-y-1">
-                                                                                <li>Under "Select app", choose <strong>"Other (Custom name)"</strong>.</li>
-                                                                                <li>Enter a name like <strong>"BizSuite DataFlow"</strong> and click "CREATE".</li>
-                                                                                <li>Google will show you a 16-character password. <strong>Copy this password.</strong></li>
-                                                                            </ul>
-                                                                        </CardContent>
-                                                                        <CardFooter className="p-4 pt-0">
-                                                                            <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full">
-                                                                                <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                                                            </a>
-                                                                        </CardFooter>
-                                                                    </Card>
-                                                                </div>
-                                                        </ScrollArea>
-                                                            <DialogFooter className="sm:justify-start mt-4">
-                                                            <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
-                                                            </DialogFooter>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            </div>
-                                        </div>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild><Button variant="destructive" type="button" disabled={saving || !emailForm.watch('appPassword')}><Trash2 className="mr-2 h-4 w-4"/>Disconnect</Button></AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>Disconnect Email?</AlertDialogTitle><AlertDialogDescription>This will remove your saved App Password. You will need to reconnect to send emails.</AlertDialogDescription></AlertDialogHeader>
-                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleEmailDisconnect}>Disconnect</AlertDialogAction></AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </div>
-                                </SettingsCard>
-                            </form>
-                             <SettingsCard title="Auto-Sync Settings" description="Set how often the app should automatically sync data in the background.">
-                                <CustomDropdown 
-                                    options={[
-                                        { value: 'never', label: 'Never (Manual Sync Only)' },
-                                        { value: '6h', label: 'Every 6 Hours' },
-                                        { value: '12h', label: 'Every 12 Hours' },
-                                        { value: '24h', label: 'Daily (Every 24 Hours)' },
-                                    ]}
-                                    value={autoSyncInterval}
-                                    onChange={handleAutoSyncChange}
-                                />
-                                <p className="text-xs text-muted-foreground mt-2">Note: Your browser controls the exact timing to optimize performance. The sync will happen around your selected interval.</p>
-                             </SettingsCard>
-                         </div>
+                        <SettingsCard title="Auto-Sync Settings" description="Set how often the app should automatically sync data in the background.">
+                            <CustomDropdown 
+                                options={[
+                                    { value: 'never', label: 'Never (Manual Sync Only)' },
+                                    { value: '6h', label: 'Every 6 Hours' },
+                                    { value: '12h', label: 'Every 12 Hours' },
+                                    { value: '24h', label: 'Daily (Every 24 Hours)' },
+                                ]}
+                                value={autoSyncInterval}
+                                onChange={handleAutoSyncChange}
+                            />
+                            <p className="text-xs text-muted-foreground mt-2">Note: Your browser controls the exact timing to optimize performance. The sync will happen around your selected interval.</p>
+                        </SettingsCard>
                     </div>
                 </TabsContent>
-                 <TabsContent value="team" className="mt-6">
-                    <AddCompanyUserCard />
+                <TabsContent value="team" className="mt-6">
+                    <div className="space-y-6">
+                        <AddCompanyUserCard onSuccess={() => setTeamRefreshTrigger(prev => prev + 1)} />
+                        <CompanyUserList refreshTrigger={teamRefreshTrigger} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="security" className="mt-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <ChangePasswordCard isCompanyUser={!!user?.uid?.startsWith('cu_')} />
+                    </div>
                 </TabsContent>
                 <TabsContent value="banks" className="mt-6">
                      <SettingsCard title="Bank Accounts" description="Manage all your company bank accounts here." footer={

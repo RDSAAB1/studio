@@ -441,7 +441,7 @@ export default function IncomeExpenseClient() {
 
     useEffect(() => {
         if (!editingTransaction) {
-            const nextId = getNextTransactionId(selectedTransactionType);
+            const nextId = getNextTransactionId(selectedTransactionType === 'Income' ? 'Income' : 'Expense');
             setValue('transactionId', nextId);
         }
     }, [selectedTransactionType, editingTransaction, getNextTransactionId, setValue, payments, expenses]);
@@ -1201,7 +1201,7 @@ export default function IncomeExpenseClient() {
                 setLastAmountSource={setLastAmountSource}
                 bankAccounts={bankAccounts}
                 projects={projects}
-                selectedTransactionType={selectedTransactionType}
+                selectedTransactionType={selectedTransactionType === 'Income' ? 'Income' : 'Expense'}
                 errors={errors}
               />
             </CardContent>

@@ -13,6 +13,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from 'next/navigation';
+import { electronNavigate } from "@/lib/electron-navigate";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -37,7 +38,7 @@ export default function ForgotPasswordPage(props: PageProps) {
         try {
             await sendPasswordResetEmail(auth, data.email);
             toast({ title: "Password Reset Email Sent", description: "Please check your inbox to reset your password.", variant: "success" });
-            router.push('/login');
+            electronNavigate('/login', router);
         } catch (error: any) {
 
             let errorMessage = "Failed to send reset email. Please try again.";

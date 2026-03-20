@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Building2, Layers, FileText, Plus, X } from "lucide-react";
+import { Building2, Layers, FileText, Plus, X, HardDrive, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +73,22 @@ export function ErpCompanySelector({
   const [companyRole, setCompanyRole] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const confirmShownRef = React.useRef(false);
+  const folderDialogOpen = false;
+  const setFolderDialogOpen = () => {};
+  const folderDialogShownRef = React.useRef(false);
+  const localFolderPath: string | null = null;
+  const setLocalFolderPathState = () => {};
+  const isEnablingLocal = false;
+  const setIsEnablingLocal = () => {};
+  const localCompanies: ErpCompany[] = [];
+  const setLocalCompanies = () => {};
+
+  // SQLite-only: legacy local-folder helpers become no-ops
+  const saveLocalSelectionToFolder = async () => {};
+  const loadFromFolderToDexie = async () => ({ success: false as const, loaded: 0, error: "disabled" });
+  const ensureLocalMetaStructure = async () => {};
+  const initFolderWatcher = async () => {};
+  const setLocalFolderPath = () => {};
 
   const refreshCompanies = () =>
     listErpCompanies().then(setCompanies).catch(() => setCompanies([]));
@@ -82,17 +98,21 @@ export function ErpCompanySelector({
     setLoading(false);
   }, []);
 
+  // SQLite-only: local folder mode disabled (state setters are no-ops)
+
+  const effectiveCompanies = companies;
+
   // Validate selection: user should only see their companies' data. If selection is invalid, fix it.
   // Prefer restored selection from localStorage so refresh keeps company/sub/season.
   const validatedRef = React.useRef(false);
   useEffect(() => {
-    if (companies.length === 0) return;
+    if (effectiveCompanies.length === 0) return;
     if (validatedRef.current) return;
-    const isValid = selection && companies.some((c) => c.id === selection.companyId);
+    const isValid = selection && effectiveCompanies.some((c) => c.id === selection.companyId);
     if (!isValid) {
       // Prefer localStorage so refresh keeps company/sub/season (context may not have restored yet).
       const stored = loadStoredErpSelection();
-      const company = stored ? companies.find((c) => c.id === stored.companyId) : null;
+      const company = stored ? effectiveCompanies.find((c) => c.id === stored.companyId) : null;
       const sub = company?.subCompanies.find((s) => s.id === stored!.subCompanyId);
       const seasonKey = sub?.seasons.some((s) => s.key === stored!.seasonKey) ? stored!.seasonKey : sub?.seasons[0]?.key;
       if (company && sub && seasonKey) {
@@ -100,7 +120,7 @@ export function ErpCompanySelector({
         return; // do not set validatedRef so effect can run again if needed
       }
       validatedRef.current = true;
-      const first = companies[0];
+      const first = effectiveCompanies[0];
       const subWithSeason = first?.subCompanies.find((s) => s.seasons.length > 0);
       const subFallback = subWithSeason ?? first?.subCompanies[0];
       const seasonFallback = subFallback?.seasons[0];
@@ -108,7 +128,7 @@ export function ErpCompanySelector({
         void setSelection({ companyId: first.id, subCompanyId: subFallback.id, seasonKey: seasonFallback.key }, { skipReload: true });
       }
     }
-  }, [companies, selection, setSelection]);
+  }, [effectiveCompanies, selection, setSelection]);
 
   useEffect(() => {
     const cid = selection?.companyId ?? uiCompanyId;
@@ -121,16 +141,22 @@ export function ErpCompanySelector({
 
   const companyId = selection?.companyId ?? uiCompanyId;
   const subCompanyId = selection?.subCompanyId ?? uiSubCompanyId;
-  const selectedCompany = companyId ? companies.find((c) => c.id === companyId) : null;
+  const selectedCompany = companyId ? effectiveCompanies.find((c) => c.id === companyId) : null;
   const selectedSubCompany = selectedCompany?.subCompanies.find((s) => s.id === subCompanyId);
   const selectedSeason = selectedSubCompany?.seasons.find((s) => s.key === selection?.seasonKey);
+  const hasEffectiveCompanies = hasErpCompanies;
 
-  // After each refresh / first valid selection, show a small confirmation window
-  // so user consciously continues with the current sub company + season.
+  // SQLite-only app: disable legacy Excel/local-folder dialog on refresh.
+  useEffect(() => {
+    // no-op (kept to preserve hook order in file history)
+  }, []);
+
+  // After folder dialog closed, show confirmation for sub company + season
   useEffect(() => {
     if (
+      !folderDialogOpen &&
       !confirmShownRef.current &&
-      hasErpCompanies &&
+      hasEffectiveCompanies &&
       selectedCompany &&
       selectedSubCompany &&
       selectedSeason
@@ -138,14 +164,15 @@ export function ErpCompanySelector({
       confirmShownRef.current = true;
       setConfirmOpen(true);
     }
-  }, [hasErpCompanies, selectedCompany, selectedSubCompany, selectedSeason]);
+  }, [folderDialogOpen, hasEffectiveCompanies, selectedCompany, selectedSubCompany, selectedSeason]);
 
-  const handleCompanySelect = (c: ErpCompany) => {
+  const handleCompanySelect = async (c: ErpCompany) => {
     const subWithSeason = c.subCompanies.find((s) => s.seasons.length > 0);
     const sub = subWithSeason ?? c.subCompanies[0];
     const season = sub?.seasons[0];
     if (sub && season) {
-      void setSelection({ companyId: c.id, subCompanyId: sub.id, seasonKey: season.key }, { skipReload: true });
+      const sel = { companyId: c.id, subCompanyId: sub.id, seasonKey: season.key };
+      void setSelection(sel, { skipReload: true });
     } else {
       setUiCompanyId(c.id);
       setUiSubCompanyId(sub?.id ?? null);
@@ -153,10 +180,11 @@ export function ErpCompanySelector({
     }
   };
 
-  const handleSubCompanySelect = (s: ErpCompany["subCompanies"][0], companyId: string) => {
+  const handleSubCompanySelect = async (s: ErpCompany["subCompanies"][0], companyId: string) => {
     const season = s.seasons[0];
     if (season) {
-      void setSelection({ companyId, subCompanyId: s.id, seasonKey: season.key }, { skipReload: true });
+      const sel = { companyId, subCompanyId: s.id, seasonKey: season.key };
+      void setSelection(sel, { skipReload: true });
     } else {
       setUiCompanyId(companyId);
       setUiSubCompanyId(s.id);
@@ -164,8 +192,20 @@ export function ErpCompanySelector({
     }
   };
 
-  const handleSeasonSelect = (s: { key: string; name: string }, companyId: string, subCompanyId: string) => {
-    void setSelection({ companyId, subCompanyId, seasonKey: s.key }, { skipReload: true });
+  const handleSeasonSelect = async (s: { key: string; name: string }, companyId: string, subCompanyId: string) => {
+    const sel = { companyId, subCompanyId, seasonKey: s.key };
+    void setSelection(sel, { skipReload: true });
+  };
+
+  const handleUseFolderAsDataSource = async () => {
+    toast({
+      title: "SQLite only",
+      description: "Excel/Folder mode disabled. Settings → Data Settings me SQLite folder select karein.",
+    });
+  };
+
+  const handleSwitchToFirestore = () => {
+    toast({ title: "SQLite only", description: "Firestore data mode disabled." });
   };
 
   const handleAddSubCompany = async () => {
@@ -219,7 +259,7 @@ export function ErpCompanySelector({
     setSelection(null, { skipReload: true });
   };
 
-  const companyLabel = hasErpCompanies
+  const companyLabel = hasEffectiveCompanies
     ? (selectedCompany?.name ?? "Select Company")
     : (activeTenant?.name ?? "Company");
   const subCompanyLabel = selectedSubCompany?.name ?? "Sub Company";
@@ -251,9 +291,9 @@ export function ErpCompanySelector({
             </Tooltip>
           <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
             <DropdownMenuLabel>Company</DropdownMenuLabel>
-            {hasErpCompanies ? (
+            {hasEffectiveCompanies ? (
               <>
-                {companies.map((c) => (
+                {effectiveCompanies.map((c) => (
                   <DropdownMenuItem
                     key={c.id}
                     className="cursor-pointer focus:bg-white/10"
@@ -322,7 +362,7 @@ export function ErpCompanySelector({
         </DropdownMenu>
         )}
 
-      {/* Sub company & Season: header/sub-header on left, both icons on their right */}
+      {/* Sub company & Season & Folder: header on left, icons on right */}
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-col leading-tight">
           <span className="text-[11px] font-semibold text-white/95 truncate max-w-[140px] sm:max-w-[180px]" title={subCompanyLabel}>
@@ -331,6 +371,11 @@ export function ErpCompanySelector({
           <span className="text-[10px] font-medium text-white/75 truncate max-w-[140px] sm:max-w-[180px]" title={seasonLabel}>
             {seasonLabel}
           </span>
+          {localFolderPath && (
+            <span className="text-[9px] font-medium text-emerald-400/90 truncate max-w-[140px] sm:max-w-[180px]" title={localFolderPath}>
+              Folder
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <DropdownMenu>
@@ -340,8 +385,8 @@ export function ErpCompanySelector({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={hasErpCompanies && selectedCompany ? dropdownClass : disabledClass}
-                    disabled={!hasErpCompanies || !selectedCompany}
+                    className={hasEffectiveCompanies && selectedCompany ? dropdownClass : disabledClass}
+                    disabled={!hasEffectiveCompanies || !selectedCompany}
                   >
                     <Layers className="h-5 w-5" />
                   </Button>
@@ -353,7 +398,7 @@ export function ErpCompanySelector({
             </Tooltip>
             <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
               <DropdownMenuLabel>Sub Company</DropdownMenuLabel>
-              {hasErpCompanies && selectedCompany ? (
+              {hasEffectiveCompanies && selectedCompany ? (
                 <>
                   {selectedCompany.subCompanies.map((s) => (
                     <DropdownMenuItem
@@ -364,16 +409,18 @@ export function ErpCompanySelector({
                       {s.name}
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuItem
-                    className="cursor-pointer focus:bg-white/10 text-white/80"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setAddSubOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add new sub company
-                  </DropdownMenuItem>
+                  {!localFolderPath && (
+                    <DropdownMenuItem
+                      className="cursor-pointer focus:bg-white/10 text-white/80"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setAddSubOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add new sub company
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <DropdownMenuItem disabled>Select company first</DropdownMenuItem>
@@ -387,8 +434,8 @@ export function ErpCompanySelector({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={hasErpCompanies && selectedCompany && selectedSubCompany ? dropdownClass : disabledClass}
-                    disabled={!hasErpCompanies || !selectedCompany || !selectedSubCompany}
+                    className={hasEffectiveCompanies && selectedCompany && selectedSubCompany ? dropdownClass : disabledClass}
+                    disabled={!hasEffectiveCompanies || !selectedCompany || !selectedSubCompany}
                   >
                     <FileText className="h-5 w-5" />
                   </Button>
@@ -400,7 +447,7 @@ export function ErpCompanySelector({
             </Tooltip>
             <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
               <DropdownMenuLabel>Season</DropdownMenuLabel>
-              {hasErpCompanies && selectedCompany && selectedSubCompany ? (
+              {hasEffectiveCompanies && selectedCompany && selectedSubCompany ? (
                 <>
                   {selectedSubCompany.seasons.map((s) => (
                     <DropdownMenuItem
@@ -411,24 +458,166 @@ export function ErpCompanySelector({
                       {s.name}
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuItem
-                    className="cursor-pointer focus:bg-white/10 text-white/80"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setAddSeasonOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add new season
-                  </DropdownMenuItem>
+                  {!localFolderPath && (
+                    <DropdownMenuItem
+                      className="cursor-pointer focus:bg-white/10 text-white/80"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setAddSeasonOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add new season
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <DropdownMenuItem disabled>Select sub company first</DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+            className={dropdownClass}
+                  >
+                    <HardDrive className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                SQLite only
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="min-w-64 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
+              <DropdownMenuLabel>SQLite</DropdownMenuLabel>
+              <DropdownMenuItem disabled className="text-[11px] text-white/80">
+                Select SQLite folder in Settings → Data Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+
+      {/* SQLite-only: legacy folder dialog disabled */}
+      <Dialog open={false} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible">
+          <div
+            className="rounded-xl text-slate-900 shadow-[0_16px_48px_rgba(15,23,42,0.14),0_32px_80px_rgba(15,23,42,0.12)] overflow-hidden"
+            style={{ backgroundColor: "#f1f5f9" }}
+          >
+            <div className="px-5 pt-6 pr-12 pb-1">
+              <DialogHeader className="p-0">
+                <DialogTitle className="text-[13px] font-semibold tracking-tight text-slate-800">
+                  Data Folder
+                </DialogTitle>
+              </DialogHeader>
+            </div>
+            <div className="px-5 pb-5 space-y-4 text-[11px]">
+              {localFolderPath ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-slate-600 font-medium">Active folder:</p>
+                    <p className="text-[11px] font-mono truncate text-emerald-700 bg-emerald-50 px-3 py-2 rounded border border-emerald-200">
+                      {localFolderPath}
+                    </p>
+                  </div>
+                  {localCompanies.length > 0 && (
+                    <div className="space-y-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-3">
+                      <p className="text-slate-600 font-medium text-[11px]">Company / Sub Company / Season</p>
+                      <div className="grid grid-cols-1 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-slate-500">Company</Label>
+                          <Select
+                            value={selectedCompany?.id ?? ""}
+                            onValueChange={(v) => {
+                              const c = companies.find((x) => x.id === v);
+                              if (c) void handleCompanySelect(c);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-[11px]">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {companies.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-slate-500">Sub Company</Label>
+                          <Select
+                            value={selectedSubCompany?.id ?? ""}
+                            onValueChange={(v) => {
+                              if (selectedCompany) {
+                                const sub = selectedCompany.subCompanies.find((s) => s.id === v);
+                                if (sub) void handleSubCompanySelect(sub, selectedCompany.id);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-[11px]">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectedCompany?.subCompanies.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              )) ?? []}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-slate-500">Season</Label>
+                          <Select
+                            value={selection?.seasonKey ?? ""}
+                            onValueChange={(v) => {
+                              if (selectedCompany && selectedSubCompany) {
+                                const sel = { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey: v };
+                                void setSelection(sel, { skipReload: true });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-[11px]">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectedSubCompany?.seasons.map((s) => (
+                                <SelectItem key={s.key} value={s.key}>{s.name}</SelectItem>
+                              )) ?? []}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {}}>
+                      SQLite only
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-slate-600">SQLite only. Settings → Data Settings me SQLite folder select karein.</p>
+                  <Button
+                    className="w-full"
+                    onClick={() => {}}
+                  >
+                    Select SQLite folder (Settings)
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => {}}>
+                    Close
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Per-refresh confirmation window: confirm / change active sub company + season */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -466,6 +655,30 @@ export function ErpCompanySelector({
                       {seasonLabel}
                     </span>
                   </div>
+                  <div className="h-px bg-slate-100 my-1.5" />
+                  <div className="flex items-center justify-between gap-3 py-0.5">
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Data Folder</span>
+                    {localFolderPath ? (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-[11px] font-semibold truncate max-w-[140px] text-emerald-700" title={localFolderPath}>
+                          {localFolderPath}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] shrink-0" onClick={handleSwitchToFirestore}>
+                          <Database className="h-3 w-3 mr-1" />
+                          Firestore
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px]"
+                        onClick={() => {}}
+                      >
+                        SQLite only
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   Please confirm before entries karein, taki galti se dusri season ya sub company mein data na chale jaye.
@@ -473,7 +686,7 @@ export function ErpCompanySelector({
               </div>
 
               {/* Change selection - grouped controls */}
-              {hasErpCompanies && selectedCompany && (
+              {hasEffectiveCompanies && selectedCompany && (
                 <div className="space-y-3 pt-1">
                   <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
                     Change selection
@@ -548,7 +761,7 @@ export function ErpCompanySelector({
         </DialogContent>
       </Dialog>
 
-      {!hideCompanySelector && hasErpCompanies && (selection || companyId) && (
+      {!hideCompanySelector && hasEffectiveCompanies && (selection || companyId) && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -609,7 +822,7 @@ export function ErpCompanySelector({
       </Dialog>
 
       {/* Overlay: Company selected but no sub/season - block root data, show setup options */}
-      {hasErpCompanies && selectedCompany && !selection && (
+      {hasEffectiveCompanies && selectedCompany && !selection && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm">
           <div className="max-w-md mx-4 p-6 rounded-xl border border-violet-900/30 bg-violet-950/95 text-white shadow-2xl text-center space-y-4">
             <Building2 className="h-12 w-12 text-violet-400 mx-auto" />

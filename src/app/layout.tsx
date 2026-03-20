@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useRef, type ReactNode } from 'react';
+import React, { Suspense, useEffect, useState, useRef, type ReactNode } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { GlobalConfirmDialog } from "@/components/ui/global-confirm-dialog";
@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store';
 import { GlobalDataProvider } from '@/contexts/global-data-context';
 import { ErpSelectionProvider } from '@/contexts/erp-selection-context';
+import { ScrollContainerProvider } from '@/contexts/scroll-container-context';
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import { AuthTransitionScreen } from '@/components/auth/auth-transition-screen';
 import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
@@ -17,9 +18,12 @@ import type { User } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings, refreshTenantFirestoreBindings } from "@/lib/firestore";
 import { ensureTenantForUser, getActiveTenant } from "@/lib/tenancy";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { syncAllData } from '@/lib/database';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { ElectronBaseTag } from '@/components/electron-base-tag';
+import { ElectronParamSync } from '@/components/electron-param-sync';
 import '@/lib/sync-processors'; // register sync processors early
 
 
@@ -219,8 +223,16 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 									} catch {} 
 								});
 							};
+
+							// Local folder mode: sync from folder immediately so data is ready (no Firestore)
+							const { isLocalFolderMode, initFolderWatcher } = await import('@/lib/local-folder-storage');
+							if (isLocalFolderMode()) {
+								syncScheduled = true;
+								syncAllData().catch(() => {});
+								initFolderWatcher();
+							}
 							
-							// Wait for first user interaction before syncing
+							// Wait for first user interaction before syncing (Firestore mode)
 							const events = ['click', 'keydown', 'touchstart'] as const;
 							const onUserInteraction = () => {
 								events.forEach(e => {
@@ -270,7 +282,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         // ✅ FIX: Normalize pathname to handle trailing slashes
         const normalizedPathname = pathname.replace(/\/$/, '') || '/';
         const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
-        const isAuthPublicPage = ['/login', '/signup', '/forgot-password'].some(page => 
+        const isAuthPublicPage = ['/login', '/signup', '/forgot-password', '/create-company'].some(page => 
             normalizedPathname === page || normalizedPathname.startsWith(page + '/')
         );
         const isPublicPage = isAuthPublicPage || isIntroPage;
@@ -307,19 +319,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             if (!isSetupComplete && !isSettingsPage && !isCompanySetupPage) {
                 // No company yet - redirect to ERP Migration so user can create company (skip if already on company-setup)
                 if (!redirectHandledRef.current) {
-                    router.replace('/settings/erp-migration');
+                    electronNavigate('/settings/erp-migration', router);
                     redirectHandledRef.current = true;
                 }
             } else if (isSetupComplete && (isAuthPublicPage || isIntroPage)) {
                 // ✅ FIX: Setup complete and on login/intro page - redirect to dashboard (/)
                 if (normalizedPathname !== '/') {
                     if (typeof window !== 'undefined') {
-                        router.replace('/');
-                        setTimeout(() => {
-                            if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/company-setup')) {
-                                window.location.href = '/';
-                            }
-                        }, 100);
+                        electronNavigate('/', router);
                     }
                     redirectHandledRef.current = true;
                 } else {
@@ -338,7 +345,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         } else { // User is not logged in
              if (!isPublicPage) {
                 if (!redirectHandledRef.current) {
-                    router.replace('/intro');
+                    electronNavigate('/intro', router);
                     redirectHandledRef.current = true;
                 }
             } else {
@@ -355,7 +362,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     // show transition screen until redirect completes. Never show top bar + login page together.
     const normalizedPathname = pathname.replace(/\/$/, '') || '/';
     const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
-    const isAuthPublicPage = ['/login', '/signup', '/forgot-password'].some(
+    const isAuthPublicPage = ['/login', '/signup', '/forgot-password', '/create-company'].some(
         (p) => normalizedPathname === p || normalizedPathname.startsWith(p + '/')
     );
     const showAppLayout = !!user && !isAuthPublicPage && !isIntroPage;
@@ -363,11 +370,13 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     // ✅ FIX: Always mount GlobalDataProvider to prevent "useGlobalData must be used within a GlobalDataProvider" errors
     if (showAppLayout) {
         return (
-            <ErpSelectionProvider>
-                <GlobalDataProvider>
-                    <AppLayoutWrapper>{children}</AppLayoutWrapper>
-                </GlobalDataProvider>
-            </ErpSelectionProvider>
+            <ScrollContainerProvider>
+                <ErpSelectionProvider>
+                    <GlobalDataProvider>
+                        <AppLayoutWrapper>{children}</AppLayoutWrapper>
+                    </GlobalDataProvider>
+                </ErpSelectionProvider>
+            </ScrollContainerProvider>
         );
     }
     // User logged in but still on auth public page (login/signup/forgot) - show transition screen until redirect
@@ -403,6 +412,17 @@ export default function RootLayout({ children, params }: LayoutProps) {
   const { toast } = useToast();
     useSyncQueue();
 
+    // Electron: if we're on app://, force redirect to http (works even when preload didn't run)
+    useEffect(() => {
+      if (typeof window === 'undefined') return;
+      if (window.location.protocol === 'app:') {
+        const path = window.location.pathname || '/';
+        const search = window.location.search || '';
+        const base = (window as any).electron?.appUrl ?? 'http://127.0.0.1:3000';
+        window.location.replace(base.replace(/\/$/, '') + path + search);
+      }
+    }, []);
+
     // Handle Webpack/Next.js stale chunk error - auto-reload when detected
     useEffect(() => {
         const handleUnhandled = (e: ErrorEvent | PromiseRejectionEvent) => {
@@ -421,27 +441,52 @@ export default function RootLayout({ children, params }: LayoutProps) {
         };
     }, []);
 
+    // Local folder: Excel file open - notify user, retry will save when closed
+    useEffect(() => {
+        let lastToast = 0;
+        const handler = () => {
+            if (Date.now() - lastToast < 10000) return;
+            lastToast = Date.now();
+            toast({ title: "Excel file open", description: "Data save hoga jab Excel band karenge. Retry ho raha hai.", variant: "default" });
+        };
+        window.addEventListener('folder:write-failed', handler);
+        return () => window.removeEventListener('folder:write-failed', handler);
+    }, [toast]);
+
     // ✅ OPTIMIZED: Combined service worker registration and message handling
     useEffect(() => {
-        if (process.env.NODE_ENV !== 'production') {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                    registrations.forEach(registration => {
-                        registration.unregister();
-                    });
-                });
+        const safeGetRegistrations = () => {
+            try {
+                if (!('serviceWorker' in navigator)) return Promise.resolve([]);
+                return navigator.serviceWorker.getRegistrations();
+            } catch {
+                return Promise.resolve([]);
             }
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            safeGetRegistrations().then(registrations => {
+                registrations.forEach(registration => registration.unregister());
+            }).catch(() => {});
+            return;
+        }
+
+        // Disable service worker in Electron - it causes blank pages / wrong cache for other routes
+        if (typeof window !== 'undefined' && ((window as any).electron || (window as any).__ELECTRON__)) {
+            safeGetRegistrations().then(registrations => {
+                registrations.forEach(registration => registration.unregister());
+            }).catch(() => {});
             return;
         }
 
         if (!('serviceWorker' in navigator)) return;
 
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-            // Service worker registered successfully
-        }).catch(err => {
-            // Service worker registration failed (silent fail)
-        });
-        
+        try {
+            navigator.serviceWorker.register('/sw.js').then(() => {}).catch(() => {});
+        } catch {
+            // Document may be in invalid state (e.g. Electron navigation)
+        }
+
         const handleServiceWorkerMessage = (event: MessageEvent) => {
             if (event.data && event.data.type === 'SW_ACTIVATED') {
                 toast({
@@ -450,11 +495,19 @@ export default function RootLayout({ children, params }: LayoutProps) {
                 });
             }
         };
-        
-        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-        
+
+        try {
+            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        } catch {
+            // Ignore if document invalid state
+        }
+
         return () => {
-            navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+            try {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+                }
+            } catch {}
         };
         // Removed toast from dependencies - it's stable from useToast hook
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -464,6 +517,7 @@ export default function RootLayout({ children, params }: LayoutProps) {
         <html lang="en" suppressHydrationWarning className="dark">
             <head>
                 <title>JRMD Studio</title>
+                <ElectronBaseTag />
                 <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#000000" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -472,13 +526,18 @@ export default function RootLayout({ children, params }: LayoutProps) {
                 <meta name="mobile-web-app-capable" content="yes" />
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} ${plusJakartaSans.variable} font-body antialiased`}>
-                <ErrorBoundary>
-                    <StateProvider>
-                        <AuthWrapper>
-                            {children}
-                        </AuthWrapper>
-                    </StateProvider>
-                </ErrorBoundary>
+                <Suspense fallback={null}>
+                    <ElectronParamSync />
+                </Suspense>
+                <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                    <ErrorBoundary>
+                        <StateProvider>
+                            <AuthWrapper>
+                                {children}
+                            </AuthWrapper>
+                        </StateProvider>
+                    </ErrorBoundary>
+                </Suspense>
                 <Toaster />
                 <GlobalConfirmDialog />
             </body>

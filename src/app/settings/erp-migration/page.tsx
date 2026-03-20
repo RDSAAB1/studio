@@ -1,292 +1,456 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
-import {
-  migrateDataToSeason,
-  checkCompanyStructureExists,
-  setupCompanyStructureViaRest,
-  MIGRATABLE_COLLECTIONS,
-  type CompanySetupResult,
-  type MigrationResult,
-} from "@/lib/erp-migration";
-import { getFirebaseAuth } from "@/lib/firebase";
-import { getRtgsSettings } from "@/lib/firestore";
+import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, FolderOpen, DatabaseZap, ArrowRightLeft, FileSpreadsheet, Database, CheckCircle2 } from "lucide-react";
+import { isSqliteMode, setSqliteMode, setSqliteFolderPath, getSqliteFolderPath, switchToSqliteFolder } from "@/lib/sqlite-storage";
+import { clearAllLocalData } from "@/lib/database";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, CheckCircle2, ArrowRight } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-type Step = 1 | 2;
-
-type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
-export default function ErpMigrationPage(props: PageProps) {
-  if (props.searchParams) use(props.searchParams);
+export default function ErpMigrationPage() {
   const { toast } = useToast();
-  const [step, setStep] = useState<Step>(1);
-  const [companyName, setCompanyName] = useState("");
-  const [subCompanyName, setSubCompanyName] = useState("MAIN");
-  const [seasonName, setSeasonName] = useState(
-    `${new Date().getFullYear()} A`
-  );
+  const [sqliteFolderPath, setSqliteFolderPathState] = useState<string | null>(null);
+  const [sqliteModeActive, setSqliteModeActive] = useState(false);
+  const [isEnablingSqlite, setIsEnablingSqlite] = useState(false);
+  const [isMigratingToSqlite, setIsMigratingToSqlite] = useState(false);
+  const [isImportingExcelToSqlite, setIsImportingExcelToSqlite] = useState(false);
+  const [isCreatingNewDb, setIsCreatingNewDb] = useState(false);
+  const [selectedCollectionsForNewDb, setSelectedCollectionsForNewDb] = useState<string[]>([
+    'settings',
+    'options',
+    'banks',
+    'bankBranches',
+    'bankAccounts',
+    'supplierBankAccounts',
+  ]);
   const [loading, setLoading] = useState(true);
 
-  // Step 1 state
-  const [setupRunning, setSetupRunning] = useState(false);
-  const [verifyRunning, setVerifyRunning] = useState(false);
-  const [setupResult, setSetupResult] = useState<CompanySetupResult | null>(
-    null
-  );
+  // States for Select Folder Flow
+  const [isSelectFolderDialogOpen, setIsSelectFolderDialogOpen] = useState(false);
+  const [selectFolderFlowStep, setSelectFolderFlowStep] = useState<"initial" | "synced" | "cleared">("initial");
+  const [syncStats, setSyncStats] = useState<{ total: number; error: string }>({ total: 0, error: "" });
+  const [isFlowSyncing, setIsFlowSyncing] = useState(false);
 
-  // Step 2 state
-  const [migrationRunning, setMigrationRunning] = useState(false);
-  const [migrationResult, setMigrationResult] =
-    useState<MigrationResult | null>(null);
-  const [migrationProgress, setMigrationProgress] = useState({
-    pct: 0,
-    current: "",
-    done: 0,
-    total: 0,
-  });
-  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(
-    () => new Set(MIGRATABLE_COLLECTIONS.map((c) => c.id))
-  );
+  const [dbSize, setDbSize] = useState<number | null>(null);
+  const [isVacuuming, setIsVacuuming] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const fallback = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 1500);
-
-    getRtgsSettings()
-      .then((settings) => {
-        if (!cancelled && settings?.companyName) {
-          setCompanyName((prev) => prev || settings.companyName);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          clearTimeout(fallback);
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(fallback);
-    };
+    setSqliteModeActive(isSqliteMode());
+    const electron = typeof window !== "undefined" ? (window as any).electron : undefined;
+    if (electron?.sqliteGetFolder) {
+      electron.sqliteGetFolder()
+        .then((res: any) => { if (res?.folder) setSqliteFolderPathState(res.folder); })
+        .catch(() => {});
+    }
+    if (electron?.sqliteGetFileSize) {
+      electron.sqliteGetFileSize()
+        .then((res: any) => { if (res?.size !== undefined) setDbSize(res.size); })
+        .catch(() => {});
+    }
+    setLoading(false);
   }, []);
 
-  const handleStep1CreateCompany = async () => {
-    if (!companyName.trim() || !subCompanyName.trim() || !seasonName.trim()) {
-      toast({
-        title: "Missing details",
-        description:
-          "Please enter Company Name, Sub Company and Season before creating.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSetupRunning(true);
-    setSetupResult(null);
-
-    const TIMEOUT_MS = 300_000; // 5 min — REST retries on 429 with backoff (8s, 20s, 45s, 90s) and 5s between docs
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              "Request timed out. Check Firebase Console → Firestore → companies, or try \"Verify if already created\"."
-            )
-          ),
-        TIMEOUT_MS
-      );
-    });
-
-    try {
-      const opts = {
-        companyName: companyName.trim(),
-        subCompanyName: subCompanyName.trim(),
-        seasonName: seasonName.trim(),
-      };
-      let result: CompanySetupResult;
-
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      if (user) {
-        const idToken = await user.getIdToken();
-        result = await Promise.race([
-          setupCompanyStructureViaRest(idToken, opts),
-          timeoutPromise,
-        ]);
-      } else {
-        result = await Promise.race([
-          fetch("/api/erp-migration/setup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(opts),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json().catch(() => ({}));
-              throw new Error(data?.error || res.statusText || "Setup failed");
-            }
-            return res.json();
-          }),
-          timeoutPromise,
-        ]);
-      }
-      setSetupResult(result);
-      toast({
-        title: "Company created",
-        description: `${companyName} → ${subCompanyName} → ${seasonName} structure is ready.`,
-        variant: "success",
-      });
-    } catch (error: unknown) {
-      let msg = error instanceof Error ? error.message : "Could not create company.";
-      const isQuota =
-        msg.includes("429") ||
-        msg.includes("RESOURCE_EXHAUSTED") ||
-        msg.includes("Quota exceeded") ||
-        msg.includes("Too Many Requests");
-      if (isQuota) {
-        msg =
-          "Firestore quota exceeded. Wait a few minutes, then try \"Verify if already created\" — the structure may have been created before the error.";
-      }
-      console.error("[ERP Migration] Company setup failed:", error);
-      toast({
-        title: "Company setup failed",
-        description: msg,
-        variant: "destructive",
-      });
-    } finally {
-      setSetupRunning(false);
-    }
+  const onClickSelectSqliteFolder = () => {
+    setIsSelectFolderDialogOpen(true);
+    setSelectFolderFlowStep("initial");
+    setSyncStats({ total: 0, error: "" });
   };
 
-  const handleVerifyExisting = async () => {
-    if (!companyName.trim() || !subCompanyName.trim() || !seasonName.trim()) {
-      toast({
-        title: "Missing details",
-        description: "Enter Company, Sub Company and Season to verify.",
-        variant: "destructive",
-      });
+  const handleFlowSyncData = async () => {
+    const electron = typeof window !== "undefined"
+      ? (window as unknown as { electron?: { sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }> } }).electron
+      : undefined;
+
+    if (!electron?.sqliteSetFolder) {
+      toast({ title: "Electron required", description: "Run: npm run electron:dev", variant: "destructive" });
       return;
     }
-    setVerifyRunning(true);
+
+    const folderPath = sqliteFolderPath || getSqliteFolderPath();
+    if (!folderPath) {
+      // If no folder path is selected yet, maybe they can't sync. But let's allow skipping or show error.
+      toast({ title: "No current folder", description: "Koi SQLite folder active nahi hai. Aap direct switch kar sakte hain.", variant: "default" });
+      setSelectFolderFlowStep("synced");
+      return;
+    }
+
+    setIsFlowSyncing(true);
     try {
-      const result = await checkCompanyStructureExists({
-        companyName: companyName.trim(),
-        subCompanyName: subCompanyName.trim(),
-        seasonName: seasonName.trim(),
-      });
-      if (result) {
-        setSetupResult(result);
-        toast({
-          title: "Structure found",
-          description: "Company structure already exists in Firestore. You can proceed to Step 2.",
-          variant: "success",
-        });
+      const res = await electron.sqliteSetFolder(folderPath);
+      if (!res?.success) {
+        toast({ title: "Failed", description: res?.error || "Could not set SQLite folder.", variant: "destructive" });
+        return;
+      }
+
+      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
+      const out = await importDexieToSqlite();
+      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
+        table,
+        fromDexie: d.sourceCount,
+        toSqlite: d.sqliteCount,
+        error: d.error ?? "",
+      }));
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error || r.fromDexie !== r.toSqlite);
+
+      if (out.success && !hasError) {
+        setSyncStats({ total, error: "" });
+        setSelectFolderFlowStep("synced");
       } else {
-        toast({
-          title: "Not found",
-          description: "No matching structure in Firestore. Create it first or check names.",
-          variant: "destructive",
-        });
+        const firstErr = tableRows.find((r) => r.error)?.error;
+        setSyncStats({ total, error: firstErr || "Kuch tables migrate nahi ho paye." });
+        setSelectFolderFlowStep("synced");
       }
     } catch (e) {
-      toast({
-        title: "Verify failed",
-        description: e instanceof Error ? e.message : "Could not verify.",
-        variant: "destructive",
-      });
+      setSyncStats({ total: 0, error: e instanceof Error ? e.message : "Error syncing." });
+      setSelectFolderFlowStep("synced");
     } finally {
-      setVerifyRunning(false);
+      setIsFlowSyncing(false);
     }
   };
 
-  const handleProceedToStep2 = () => {
-    setStep(2);
-    setMigrationResult(null);
-    setMigrationProgress({ pct: 0, current: "", done: 0, total: 0 });
+  const handleFlowClearDexie = async () => {
+    try {
+      await clearAllLocalData();
+      toast({ title: "Data cleared", description: "Dexie data clear ho gaya.", variant: "default" });
+      setSelectFolderFlowStep("cleared");
+    } catch (e) {
+      toast({ title: "Failed", description: "Could not clear Dexie data", variant: "destructive" });
+    }
   };
 
-  const toggleCollection = (id: string) => {
-    setSelectedCollections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const handleFlowSelectFolder = async () => {
+    const electron = typeof window !== "undefined" ? (window as unknown as { electron?: { selectFolder?: () => Promise<string | null> } }).electron : undefined;
+    if (!electron?.selectFolder) return;
+    
+    const folderPath = await electron.selectFolder();
+    if (!folderPath) return;
+
+    try {
+      const res = await switchToSqliteFolder(folderPath);
+      if (res?.success) {
+        const effective = res.folder || folderPath;
+        setSqliteFolderPathState(effective);
+        setSqliteFolderPath(effective);
+        setSqliteMode(true);
+        setSqliteModeActive(true);
+        
+        setIsSelectFolderDialogOpen(false);
+        toast({ title: "Folder set", description: `SQLite DB: ${effective}. Loaded records from it.` });
+        
+        // Reload page to ensure clean state with new DB
+        window.location.reload();
+      } else {
+        toast({ title: "Failed", description: res?.error || "Could not set folder.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    }
   };
 
-  const selectAllCollections = () => {
-    setSelectedCollections(new Set(MIGRATABLE_COLLECTIONS.map((c) => c.id)));
+  const handleUseSqliteForData = async () => {
+    const electron = typeof window !== "undefined" ? (window as unknown as { electron?: { selectFolder?: () => Promise<string | null> } }).electron : undefined;
+    if (!electron?.selectFolder) {
+      toast({ title: "Electron required", description: "Run: npm run electron:dev", variant: "destructive" });
+      return;
+    }
+    let folderPath = sqliteFolderPath;
+    if (!folderPath) {
+      folderPath = await electron.selectFolder();
+      if (!folderPath) return;
+    }
+    setIsEnablingSqlite(true);
+    try {
+      const res = await switchToSqliteFolder(folderPath);
+      if (res.success) {
+        const effective = res.folder || folderPath;
+        setSqliteFolderPathState(effective);
+        setSqliteFolderPath(effective);
+        setSqliteMode(true);
+        setSqliteModeActive(true);
+
+        const mismatches: string[] = [];
+        if (res.details) {
+          for (const [table, info] of Object.entries(res.details)) {
+            if (info.sqlite !== info.dexie || info.error) {
+              mismatches.push(`${table}: sqlite=${info.sqlite}, dexie=${info.dexie}${info.error ? `, err=${info.error}` : ''}`);
+            }
+          }
+        }
+
+        toast({
+          title: "SQLite enabled",
+          description: mismatches.length
+            ? `${res.loaded ?? 0} records loaded. Mismatch tables: ${mismatches.join(" | ")}`
+            : `${res.loaded ?? 0} records loaded. Data ab SQLite se read/write hoga.`,
+          variant: mismatches.length ? "destructive" : "success",
+        });
+
+        if (typeof window !== "undefined" && res.details) {
+          // eslint-disable-next-line no-console
+          console.table(
+            Object.entries(res.details).map(([table, info]) => ({
+              table,
+              sqlite: info.sqlite,
+              dexie: info.dexie,
+              skipped: info.skipped ?? 0,
+              error: info.error ?? "",
+            }))
+          );
+        }
+      } else {
+        toast({ title: "Load failed", description: res.error, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      setIsEnablingSqlite(false);
+    }
   };
 
-  const deselectAllCollections = () => {
-    setSelectedCollections(new Set());
-  };
+  const handleMigrateCurrentDataToSqlite = async () => {
+    const electron = typeof window !== "undefined"
+      ? (window as unknown as { electron?: { sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }> } }).electron
+      : undefined;
 
-  const handleStep2MigrateData = async () => {
-    if (!companyName.trim() || !subCompanyName.trim() || !seasonName.trim()) {
-      toast({
-        title: "Missing details",
-        description: "Company setup is required first.",
-        variant: "destructive",
-      });
+    if (!electron?.sqliteSetFolder) {
+      toast({ title: "Electron required", description: "SQLite works only in Electron. Run: npm run electron:dev", variant: "destructive" });
       return;
     }
 
-    setMigrationRunning(true);
-    setMigrationResult(null);
-    setMigrationProgress({ pct: 0, current: "Starting…", done: 0, total: 30 });
+    const folderPath = sqliteFolderPath || getSqliteFolderPath();
+    if (!folderPath) {
+      toast({ title: "Select SQLite folder", description: "Pehle SQLite folder select karein.", variant: "destructive" });
+      return;
+    }
 
+    setIsMigratingToSqlite(true);
     try {
-      const result = await migrateDataToSeason(
-        {
-          companyName: companyName.trim(),
-          subCompanyName: subCompanyName.trim(),
-          seasonName: seasonName.trim(),
-        },
-        (pct, current, done, total) => {
-          setMigrationProgress({ pct, current, done, total });
-        },
-        setupResult,
-        selectedCollections.size > 0 ? Array.from(selectedCollections) : undefined
-      );
-      setMigrationResult(result);
-      toast({
-        title: "Migration complete",
-        description: `Migrated ${result.totalMigrated} records to ${seasonName}.`,
-        variant: "success",
-      });
-    } catch (error: unknown) {
-      toast({
-        title: "Migration failed",
-        description:
-          error instanceof Error ? error.message : "Could not migrate data.",
-        variant: "destructive",
-      });
+      // Ensure main process points at same folder
+      const res = await electron.sqliteSetFolder(folderPath);
+      if (!res?.success) {
+        toast({ title: "Failed", description: res?.error || "Could not set SQLite folder.", variant: "destructive" });
+        return;
+      }
+      // Yahan sirf main process ko correct folder par point kar rahe hain.
+      // Active "selected folder" sirf Select SQLite folder / Use SQLite for data se change hoga.
+
+      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
+      const out = await importDexieToSqlite();
+      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
+        table,
+        fromDexie: d.sourceCount,
+        toSqlite: d.sqliteCount,
+        error: d.error ?? "",
+      }));
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error || r.fromDexie !== r.toSqlite);
+
+      if (typeof window !== "undefined") {
+        // Excel/Dexie -> SQLite import diagnostics
+        // eslint-disable-next-line no-console
+        console.table(tableRows);
+      }
+
+      if (out.success && !hasError) {
+        toast({ title: "Migration complete", description: `${total} records SQLite me migrate ho gaye.`, variant: "success" });
+      } else {
+        const firstErr = tableRows.find((r) => r.error)?.error;
+        const msg = firstErr || "Kuch tables migrate nahi ho paye. DevTools console.table me per-table detail dekh sakte hain.";
+        toast({ title: "Migration partial", description: msg, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Migration failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
     } finally {
-      setMigrationRunning(false);
+      setIsMigratingToSqlite(false);
     }
   };
 
-  const handleBackToStep1 = () => {
-    setStep(1);
+  const handleImportExcelFolderToSqlite = async () => {
+    const electron = typeof window !== "undefined"
+      ? (window as unknown as {
+          electron?: {
+            selectFolder?: () => Promise<string | null>;
+            sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }>;
+          };
+        }).electron
+      : undefined;
+
+    if (!electron?.selectFolder || !electron?.sqliteSetFolder) {
+      toast({ title: "Electron required", description: "Run: npm run electron:dev", variant: "destructive" });
+      return;
+    }
+
+    const sqliteFolder = sqliteFolderPath || getSqliteFolderPath();
+    if (!sqliteFolder) {
+      toast({ title: "Select SQLite folder", description: "Pehle SQLite folder select karein.", variant: "destructive" });
+      return;
+    }
+
+    const excelFolder = await electron.selectFolder();
+    if (!excelFolder) return;
+
+    setIsImportingExcelToSqlite(true);
+    try {
+      const setRes = await electron.sqliteSetFolder(sqliteFolder);
+      if (!setRes?.success) {
+        toast({ title: "Failed", description: setRes?.error || "Could not set SQLite folder.", variant: "destructive" });
+        return;
+      }
+      // Backend ko selected SQLite folder par point kar rahe hain.
+      // Active folder selection sirf Select SQLite folder / Use SQLite for data se change hota hai.
+      const { loadFromFolderToDexie } = await import("@/lib/local-folder-storage");
+      const loadRes = await loadFromFolderToDexie(excelFolder);
+      if (!loadRes.success) {
+        toast({ title: "Excel load failed", description: loadRes.error || "Excel se load nahi ho paya.", variant: "destructive" });
+        return;
+      }
+
+      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
+      const out = await importDexieToSqlite();
+      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
+        table,
+        fromDexie: d.sourceCount,
+        toSqlite: d.sqliteCount,
+        error: d.error ?? "",
+      }));
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error || r.fromDexie !== r.toSqlite);
+
+      if (typeof window !== "undefined") {
+        // Excel -> Dexie -> SQLite diagnostics
+        // eslint-disable-next-line no-console
+        console.table(tableRows);
+      }
+
+      if (out.success && !hasError) {
+        toast({ title: "Excel → SQLite done", description: `${total} records SQLite me migrate ho gaye.`, variant: "success" });
+      } else {
+        const firstErr = tableRows.find((r) => r.error)?.error;
+        const msg = firstErr || "Kuch tables migrate nahi ho paye. DevTools console.table me per-table detail dekh sakte hain.";
+        toast({ title: "Partial migration", description: msg, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      setIsImportingExcelToSqlite(false);
+    }
+  };
+
+  const toggleCollectionForNewDb = (name: string) => {
+    setSelectedCollectionsForNewDb((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+    );
+  };
+
+  const handleCreateNewDbFromSelectedCollections = async () => {
+    const electron = typeof window !== "undefined"
+      ? (window as unknown as {
+          electron?: {
+            selectFolder?: () => Promise<string | null>;
+            sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }>;
+          };
+        }).electron
+      : undefined;
+
+    if (!electron?.selectFolder || !electron?.sqliteSetFolder) {
+      toast({ title: "Electron required", description: "Run: npm run electron:dev", variant: "destructive" });
+      return;
+    }
+
+    if (!selectedCollectionsForNewDb.length) {
+      toast({ title: "Select at least one collection", description: "Koi na koi collection select karein jo nayi DB me chahiye.", variant: "destructive" });
+      return;
+    }
+
+    const targetFolder = await electron.selectFolder();
+    if (!targetFolder) return;
+
+    const currentFolder = sqliteFolderPath || getSqliteFolderPath();
+
+    setIsCreatingNewDb(true);
+    try {
+      // Switch SQLite backend to target folder temporarily (sirf is operation ke liye)
+      const setRes = await electron.sqliteSetFolder(targetFolder);
+      if (!setRes?.success) {
+        toast({ title: "Failed", description: setRes?.error || "Could not set SQLite folder.", variant: "destructive" });
+        return;
+      }
+
+      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
+      const out = await importDexieToSqlite(selectedCollectionsForNewDb);
+      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
+        table,
+        fromDexie: d.sourceCount,
+        toSqlite: d.sqliteCount,
+        error: d.error ?? "",
+      }));
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error || (r.table !== 'ledgerCashAccounts' && r.fromDexie !== r.toSqlite));
+
+      if (typeof window !== "undefined") {
+        // Selected collections -> new DB diagnostics
+        // eslint-disable-next-line no-console
+        console.table(tableRows);
+      }
+
+      if (!hasError) {
+        toast({ title: "New DB created", description: `${total} records selected collections se nayi DB me copy ho gaye.`, variant: "success" });
+      } else {
+        const firstErr = tableRows.find((r) => r.error)?.error;
+        const msg = firstErr || "Kuch collections copy nahi ho payeen. DevTools console.table me per-table detail dekh sakte hain.";
+        toast({ title: "New DB partial", description: msg, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      // Hamesha purane active folder par backend ko wapas le aao
+      if (currentFolder) {
+        try {
+          await electron.sqliteSetFolder(currentFolder);
+        } catch {
+          // ignore
+        }
+      }
+      setIsCreatingNewDb(false);
+    }
+  };
+
+  const handleVacuumSqlite = async () => {
+    const electron = typeof window !== "undefined" ? (window as any).electron : undefined;
+    if (!electron?.sqliteVacuum) return;
+    setIsVacuuming(true);
+    try {
+      const res = await electron.sqliteVacuum();
+      if (res?.success) {
+        toast({ title: "Optimized", description: "SQLite database size has been optimized.", variant: "success" });
+        if (electron.sqliteGetFileSize) {
+          const sizeRes = await electron.sqliteGetFileSize();
+          if (sizeRes?.size !== undefined) setDbSize(sizeRes.size);
+        }
+      } else {
+        toast({ title: "Failed", description: res?.error || "Optimization failed.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      setIsVacuuming(false);
+    }
+  };
+
+  const handleSwitchFromSqlite = () => {
+    setSqliteMode(false);
+    setSqliteModeActive(false);
+    toast({ title: "SQLite off", description: "Page refresh karein." });
   };
 
   if (loading) {
@@ -299,243 +463,202 @@ export default function ErpMigrationPage(props: PageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">ERP Data Migration</h1>
+      <h1 className="text-2xl font-bold">Data Settings</h1>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-2">
-        <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            step === 1 ? "bg-primary text-primary-foreground" : "bg-muted"
-          }`}
-        >
-          {setupResult ? (
-            <CheckCircle2 className="h-4 w-4" />
-          ) : (
-            <span className="w-5 h-5 rounded-full bg-current/30 flex items-center justify-center text-xs">
-              1
-            </span>
-          )}
-          Step 1: Company Setup
-        </div>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            step === 2 ? "bg-primary text-primary-foreground" : "bg-muted"
-          }`}
-        >
-          {migrationResult ? (
-            <CheckCircle2 className="h-4 w-4" />
-          ) : (
-            <span className="w-5 h-5 rounded-full bg-current/30 flex items-center justify-center text-xs">
-              2
-            </span>
-          )}
-          Step 2: Data Migration
-        </div>
-      </div>
-
-      {/* Step 1: Company Setup */}
       <Card>
         <CardHeader>
-          <CardTitle>Step 1: Company Setup</CardTitle>
+          <CardTitle>SQLite Database</CardTitle>
           <CardDescription>
-            Create Company → Sub Company → Season structure. Data migration will
-            happen in Step 2.
+            Sirf SQLite use hota hai. Folder select karein jahan jrmd.sqlite store hoga. Sab data wahi se read/write hoga.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Company Name</Label>
-              <Input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="e.g. JRMD Agro"
-                disabled={!!setupResult}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Sub Company</Label>
-              <Input
-                value={subCompanyName}
-                onChange={(e) => setSubCompanyName(e.target.value)}
-                placeholder="e.g. MAIN BRANCH"
-                disabled={!!setupResult}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Season / Year Label</Label>
-              <Input
-                value={seasonName}
-                onChange={(e) => setSeasonName(e.target.value)}
-                placeholder="e.g. 2024 A"
-                disabled={!!setupResult}
-              />
-            </div>
-          </div>
-
-          {setupResult && (
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-400">
-              <CheckCircle2 className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="font-medium">Company structure created</p>
-                <p className="text-sm opacity-90">
-                  {companyName} → {subCompanyName} → {seasonName}
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2 items-start">
-          {!setupResult ? (
-            <>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={handleStep1CreateCompany}
-                  disabled={setupRunning || verifyRunning}
-                >
-                  {setupRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Company Structure
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleVerifyExisting}
-                  disabled={setupRunning || verifyRunning}
-                >
-                  {verifyRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verify if already created
-                </Button>
-              </div>
-              {setupRunning && (
-                <p className="text-xs text-muted-foreground">
-                  First-time write can take 1–2 minutes. If it times out, check Firestore → companies; if the doc exists, click &quot;Verify if already created&quot;.
-                </p>
-              )}
-            </>
-          ) : (
-            <Button type="button" onClick={handleProceedToStep2}>
-              Proceed to Step 2: Data Migration
-              <ArrowRight className="ml-2 h-4 w-4" />
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={onClickSelectSqliteFolder} variant="outline">
+              <FolderOpen className="mr-2 h-4 w-4" />
+              Select SQLite folder
             </Button>
-          )}
-        </CardFooter>
-      </Card>
-
-      {/* Step 2: Data Migration - only prominent when step 2 */}
-      <Card className={step === 2 ? "" : "opacity-75"}>
-        <CardHeader>
-          <CardTitle>Step 2: Data Migration</CardTitle>
-          <CardDescription>
-            Copy existing data into the new structure. Original data is not
-            deleted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!setupResult ? (
-            <p className="text-sm text-muted-foreground">
-              Complete Step 1 first to enable data migration.
-            </p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label className="text-base">Select collections to migrate</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose which data to copy. Original data is not deleted.
-                </p>
-                <div className="flex gap-2 mb-2">
+            <Button
+              onClick={handleImportExcelFolderToSqlite}
+              disabled={isImportingExcelToSqlite}
+              variant="outline"
+            >
+              {isImportingExcelToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+              {isImportingExcelToSqlite ? "Importing..." : "Import Excel folder → SQLite"}
+            </Button>
+            <Button
+              onClick={handleMigrateCurrentDataToSqlite}
+              disabled={isMigratingToSqlite}
+              variant="outline"
+            >
+              {isMigratingToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+              {isMigratingToSqlite ? "Migrating..." : "Migrate current data → SQLite"}
+            </Button>
+            <Button
+              onClick={handleUseSqliteForData}
+              disabled={isEnablingSqlite}
+              className="bg-primary text-primary-foreground"
+            >
+              {isEnablingSqlite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEnablingSqlite ? "Loading..." : (
+                <>
+                  <DatabaseZap className="mr-2 h-4 w-4" />
+                  Use SQLite for data
+                </>
+              )}
+            </Button>
+            {sqliteModeActive && (
+              <Button onClick={handleSwitchFromSqlite} variant="destructive" size="sm">
+                SQLite off
+              </Button>
+            )}
+          </div>
+          {(sqliteFolderPath || sqliteModeActive) && (
+            <div className="flex flex-col gap-2 mt-2">
+              <p className="text-sm text-muted-foreground">
+                <strong>SQLite folder:</strong> {sqliteFolderPath || getSqliteFolderPath() || "—"}
+              </p>
+              {dbSize !== null && (
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span><strong>DB Size:</strong> {(dbSize / 1024).toFixed(1)} KB</span>
                   <Button
-                    type="button"
+                    onClick={handleVacuumSqlite}
+                    disabled={isVacuuming || !sqliteModeActive}
                     variant="outline"
                     size="sm"
-                    onClick={selectAllCollections}
-                    disabled={migrationRunning}
+                    className="h-7 text-xs"
                   >
-                    Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={deselectAllCollections}
-                    disabled={migrationRunning}
-                  >
-                    Deselect All
+                    {isVacuuming ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <DatabaseZap className="mr-1 h-3 w-3" />}
+                    Optimize Size
                   </Button>
                 </div>
-                <ScrollArea className="h-48 rounded-md border p-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                    {MIGRATABLE_COLLECTIONS.map((c) => (
-                      <label
-                        key={c.id}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
-                      >
-                        <Checkbox
-                          checked={selectedCollections.has(c.id)}
-                          onCheckedChange={() => toggleCollection(c.id)}
-                          disabled={migrationRunning}
-                        />
-                        <span className="text-sm">{c.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </ScrollArea>
-                <p className="text-xs text-muted-foreground">
-                  {selectedCollections.size} of {MIGRATABLE_COLLECTIONS.length} selected
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 space-y-2 border-t pt-3">
+            <p className="text-sm font-medium">Create new DB from selected collections</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[
+                'settings',
+                'options',
+                'banks',
+                'bankBranches',
+                'bankAccounts',
+                'supplierBankAccounts',
+              ].map((name) => {
+                const labelMap: Record<string, string> = {
+                  settings: 'Settings',
+                  options: 'Options',
+                  banks: 'Banks',
+                  bankBranches: 'Bank Branches',
+                  bankAccounts: 'Bank Accounts',
+                  supplierBankAccounts: 'Supplier Bank Accounts',
+                };
+                const checked = selectedCollectionsForNewDb.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleCollectionForNewDb(name)}
+                    className={cn(
+                      "px-2 py-1 rounded-full border text-[11px]",
+                      checked ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-accent"
+                    )}
+                  >
+                    {labelMap[name] || name}
+                  </button>
+                );
+              })}
+            </div>
+            <Button
+              onClick={handleCreateNewDbFromSelectedCollections}
+              disabled={isCreatingNewDb}
+              variant="outline"
+            >
+              {isCreatingNewDb ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+              {isCreatingNewDb ? "Creating..." : "Create new DB from selected collections"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Select SQLite Folder Popup Dialog */}
+      <Dialog open={isSelectFolderDialogOpen} onOpenChange={setIsSelectFolderDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Switch SQLite Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectFolderFlowStep === "initial" && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  Folder switch karne se pehle current app data ko SQLite mein zaroor save/sync kar lein taki koi recent data loss na ho.
                 </p>
+                <Button 
+                  onClick={handleFlowSyncData} 
+                  disabled={isFlowSyncing} 
+                  className="w-full"
+                >
+                  {isFlowSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                  {isFlowSyncing ? "Syncing..." : "Switch data (Sync to SQLite)"}
+                </Button>
               </div>
-              {migrationRunning && (
-                <div className="space-y-2">
-                  <Progress
-                    value={migrationProgress.pct}
-                    className="h-3 transition-all duration-300"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Migrating {migrationProgress.current} (
-                    {migrationProgress.done}/{migrationProgress.total} collections)
-                    … please keep this tab open.
+            )}
+
+            {selectFolderFlowStep === "synced" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-md border border-emerald-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    Data sync successful. {syncStats.total} records transfer hue.
                   </p>
                 </div>
-              )}
-              {migrationResult && !migrationRunning && (
-                <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-400">
-                  <CheckCircle2 className="h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-medium">Migration complete</p>
-                    <p className="text-sm opacity-90">
-                      Migrated {migrationResult.totalMigrated} records to{" "}
-                      {seasonName}.
-                    </p>
-                  </div>
+                {syncStats.error && (
+                  <p className="text-xs text-red-600 bg-red-50 p-2 rounded">{syncStats.error}</p>
+                )}
+                <p className="text-sm text-slate-600">
+                  Ab baari hai purane app cache (Dexie data) ko clear karne ki, taki nayi DB open karte waqt dono mix na hon.
+                </p>
+                <Button 
+                  onClick={handleFlowClearDexie} 
+                  className="w-full"
+                >
+                  Continue (Clear Dexie Data)
+                </Button>
+              </div>
+            )}
+
+            {selectFolderFlowStep === "cleared" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-md border border-emerald-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <p className="text-sm font-medium">Cache completely cleared.</p>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-        <CardFooter className="flex gap-2">
-          {step === 2 && (
+                <p className="text-sm text-slate-600">
+                  Aap completely safe hain naya folder select karne ke liye. Naya folder chunen.
+                </p>
+                <Button 
+                  onClick={handleFlowSelectFolder} 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  Select folder
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-start">
             <Button
               type="button"
-              variant="outline"
-              onClick={handleBackToStep1}
-              disabled={migrationRunning}
+              variant="secondary"
+              onClick={() => setIsSelectFolderDialogOpen(false)}
             >
-              Back to Step 1
+              Cancel
             </Button>
-          )}
-          <Button
-            type="button"
-            onClick={handleStep2MigrateData}
-            disabled={!setupResult || migrationRunning || selectedCollections.size === 0}
-          >
-            {migrationRunning && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Migrate Existing Data
-          </Button>
-        </CardFooter>
-      </Card>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

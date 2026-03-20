@@ -3,6 +3,7 @@
 import React, { useCallback, useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { cn } from "@/lib/utils";
 import { useLayoutSubnav } from "@/components/layout/app-layout";
 
@@ -45,7 +46,10 @@ const CashBankPage = dynamic(() => import("@/app/cash-bank/page"));
 const BankAccountsPage = dynamic(() => import("@/app/settings/bank-accounts/page"));
 const BankManagementPage = dynamic(() => import("@/app/settings/bank-management/page"));
 const ErpMigrationPage = dynamic(() => import("@/app/settings/erp-migration/page"));
-const AddCompanyUserCard = dynamic(() => import("@/components/settings/add-company-user-card").then(m => ({ default: m.AddCompanyUserCard })));
+// Admin Modules (moved into Unified Sales SPA)
+const AdminMigrationsPage = dynamic(() => import("@/app/admin/migrations/page"));
+const AdminDiagnosticsPage = dynamic(() => import("@/app/admin/diagnostics/page"));
+const AdminTasksPage = dynamic(() => import("@/app/admin/tasks/page"));
 import ActivityHistoryPage from "@/app/activity-history/page";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -59,7 +63,7 @@ type SalesTab =
   | "project-dashboard" | "project-tasks" | "project-collaboration"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
-  | "settings-team" | "settings-data-migration";
+  | "admin-migrations" | "admin-diagnostics" | "admin-tasks";
 
 type MenuType = "dashboard" | "entry" | "payments" | "reports" | "hr" | "projects" | "cash-bank" | "history" | "settings" | "admin";
 
@@ -107,8 +111,9 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "history-delete": "Delete History",
   
   // Settings / Admin
-  "settings-team": "Team",
-  "settings-data-migration": "Data Migration",
+  "admin-migrations": "DB Migrations",
+  "admin-diagnostics": "ID Diagnostics",
+  "admin-tasks": "Task Progress",
 };
 
 export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu = "dashboard" }: { defaultTab?: SalesTab; defaultMenu?: MenuType }) {
@@ -154,9 +159,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         } else if (menuParam === 'history') {
           tabsToMount = ['history-new', 'history-edit', 'history-recycle', 'history-delete'];
         } else if (menuParam === 'settings') {
-          tabsToMount = ['settings-team'];
+          tabsToMount = [];
         } else if (menuParam === 'admin') {
-          tabsToMount = ['settings-data-migration'];
+          tabsToMount = ['admin-migrations', 'admin-diagnostics', 'admin-tasks'];
         }
         
         const toAdd = tabsToMount.filter(t => !prev.includes(t));
@@ -214,8 +219,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     else if (['project-dashboard', 'project-tasks', 'project-collaboration'].includes(value)) newMenuType = 'projects';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
-    else if (['settings-team'].includes(value)) newMenuType = 'settings';
-    else if (['settings-data-migration'].includes(value)) newMenuType = 'admin';
+    else if (['admin-migrations', 'admin-diagnostics', 'admin-tasks'].includes(value)) newMenuType = 'admin';
     else newMenuType = 'payments';
     
     setMenuType(newMenuType);
@@ -224,7 +228,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', value);
     params.set('menu', newMenuType);
-    router.push(`/sales?${params.toString()}`, { scroll: false });
+    electronNavigate(`/sales?${params.toString()}`, router, { method: 'push' });
   }, [router, searchParams]);
   
   const subTabs = useMemo(() => {
@@ -269,8 +273,16 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "history-delete" as const, label: TAB_LABELS["history-delete"] },
       ];
     }
-    if (menuType === "settings") return [{ value: "settings-team" as const, label: TAB_LABELS["settings-team"] }];
-    if (menuType === "admin") return [{ value: "settings-data-migration" as const, label: TAB_LABELS["settings-data-migration"] }];
+    if (menuType === "settings") {
+      return [];
+    }
+    if (menuType === "admin") {
+      return [
+        { value: "admin-migrations" as const, label: TAB_LABELS["admin-migrations"] },
+        { value: "admin-diagnostics" as const, label: TAB_LABELS["admin-diagnostics"] },
+        { value: "admin-tasks" as const, label: TAB_LABELS["admin-tasks"] },
+      ];
+    }
     return [
       { value: "supplier-payments" as const, label: TAB_LABELS["supplier-payments"] },
       { value: "customer-payments" as const, label: TAB_LABELS["customer-payments"] },
@@ -376,14 +388,17 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         case "history-delete":
           return <ErrorBoundary><ActivityHistoryPage initialTab="delete" /></ErrorBoundary>;
         // Settings
-        case "settings-team":
-          return <AddCompanyUserCard />;
         case "settings-bank-accounts":
           return <BankAccountsPage />;
         case "settings-bank-management":
           return <BankManagementPage />;
-        case "settings-data-migration":
-          return <ErpMigrationPage />;
+        // Admin (now inside Unified Sales SPA)
+        case "admin-migrations":
+          return <AdminMigrationsPage />;
+        case "admin-diagnostics":
+          return <AdminDiagnosticsPage />;
+        case "admin-tasks":
+          return <AdminTasksPage />;
         default:
           return null;
       }

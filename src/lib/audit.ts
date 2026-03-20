@@ -15,6 +15,7 @@ import {
   orderBy,
   limit,
   startAfter,
+  QueryConstraint,
   QueryDocumentSnapshot,
   DocumentData,
   writeBatch,
@@ -210,7 +211,7 @@ export async function fetchActivityLog(
     const path = getTenantCollectionPath("activityLog");
     const colRef = collection(firestoreDB, ...path);
 
-    const constraints: unknown[] = [orderBy("timestamp", "desc"), limit(pageSize)];
+    const constraints: QueryConstraint[] = [orderBy("timestamp", "desc"), limit(pageSize)];
     if (type !== "all") {
       constraints.unshift(where("type", "==", type));
     }
@@ -398,4 +399,3 @@ export async function clearAllRecycleBin(): Promise<number> {
   }
   return snap.size;
 }
-

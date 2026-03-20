@@ -1,23 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode, useTransition, useCallback } from 'react';
-import { 
-    getSuppliersRealtime, 
-    getPaymentsRealtime, 
-    getCustomersRealtime, 
-    getCustomerPaymentsRealtime,
-    getBanksRealtime,
-    getBankAccountsRealtime,
-    getSupplierBankAccountsRealtime,
-    getFundTransactionsRealtime,
-    getExpensesRealtime,
-    getIncomeRealtime,
-    getBankBranchesRealtime,
-    getReceiptSettings,
-    refreshTenantFirestoreBindings
-} from "@/lib/firestore";
-import { db } from "@/lib/database";
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode, useTransition, useCallback, useRef } from 'react';
+import { db, syncAllData, getReceiptSettingsFromLocal } from "@/lib/database";
 import { logError } from "@/lib/error-logger";
+import { isSqliteMode } from "@/lib/sqlite-storage";
 import type { 
     Customer, 
     Payment, 
@@ -53,6 +39,10 @@ interface GlobalDataContextType {
     receiptSettings: ReceiptSettings | null;
     
     // No loading states needed - data loads initially, then just CRUD updates
+    upsertSupplierPayment: (payment: Payment) => void;
+    deleteSupplierPayment: (paymentId: string) => void;
+    upsertCustomerPayment: (payment: CustomerPayment) => void;
+    deleteCustomerPayment: (paymentId: string) => void;
 }
 
 // Create Context
@@ -87,272 +77,360 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             setter(value);
         });
     }, [startTransition]);
+
+    const normalizePaymentKey = useCallback((p: any) => String(p?.paymentId || p?.id || p?.rtgsSrNo || '').trim(), []);
+
+    const normalizeSupplierKey = useCallback((s: any) => {
+        if (!s) return '';
+        const id = (s as any).id;
+        const srNo = (s as any).srNo;
+        return String(srNo || id || '').trim();
+    }, []);
+
+    const upsertPaymentInList = useCallback(
+        <T extends { id?: unknown; paymentId?: unknown; rtgsSrNo?: unknown }>(prev: T[], payment: T) => {
+            const key = normalizePaymentKey(payment);
+            if (!key) return prev;
+
+            const idx = prev.findIndex((p) => normalizePaymentKey(p) === key);
+            if (idx === -1) return [payment, ...prev];
+
+            const next = prev.slice();
+            next[idx] = payment;
+            return next;
+        },
+        [normalizePaymentKey]
+    );
+
+    const removePaymentFromList = useCallback(
+        <T extends { id?: unknown; paymentId?: unknown; rtgsSrNo?: unknown }>(prev: T[], key: string) => {
+            if (!key) return prev;
+            return prev.filter((p) => normalizePaymentKey(p) !== key);
+        },
+        [normalizePaymentKey]
+    );
+
+    const upsertSupplierInList = useCallback(
+        <T extends { id?: unknown; srNo?: unknown }>(prev: T[], supplier: T) => {
+            const key = normalizeSupplierKey(supplier);
+            if (!key) return prev;
+            const idx = prev.findIndex((s) => normalizeSupplierKey(s) === key);
+            if (idx === -1) return [supplier, ...prev];
+            const next = prev.slice();
+            next[idx] = supplier;
+            return next;
+        },
+        [normalizeSupplierKey]
+    );
+
+    const removeSupplierFromList = useCallback(
+        <T extends { id?: unknown; srNo?: unknown }>(prev: T[], key: string) => {
+            if (!key) return prev;
+            return prev.filter((s) => normalizeSupplierKey(s) !== key);
+        },
+        [normalizeSupplierKey]
+    );
+
+    const upsertSupplierPayment = useCallback(
+        (payment: Payment) => {
+            startTransition(() => {
+                setSupplierPayments((prev) => upsertPaymentInList(prev, payment));
+            });
+        },
+        [startTransition, upsertPaymentInList]
+    );
+
+    const deleteSupplierPayment = useCallback(
+        (paymentId: string) => {
+            const key = String(paymentId || '').trim();
+            if (!key) return;
+            startTransition(() => {
+                setSupplierPayments((prev) => removePaymentFromList(prev, key));
+            });
+        },
+        [startTransition, removePaymentFromList]
+    );
+
+    const upsertCustomerPayment = useCallback(
+        (payment: CustomerPayment) => {
+            startTransition(() => {
+                setCustomerPayments((prev) => upsertPaymentInList(prev, payment as any));
+            });
+        },
+        [startTransition, upsertPaymentInList]
+    );
+
+    const deleteCustomerPayment = useCallback(
+        (paymentId: string) => {
+            const key = String(paymentId || '').trim();
+            if (!key) return;
+            startTransition(() => {
+                setCustomerPayments((prev) => removePaymentFromList(prev as any, key) as any);
+            });
+        },
+        [startTransition, removePaymentFromList]
+    );
     
+    const refreshDebounceRef = useRef<Record<string, number>>({});
+    const refreshIdleRef = useRef<number | null>(null);
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const refresh = async (collection: string) => {
+        // SQLite mode: trigger load
+        if (isSqliteMode()) {
+            void syncAllData();
+        }
+
+        const isDbClosedError = (e: unknown) =>
+            (e && typeof e === 'object' && ((e as Error).name === 'DatabaseClosedError' || String((e as Error).message || '').includes('Database has been closed')));
+
+        const refresh = async (collection: string, retry = false) => {
             if (!db) return;
+            try {
+                if (collection === 'suppliers') {
+                    const data = await db.suppliers.orderBy('srNo').reverse().toArray();
+                    updateState(setSuppliers, data);
+                    return;
+                }
+                if (collection === 'customers') {
+                    const data = await db.customers.orderBy('srNo').reverse().toArray();
+                    updateState(setCustomers, data);
+                    return;
+                }
+                if (collection === 'customerPayments') {
+                    const data = await db.customerPayments.orderBy('date').reverse().toArray();
+                    updateState(setCustomerPayments, data);
+                    return;
+                }
+                if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
+                    const payments = await db.payments.orderBy('date').reverse().toArray();
+                    updateState(setSupplierPayments, payments as Payment[]);
+                    return;
+                }
+                if (collection === 'banks') {
+                    const data = await db.banks.toArray();
+                    updateState(setBanks, data);
+                    return;
+                }
+                if (collection === 'bankBranches') {
+                    const data = await db.bankBranches.toArray();
+                    updateState(setBankBranches, data);
+                    return;
+                }
+                if (collection === 'bankAccounts') {
+                    const data = await db.bankAccounts.toArray();
+                    updateState(setBankAccounts, data);
+                    return;
+                }
+                if (collection === 'supplierBankAccounts') {
+                    const data = await db.supplierBankAccounts.toArray();
+                    updateState(setSupplierBankAccounts, data);
+                    return;
+                }
+                if (collection === 'fundTransactions') {
+                    const data = await db.fundTransactions.orderBy('date').reverse().toArray();
+                    updateState(setFundTransactions, data);
+                    return;
+                }
+                if (collection === 'incomes' && db.transactions) {
+                    const data = await db.transactions.where('type').equals('Income').toArray();
+                    data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setIncomes, data);
+                    return;
+                }
+                if (collection === 'expenses' && db.transactions) {
+                    const data = await db.transactions.where('type').equals('Expense').toArray();
+                    data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setExpenses, data);
+                    return;
+                }
+            } catch (e) {
+                if (isDbClosedError(e) && !retry) {
+                    void refresh(collection, true);
+                    return;
+                }
+                logError(e, `global-data refresh ${collection}`, 'low');
+            }
+        };
 
-            if (collection === 'suppliers') {
-                const data = await db.suppliers.orderBy('srNo').reverse().toArray();
-                updateState(setSuppliers, data);
-                return;
-            }
-
-            if (collection === 'customers') {
-                const data = await db.customers.orderBy('srNo').reverse().toArray();
-                updateState(setCustomers, data);
-                return;
-            }
-
-            if (collection === 'customerPayments') {
-                const data = await db.customerPayments.orderBy('date').reverse().toArray();
-                updateState(setCustomerPayments, data);
-                return;
-            }
-
-            if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
-                const payments = await db.payments.orderBy('date').reverse().toArray();
-                updateState(setSupplierPayments, payments as Payment[]);
-                return;
-            }
-
-            if (collection === 'banks') {
-                const data = await db.banks.toArray();
-                updateState(setBanks, data);
-                return;
-            }
-            if (collection === 'bankBranches') {
-                const data = await db.bankBranches.toArray();
-                updateState(setBankBranches, data);
-                return;
-            }
-            if (collection === 'bankAccounts') {
-                const data = await db.bankAccounts.toArray();
-                updateState(setBankAccounts, data);
-                return;
-            }
-            if (collection === 'fundTransactions') {
-                const data = await db.fundTransactions.orderBy('date').reverse().toArray();
-                updateState(setFundTransactions, data);
-                return;
-            }
-            if (collection === 'incomes' && db.transactions) {
-                const data = await db.transactions.where('type').equals('Income').toArray();
-                data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                updateState(setIncomes, data);
-                return;
-            }
-            if (collection === 'expenses' && db.transactions) {
-                const data = await db.transactions.where('type').equals('Expense').toArray();
-                data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                updateState(setExpenses, data);
-                return;
-            }
+        const scheduleRefresh = (collection: string) => {
+            const prev = refreshDebounceRef.current[collection];
+            if (prev) clearTimeout(prev);
+            refreshDebounceRef.current[collection] = window.setTimeout(() => {
+                delete refreshDebounceRef.current[collection];
+                const doRefresh = () => void refresh(collection);
+                if (typeof (window as any).requestIdleCallback === 'function') {
+                    refreshIdleRef.current = (window as any).requestIdleCallback(doRefresh, { timeout: 300 });
+                } else {
+                    doRefresh();
+                }
+            }, 120);
         };
 
         const onCollectionChanged = (event: Event) => {
             const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
             const collection = detail?.collection;
             if (!collection) return;
-            void refresh(collection);
+
+            // In local-folder mode we already do incremental updates for payments/suppliers via
+            // indexeddb:payment:* / indexeddb:supplier:* events. To avoid heavy full-table reloads
+            // after every finalize/delete/edit, skip automatic refresh for these collections.
+            if (isSqliteMode() && (collection === 'payments' || collection === 'customerPayments' || collection === 'suppliers')) {
+                return;
+            }
+
+            scheduleRefresh(collection);
         };
 
         const onPaymentUpdated = (event: Event) => {
-            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
+            const detail = (event as CustomEvent).detail as { collection?: string; payment?: unknown } | undefined;
             const collection = detail?.collection;
-            if (!collection) return;
-            void refresh(collection);
+            const payment = detail?.payment;
+            if (!collection || !payment) return;
+
+            if (collection === 'customerPayments') {
+                upsertCustomerPayment(payment as any);
+                return;
+            }
+            if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
+                upsertSupplierPayment(payment as any);
+            }
         };
 
         const onPaymentDeleted = (event: Event) => {
-            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
-            const collection = detail?.collection;
-            if (!collection) return;
-            void refresh(collection);
+            const detail = (event as CustomEvent).detail as {
+                id?: string;
+                payment?: unknown;
+                isCustomer?: boolean;
+            } | undefined;
+            const keyFromPayment = normalizePaymentKey(detail?.payment);
+            const key = keyFromPayment || String(detail?.id || '').trim();
+            if (!key) return;
+
+            if (detail?.isCustomer) {
+                deleteCustomerPayment(key);
+                return;
+            }
+            deleteSupplierPayment(key);
+        };
+
+        const onSupplierUpdated = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { supplier?: unknown } | undefined;
+            const supplier = detail?.supplier;
+            if (!supplier) return;
+            startTransition(() => {
+                setSuppliers((prev) => upsertSupplierInList(prev, supplier as any));
+            });
+        };
+
+        const onSupplierDeleted = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { id?: string; srNo?: string; supplier?: unknown } | undefined;
+            const fromSupplier = detail?.supplier ? normalizeSupplierKey(detail.supplier) : '';
+            const key = fromSupplier || String(detail?.srNo || detail?.id || '').trim();
+            if (!key) return;
+            startTransition(() => {
+                setSuppliers((prev) => removeSupplierFromList(prev as any, key) as any);
+            });
+        };
+
+        const onLocalDataReady = () => {
+            if (!isSqliteMode()) return;
+            ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses'].forEach((c) => void refresh(c));
         };
 
         window.addEventListener('indexeddb:collection:changed', onCollectionChanged);
         window.addEventListener('indexeddb:payment:updated', onPaymentUpdated);
         window.addEventListener('indexeddb:payment:deleted', onPaymentDeleted);
+        window.addEventListener('indexeddb:supplier:updated', onSupplierUpdated);
+        window.addEventListener('indexeddb:supplier:deleted', onSupplierDeleted);
+        window.addEventListener('local:data-ready', onLocalDataReady);
 
         return () => {
+            Object.values(refreshDebounceRef.current).forEach((t) => clearTimeout(t));
+            refreshDebounceRef.current = {};
+            if (refreshIdleRef.current != null && typeof (window as any).cancelIdleCallback === 'function') {
+                (window as any).cancelIdleCallback(refreshIdleRef.current);
+            }
             window.removeEventListener('indexeddb:collection:changed', onCollectionChanged);
             window.removeEventListener('indexeddb:payment:updated', onPaymentUpdated);
             window.removeEventListener('indexeddb:payment:deleted', onPaymentDeleted);
+            window.removeEventListener('indexeddb:supplier:updated', onSupplierUpdated);
+            window.removeEventListener('indexeddb:supplier:deleted', onSupplierDeleted);
+            window.removeEventListener('local:data-ready', onLocalDataReady);
         };
-    }, [updateState]);
+    }, [
+        updateState,
+        normalizePaymentKey,
+        upsertCustomerPayment,
+        upsertSupplierPayment,
+        deleteCustomerPayment,
+        deleteSupplierPayment,
+    ]);
 
     // NO LOADING STATES - Data loads initially, then only CRUD updates happen via realtime listeners
     
-    // ✅ OPTIMIZED: Lazy load supplierBankAccounts listener only when needed
-    const [supplierBankAccountsListenerSetup, setSupplierBankAccountsListenerSetup] = useState(false);
-    
-    // ✅ FIX: Defer realtime listeners setup until after initialization is complete
-    // This prevents blocking initialization with heavy Firestore queries
-    // ✅ CRITICAL: Re-setup listeners when company/tenant changes (erp:selection-changed) so we fetch correct company data
+    // SQLite-only: load data from IndexedDB (populated by syncAllData) and receipt settings from local
     useEffect(() => {
         let isSubscribed = true;
-        const unsubFunctions: Array<(() => void) | undefined> = [];
         const staggerTimers: number[] = [];
-        let supplierBankAccountsUnsub: (() => void) | undefined;
-        
-        const cleanupListeners = () => {
-            staggerTimers.forEach((t) => clearTimeout(t));
-            staggerTimers.length = 0;
-            unsubFunctions.forEach((unsub) => { try { unsub?.(); } catch {} });
-            unsubFunctions.length = 0;
-        };
-        
-        const setupListeners = () => {
-            if (!isSubscribed) return;
-            
-            // Cleanup existing listeners before re-setting up (needed when company changes)
-            cleanupListeners();
-            
-            // Collection name for IndexedDB refresh on fetch error (some map to same table)
-            const createErrorHandler = (collectionName: string) => (error: Error) => {
-                logError(error, `Data fetch failed: ${collectionName}`, 'medium', { collection: collectionName });
-                // Trigger IndexedDB refresh so user sees cached data if any
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
-                }
-            };
-            
-            // Stagger listener setup (150ms apart) to reduce Firestore concurrency and avoid intermittent fetch failures
-            const listeners: Array<{ delay: number; setup: () => (() => void) | undefined }> = [
-                { delay: 0, setup: () => getSuppliersRealtime((d) => isSubscribed && updateState(setSuppliers, d), createErrorHandler('suppliers')) },
-                { delay: 150, setup: () => getPaymentsRealtime((d) => isSubscribed && updateState(setSupplierPayments, d), createErrorHandler('payments')) },
-                { delay: 300, setup: () => getCustomersRealtime((d) => isSubscribed && updateState(setCustomers, d), createErrorHandler('customers')) },
-                { delay: 450, setup: () => getCustomerPaymentsRealtime((d) => isSubscribed && updateState(setCustomerPayments, d), createErrorHandler('customerPayments')) },
-                { delay: 600, setup: () => getBanksRealtime((d) => isSubscribed && updateState(setBanks, d), createErrorHandler('banks')) },
-                { delay: 750, setup: () => getBankBranchesRealtime((d) => isSubscribed && updateState(setBankBranches, d), createErrorHandler('bankBranches')) },
-                { delay: 900, setup: () => getBankAccountsRealtime((d) => isSubscribed && updateState(setBankAccounts, d), createErrorHandler('bankAccounts')) },
-                { delay: 1050, setup: () => getFundTransactionsRealtime((d) => isSubscribed && updateState(setFundTransactions, d), createErrorHandler('fundTransactions')) },
-                { delay: 1200, setup: () => getExpensesRealtime((d) => isSubscribed && updateState(setExpenses, d), createErrorHandler('expenses')) },
-                { delay: 1350, setup: () => getIncomeRealtime((d) => isSubscribed && updateState(setIncomes, d), createErrorHandler('incomes')) },
-            ];
-            
-            listeners.forEach(({ delay, setup }) => {
-                const timer = window.setTimeout(() => {
-                    if (!isSubscribed) return;
-                    const unsub = setup();
-                    if (unsub) unsubFunctions.push(unsub);
-                }, delay);
-                staggerTimers.push(timer);
-            });
-            
-            // ✅ OPTIMIZED: Defer receipt settings fetch (not critical for initialization)
-            // Load receipt settings after a delay to avoid blocking
-            setTimeout(() => {
-                if (isSubscribed) {
-                    getReceiptSettings()
-                        .then((settings) => {
-                            if (isSubscribed && settings) {
-                                setReceiptSettings(settings);
-                            }
-                        })
-                        .catch((error) => {
-                            // Silent fail
-                        });
-                }
-            }, 500); // Defer by 500ms
-        };
-        
-        // ✅ OPTIMIZED: Setup supplierBankAccounts listener lazily (only when needed)
-        const setupSupplierBankAccountsListener = () => {
-            if (!isSubscribed || supplierBankAccountsListenerSetup) return;
-            
-            supplierBankAccountsUnsub = getSupplierBankAccountsRealtime(
-                (data) => {
-                    if (isSubscribed) {
-                        // ✅ OPTIMIZED: Use transition for non-urgent updates
-                        updateState(setSupplierBankAccounts, data);
-                    }
-                },
-                (error) => {
-                    // Silent fail
-                }
-            );
-            
-            setSupplierBankAccountsListenerSetup(true);
-        };
-        
-        // Start listener setup soon so data fetch is reliable (retry inside listener handles transient failures)
+
         const runSetup = () => {
-            if (isSubscribed) setupListeners();
+            if (!isSubscribed) return;
+            if (!isSqliteMode()) return;
+            // Fallback: refresh all from IndexedDB after sync (events may have been missed)
+            const fallbackTimer = window.setTimeout(async () => {
+                if (!isSubscribed || !db) return;
+                const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses'];
+                for (const c of collections) {
+                    try {
+                        if (c === 'suppliers') { const d = await db.suppliers.orderBy('srNo').reverse().toArray(); updateState(setSuppliers, d); }
+                        else if (c === 'customers') { const d = await db.customers.orderBy('srNo').reverse().toArray(); updateState(setCustomers, d); }
+                        else if (c === 'customerPayments') { const d = await db.customerPayments.orderBy('date').reverse().toArray(); updateState(setCustomerPayments, d); }
+                        else if (c === 'payments') { const d = await db.payments.orderBy('date').reverse().toArray(); updateState(setSupplierPayments, d); }
+                        else if (c === 'banks') { const d = await db.banks.toArray(); updateState(setBanks, d); }
+                        else if (c === 'bankBranches') { const d = await db.bankBranches.toArray(); updateState(setBankBranches, d); }
+                        else if (c === 'bankAccounts') { const d = await db.bankAccounts.toArray(); updateState(setBankAccounts, d); }
+                        else if (c === 'supplierBankAccounts') { const d = await db.supplierBankAccounts.toArray(); updateState(setSupplierBankAccounts, d); }
+                        else if (c === 'fundTransactions') { const d = await db.fundTransactions.orderBy('date').reverse().toArray(); updateState(setFundTransactions, d); }
+                        else if (c === 'incomes' && db.transactions) { const d = await db.transactions.where('type').equals('Income').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setIncomes, d); }
+                        else if (c === 'expenses' && db.transactions) { const d = await db.transactions.where('type').equals('Expense').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setExpenses, d); }
+                    } catch {}
+                }
+                // Load receipt settings from local IndexedDB
+                getReceiptSettingsFromLocal().then((settings) => {
+                    if (isSubscribed && settings) setReceiptSettings(settings);
+                });
+            }, 2500);
+            staggerTimers.push(fallbackTimer);
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
             (window as any).requestIdleCallback(runSetup, { timeout: 150 });
         } else {
             setTimeout(runSetup, 50);
         }
-        
-        // ✅ Re-setup listeners when company/tenant changes (skipReload case)
+
         const onCompanyChanged = () => {
             if (!isSubscribed) return;
-            refreshTenantFirestoreBindings();
-            setupListeners();
+            if (isSqliteMode()) void syncAllData();
         };
         const onRefreshRequested = () => {
-            if (isSubscribed) {
-                refreshTenantFirestoreBindings();
-                setupListeners();
-            }
+            if (isSubscribed && isSqliteMode()) void syncAllData();
         };
         if (typeof window !== 'undefined') {
             window.addEventListener('erp:selection-changed', onCompanyChanged);
             window.addEventListener('data:refresh-requested', onRefreshRequested);
         }
-        
+
         return () => {
             isSubscribed = false;
             if (typeof window !== 'undefined') {
                 window.removeEventListener('erp:selection-changed', onCompanyChanged);
                 window.removeEventListener('data:refresh-requested', onRefreshRequested);
             }
-            cleanupListeners();
+            staggerTimers.forEach((t) => clearTimeout(t));
         };
-    }, []); // Empty deps - setup once, company change handled via event
-    
-    // ✅ OPTIMIZED: Lazy load supplierBankAccounts when actually needed (not on every page)
-    // This prevents blocking when opening pages like cash-bank that don't need it
-    useEffect(() => {
-        if (supplierBankAccountsListenerSetup) return;
-        
-        // Defer supplier bank accounts listener setup - only load when actually needed
-        // This prevents blocking when opening pages like cash-bank that don't need it
-        const timer = setTimeout(() => {
-            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(() => {
-                    getSupplierBankAccountsRealtime(
-                        (data) => {
-                            updateState(setSupplierBankAccounts, data);
-                        },
-                        (error) => {
-                            // Silent fail
-                        }
-                    );
-                    setSupplierBankAccountsListenerSetup(true);
-                }, { timeout: 5000 }); // Wait up to 5 seconds
-            } else {
-                setTimeout(() => {
-                    getSupplierBankAccountsRealtime(
-                        (data) => {
-                            updateState(setSupplierBankAccounts, data);
-                        },
-                        (error) => {
-                            // Silent fail
-                        }
-                    );
-                    setSupplierBankAccountsListenerSetup(true);
-                }, 3000); // Defer by 3 seconds
-            }
-        }, 2000); // Initial delay of 2 seconds
-        
-        return () => clearTimeout(timer);
-    }, [supplierBankAccountsListenerSetup, updateState]);
+    }, [updateState]);
     
     // Context value - useMemo with proper dependencies
     // Arrays are already memoized by React state, so we just pass them through
@@ -375,6 +453,10 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         incomes,
         expenses,
         receiptSettings,
+        upsertSupplierPayment,
+        deleteSupplierPayment,
+        upsertCustomerPayment,
+        deleteCustomerPayment,
     }), [
         suppliers,
         supplierPayments,
@@ -388,6 +470,10 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         incomes,
         expenses,
         receiptSettings,
+        upsertSupplierPayment,
+        deleteSupplierPayment,
+        upsertCustomerPayment,
+        deleteCustomerPayment,
     ]);
     
     return (

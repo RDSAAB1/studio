@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
 import { useGlobalData } from '@/contexts/global-data-context';
-import { doc, updateDoc, writeBatch, Timestamp, FieldValue } from 'firebase/firestore';
+import { doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 import { getTenantDocPath } from '@/lib/tenancy';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
@@ -32,7 +32,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 interface RtgsReportRow {
-    paymentId: string;
+    id: string; // Firestore document ID
+    paymentId: string; // Human-readable ID
     date: string;
     checkNo: string;
     type: string;
@@ -73,6 +74,20 @@ export default function RtgsReportClient() {
     const [updateCheckNo, setUpdateCheckNo] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
 
+    /** Auto-format: pad check number to 6 digits when the user types */
+    const handleCheckNoChange = (val: string) => {
+        // Allow typing freely; only format if user enters a pure number
+        setUpdateCheckNo(val);
+    };
+
+    /** On blur: auto-pad to 6 digits if it's a pure number */
+    const handleCheckNoBlur = () => {
+        const trimmed = updateCheckNo.trim();
+        if (trimmed && /^\d+$/.test(trimmed)) {
+            setUpdateCheckNo(trimmed.padStart(6, '0'));
+        }
+    };
+
     // State for search filters
     const [searchSrNo, setSearchSrNo] = useState('');
     const [searchCheckNo, setSearchCheckNo] = useState('');
@@ -101,6 +116,7 @@ export default function RtgsReportClient() {
                 const srNo = p.rtgsSrNo || p.paymentId || '';
                 const amount = p.rtgsAmount || p.amount || 0;
                 return {
+                    id: p.id,
                     paymentId: p.paymentId,
                     date: p.date || '',
                     checkNo: p.checkNo || '',
@@ -429,16 +445,16 @@ export default function RtgsReportClient() {
         if (selectedPaymentIds.size === filteredReportRows.length) {
             setSelectedPaymentIds(new Set());
         } else {
-            setSelectedPaymentIds(new Set(filteredReportRows.map(row => row.paymentId)));
+            setSelectedPaymentIds(new Set(filteredReportRows.map(row => row.id)));
         }
     };
 
-    const handleSelectRow = (paymentId: string) => {
+    const handleSelectRow = (id: string) => {
         const newSelected = new Set(selectedPaymentIds);
-        if (newSelected.has(paymentId)) {
-            newSelected.delete(paymentId);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
         } else {
-            newSelected.add(paymentId);
+            newSelected.add(id);
         }
         setSelectedPaymentIds(newSelected);
     };
@@ -469,80 +485,83 @@ export default function RtgsReportClient() {
 
         setIsUpdating(true);
         try {
-            const batch = writeBatch(firestoreDB);
             const updateData: any = {
                 updatedAt: Timestamp.now()
             };
 
-            // Only update fields that user explicitly wants to change
-            // We need to track which fields the user actually wants to update
-            // If user doesn't provide a value, we don't update that field
-            
             // Track if user wants to update date
-            // If updateDate is a Date object, update it
-            // If updateDate is explicitly set to null (cleared), we'll handle it differently
-            // For now, we only update if updateDate is a valid Date
             if (updateDate !== undefined && updateDate !== null) {
                 updateData.date = updateDate.toISOString();
             } else if (updateDate === null) {
-                // User explicitly cleared date - set to null
                 updateData.date = null;
             }
-            // If updateDate is undefined, don't update the date field
 
-            // For checkNo, only update if user provided a value (even if empty)
-            // If updateCheckNo is an empty string, it means user wants to clear it
-            // If updateCheckNo is undefined, don't update
+            // For checkNo
             if (updateCheckNo !== undefined) {
-                // If empty string, set to null to clear it
-                // Otherwise, set to the trimmed value
                 updateData.checkNo = updateCheckNo.trim() === '' ? null : updateCheckNo.trim();
             }
 
             let updateCount = 0;
-            for (const paymentId of selectedPaymentIds) {
-                const paymentRef = doc(firestoreDB, ...getTenantDocPath('payments', paymentId));
-                batch.update(paymentRef, updateData);
-                updateCount++;
-            }
 
-            await batch.commit();
-
-            // Also update local IndexedDB if available
+            // 1. Update local IndexedDB first (Primary for SQLite mode)
             if (typeof window !== 'undefined') {
                 try {
                     const { db } = await import('@/lib/database');
                     if (db) {
-                        for (const paymentId of selectedPaymentIds) {
+                        for (const id of selectedPaymentIds) {
                             try {
-                                const existing =
-                                    (await db.payments.get(paymentId as any)) ||
-                                    (await db.payments.where('paymentId').equals(paymentId).first());
+                                const existing = await db.payments.get(id as any);
                                 if (existing) {
                                     const localUpdateData: any = { ...existing, ...updateData };
-                                    // Handle date update - if updateDate is undefined, don't change; if it's null/empty, clear it
+                                    // Handle date update
                                     if (updateDate !== undefined) {
                                         localUpdateData.date = updateDate ? updateDate.toISOString() : '';
                                     }
-                                    // Handle checkNo update - if updateCheckNo is provided (even if empty), update it
+                                    // Handle checkNo update
                                     if (updateCheckNo !== undefined) {
                                         localUpdateData.checkNo = updateCheckNo.trim();
                                     }
                                     await db.payments.put(localUpdateData);
+                                    updateCount++;
+                                    // Dispatch event to trigger global data context reload (auto-refresh)
+                                    if (typeof window !== 'undefined') {
+                                        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+                                    }
                                 }
                             } catch (localError) {
-
+                                console.error(`Local update failed for ${id}:`, localError);
                             }
                         }
                     }
                 } catch (dbError) {
-
+                    console.error("Database import failed:", dbError);
                 }
+            }
+
+            // 2. Update Firestore in background (Non-blocking)
+            try {
+                const batch = writeBatch(firestoreDB);
+                let firestoreUpdateCount = 0;
+                for (const id of selectedPaymentIds) {
+                    const paymentRef = doc(firestoreDB, ...getTenantDocPath('payments', id));
+                    batch.update(paymentRef, updateData);
+                    firestoreUpdateCount++;
+                }
+                
+                if (firestoreUpdateCount > 0) {
+                    // We don't await this if we want it to be truly background, 
+                    // but for now let's just catch errors so it doesn't block.
+                    await batch.commit().catch(err => {
+                        console.warn("Firestore sync failed (skipped as per user preference):", err);
+                    });
+                }
+            } catch (fsError) {
+                console.warn("Firestore batch preparation failed:", fsError);
             }
 
             toast({ 
                 title: "Success", 
-                description: `Updated ${updateCount} payment(s) successfully.`, 
+                description: `Updated ${updateCount} payment(s) locally.`, 
                 variant: "default" 
             });
 
@@ -551,7 +570,6 @@ export default function RtgsReportClient() {
             setUpdateDate(undefined);
             setUpdateCheckNo('');
         } catch (error: any) {
-
             toast({ 
                 title: "Error", 
                 description: `Failed to update payments: ${error.message}`, 
@@ -682,7 +700,7 @@ export default function RtgsReportClient() {
                                                     size="sm"
                                                     className="h-8 w-8 p-0"
                                                     onClick={() => {
-                                                        const completedIds = new Set(completedRows.map(r => r.paymentId));
+                                                        const completedIds = new Set(completedRows.map(r => r.id));
                                                         if (selectedPaymentIds.size === completedIds.size && completedRows.length > 0 && 
                                                             Array.from(selectedPaymentIds).every(id => completedIds.has(id))) {
                                                             // Deselect all completed
@@ -699,7 +717,7 @@ export default function RtgsReportClient() {
                                                     title="Select All Completed"
                                                 >
                                                     {selectedPaymentIds.size > 0 && completedRows.length > 0 && 
-                                                     completedRows.every(r => selectedPaymentIds.has(r.paymentId)) ? (
+                                                     completedRows.every(r => selectedPaymentIds.has(r.id)) ? (
                                                         <CheckSquare className="h-4 w-4" />
                                                     ) : (
                                                         <Square className="h-4 w-4" />
@@ -719,11 +737,11 @@ export default function RtgsReportClient() {
                             <TableBody>
                                         {completedRows.length > 0 ? (
                                             completedRows.map((row, index) => (
-                                                <TableRow key={`completed-${row.paymentId}-${row.srNo}-${index}`}>
+                                                <TableRow key={`completed-${row.id}-${row.srNo}-${index}`}>
                                                     <TableCell>
                                                         <Checkbox
-                                                            checked={selectedPaymentIds.has(row.paymentId)}
-                                                            onCheckedChange={() => handleSelectRow(row.paymentId)}
+                                                            checked={selectedPaymentIds.has(row.id)}
+                                                            onCheckedChange={() => handleSelectRow(row.id)}
                                                         />
                                                     </TableCell>
                                             <TableCell>
@@ -795,7 +813,7 @@ export default function RtgsReportClient() {
                                                     size="sm"
                                                     className="h-8 w-8 p-0"
                                                     onClick={() => {
-                                                        const pendingIds = new Set(pendingRows.map(r => r.paymentId));
+                                                        const pendingIds = new Set(pendingRows.map(r => r.id));
                                                         if (selectedPaymentIds.size === pendingIds.size && pendingRows.length > 0 && 
                                                             Array.from(selectedPaymentIds).every(id => pendingIds.has(id))) {
                                                             setSelectedPaymentIds(new Set());
@@ -806,7 +824,7 @@ export default function RtgsReportClient() {
                                                     title="Select All Pending"
                                                 >
                                                     {selectedPaymentIds.size === pendingRows.length && pendingRows.length > 0 && 
-                                                     Array.from(selectedPaymentIds).every(id => pendingRows.some(r => r.paymentId === id)) ? (
+                                                     Array.from(selectedPaymentIds).every(id => pendingRows.some(r => r.id === id)) ? (
                                                         <CheckSquare className="h-4 w-4" />
                                                     ) : (
                                                         <Square className="h-4 w-4" />
@@ -826,11 +844,11 @@ export default function RtgsReportClient() {
                                     <TableBody>
                                         {pendingRows.length > 0 ? (
                                             pendingRows.map((row, index) => (
-                                                <TableRow key={`pending-${row.paymentId}-${row.srNo}-${index}`}>
+                                                <TableRow key={`pending-${row.id}-${row.srNo}-${index}`}>
                                                     <TableCell>
                                                         <Checkbox
-                                                            checked={selectedPaymentIds.has(row.paymentId)}
-                                                            onCheckedChange={() => handleSelectRow(row.paymentId)}
+                                                            checked={selectedPaymentIds.has(row.id)}
+                                                            onCheckedChange={() => handleSelectRow(row.id)}
                                                         />
                                                     </TableCell>
                                                     <TableCell>
@@ -916,7 +934,7 @@ export default function RtgsReportClient() {
                             <TableBody>
                                 {filteredReportRows.length > 0 ? (
                                     filteredReportRows.map((row, index) => (
-                                        <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                        <TableRow key={`${row.id}-${row.srNo}-${index}`}>
                                             <TableCell>
                                                 <div className="font-medium whitespace-nowrap text-gray-900">{format(new Date(row.date), 'dd-MMM-yy')}</div>
                                                 <div className="text-xs text-gray-700 font-medium">{row.srNo}</div>
@@ -1026,8 +1044,9 @@ export default function RtgsReportClient() {
                             <Input
                                 id="updateCheckNo"
                                 value={updateCheckNo}
-                                onChange={(e) => setUpdateCheckNo(e.target.value)}
-                                placeholder="Enter check number or leave empty"
+                                onChange={(e) => handleCheckNoChange(e.target.value)}
+                                onBlur={handleCheckNoBlur}
+                                placeholder="e.g. 000001"
                             />
                         </div>
                         <div className="text-xs text-muted-foreground bg-muted p-2 rounded">

@@ -91,7 +91,7 @@ export function fromFirestoreDocument<T extends Record<string, unknown>>(doc: Fi
     out[k] = fromFirestoreValue(v);
   }
   const id = doc.name.split("/").pop() || "";
-  return { id, ...out } as T;
+  return { id, ...out } as unknown as T;
 }
 
 function buildHeaders(idToken: string): HeadersInit {
@@ -200,4 +200,3 @@ export async function firestoreDeleteDocument(args: { idToken: string; documentP
   if (res.status === 404) return;
   if (!res.ok) throw await parseFirestoreError(res);
 }
-

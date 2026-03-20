@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { Tabs } from "@/components/ui/tabs";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
@@ -37,7 +38,7 @@ export default function UnifiedEntryPage({ defaultTab = "supplier" }: { defaultT
     // Update URL query parameter
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', value);
-    router.push(`/sales/entry?${params.toString()}`, { scroll: false });
+    electronNavigate(`/sales/entry?${params.toString()}`, router, { method: 'push' });
   };
 
   // Keep both components mounted but hide inactive one (like SPMS behavior)

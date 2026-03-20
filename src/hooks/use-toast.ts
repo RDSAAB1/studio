@@ -142,7 +142,32 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+// Throttle success toasts so rapid saves/deletes don't spam UI and cause jank.
+// Multiple quick "Save/Delete successful" actions will at most show one success toast
+// in a short window; errors are never throttled.
+let lastSuccessToastTime = 0;
+const SUCCESS_TOAST_COOLDOWN = 2500; // ms
+
 function toast({ ...props }: Toast) {
+  const now = Date.now();
+  const isSuccess =
+    (props as any)?.variant === "success" ||
+    (typeof (props as any)?.variant === "undefined" &&
+      typeof props.title === "string" &&
+      /success|saved|completed|done/i.test(props.title));
+
+  if (isSuccess) {
+    if (now - lastSuccessToastTime < SUCCESS_TOAST_COOLDOWN) {
+      // Drop duplicate/rapid success toasts – UI already showed one recently.
+      return {
+        id: "",
+        dismiss: () => {},
+        update: () => {},
+      }
+    }
+    lastSuccessToastTime = now;
+  }
+
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -165,11 +190,14 @@ function toast({ ...props }: Toast) {
   })
 
   // Calculate duration so full message can be read (longer for longer text)
-  // Base: 4000ms, + 80ms per character (min 4000ms, max 20000ms)
+  // Success toasts are kept shorter; errors/info can stay longer.
+  // Base: 4000ms, + 80ms per character (min 2500ms, max 20000ms)
   const titleText = props.title ? String(props.title).length : 0;
   const descText = props.description ? String(props.description).length : 0;
   const messageLength = titleText + descText;
-  const calculatedDuration = Math.min(Math.max(4000 + (messageLength * 80), 4000), 20000);
+  const base = isSuccess ? 2500 : 4000;
+  const minDuration = isSuccess ? 2500 : 4000;
+  const calculatedDuration = Math.min(Math.max(base + (messageLength * 80), minDuration), 20000);
 
   // Auto-dismiss after calculated delay
   setTimeout(() => {

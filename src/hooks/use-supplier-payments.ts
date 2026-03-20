@@ -705,6 +705,10 @@ export const useSupplierPayments = () => {
                 return;
             }
 
+            if (result.payment) {
+                data.upsertSupplierPayment?.(result.payment);
+            }
+
             toast({ title: `Payment processed successfully.`, variant: 'success' });
             // RTGS receipt dialog disabled - receipt window should not open automatically
             // if (form.paymentMethod === 'RTGS' && result.payment) {
@@ -737,6 +741,7 @@ export const useSupplierPayments = () => {
                 incomes: data.incomes,
                 isCustomer: false,
             }); 
+            data.deleteSupplierPayment?.(id);
             toast({ title: `Payment deleted successfully.`, variant: 'success', duration: 3000 });
             if (form.editingPayment?.id === id || form.editingPayment?.paymentId === id) {
               form.resetPaymentForm();

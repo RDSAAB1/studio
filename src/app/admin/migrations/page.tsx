@@ -4,7 +4,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, AlertCircle, Download, Upload } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Download, Upload, FolderOpen, FolderInput } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -36,6 +36,7 @@ import { checkSupplierSerialDuplicates, type DuplicateAnalysis } from '@/scripts
 import type { FixResult } from '@/scripts/fix-supplier-serial-duplicates';
 import { fixSupplierSerialDuplicates } from '@/scripts/fix-supplier-serial-duplicates';
 import { MigrationResult, migrateUpdatedAt } from '@/lib/migration-utils';
+import { exportToFolder, importFromFolder } from '@/lib/folder-structure-export';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
@@ -281,6 +282,10 @@ export default function MigrationsPage() {
     const [isRunning6, setIsRunning6] = useState(false);
     const [result6, setResult6] = useState<MigrateGovFinalizedToPaymentsResult | null>(null);
     const [govMigrateDeleteSource, setGovMigrateDeleteSource] = useState(false);
+
+    const [isFolderExporting, setIsFolderExporting] = useState(false);
+    const [isFolderImporting, setIsFolderImporting] = useState(false);
+    const [folderResult, setFolderResult] = useState<{ type: 'export' | 'import'; success: boolean; message: string; details?: string } | null>(null);
 
     const handleMigrateGovFinalizedToPayments = async () => {
         if (!confirm('Gov Finalized payments ko Payments collection mein copy karenge. Continue?')) return;
@@ -603,6 +608,62 @@ export default function MigrationsPage() {
         }
     };
 
+    const handleExportToFolder = async () => {
+        const electron = typeof window !== 'undefined' ? (window as unknown as { electron?: { selectFolder: () => Promise<string | null> } }).electron : undefined;
+        if (!electron?.selectFolder) {
+            toast({ title: 'Electron required', description: 'Folder export works only in Electron desktop app. Run: npm run electron:dev', variant: 'destructive' });
+            return;
+        }
+        const folderPath = await electron.selectFolder();
+        if (!folderPath) return;
+        setIsFolderExporting(true);
+        setFolderResult(null);
+        try {
+            const res = await exportToFolder(folderPath);
+            if (res.success) {
+                setFolderResult({ type: 'export', success: true, message: `Exported ${res.filesWritten} files`, details: folderPath });
+                toast({ title: 'Export complete', description: `${res.filesWritten} files saved to folder.`, variant: 'success' });
+            } else {
+                setFolderResult({ type: 'export', success: false, message: res.error || 'Export failed' });
+                toast({ title: 'Export failed', description: res.error, variant: 'destructive' });
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            setFolderResult({ type: 'export', success: false, message: msg });
+            toast({ title: 'Export failed', description: msg, variant: 'destructive' });
+        } finally {
+            setIsFolderExporting(false);
+        }
+    };
+
+    const handleImportFromFolder = async () => {
+        const electron = typeof window !== 'undefined' ? (window as unknown as { electron?: { selectFolder: () => Promise<string | null> } }).electron : undefined;
+        if (!electron?.selectFolder) {
+            toast({ title: 'Electron required', description: 'Folder import works only in Electron desktop app. Run: npm run electron:dev', variant: 'destructive' });
+            return;
+        }
+        const folderPath = await electron.selectFolder();
+        if (!folderPath) return;
+        setIsFolderImporting(true);
+        setFolderResult(null);
+        try {
+            const res = await importFromFolder(folderPath);
+            if (res.summary.length) {
+                setFolderResult({ type: 'import', success: res.errors.length === 0, message: res.summary.join(', '), details: res.errors.length ? res.errors.join('; ') : undefined });
+                toast({ title: 'Import complete', description: res.summary.join(', '), variant: res.errors.length ? 'default' : 'success' });
+            } else {
+                setFolderResult({ type: 'import', success: false, message: 'No data found in folder or invalid structure.' });
+                toast({ title: 'Import failed', description: 'No supported files found in folder.', variant: 'destructive' });
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            setFolderResult({ type: 'import', success: false, message: msg });
+            toast({ title: 'Import failed', description: msg, variant: 'destructive' });
+        } finally {
+            setIsFolderImporting(false);
+        }
+    };
+
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div>
@@ -673,6 +734,60 @@ export default function MigrationsPage() {
 
                     <p className="text-xs text-muted-foreground">
                         Export includes suppliers, customers, payments, ledger accounts, ledger entries, cash accounts, and mandi reports. Import recalculates financial fields, writes to Firestore in batches, and refreshes the local IndexedDB cache.
+                    </p>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Folder Export / Import (Menu Structure)</CardTitle>
+                    <CardDescription>
+                        Export data to a folder with menu-based structure (Entry, Payments, CashAndBank, Reports, HR, Projects, Settings). Excel experts can edit files directly. Import reads from the same structure. Requires Electron desktop app.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-3">
+                        <Button
+                            onClick={handleExportToFolder}
+                            disabled={isFolderExporting || isFolderImporting}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                        >
+                            {isFolderExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isFolderExporting ? 'Exporting...' : (
+                                <>
+                                    <FolderOpen className="mr-2 h-4 w-4" />
+                                    Export to Folder
+                                </>
+                            )}
+                        </Button>
+                        <Button
+                            onClick={handleImportFromFolder}
+                            disabled={isFolderImporting || isFolderExporting}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                        >
+                            {isFolderImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isFolderImporting ? 'Importing...' : (
+                                <>
+                                    <FolderInput className="mr-2 h-4 w-4" />
+                                    Import from Folder
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    {folderResult && (
+                        <div className={cn(
+                            'rounded-lg border p-4 text-sm',
+                            folderResult.success ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+                        )}>
+                            <p className="font-semibold">{folderResult.success ? 'Success' : 'Completed with issues'}</p>
+                            <p>{folderResult.message}</p>
+                            {folderResult.details && <p className="mt-1 text-xs opacity-90">{folderResult.details}</p>}
+                        </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        Structure: BizSuiteData/Entry/, Payments/, CashAndBank/, Reports/, HR/, Projects/, Settings/ — each with Excel files. Run: npm run electron:dev
                     </p>
                 </CardContent>
             </Card>

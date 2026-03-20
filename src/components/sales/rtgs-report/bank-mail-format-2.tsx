@@ -9,9 +9,9 @@ import { Download, Printer, Mail, Loader2, Paperclip, X, FileSpreadsheet } from 
 import { toTitleCase, formatCurrency } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { sendEmailWithAttachment } from '@/lib/actions';
 import { getFirebaseAuth } from '@/lib/firebase';
 import { Input } from '@/components/ui/input';
+import { useErpSelection } from '@/hooks/use-erp-selection';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,6 +23,7 @@ interface Attachment {
 }
 
 export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings }: any) => {
+    const erp = useErpSelection();
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
     const [isSending, setIsSending] = useState(false);
@@ -364,14 +365,23 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         setIsSending(true);
 
         try {
-            const result = await sendEmailWithAttachment({
-                to: emailData.to,
-                subject: emailData.subject,
-                body: emailData.body,
-                attachments: attachments,
-                userId: auth.currentUser.uid,
-                userEmail: auth.currentUser.email || '',
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    to: emailData.to,
+                    subject: emailData.subject,
+                    body: emailData.body,
+                    attachments,
+                    userId: auth.currentUser?.uid,
+                    erp,
+                }),
             });
+            const result = await res.json();
 
             if (result.success) {
                 toast({ title: "Email Sent!", variant: "success" });

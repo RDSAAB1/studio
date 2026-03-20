@@ -439,30 +439,38 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     />
                                 </div>
                             )} />
-                            <div className="space-y-0.5 relative z-[9999]">
+                            <div className="space-y-0.5">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
-                                <div className="relative z-[9999]">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                                        <User className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </div>
-                                    <div className="relative z-[9999]">
-                                    <CustomDropdown
+                                <InputWithIcon icon={<User className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                  <Controller
+                                    name="name"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                      <Input
                                         id="name"
-                                        options={nameOptions}
-                                        value={form.watch('name')}
-                                        onChange={(value) => {
-                                            handleNameChange(value);
-                                            if (value) {
-                                                handleNameSelect(value);
-                                            }
+                                        {...field}
+                                        placeholder="Enter customer name..."
+                                        className={cn("h-7 text-xs pl-9", form.formState.errors.name && "border-destructive")}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          field.onChange(toTitleCase(val));
                                         }}
-                                        onAdd={handleAddNewName}
-                                        placeholder="Search or enter customer name..."
-                                        inputClassName={cn("h-7 text-xs pl-9", form.formState.errors.name && "border-destructive")}
-                                        showClearButton={true}
-                                    />
-                                    </div>
-                                </div>
+                                        onBlur={(e) => {
+                                          const raw = e.target.value.trim();
+                                          if (!raw) return;
+                                          const match = nameOptions.find(
+                                            (opt) => opt.value.toLowerCase() === raw.toLowerCase()
+                                          );
+                                          if (match) {
+                                            handleNameSelect(match.value);
+                                          } else {
+                                            handleAddNewName(raw);
+                                          }
+                                        }}
+                                      />
+                                    )}
+                                  />
+                                </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
                                 <Label htmlFor="contact" className="text-xs">Contact No.</Label>

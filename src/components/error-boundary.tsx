@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { navigateTo } from '@/lib/electron-navigate';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
   handleGoHome = () => {
     this.handleReset();
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      navigateTo('/');
     }
   };
 

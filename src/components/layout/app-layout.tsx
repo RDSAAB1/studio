@@ -29,6 +29,8 @@ import { format } from 'date-fns';
 import { ProfileDropdown } from '@/components/layout/profile-dropdown';
 import { ErpCompanySelector } from '@/components/layout/erp-company-selector';
 import { listErpCompanies } from '@/lib/erp-migration';
+import { getElectronBaseUrl, electronNavigate } from '@/lib/electron-navigate';
+import { useScrollContainer } from '@/contexts/scroll-container-context';
 
 // Pre-compute flattened menu items once (outside component to avoid recalculation)
 const flattenedMenuItems = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i);
@@ -94,28 +96,25 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const [erpCompanies, setErpCompanies] = useState<{ id: string; name: string }[]>([]);
 
   const performNavigation = (path: string, options?: { forceWindow?: boolean }) => {
-    const shouldUseWindowLocation = options?.forceWindow;
+    // Prefer client-side navigation (no full refresh). Use full page load only when forceWindow is true.
+    const shouldUseWindowLocation = options?.forceWindow === true;
     startTransition(() => {
       if (!isBrowser) {
         return;
       }
       try {
         if (shouldUseWindowLocation) {
-          window.location.href = path;
+          electronNavigate(path);
           return;
         }
-        try {
-          router.push(path);
-        } catch (error) {
-          logError(error, `app-layout: router.push to ${path}`, 'medium');
-          window.location.href = path;
-        }
+        electronNavigate(path, router, { method: 'push' });
       } catch (error) {
-        logError(error, `app-layout: hard navigate to ${path}`, 'high');
+        logError(error, `app-layout: navigate to ${path}`, 'high');
         try {
-          window.location.href = path;
+          electronNavigate(path, router, { method: 'push' });
         } catch (hardError) {
-          logError(hardError, `app-layout: window.location.href to ${path}`, 'critical');
+          logError(hardError, `app-layout: electronNavigate to ${path}`, 'critical');
+          electronNavigate(path);
         }
       }
     });
@@ -212,23 +211,26 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       }
     };
     
-    // Handle direct payment paths - map to menu item IDs
-    let currentPathId = pathname === '/' ? 'dashboard-overview' : pathname.substring(1);
+    // pathname never includes query string; normalize for trailingSlash (pathname can be /sales or /sales/)
+    const pathBase = pathname.replace(/\/$/, '') || '/';
     
-    if (pathname === '/sales/payments-supplier') {
+    // Handle direct payment paths - map to menu item IDs
+    let currentPathId = pathBase === '/' ? 'dashboard-overview' : pathBase.substring(1);
+    
+    if (pathBase === '/sales/payments-supplier') {
       currentPathId = 'payments-supplier';
-    } else if (pathname === '/sales/payments-customer') {
+    } else if (pathBase === '/sales/payments-customer') {
       currentPathId = 'payments-customer';
-    } else if (pathname === '/sales/payments-outsider') {
+    } else if (pathBase === '/sales/payments-outsider') {
       currentPathId = 'payments-outsider';
     }
     
     const menuItem = flattenedMenuItems.find(item => item.id === currentPathId);
     
     // Check if this is unified Sales page - if so, create sub-tabs
-    const isSalesPage = pathname === '/sales' || pathname.startsWith('/sales?');
-    const isEntryPage = pathname === '/sales/entry' || pathname.startsWith('/sales/entry');
-    const isUnifiedPaymentsPage = pathname === '/sales/payments' || pathname.startsWith('/sales/payments');
+    const isSalesPage = pathBase === '/sales';
+    const isEntryPage = pathBase === '/sales/entry' || pathBase.startsWith('/sales/entry');
+    const isUnifiedPaymentsPage = pathBase === '/sales/payments' || pathBase.startsWith('/sales/payments');
     
     // Get tab and menu from URL query for sales, entry and payments pages
     const urlParams = isBrowser ? new URLSearchParams(window.location.search) : null;
@@ -289,7 +291,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       else menuItemId = menuParam ?? 'entry'; // hr, projects match their IDs
 
       // Try to find the specific tab item first (leaf node)
-      const targetTabId = tabParam;
+      const targetTabId = String(tabParam);
       
       // Find the menu item in flattened list (for sub-menus) or allMenuItems (for top-level)
       const menuItem = flattenedMenuItems.find(item => item.id === targetTabId) || 
@@ -299,11 +301,15 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         return;
       }
 
-      const selectedMenuItem = menuItem!;
-      const parentMenu = allMenuItems.find(p => p.subMenus?.some(s => s.id === targetTabId));
-      const tabsToShow = parentMenu?.subMenus && parentMenu.subMenus.some(s => s.id === targetTabId)
-        ? parentMenu.subMenus
-        : [selectedMenuItem];
+      const selectedMenuItem = menuItem as MenuItem;
+      const parentMenu = allMenuItems.find((p) => p.subMenus?.some((s) => s.id === targetTabId));
+      const parentSubMenus = parentMenu?.subMenus;
+      let tabsToShow: MenuItem[] = [selectedMenuItem];
+      if (parentSubMenus) {
+        if (parentSubMenus!.some((s) => s.id === targetTabId)) {
+          tabsToShow = parentSubMenus!;
+        }
+      }
       const activeId = flattenedMenuItems.some(m => m.id === targetTabId) ? targetTabId : selectedMenuItem.id;
 
       // Batch state updates in a transition
@@ -703,6 +709,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   };
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const scrollCtx = useScrollContainer();
   const isSalesRoute = pathname.startsWith('/sales');
   const hasSubnav = isSalesRoute && !!subnav;
 
@@ -884,7 +891,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                               payee: loan.lenderName || loan.productName || 'Loan Payment',
                               description: `EMI for ${loan.loanName}`
                             }).toString();
-                            router.push(`/expense-tracker?${params}`);
+                            performNavigation(`/expense-tracker?${params}`);
                           }}
                           className="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                         >
@@ -966,7 +973,10 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         </div>
       )}
 
-      <div className={cn("flex-1 overflow-y-auto overflow-x-hidden", isSalesRoute && "bg-[#F3F4F6]")}>
+      <div
+        ref={scrollCtx?.setScrollContainer ?? undefined}
+        className={cn("flex-1 overflow-y-auto overflow-x-hidden relative", isSalesRoute && "bg-[#F3F4F6]")}
+      >
         <main className={cn(isSalesRoute ? "p-2" : "p-1.5 sm:p-2.5")}>
           {children}
         </main>

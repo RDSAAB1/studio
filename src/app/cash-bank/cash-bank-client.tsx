@@ -27,6 +27,7 @@ import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-f
 import { addFundTransaction, addLoan, updateLoan, deleteLoan, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { getLoansRealtime } from "@/lib/firestore";
 import { db } from "@/lib/database";
+import { syncLoansAndFundTransactionsToFolder } from "@/lib/local-folder-storage";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalData } from "@/contexts/global-data-context";
@@ -376,13 +377,13 @@ export default function CashBankClient() {
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
-            .then(() => {
+            .then(async () => {
                 toast({ title: "Transaction recorded successfully", variant: "success" });
+                await syncLoansAndFundTransactionsToFolder();
             })
             .catch((error) => {
-
                 toast({ title: "Failed to record transaction", variant: "destructive" });
-                throw error; // Re-throw to handle in the caller
+                throw error;
             });
     };
 
@@ -465,6 +466,7 @@ export default function CashBankClient() {
             };
             try {
                 await addFundTransaction(capitalInflowData);
+                await syncLoansAndFundTransactionsToFolder();
                 toast({ title: "Capital added successfully", variant: 'success' });
                 setIsLoanDialogOpen(false);
             } catch (error) {
@@ -503,15 +505,16 @@ export default function CashBankClient() {
                 const newLoan = await addLoan(loanData as Omit<Loan, 'id'>);
                 toast({ title: "Loan added and funds deposited", variant: "success" });
             }
+            await syncLoansAndFundTransactionsToFolder();
             setIsLoanDialogOpen(false);
         } catch (error) {
-
             toast({ title: `Failed to ${loanData.id ? 'update' : 'add'} loan`, description: (error as Error).message, variant: "destructive" });
         }
     };
     
     const handleDeleteLoan = async (id: string) => {
         await deleteLoan(id);
+        await syncLoansAndFundTransactionsToFolder();
         toast({ title: "Loan deleted", variant: "success" });
     }
 
@@ -537,21 +540,21 @@ export default function CashBankClient() {
                 amount: currentFundTransaction.amount,
                 description: currentFundTransaction.description,
             });
+            await syncLoansAndFundTransactionsToFolder();
             toast({ title: 'Transaction updated successfully', variant: 'success' });
             setIsFundTransactionDialogOpen(false);
         } catch (error) {
             toast({ title: 'Failed to update transaction', variant: 'destructive' });
-
         }
     };
 
     const handleDeleteFundTransaction = async (id: string) => {
         try {
             await deleteFundTransaction(id);
+            await syncLoansAndFundTransactionsToFolder();
             toast({ title: 'Transaction deleted successfully', variant: 'success' });
         } catch (error) {
             toast({ title: 'Failed to delete transaction', variant: 'destructive' });
-
         }
     };
 

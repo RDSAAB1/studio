@@ -1,7 +1,8 @@
-
 import { NextResponse } from 'next/server';
 import { doc, setDoc, updateDoc, deleteDoc, collection, writeBatch, getDocs, where, query } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+
+export const dynamic = 'force-static';
 
 type TenantHint = { id?: string; storageMode?: 'root' | 'tenant' } | undefined;
 type ErpSelectionHint = { companyId: string; subCompanyId: string; seasonKey: string } | undefined;

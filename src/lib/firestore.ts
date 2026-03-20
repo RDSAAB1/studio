@@ -24,12 +24,14 @@ import {
   DocumentChangeType,
   getCountFromServer,
   documentId,
+  increment,
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
-import { db } from "./database";
+import { db, getDb } from "./database";
 import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
-import { getTenantCollectionPath, getTenantDocPath, getStorageKeySuffix } from "./tenancy";
+import { getTenantCollectionPath, getTenantDocPath, getStorageKeySuffix, getErpCollectionPath, getErpSelection } from "./tenancy";
+import { isSqliteMode } from "./sqlite-storage";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday, LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerEntryInput, LedgerCashAccount, LedgerCashAccountInput, MandiReport, MandiHeaderSettings, KantaParchi, CustomerDocument, Employee, PayrollEntry, InventoryItem, Account, ManufacturingCostingData } from "@/lib/definitions";
 import { toTitleCase, generateReadableId, calculateSupplierEntry } from "./utils";
 import { withCreateMetadata, withEditMetadata, getEditMetadata, logActivity, moveToRecycleBin } from "./audit";
@@ -349,34 +351,49 @@ export async function deleteOption(collectionName: string, id: string, name: str
 
 // --- Company & RTGS Settings Functions ---
 
-export async function getCompanySettings(userId: string): Promise<{ email: string; appPassword: string } | null> {
-    if (!userId) return null;
-    const docRef = doc(firestoreDB, "users", userId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        return {
-            email: data.email,
-            appPassword: data.appPassword
-        };
+export async function getCompanyEmailSettings(erp?: { companyId: string; subCompanyId: string; seasonKey: string }): Promise<{ email: string; appPassword: string } | null> {
+    try {
+        let coll = settingsCollection;
+        if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
+            coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+        }
+        const docRef = doc(coll, "emailConfig");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as { email: string; appPassword: string };
+        }
+    } catch (e) {
+        console.error("Error getting company email settings:", e);
     }
     return null;
 }
 
-export async function saveCompanySettings(userId: string, settings: { email: string; appPassword: string }): Promise<void> {
-    const userDocRef = doc(firestoreDB, "users", userId);
-    await setDoc(userDocRef, settings, { merge: true });
+export async function saveCompanyEmailSettings(settings: { email: string; appPassword: string }, erp?: { companyId: string; subCompanyId: string; seasonKey: string }): Promise<void> {
+    let coll = settingsCollection;
+    if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
+        coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+    }
+    const docRef = doc(coll, "emailConfig");
+    await setDoc(docRef, settings, { merge: true });
 }
 
-export async function deleteCompanySettings(userId: string): Promise<void> {
-    const userDocRef = doc(firestoreDB, "users", userId);
-    await updateDoc(userDocRef, {
-        appPassword: '' 
-    });
+export async function deleteCompanyEmailSettings(erp?: { companyId: string; subCompanyId: string; seasonKey: string }): Promise<void> {
+    let coll = settingsCollection;
+    if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
+        coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+    }
+    const docRef = doc(coll, "emailConfig");
+    await deleteDoc(docRef);
 }
 
 
 export async function getRtgsSettings(): Promise<RtgsSettings> {
+    if (isSqliteMode()) {
+        const { getReceiptSettingsFromLocal } = await import('./database');
+        const local = await getReceiptSettingsFromLocal();
+        if (local) return local as RtgsSettings;
+    }
+
     const docRef = doc(settingsCollection, "companyDetails");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -399,8 +416,18 @@ export async function getRtgsSettings(): Promise<RtgsSettings> {
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
-    const docRef = doc(settingsCollection, "companyDetails");
-    await setDoc(docRef, settings, { merge: true });
+    if (isSqliteMode()) {
+        const d = getDb();
+        await d.settings.put({ id: 'companyDetails', ...settings } as any);
+    }
+    
+    try {
+        const docRef = doc(settingsCollection, "companyDetails");
+        await setDoc(docRef, settings, { merge: true });
+    } catch (e) {
+        if (!isSqliteMode()) throw e;
+        console.warn("Firestore sync for RTGS settings failed (skipped in SQLite mode):", e);
+    }
 }
 
 const defaultReceiptFields: ReceiptFieldSettings = {
@@ -510,7 +537,7 @@ export async function addBank(bankName: string): Promise<Bank> {
   await notifySyncRegistry('banks', { batch });
   await batch.commit();
   logActivity({ type: "create", collection: "banks", docId: docRef.id, docPath: getTenantCollectionPath("banks").join("/"), summary: `Created bank ${bankName}`, afterData: bankData as Record<string, unknown> }).catch(() => {});
-  return { id: docRef.id, ...bankData };
+  return { id: docRef.id, ...(bankData as any) } as Bank;
 }
 
 export async function deleteBank(id: string): Promise<void> {
@@ -559,7 +586,7 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
     await notifySyncRegistry('bankBranches', { batch });
     await batch.commit();
     logActivity({ type: "create", collection: "bankBranches", docId: docRef.id, docPath: getTenantCollectionPath("bankBranches").join("/"), summary: `Created branch ${branchData.branchName}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
-    return { id: docRef.id, ...dataWithTimestamp };
+    return { id: docRef.id, ...(dataWithTimestamp as any) } as BankBranch;
 }
 
 export async function updateBankBranch(id: string, branchData: Partial<BankBranch>): Promise<void> {
@@ -653,9 +680,19 @@ export async function addSupplier(supplierData: Customer): Promise<Customer> {
         // Ensure the id field matches the document ID
         const supplierWithCorrectId = { ...supplierData, id: documentId };
         
-        // Use local-first sync manager
+        // Use local-first sync manager (Dexie add)
         const { writeLocalFirst } = await import('./local-first-sync');
-        return await writeLocalFirst('suppliers', 'create', documentId, supplierWithCorrectId) as Customer;
+        const result = await writeLocalFirst('suppliers', 'create', documentId, supplierWithCorrectId) as Customer;
+        // File-first (local folder): merge new supplier to file in background so UI doesn't block
+        const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+        if (isLocalFolderMode() && result) void mergeRecordToFolderFile('suppliers', result as unknown as Record<string, unknown>, 'id').catch(() => {});
+        // UI incremental update: notify listeners about this single supplier (avoids full-table reloads)
+        if (typeof window !== 'undefined' && result) {
+            window.dispatchEvent(new CustomEvent('indexeddb:supplier:updated', {
+                detail: { supplier: result },
+            }));
+        }
+        return result;
     } catch (error) {
         logError(error, `addSupplier(${supplierData.srNo || supplierData.id})`, 'high');
         throw error;
@@ -744,11 +781,25 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
     }
   }
   
-  // Use local-first sync manager
+    // Use local-first sync manager (Dexie update)
   try {
     const { writeLocalFirst } = await import('./local-first-sync');
-    // Cast supplierData to match the expected type for writeLocalFirst
     await writeLocalFirst('suppliers', 'update', id, undefined, supplierData as Partial<Customer>);
+    // File-first (local folder): merge updated supplier to file in background so UI doesn't block
+    const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+    let updatedSupplier: Customer | null = null;
+    if (db) {
+      updatedSupplier = await db.suppliers.get(id) as Customer | null;
+    }
+    if (isLocalFolderMode() && updatedSupplier) {
+      void mergeRecordToFolderFile('suppliers', updatedSupplier as unknown as Record<string, unknown>, 'id').catch(() => {});
+    }
+    // UI incremental update: notify listeners about this single supplier (avoids full-table reloads)
+    if (typeof window !== 'undefined' && updatedSupplier) {
+      window.dispatchEvent(new CustomEvent('indexeddb:supplier:updated', {
+        detail: { supplier: updatedSupplier },
+      }));
+    }
     return true;
   } catch (error) {
     return false;
@@ -782,72 +833,78 @@ export async function deleteSupplier(id: string): Promise<void> {
       }
     }
     
-    // ✅ Determine the correct Firestore document ID
-    // Try multiple strategies to find the document:
-    // 1. Try with provided id (might be Firestore doc ID or srNo)
-    let supplierDoc = await getDoc(doc(suppliersCollection, id));
-    if (supplierDoc.exists()) {
-      documentId = id;
-      if (!supplierData) {
-        supplierData = supplierDoc.data() as unknown as Customer | null;
-        supplierSrNo = (supplierData as any)?.srNo;
-      }
-    } else if (supplierSrNo && supplierSrNo.trim() !== '' && supplierSrNo !== 'S----') {
-      // 2. Try with srNo as document ID (new entries are saved this way)
-      supplierDoc = await getDoc(doc(suppliersCollection, supplierSrNo));
-      if (supplierDoc.exists()) {
-        documentId = supplierSrNo;
+    // ✅ Determine the correct Firestore document ID (optional when we already have supplierData from IndexedDB / local mode)
+    let supplierDoc: { exists: () => boolean; id: string; data: () => unknown } | null = null;
+    let foundInFirestore = false;
+    try {
+      let docRef = await getDoc(doc(suppliersCollection, id));
+      if (docRef.exists()) {
+        supplierDoc = docRef as any;
+        documentId = id;
+        foundInFirestore = true;
         if (!supplierData) {
-          supplierData = supplierDoc.data() as unknown as Customer | null;
-        }
-      } else {
-        // 3. Try to find by srNo query (for old entries saved with random IDs)
-        const q = query(suppliersCollection, where('srNo', '==', supplierSrNo));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          supplierDoc = snap.docs[0];
-          documentId = supplierDoc.id; // Use the actual Firestore document ID
-          if (!supplierData) {
-            supplierData = supplierDoc.data() as unknown as Customer | null;
-          }
-        } else {
-          // 4. Last resort: try id as srNo query
-          const q2 = query(suppliersCollection, where('srNo', '==', id));
-          const snap2 = await getDocs(q2);
-          if (!snap2.empty) {
-            supplierDoc = snap2.docs[0];
-            documentId = supplierDoc.id;
-            if (!supplierData) {
-              supplierData = supplierDoc.data() as unknown as Customer | null;
-              supplierSrNo = (supplierData as any)?.srNo;
-            }
-          } else {
-            return; // Not found
-          }
-        }
-      }
-    } else {
-      // Try id as srNo query
-      const q = query(suppliersCollection, where('srNo', '==', id));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        supplierDoc = snap.docs[0];
-        documentId = supplierDoc.id;
-        if (!supplierData) {
-          supplierData = supplierDoc.data() as unknown as Customer | null;
+          supplierData = supplierDoc!.data() as unknown as Customer | null;
           supplierSrNo = (supplierData as any)?.srNo;
         }
+      } else if (supplierSrNo && supplierSrNo.trim() !== '' && supplierSrNo !== 'S----') {
+        docRef = await getDoc(doc(suppliersCollection, supplierSrNo));
+        if (docRef.exists()) {
+          supplierDoc = docRef as any;
+          documentId = supplierSrNo;
+          foundInFirestore = true;
+          if (!supplierData) supplierData = supplierDoc!.data() as unknown as Customer | null;
+        } else {
+          const q = query(suppliersCollection, where('srNo', '==', supplierSrNo));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            supplierDoc = snap.docs[0] as any;
+            documentId = supplierDoc!.id;
+            foundInFirestore = true;
+            if (!supplierData) supplierData = supplierDoc!.data() as unknown as Customer | null;
+          } else {
+            const q2 = query(suppliersCollection, where('srNo', '==', id));
+            const snap2 = await getDocs(q2);
+            if (!snap2.empty) {
+              supplierDoc = snap2.docs[0] as any;
+              documentId = supplierDoc!.id;
+              foundInFirestore = true;
+              if (!supplierData) {
+                supplierData = supplierDoc!.data() as unknown as Customer | null;
+                supplierSrNo = (supplierData as any)?.srNo;
+              }
+            }
+          }
+        }
       } else {
-        return; // Not found
+        const q = query(suppliersCollection, where('srNo', '==', id));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          supplierDoc = snap.docs[0] as any;
+          documentId = supplierDoc!.id;
+          foundInFirestore = true;
+          if (!supplierData) {
+            supplierData = supplierDoc!.data() as unknown as Customer | null;
+            supplierSrNo = (supplierData as any)?.srNo;
+          }
+        }
       }
+    } catch (_) {
+      // Firestore may be unavailable (e.g. local folder mode); continue if we have supplierData from IndexedDB
     }
-    
+    // If not found in Firestore but we have supplierData from IndexedDB (local mode), use it and proceed with delete
+    if (!supplierData) {
+      return; // Not found anywhere
+    }
+    if (!foundInFirestore) {
+      documentId = (supplierData as any)?.id ?? id;
+    }
     if (!supplierSrNo && supplierData) {
       supplierSrNo = (supplierData as any)?.srNo;
     }
     
     // Find all payments associated with this supplier's serial number from IndexedDB
     const paymentsToDelete: string[] = [];
+    const paymentIdsToRemoveFromFile: string[] = [];
     const paymentsToUpdate: Array<{ id: string; paidFor: PaidFor[]; amount: number }> = [];
     
     if (db) {
@@ -857,10 +914,9 @@ export async function deleteSupplier(id: string): Promise<void> {
           const matchingPaidFor = payment.paidFor.find((pf: PaidFor) => pf.srNo === supplierSrNo);
           if (matchingPaidFor) {
             if (payment.paidFor.length === 1) {
-              // Payment is only for this supplier, delete it completely
               paymentsToDelete.push(payment.id);
+              paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
             } else {
-              // Payment is for multiple entries, remove this supplier from paidFor
               const updatedPaidFor = payment.paidFor.filter((pf: PaidFor) => pf.srNo !== supplierSrNo);
               const amountToDeduct = matchingPaidFor.amount || 0;
               paymentsToUpdate.push({
@@ -874,12 +930,18 @@ export async function deleteSupplier(id: string): Promise<void> {
       }
     }
     
+    // File-first (local folder): remove deleted payments from file, then update file for modified payments
+    const { isLocalFolderMode, removePaymentsFromFolderFile, writePaymentToFolderFile, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false, writePaymentToFolderFile: async () => false, removeRecordFromFolderFile: async () => false }));
+    if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
+      await removePaymentsFromFolderFile('payments', paymentIdsToRemoveFromFile).catch(() => {});
+    }
+    
     // Delete payments from IndexedDB
     if (db && paymentsToDelete.length > 0) {
       await db.payments.bulkDelete(paymentsToDelete);
     }
     
-    // Update payments in IndexedDB
+    // Update payments in IndexedDB and in file (file-first for each updated payment)
     if (db && paymentsToUpdate.length > 0) {
       for (const paymentUpdate of paymentsToUpdate) {
         const existingPayment = await db.payments.get(paymentUpdate.id);
@@ -889,10 +951,10 @@ export async function deleteSupplier(id: string): Promise<void> {
             paidFor: paymentUpdate.paidFor,
             amount: paymentUpdate.amount
           };
-          // Add updatedAt if it exists in the payment type
           if ('updatedAt' in existingPayment) {
             (updatedPayment as any).updatedAt = new Date().toISOString();
           }
+          if (isLocalFolderMode()) await writePaymentToFolderFile('payments', updatedPayment as unknown as Record<string, unknown>).catch(() => {});
           await db.payments.put(updatedPayment);
         }
       }
@@ -903,17 +965,33 @@ export async function deleteSupplier(id: string): Promise<void> {
       window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
     }
     
-    // ✅ Use local-first sync for supplier deletion – use IndexedDB key so delete actually removes the row
+    // ✅ Use local-first sync for supplier deletion – use raw DB so delete is not affected by proxy
     const idToDelete = (supplierData as any)?.id ?? documentId;
-    if (db) {
-      await db.suppliers.delete(idToDelete);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
+    if (typeof window !== 'undefined') {
+      try {
+        const dbRaw = getDb();
+        await dbRaw.suppliers.delete(idToDelete);
+        // Fallback: delete by srNo in case primary key differs (e.g. Excel id vs UI id)
+        if (supplierSrNo != null && String(supplierSrNo).trim() !== '') {
+          await dbRaw.suppliers.where('srNo').equals(supplierSrNo).delete();
+        }
+      } catch (e) {
+        handleSilentError(e, 'deleteSupplier IndexedDB delete');
       }
+      // UI incremental update: notify listeners so they can remove this supplier from in-memory lists
+      window.dispatchEvent(new CustomEvent('indexeddb:supplier:deleted', {
+        detail: { id: idToDelete, srNo: supplierSrNo },
+      }));
+      window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
     }
     const { writeLocalFirst } = await import('./local-first-sync');
     await writeLocalFirst('suppliers', 'delete', documentId);
-    
+
+    // File-first (local folder): remove supplier from file (reuse isLocalFolderMode/removeRecordFromFolderFile from above)
+    if (isLocalFolderMode()) {
+      await removeRecordFromFolderFile('suppliers', (supplierData as any)?.id ?? documentId, 'id').catch(() => {});
+    }
+
     // Enqueue sync tasks for payment deletions
     if (paymentsToDelete.length > 0) {
       const { enqueueSyncTask } = await import('./sync-queue');
@@ -949,62 +1027,135 @@ export async function deleteSupplier(id: string): Promise<void> {
 }
 
 export async function deleteMultipleSuppliers(supplierIds: string[]): Promise<void> {
-    const batch = writeBatch(firestoreDB);
-    const paymentsToDelete: string[] = [];
+    if (!supplierIds || supplierIds.length === 0) return;
 
-    // First, find all payments associated with the suppliers to be deleted
-    for (const supplierId of supplierIds) {
-        const supplierDoc = await getDoc(doc(suppliersCollection, supplierId));
-        if (!supplierDoc.exists()) continue;
-        const supplierSrNo = supplierDoc.data().srNo;
-        
-        const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: supplierSrNo }));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
+    try {
+        const paymentsToDelete = new Set<string>();
+        const paymentsToUpdate = new Map<string, { updatedPaidFor: any[], amountToDeduct: number }>();
+        const validSupplierIds: string[] = [];
+        const supplierSrNos: string[] = [];
 
-        paymentsSnapshot.forEach(paymentDoc => {
-            const payment = paymentDoc.data() as Payment;
-            if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === supplierSrNo) {
-                if (!paymentsToDelete.includes(paymentDoc.id)) {
-                    paymentsToDelete.push(paymentDoc.id);
-                }
-            } else {
-                // If payment is for multiple entries, just remove this one
-                const updatedPaidFor = payment.paidFor?.filter(pf => pf.srNo !== supplierSrNo);
-                const amountToDeduct = payment.paidFor?.find(pf => pf.srNo === supplierSrNo)?.amount || 0;
-                batch.update(paymentDoc.ref, {
-                    paidFor: updatedPaidFor,
-                    amount: payment.amount - amountToDeduct
+        // 1. Identify suppliers and related payments (Prefer Local IndexedDB for speed)
+        if (typeof window !== 'undefined' && db) {
+            const localSuppliers = await db.suppliers.where('id').anyOf(supplierIds).toArray();
+            localSuppliers.forEach(s => {
+                validSupplierIds.push(s.id);
+                if (s.srNo) supplierSrNos.push(s.srNo);
+            });
+
+            if (supplierSrNos.length > 0) {
+                // Find all affected payments locally
+                const allPayments = await db.payments.toArray();
+                allPayments.forEach(payment => {
+                    const affectedEntries = payment.paidFor?.filter((pf: any) => supplierSrNos.includes(pf.srNo)) || [];
+                    if (affectedEntries.length > 0) {
+                        if (payment.paidFor?.length === affectedEntries.length) {
+                            // Entire payment belongs to these suppliers
+                            paymentsToDelete.add(payment.id);
+                        } else {
+                            // Partial update needed
+                            const updatedPaidFor = payment.paidFor?.filter((pf: any) => !supplierSrNos.includes(pf.srNo)) || [];
+                            const amountToDeduct = affectedEntries.reduce((sum: number, pf: any) => sum + (Number(pf.amount) || 0), 0);
+                            paymentsToUpdate.set(payment.id, { updatedPaidFor, amountToDeduct });
+                        }
+                    }
                 });
             }
-        });
-    }
-
-    // Delete the identified single-entry payments
-    for (const paymentId of paymentsToDelete) {
-        batch.delete(doc(supplierPaymentsCollection, paymentId));
-    }
-    // Delete the suppliers themselves
-    for (const supplierId of supplierIds) {
-        batch.delete(doc(suppliersCollection, supplierId));
-    }
-    
-    // ✅ Update sync registry atomically for suppliers and payments
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('suppliers', { batch });
-    if (paymentsToDelete.length > 0) {
-        await notifySyncRegistry('payments', { batch });
-    }
-    
-    await batch.commit();
-
-    // Sync Dexie and refresh UI
-    if (db) {
-        await db.suppliers.bulkDelete(supplierIds);
-        await db.payments.bulkDelete(paymentsToDelete);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
-            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+        } else {
+            // Fallback: Parallel Firestore Queries (Slow but correct)
+            const supplierDocs = await Promise.all(supplierIds.map(id => getDoc(doc(suppliersCollection, id))));
+            for (const sDoc of supplierDocs) {
+                if (!sDoc.exists()) continue;
+                validSupplierIds.push(sDoc.id);
+                const srNo = sDoc.data().srNo;
+                if (!srNo) continue;
+                
+                const q = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
+                const pSnap = await getDocs(q);
+                pSnap.forEach(pDoc => {
+                    const pData = pDoc.data() as Payment;
+                    if (pData.paidFor?.length === 1) {
+                        paymentsToDelete.add(pDoc.id);
+                    } else {
+                        const updatedPaidFor = pData.paidFor?.filter(pf => pf.srNo !== srNo) || [];
+                        const amountToDeduct = pData.paidFor?.find(pf => pf.srNo === srNo)?.amount || 0;
+                        const existing = paymentsToUpdate.get(pDoc.id);
+                        if (existing) {
+                            existing.updatedPaidFor = existing.updatedPaidFor.filter(pf => pf.srNo !== srNo);
+                            existing.amountToDeduct += Number(amountToDeduct);
+                        } else {
+                            paymentsToUpdate.set(pDoc.id, { updatedPaidFor, amountToDeduct: Number(amountToDeduct) });
+                        }
+                    }
+                });
+            }
         }
+
+        // 2. Perform Firestore Writes in Chunked Batches (Max 500 per batch)
+        // REWRITTEN BATCH LOOP FOR SAFETY:
+        const ops = [
+            ...Array.from(paymentsToDelete).map(pid => ({ type: 'delete', ref: doc(supplierPaymentsCollection, pid) })),
+            ...Array.from(paymentsToUpdate.entries()).map(([pid, info]) => ({ 
+                type: 'update', 
+                ref: doc(supplierPaymentsCollection, pid), 
+                data: { paidFor: info.updatedPaidFor, amount: increment(-info.amountToDeduct) } 
+            })),
+            ...validSupplierIds.map(sid => ({ type: 'delete', ref: doc(suppliersCollection, sid) }))
+        ];
+
+        for (let i = 0; i < ops.length; i += 450) {
+            const batch = writeBatch(firestoreDB);
+            const chunk = ops.slice(i, i + 450);
+            
+            chunk.forEach(op => {
+                if (op.type === 'delete') batch.delete(op.ref);
+                else if (op.type === 'update') batch.update(op.ref, (op as any).data);
+            });
+
+            await notifySyncRegistry('suppliers', { batch });
+            if (paymentsToDelete.size > 0 || paymentsToUpdate.size > 0) {
+                await notifySyncRegistry('payments', { batch });
+            }
+            await batch.commit();
+        }
+
+        // 3. Local Cleanups
+        if (db) {
+            const { isLocalFolderMode, removePaymentsFromFolderFile, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false, removeRecordFromFolderFile: async () => false }));
+            
+            const pIdsArray = Array.from(paymentsToDelete);
+            if (isLocalFolderMode() && pIdsArray.length > 0) {
+                const rows = await db.payments.where('id').anyOf(pIdsArray).toArray();
+                const pids = rows.map((p: any) => String(p.paymentId ?? p.id).trim()).filter(Boolean);
+                if (pids.length) await removePaymentsFromFolderFile('payments', pids).catch(() => {});
+            }
+            if (isLocalFolderMode()) {
+                for (const sid of validSupplierIds) await removeRecordFromFolderFile('suppliers', sid, 'id').catch(() => {});
+            }
+
+            // Bulk actions on Dexie
+            await db.suppliers.bulkDelete(validSupplierIds);
+            await db.payments.bulkDelete(pIdsArray);
+            
+            // Apply partial updates to Dexie
+            for (const [pid, info] of paymentsToUpdate.entries()) {
+                const p = await db.payments.get(pid);
+                if (p) {
+                    await db.payments.update(pid, { 
+                        paidFor: info.updatedPaidFor, 
+                        amount: (Number(p.amount) || 0) - info.amountToDeduct 
+                    });
+                }
+            }
+
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'suppliers' } }));
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
+            }
+        }
+    } catch (error) {
+        console.error('[Bulk Delete Error]', error);
+        throw error;
     }
 }
 
@@ -1065,9 +1216,13 @@ export async function addCustomer(customerData: Customer): Promise<Customer> {
         // Ensure the id field matches the document ID
         const customerWithCorrectId = { ...customerData, id: documentId };
         
-        // Use local-first sync manager
+        // Use local-first sync manager (Dexie add)
         const { writeLocalFirst } = await import('./local-first-sync');
-        return await writeLocalFirst('customers', 'create', documentId, customerWithCorrectId) as Customer;
+        const result = await writeLocalFirst('customers', 'create', documentId, customerWithCorrectId) as Customer;
+        // File-first (local folder): merge new customer to file
+        const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+        if (isLocalFolderMode() && result) void mergeRecordToFolderFile('customers', result as unknown as Record<string, unknown>, 'id').catch(() => {});
+        return result;
     } catch (error) {
         logError(error, `addCustomer(${customerData.srNo || customerData.id})`, 'high');
         throw error;
@@ -1138,10 +1293,16 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         }
     }
     
-    // Use local-first sync manager
+    // Use local-first sync manager (Dexie update)
     try {
         const { writeLocalFirst } = await import('./local-first-sync');
         await writeLocalFirst<Customer>('customers', 'update', id, undefined, customerData as Partial<Customer>);
+        // File-first (local folder): merge updated customer to file in background so UI doesn't block
+        const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+        if (isLocalFolderMode() && db) {
+            const updated = await db.customers.get(id);
+            if (updated) void mergeRecordToFolderFile('customers', updated as unknown as Record<string, unknown>, 'id').catch(() => {});
+        }
         return true;
     } catch (error) {
         return false;
@@ -1152,7 +1313,9 @@ export async function deleteCustomer(id: string): Promise<void> {
     if (!id) {
         return;
     }
-    // Use local-first sync manager
+    // File-first (local folder): remove customer from file then Dexie
+    const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
+    if (isLocalFolderMode()) await removeRecordFromFolderFile('customers', id, 'id').catch(() => {});
     const { writeLocalFirst } = await import('./local-first-sync');
     await writeLocalFirst('customers', 'delete', id);
 }
@@ -1356,16 +1519,22 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   
   if (db) {
     const allPayments = await db.payments.toArray();
+    const paymentIdsToRemoveFromFile: string[] = [];
     for (const payment of allPayments) {
       if (payment.paidFor && Array.isArray(payment.paidFor)) {
         const hasMatchingSrNo = payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo);
         if (hasMatchingSrNo) {
           paymentIdsToDelete.push(payment.id);
+          paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
         }
       }
     }
     
-    // Delete from IndexedDB
+    // File-first (local folder): remove from file then Dexie
+    const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+    if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
+      await removePaymentsFromFolderFile('payments', paymentIdsToRemoveFromFile).catch(() => {});
+    }
     if (paymentIdsToDelete.length > 0) {
       await db.payments.bulkDelete(paymentIdsToDelete);
     }
@@ -1403,16 +1572,21 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
   
   if (db) {
     const allPayments = await db.customerPayments.toArray();
+    const paymentIdsToRemoveFromFile: string[] = [];
     for (const payment of allPayments) {
       if (payment.paidFor && Array.isArray(payment.paidFor)) {
         const hasMatchingSrNo = payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo);
         if (hasMatchingSrNo) {
           paymentIdsToDelete.push(payment.id);
+          paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
         }
       }
     }
     
-    // Delete from IndexedDB
+    const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+    if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
+      await removePaymentsFromFolderFile('customerPayments', paymentIdsToRemoveFromFile).catch(() => {});
+    }
     if (paymentIdsToDelete.length > 0) {
       await db.customerPayments.bulkDelete(paymentIdsToDelete);
     }
@@ -1433,70 +1607,76 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
 
 // --- Fund Transaction Functions ---
 export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId' | 'date'>): Promise<FundTransaction> {
-  const batch = writeBatch(firestoreDB);
-  const docRef = doc(fundTransactionsCollection);
   const dataWithDate = withCreateMetadata({ ...transactionData, date: new Date().toISOString(), updatedAt: new Date().toISOString() } as Record<string, unknown>);
-  batch.set(docRef, dataWithDate);
-  const { notifySyncRegistry } = await import('./sync-registry');
-  await notifySyncRegistry('fundTransactions', { batch });
-  await batch.commit();
-  const saved = { id: docRef.id, transactionId: '', ...dataWithDate } as FundTransaction;
-  logActivity({ type: "create", collection: "fundTransactions", docId: docRef.id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${docRef.id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
-
-  // Update IndexedDB and notify so Cash & Bank list updates immediately without refresh
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ft-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const saved = { id, transactionId: '', ...dataWithDate } as FundTransaction;
+  try {
+    const batch = writeBatch(firestoreDB);
+    const docRef = doc(fundTransactionsCollection, id);
+    batch.set(docRef, dataWithDate);
+    const { notifySyncRegistry } = await import('./sync-registry');
+    await notifySyncRegistry('fundTransactions', { batch });
+    await batch.commit();
+    logActivity({ type: "create", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
+  } catch {
+    // Firestore failed (e.g. local folder mode) — save to IndexedDB only
+  }
   if (typeof window !== 'undefined' && db) {
     try {
+      const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+      if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', saved as unknown as Record<string, unknown>, 'id').catch(() => {});
       await db.fundTransactions.put(saved);
       window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
   return saved;
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
-    const batch = writeBatch(firestoreDB);
-    const docRef = doc(fundTransactionsCollection, id);
     const updateData = withEditMetadata({ ...data, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, updateData);
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('fundTransactions', { batch });
-    await batch.commit();
-    logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData }).catch(() => {});
-
+    try {
+      const batch = writeBatch(firestoreDB);
+      const docRef = doc(fundTransactionsCollection, id);
+      batch.update(docRef, updateData);
+      const { notifySyncRegistry } = await import('./sync-registry');
+      await notifySyncRegistry('fundTransactions', { batch });
+      await batch.commit();
+      logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData }).catch(() => {});
+    } catch { /* Firestore failed — update IndexedDB only */ }
     if (typeof window !== 'undefined' && db) {
       try {
         const existing = await db.fundTransactions.get(id);
         if (existing) {
-          await db.fundTransactions.put({ ...existing, ...data, updatedAt: (updateData as { updatedAt?: string }).updatedAt });
+          const updated = { ...existing, ...data, updatedAt: (updateData as { updatedAt?: string }).updatedAt };
+          const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+          if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', updated as unknown as Record<string, unknown>, 'id').catch(() => {});
+          await db.fundTransactions.put(updated);
           window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
-}
+  }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
-    const docRef = doc(fundTransactionsCollection, id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
-    }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('fundTransactions', { batch });
-    await batch.commit();
-
+    try {
+      const docRef = doc(fundTransactionsCollection, id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
+      }
+      const batch = writeBatch(firestoreDB);
+      batch.delete(docRef);
+      const { notifySyncRegistry } = await import('./sync-registry');
+      await notifySyncRegistry('fundTransactions', { batch });
+      await batch.commit();
+    } catch { /* Firestore failed — delete from IndexedDB only */ }
     if (typeof window !== 'undefined' && db) {
       try {
+        const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
+        if (isLocalFolderMode()) await removeRecordFromFolderFile('fundTransactions', id, 'id').catch(() => {});
         await db.fundTransactions.delete(id);
         window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
 }
 
@@ -1836,54 +2016,92 @@ export async function deleteProject(id: string): Promise<void> {
 
 // --- Loan Functions ---
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
-    const batch = writeBatch(firestoreDB);
-    const docRef = doc(loansCollection);
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `loan-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const dataWithTimestamp = withCreateMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.set(docRef, dataWithTimestamp);
-    if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
-        const fundData = withCreateMetadata({
-            type: 'CapitalInflow',
-            source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
-            destination: loanData.depositTo,
-            amount: loanData.totalAmount,
-            description: `Capital inflow from ${loanData.loanName}`,
-            date: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        } as Record<string, unknown>);
-        const fundDocRef = doc(fundTransactionsCollection);
-        batch.set(fundDocRef, fundData);
+    const saved = { id, ...dataWithTimestamp } as Loan;
+    try {
+        const batch = writeBatch(firestoreDB);
+        const docRef = doc(loansCollection, id);
+        batch.set(docRef, dataWithTimestamp);
+        if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
+            const fundData = withCreateMetadata({
+                type: 'CapitalInflow',
+                source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
+                destination: loanData.depositTo,
+                amount: loanData.totalAmount,
+                description: `Capital inflow from ${loanData.loanName}`,
+                date: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            } as Record<string, unknown>);
+            const fundDocRef = doc(fundTransactionsCollection);
+            batch.set(fundDocRef, fundData);
+            const { notifySyncRegistry } = await import('./sync-registry');
+            await notifySyncRegistry('fundTransactions', { batch });
+        }
         const { notifySyncRegistry } = await import('./sync-registry');
-        await notifySyncRegistry('fundTransactions', { batch });
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+        logActivity({ type: "create", collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Created loan ${(loanData as any).loanName || id}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
+    } catch {
+        // Firestore failed (e.g. local folder mode) — save to IndexedDB only
     }
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
-    logActivity({ type: "create", collection: "loans", docId: docRef.id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Created loan ${(loanData as any).loanName || docRef.id}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
-    return { id: docRef.id, ...dataWithTimestamp } as Loan;
+    if (typeof window !== 'undefined' && db) {
+        try {
+            const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+            if (isLocalFolderMode()) await mergeRecordToFolderFile('loans', saved as unknown as Record<string, unknown>, 'id').catch(() => {});
+            await db.loans.put(saved);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'loans' } }));
+        } catch { /* ignore */ }
+    }
+    return saved;
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
-    const batch = writeBatch(firestoreDB);
-    const docRef = doc(loansCollection, id);
     const data = withEditMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
-    logActivity({ type: "edit", collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Updated loan ${id}`, afterData: data }).catch(() => {});
+    try {
+        const batch = writeBatch(firestoreDB);
+        const docRef = doc(loansCollection, id);
+        batch.update(docRef, data);
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+        logActivity({ type: "edit", collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Updated loan ${id}`, afterData: data }).catch(() => {});
+    } catch { /* Firestore failed — update IndexedDB only */ }
+    if (typeof window !== 'undefined' && db) {
+        try {
+            const existing = await db.loans.get(id);
+            if (existing) {
+                const updated = { ...existing, ...loanData, updatedAt: (data as { updatedAt?: string }).updatedAt };
+                const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+                if (isLocalFolderMode()) await mergeRecordToFolderFile('loans', updated as unknown as Record<string, unknown>, 'id').catch(() => {});
+                await db.loans.put(updated);
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'loans' } }));
+            }
+        } catch { /* ignore */ }
+    }
 }
 
 export async function deleteLoan(id: string): Promise<void> {
-    const docRef = doc(loansCollection, id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      await moveToRecycleBin({ collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted loan ${id}` });
+    try {
+        const docRef = doc(loansCollection, id);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            await moveToRecycleBin({ collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted loan ${id}` });
+        }
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('./sync-registry');
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+    } catch { /* Firestore failed — delete from IndexedDB only */ }
+    if (typeof window !== 'undefined' && db) {
+        try {
+            const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
+            if (isLocalFolderMode()) await removeRecordFromFolderFile('loans', id, 'id').catch(() => {});
+            await db.loans.delete(id);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'loans' } }));
+        } catch { /* ignore */ }
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('./sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
 }
 
 
@@ -1908,6 +2126,8 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
     await notifySyncRegistry('customerPayments');
     if (typeof window !== 'undefined' && db) {
       try {
+        const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+        if (isLocalFolderMode()) await removePaymentsFromFolderFile('customerPayments', [id]).catch(() => {});
         await db.customerPayments.delete(id);
         await db.customerPayments.where('paymentId').equals(id).delete();
         window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'customerPayments' } }));

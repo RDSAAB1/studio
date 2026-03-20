@@ -1,15 +1,18 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React from "react";
+import Link from "next/link";
 import {
   Building2,
   BarChart3,
   Zap,
   Shield,
   Users,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import { FlyingPlanes } from "@/components/auth/flying-planes";
-import { AuthForm } from "@/components/auth/auth-form";
+import { Button } from "@/components/ui/button";
 
 const features = [
   { icon: BarChart3, title: "Sales & Reports", desc: "Real-time analytics" },
@@ -94,12 +97,59 @@ export default function IntroPage() {
         </div>
       </div>
 
-      {/* Right: Login form */}
+      {/* Right: Login and Create options */}
       <div className="lg:w-1/2 w-full flex items-center justify-center px-6 lg:px-12 xl:px-16 py-8 shrink-0 z-10">
-        <div className="w-full max-w-xl auth-scale-in opacity-0" style={{ animationFillMode: "forwards" }}>
-          <Suspense fallback={<div className="h-64 rounded-3xl bg-white/5 animate-pulse" />}>
-            <AuthForm showBackLink={false} />
-          </Suspense>
+        <div className="w-full max-w-md auth-scale-in opacity-0 space-y-4" style={{ animationFillMode: "forwards" }}>
+          <div
+            className="relative p-8 rounded-3xl backdrop-blur-2xl border border-white/[0.1]"
+            style={{
+              background:
+                "linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 35%, rgba(99,102,241,0.06) 100%)",
+              boxShadow:
+                "0 24px 48px -12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08)",
+            }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_24px_rgba(99,102,241,0.35)]">
+                <Building2 className="w-6 h-6 text-white stroke-[1.5]" />
+              </div>
+              <div>
+                <span className="font-bold text-white font-jakarta text-lg">BizSuite</span>
+                <span className="text-slate-400 text-sm ml-1.5">DataFlow</span>
+                <p className="text-slate-500 text-xs mt-0.5">Shuru karein</p>
+              </div>
+            </div>
+            <p className="text-slate-400 text-sm mb-6">
+              Naya user? Create se company banao. Pehle se account hai? Login karo.
+            </p>
+            <div className="space-y-3">
+              <Link href="/create-company" className="block">
+                <Button
+                  className="w-full h-14 rounded-xl font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white border-0 shadow-[0_8px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300 text-base flex flex-col items-center justify-center gap-0.5 py-3"
+                  size="lg"
+                >
+                  <span className="flex items-center gap-2">
+                    <UserPlus className="h-5 w-5" />
+                    Create Company
+                  </span>
+                  <span className="text-xs font-normal text-white/80">Naya user — folder select karke company banao</span>
+                </Button>
+              </Link>
+              <Link href="/login" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full h-14 rounded-xl border border-white/15 bg-slate-800/40 hover:bg-slate-700/50 hover:border-white/25 text-slate-300 transition-all text-base flex flex-col items-center justify-center gap-0.5 py-3"
+                  size="lg"
+                >
+                  <span className="flex items-center gap-2">
+                    <LogIn className="h-5 w-5" />
+                    Login
+                  </span>
+                  <span className="text-xs font-normal text-slate-400">Pehle se account hai</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

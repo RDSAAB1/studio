@@ -427,5 +427,9 @@ export const useSupplierData = () => {
         receiptSettings,
         customerSummaryMap,
         financialState,
+        upsertSupplierPayment: globalData.upsertSupplierPayment,
+        deleteSupplierPayment: globalData.deleteSupplierPayment,
+        upsertCustomerPayment: globalData.upsertCustomerPayment,
+        deleteCustomerPayment: globalData.deleteCustomerPayment,
     };
 };

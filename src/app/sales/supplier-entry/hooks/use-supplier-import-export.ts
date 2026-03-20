@@ -1,10 +1,9 @@
 import { useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
 import type { Customer } from "@/lib/definitions";
-import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { addSupplier } from "@/lib/firestore";
+import { processSupplierImportRow } from "@/lib/supplier-import-processor";
 
 interface UseSupplierImportExportProps {
   allSuppliers: Customer[] | undefined;
@@ -16,31 +15,26 @@ export function useSupplierImportExport({ allSuppliers }: UseSupplierImportExpor
 
   const handleExport = useCallback(() => {
     const rows = (allSuppliers || []).map((s) => ({
-      'SR NO.': s.srNo,
+      'RST': s.srNo,
       'DATE': s.date,
-      'NAME': s.name,
-      'FATHER NAME': s.fatherName,
+      'CUSTOMER': s.name,
+      'FATHER NAME': s.so || s.fatherName || '', // Support both for safety
       'ADDRESS': s.address,
-      'CONTACT': s.contact,
+      'MOBILE NO.': s.contact,
       'VEHICLE NO': s.vehicleNo,
-      'VARIETY': s.variety,
-      'GROSS WT': s.grossWeight,
-      'TIER WT': s.teirWeight,
-      'NET WT': s.netWeight,
+      'MATERIAL': s.variety,
+      'GROSS': s.grossWeight,
+      'TIER': s.teirWeight,
+      'NET WT': s.weight,
+      'KARDA %': s.kartaPercentage,
+      'KARDA WT': s.kartaWeight,
       'RATE': s.rate,
-      'KARTA %': s.kartaPercentage,
-      'LAB RATE': s.labouryRate,
-      'BROKERAGE': s.brokerage,
-      'BROKERAGE RATE': s.brokerageRate,
-      'BROKERAGE ADD/SUB': s.brokerageAddSubtract ? 'ADD' : 'SUB',
+      'TOTAL AMT': s.amount,
+      'KARDA AMT': s.kartaAmount,
+      'LABOURY': s.labouryAmount,
       'KANTA': s.kanta,
-      'AMOUNT': s.amount,
-      'KARTA AMT': s.kartaAmount,
-      'LAB AMT': s.labouryAmount,
-      'NET AMT': s.netAmount,
+      'FAINAL AMT': s.netAmount,
       'TERM': s.term,
-      'DUE DATE': s.dueDate,
-      'SO': s.so,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -63,55 +57,50 @@ export function useSupplierImportExport({ allSuppliers }: UseSupplierImportExpor
       reader.onload = async (e) => {
         try {
           const data = e.target?.result as ArrayBuffer | string;
-          const workbook = XLSX.read(data, { type: typeof data === 'string' ? 'binary' : 'array', cellNF: true, cellText: false });
+          const workbook = XLSX.read(data, { 
+              type: typeof data === 'string' ? 'binary' : 'array', 
+              cellNF: true, 
+              cellText: false 
+          });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
+          // Use {raw: true} to avoid date mangling if possible, but processor handles strings
           const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
           let nextSrNum = (allSuppliers || []).length > 0
-            ? Math.max(...(allSuppliers || []).map(c => parseInt((c.srNo || 'S0000').substring(1)) || 0)) + 1
+            ? Math.max(...(allSuppliers || []).map(c => {
+                const num = parseInt((c.srNo || 'S0000').replace(/[^0-9]/g, ''));
+                return isNaN(num) ? 0 : num;
+              })) + 1
             : 1;
 
           let imported = 0;
           for (const item of json) {
-            const supplierData: Customer = {
-              id: item['ID'] || crypto.randomUUID(),
-              srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-              date: item['DATE'] || format(new Date(), 'yyyy-MM-dd'),
-              name: toTitleCase(item['NAME'] || ''),
-              fatherName: toTitleCase(item['FATHER NAME'] || ''),
-              address: toTitleCase(item['ADDRESS'] || ''),
-              contact: String(item['CONTACT'] || ''),
-              vehicleNo: String(item['VEHICLE NO'] || '').toUpperCase(),
-              variety: toTitleCase(item['VARIETY'] || ''),
-              grossWeight: Number(item['GROSS WT']) || 0,
-              teirWeight: Number(item['TIER WT']) || 0,
-              netWeight: Number(item['NET WT']) || 0,
-              rate: Number(item['rate'] ?? item['RATE']) || 0,
-              kartaPercentage: Number(item['KARTA %']) || 0,
-              labouryRate: Number(item['LAB RATE']) || 0,
-              brokerage: Number(item['BROKERAGE']) || 0,
-              brokerageRate: Number(item['BROKERAGE RATE']) || 0,
-              brokerageAddSubtract: String(item['BROKERAGE ADD/SUB'] || 'ADD').toUpperCase() === 'ADD',
-              kanta: Number(item['KANTA']) || 0,
-              amount: Number(item['AMOUNT']) || 0,
-              kartaAmount: Number(item['KARTA AMT']) || 0,
-              labouryAmount: Number(item['LAB AMT']) || 0,
-              netAmount: Number(item['NET AMT']) || 0,
-              term: String(item['TERM'] || ''),
-              dueDate: String(item['DUE DATE'] || ''),
-              so: String(item['SO'] || ''),
-              forceUnique: Boolean(item['FORCE UNIQUE'] || false),
-              paymentType: String(item['PAYMENT TYPE'] || ''),
-            } as Customer;
+            // Robust check: skip row if it doesn't have at least one of these critical fields (Name or Gross/Net weight)
+            // We search for ANY key that contains 'CUSTOMER', 'NAME', 'GROSS', 'NET' or 'SR'
+            const hasData = Object.keys(item).some(key => {
+                const k = key.toUpperCase().trim();
+                return (k.includes('CUSTOMER') || k.includes('NAME') || k.includes('GROSS') || k.includes('NET') || k.includes('RST') || k.includes('VEHICLE')) && item[key];
+            });
 
+            if (!hasData) continue;
+
+            const supplierData = processSupplierImportRow(item, nextSrNum++);
             await addSupplier(supplierData);
             imported++;
           }
 
-          toast({ title: 'Imported', description: `${imported} rows imported` });
+          toast({ 
+              title: 'Success', 
+              description: `${imported} entries imported. Name, S/O, Address, Contact, and Calculations have been updated.` 
+          });
         } catch (err) {
-          toast({ variant: 'destructive', title: 'Import failed', description: 'Invalid file format' });
+          console.error('[Import Error]', err);
+          toast({ 
+              variant: 'destructive', 
+              title: 'Import failed', 
+              description: 'Error processing data. Please ensure column headers match.' 
+          });
         } finally {
           event.target.value = '';
         }

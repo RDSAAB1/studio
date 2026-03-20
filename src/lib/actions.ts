@@ -1,8 +1,5 @@
-
-'use server';
-
 import nodemailer from 'nodemailer';
-import { getCompanySettings } from './firestore';
+import { getCompanyEmailSettings } from './firestore';
 import { getFirebaseAuth } from './firebase'; // Not used here, but good practice if needed
 
 interface AttachmentData {
@@ -17,21 +14,17 @@ interface EmailOptions {
     body: string;
     attachments: AttachmentData[];
     userId: string;
-    userEmail: string; 
+    erp?: { companyId: string; subCompanyId: string; seasonKey: string };
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachments, userId, userEmail } = options;
+    const { to, subject, body, attachments, userId, erp } = options;
 
     try {
-        const companySettings = await getCompanySettings(userId);
+        const companySettings = await getCompanyEmailSettings(erp);
 
         if (!companySettings || !companySettings.email || !companySettings.appPassword) {
-            return { success: false, error: "Email settings are not configured. Please go to Settings to connect your Gmail account." };
-        }
-
-        if (companySettings.email.toLowerCase() !== userEmail.toLowerCase()) {
-            return { success: false, error: "Email configuration mismatch. Please re-configure your email settings." };
+            return { success: false, error: "Email settings are not configured for this company. Please go to Settings -> Email to connect a Gmail account." };
         }
 
         const transporter = nodemailer.createTransport({

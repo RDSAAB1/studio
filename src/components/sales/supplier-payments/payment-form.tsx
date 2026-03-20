@@ -62,7 +62,7 @@ function PaymentFormComponent(props: any) {
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
-        checkNo, setCheckNo,
+        checkNo, setCheckNo, handleCheckNoBlur,
         onPaymentMethodChange, // Explicitly extract onPaymentMethodChange
         setPaymentMethod, // Also get setPaymentMethod directly as fallback
         hideRtgsToggle = false, // New prop to hide RTGS toggle
@@ -311,6 +311,7 @@ function PaymentFormComponent(props: any) {
                                           name="checkNo"
                                           value={checkNo}
                                           onChange={e => setCheckNo(e.target.value)}
+                                          onBlur={handleCheckNoBlur}
                                           className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
                                       />
                                     </div>
@@ -504,6 +505,7 @@ function PaymentFormComponent(props: any) {
                                             setCheckNo(value);
                                           }
                                         }}
+                                        onBlur={!isCash ? handleCheckNoBlur : undefined}
                                         className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
                                       />
                                     </div>

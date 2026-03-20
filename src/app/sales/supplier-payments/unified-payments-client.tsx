@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useTransition, useDeferredValue } from 'react';
 import type { Customer, Payment, ReceiptSettings, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -142,6 +142,8 @@ type UnifiedPaymentsHook = {
   setGovQuantity?: (value: number) => void;
   govAmount?: number;
   setGovAmount?: (value: number) => void;
+  govExtraAmount?: number;
+  setGovExtraAmount?: (value: number) => void;
   setGovRate?: (value: number) => void;
   selectedPaymentOption?: { quantity?: number; rate?: number; calculatedAmount?: number; amountRemaining?: number; bags?: number | null } | null;
 };
@@ -151,9 +153,14 @@ interface UnifiedPaymentsClientProps {
 }
 
 function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProps = {}) {
-    const [searchType, setSearchType] = useState<'name' | 'fatherName' | 'address' | 'contact'>('name');
-    const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
-    const { toast } = useToast();
+  const [, startTransition] = useTransition();
+  const [searchType, setSearchType] = useState<'name' | 'fatherName' | 'address' | 'contact'>('name');
+  const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+  const [isDeleteProcessing, setIsDeleteProcessing] = useState(false);
+  const [showProcessingOverlay, setShowProcessingOverlay] = useState(false);
+  const processingStartRef = React.useRef<number | null>(null);
+  const MIN_PROCESS_OVERLAY_MS = 1000;
+  const { toast } = useToast();
     
   // Always call all hooks to maintain hook order (Rules of Hooks)
   // But only use the results based on type
@@ -210,6 +217,45 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     calculatedCdAmount: 0,
   };
   const hook: UnifiedPaymentsHook = { ...defaultHook, ...(rawHook as any) };
+
+  // Keep the processing window visible for at least MIN_PROCESS_OVERLAY_MS
+  // so UI has time to settle before overlay disappears.
+  useEffect(() => {
+    const isBusy = Boolean(hook.isProcessing || isDeleteProcessing);
+    if (isBusy) {
+      if (!showProcessingOverlay) {
+        processingStartRef.current = Date.now();
+        setShowProcessingOverlay(true);
+      }
+      return;
+    }
+
+    if (!showProcessingOverlay) return;
+
+    const startedAt = processingStartRef.current ?? Date.now();
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(MIN_PROCESS_OVERLAY_MS - elapsed, 0);
+
+    const timer = window.setTimeout(() => {
+      setShowProcessingOverlay(false);
+      processingStartRef.current = null;
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [hook.isProcessing, isDeleteProcessing, showProcessingOverlay]);
+
+  const handleDeletePayment = useCallback(
+    async (payment: Payment) => {
+      if (!hook.handleDeletePayment) return;
+      try {
+        setIsDeleteProcessing(true);
+        await Promise.resolve(hook.handleDeletePayment(payment));
+      } finally {
+        setIsDeleteProcessing(false);
+      }
+    },
+    [hook.handleDeletePayment]
+  );
   
   // Get data based on type
   const dataSource = type === 'supplier' ? supplierData : 
@@ -219,7 +265,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const supplierBankAccounts = type === 'supplier' ? supplierData.supplierBankAccounts : [];
   const banks = (dataSource as any)?.banks ?? [];
   const bankBranches = (dataSource as any)?.bankBranches ?? [];
-  const [refreshKey, setRefreshKey] = useState<number>(0);
   const [supplierDataRefreshKey, setSupplierDataRefreshKey] = useState<number>(0);
   const [parchiNoRefreshKey, setParchiNoRefreshKey] = useState<number>(0);
   const { activeTab, setActiveTab } = hook;
@@ -238,12 +283,19 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     minRate: hook?.paymentMethod === 'Gov.' ? (hook?.govRate || 0) : (hook?.minRate || 0),
     maxRate: hook?.paymentMethod === 'Gov.' ? (hook?.govRate || 0) : (hook?.maxRate || 0),
   });
+  
+  // Defer large supplier/payment arrays so heavy summaries recalculate in low-priority renders
+  const deferredSuppliers = useDeferredValue(hook?.suppliers || []);
+  const deferredPaymentHistory = useDeferredValue(hook?.paymentHistory || []);
 
   // Use the same supplier summary and filtering as supplier profile (skip for outsider)
   // Add supplierDataRefreshKey to force recalculation when entry is edited
+  const sourceSuppliers = type === 'outsider' ? [] : deferredSuppliers;
+  const sourcePayments = type === 'outsider' ? [] : deferredPaymentHistory;
+
   const { supplierSummaryMap, MILL_OVERVIEW_KEY } = useSupplierSummary(
-    type === 'outsider' ? [] : (hook?.suppliers || []),
-    type === 'outsider' ? [] : (hook?.paymentHistory || []),
+    sourceSuppliers,
+    sourcePayments,
     undefined,
     undefined
   );
@@ -256,9 +308,11 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
 
   const onSelectSupplierKey = useCallback((key: string | null) => {
     if (key) {
-      hook.handleCustomerSelect(key);
+      startTransition(() => {
+        hook.handleCustomerSelect(key);
+      });
     }
-  }, [hook]);
+  }, [hook, startTransition]);
 
   // Update the hook's customerSummaryMap to use our new supplierSummaryMap (skip for outsider)
   useEffect(() => {
@@ -306,11 +360,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   });
 
   // Removed automatic Mill Overview selection - let user select manually
-
-  // Force lightweight rerender of heavy tables when payments list changes
-  useEffect(() => {
-    setRefreshKey(Date.now());
-  }, [hook.paymentHistory?.length]);
 
   // Check for editPaymentData from localStorage (when navigating from detail window)
   useEffect(() => {
@@ -385,37 +434,74 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
         )
       : transactionsForSelectedSupplier;
     
-    // Recalculate summary totals from filtered transactions
-    const totalGrossWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.grossWeight) || 0), 0);
-    const totalTeirWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.teirWeight) || 0), 0);
-    // Use 'weight' field for final weight (as per use-supplier-summary.ts line 237 and Customer type definition)
-    const totalFinalWeight = filteredTransactions.reduce((sum, t) => sum + (Number((t as any).weight) || 0), 0);
-    const totalKartaWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaWeight) || 0), 0);
-    const totalNetWeight = filteredTransactions.reduce((sum, t) => sum + (Number(t.netWeight) || 0), 0);
-    
-    const totalKartaAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaAmount) || 0), 0);
-    const totalLabouryAmount = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryAmount) || 0), 0);
-    const totalKanta = filteredTransactions.reduce((sum, t) => sum + (Number(t.kanta) || 0), 0);
-    const totalOther = filteredTransactions.reduce((sum, t) => sum + (Number(t.otherCharges) || 0), 0);
-    const totalBaseOriginalAmount = filteredTransactions.reduce((sum, t) => {
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+
+    let totalGrossWeight = 0;
+    let totalTeirWeight = 0;
+    let totalFinalWeight = 0;
+    let totalKartaWeight = 0;
+    let totalNetWeight = 0;
+
+    let totalKartaAmount = 0;
+    let totalLabouryAmount = 0;
+    let totalKanta = 0;
+    let totalOther = 0;
+    let totalBaseOriginalAmount = 0;
+    let totalAmountBinaDeduction = 0;
+
+    let totalWeightedRate = 0;
+    let minRate = 0;
+    let maxRate = 0;
+    let totalKartaPercentage = 0;
+    let totalLabouryRate = 0;
+
+    const outstandingEntryIds: string[] = [];
+    const filteredSrNosSet = new Set<string>();
+
+    for (const t of filteredTransactions) {
+      totalGrossWeight += Number(t.grossWeight) || 0;
+      totalTeirWeight += Number(t.teirWeight) || 0;
+      totalFinalWeight += Number((t as any).weight) || 0;
+      totalKartaWeight += Number(t.kartaWeight) || 0;
+
+      const netWeight = Number(t.netWeight) || 0;
+      totalNetWeight += netWeight;
+
+      totalKartaAmount += Number(t.kartaAmount) || 0;
+      totalLabouryAmount += Number(t.labouryAmount) || 0;
+      totalKanta += Number(t.kanta) || 0;
+      totalOther += Number(t.otherCharges) || 0;
+
       const base = Number(t.originalNetAmount) || 0;
       const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
-      return sum + base + advance;
-    }, 0);
+      totalBaseOriginalAmount += base + advance;
 
-    // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
-    const totalAmountBinaDeduction = filteredTransactions.reduce((sum, t) => {
       const amt = Number(t.amount) || 0;
-      if (amt > 0) return sum + amt;
-      const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
-        ? Number((t as any).calculatedRate) || 0
-        : Number(t.rate) || 0;
-      return sum + Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
-    }, 0);
-    
-    // Calculate paid amounts from payment history for filtered transactions
-    // Match use-supplier-summary: include paidFor match OR parchiNo match (for legacy ledger)
-    const filteredSrNosSet = new Set(filteredTransactions.map((t: Customer) => t.srNo?.toLowerCase()).filter(Boolean));
+      if (amt > 0) {
+        totalAmountBinaDeduction += amt;
+      } else {
+        const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
+          ? Number((t as any).calculatedRate) || 0
+          : Number(t.rate) || 0;
+        totalAmountBinaDeduction += round2(rate * (Number((t as any).weight) || 0));
+      }
+
+      const rateValue = Number(t.rate) || 0;
+      totalWeightedRate += rateValue * netWeight;
+      if (rateValue > 0) {
+        if (minRate === 0 || rateValue < minRate) minRate = rateValue;
+        if (rateValue > maxRate) maxRate = rateValue;
+      }
+
+      totalKartaPercentage += Number(t.kartaPercentage) || 0;
+      totalLabouryRate += Number(t.labouryRate) || 0;
+
+      const srNoLower = (t.srNo || "").toLowerCase();
+      if (srNoLower) filteredSrNosSet.add(srNoLower);
+
+      const outstanding = Number((t as any).outstandingForEntry ?? t.netAmount ?? 0);
+      if (outstanding > 0.01 && t.id) outstandingEntryIds.push(t.id);
+    }
     const filteredPayments = (hook.paymentHistory || []).filter((p: Payment) => {
       const paidForMatch = p.paidFor?.some(pf => filteredSrNosSet.has((pf.srNo || "").toLowerCase()));
       if (paidForMatch) return true;
@@ -439,87 +525,70 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     let totalRtgsPaid = 0;
     let totalGovExtraAmount = 0;
     let totalLinkedLedgerCredit = 0;
+    for (const payment of filteredPayments) {
+      const receiptType = receiptTypeOf(payment);
+      const paidForList = Array.isArray(payment.paidFor) ? payment.paidFor : [];
+      const hasAnyPaidForExtra = paidForList.some((pf) => Number((pf as any).extraAmount || 0) > 0);
 
-    filteredTransactions.forEach((entry: Customer) => {
-      const entrySrNo = (entry.srNo || "").toLowerCase();
-      const paymentsForEntry = filteredPayments.filter((p: Payment) => {
-        const paidForMatch = p.paidFor?.some(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
-        if (paidForMatch) return true;
-        const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
-        const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
-        return parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
-      });
+      const isLedger = receiptType === "ledger";
+      const ledgerCredit = isLedger && isLedgerCredit(payment);
 
-      paymentsForEntry.forEach((payment: Payment) => {
-        const paidForEntry = payment.paidFor?.find(pf => (pf.srNo || "").toLowerCase() === entrySrNo);
+      if (paidForList.length > 0) {
+        const totalPaidForInPayment = paidForList.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
+
+        for (const pf of paidForList) {
+          const srNoLower = (pf.srNo || "").toLowerCase();
+          if (!srNoLower || !filteredSrNosSet.has(srNoLower)) continue;
+
+          const pfAmount = Number(pf.amount || 0);
+
+          if (!isLedger || !ledgerCredit) {
+            totalPaid += pfAmount;
+          } else {
+            totalLinkedLedgerCredit += pfAmount;
+          }
+
+          const extraAmount = Number((pf as any).extraAmount || 0);
+          if (extraAmount > 0) totalGovExtraAmount += extraAmount;
+
+          if ('cdAmount' in pf && (pf as any).cdAmount !== undefined && (pf as any).cdAmount !== null) {
+            totalCd += Number((pf as any).cdAmount || 0);
+          } else if (payment.cdAmount && totalPaidForInPayment > 0) {
+            const proportion = pfAmount / totalPaidForInPayment;
+            totalCd += round2(Number(payment.cdAmount) * proportion);
+          }
+
+          if (receiptType === 'cash') {
+            totalCashPaid += pfAmount;
+          } else if (receiptType === 'rtgs') {
+            totalRtgsPaid += pfAmount;
+          }
+        }
+      } else {
         const parchiNoRaw = String((payment as any).parchiNo || "").trim().toLowerCase();
         const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
-        const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
-        const amountAbs = Math.abs(Number((payment as any).amount || 0));
-        const isLedger = receiptTypeOf(payment) === "ledger";
-        const ledgerCredit = isLedger && isLedgerCredit(payment);
+        if (parchiTokens.length > 0) {
+          const matchingTokenCount = parchiTokens.reduce((count: number, token: string) => {
+            return filteredSrNosSet.has(token) ? count + 1 : count;
+          }, 0);
 
-        // Legacy parchiNo-only ledger (no paidFor)
-        // Ledger Credit = charge (bill badha) → goes to ledgerCreditAmount only, NOT totalGovExtraAmount
-        // (Gov Extra = sirf Gov. payments ka extra; ledger credit alag concept hai)
-        if (isLedger && !paidForEntry && parchiMatch && amountAbs > 0) {
-          const share = parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs;
-          if (ledgerCredit) {
-            // Ledger credit: charge hai, totalGovExtra mein nahi — ledgerAdjustment.credit mein aayega
-            // (double count avoid: netBill = base + govExtra + ledgerCredit, dono jagah add nahi)
-          } else {
-            totalPaid += share;
-          }
-          return;
-        }
-
-        if (paidForEntry) {
-          // Ledger: sirf Debit = payment → Total Paid mein add; Credit = charge, Total Paid mein nahi
-          const isLedger = receiptTypeOf(payment) === "ledger";
-          if (!isLedger || !isLedgerCredit(payment)) {
-            totalPaid += Number(paidForEntry.amount || 0);
-          } else if (isLedger && ledgerCredit) {
-            // Ledger credit with paidFor: charge hai, bill badhata hai (linked ledger credit)
-            totalLinkedLedgerCredit += Number(paidForEntry.amount || 0);
-          }
-
-          if (paidForEntry.extraAmount && Number(paidForEntry.extraAmount) > 0) {
-            totalGovExtraAmount += Number(paidForEntry.extraAmount);
-          }
-
-          if ('cdAmount' in paidForEntry && paidForEntry.cdAmount !== undefined && paidForEntry.cdAmount !== null) {
-            totalCd += Number(paidForEntry.cdAmount || 0);
-          } else if (payment.cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-            const totalPaidForInPayment = payment.paidFor.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
-            if (totalPaidForInPayment > 0) {
-              const proportion = Number(paidForEntry.amount || 0) / totalPaidForInPayment;
-              totalCd += Math.round(payment.cdAmount * proportion * 100) / 100;
+          if (matchingTokenCount > 0) {
+            const amountAbs = Math.abs(Number((payment as any).amount || 0));
+            const share = parchiTokens.length > 0 ? round2(amountAbs / parchiTokens.length) : amountAbs;
+            if (!isLedger || !ledgerCredit) {
+              totalPaid += share * matchingTokenCount;
             }
           }
-
-          const receiptType = receiptTypeOf(payment);
-          const actualPaidAmount = Number(paidForEntry.amount || 0);
-          if (receiptType === 'cash') {
-            totalCashPaid += actualPaidAmount;
-          } else if (receiptType === 'rtgs') {
-            totalRtgsPaid += actualPaidAmount;
-          }
         }
-      });
-    });
+      }
 
-    // Gov Extra: include payment.govExtraAmount when paidFor has no extraAmount (backward compat)
-    filteredPayments.forEach((payment: Payment) => {
       const rt = String((payment as any).receiptType || '').trim().toLowerCase();
       const isGov = rt === 'gov.' || rt === 'gov' || rt.startsWith('gov');
       const govExtra = Number((payment as any).govExtraAmount || 0);
-      if (isGov && govExtra > 0) {
-        const hasPaidForExtra = payment.paidFor?.some(pf => Number(pf.extraAmount || 0) > 0);
-        if (!hasPaidForExtra) {
-          totalGovExtraAmount += govExtra;
-        }
+      if (isGov && govExtra > 0 && !hasAnyPaidForExtra) {
+        totalGovExtraAmount += govExtra;
       }
-    });
+    }
 
     // Gov Extra: include current form's govExtraAmount when in Gov mode (unsaved payment)
     if (type === 'supplier' && hook.paymentMethod === 'Gov.' && (hook.govExtraAmount || 0) > 0) {
@@ -605,40 +674,14 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     // Outstanding: baseOutstanding (incl. linked ledger credit) + unlinked ledger Credit − unlinked ledger Debit
     const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.credit - unlinkedLedgerDebit) * 100) / 100;
     
-    // Calculate outstanding entry IDs — use summary's outstandingForEntry when available (consistent with display)
-    const outstandingEntryIds = filteredTransactions
-      .filter((t: Customer) => {
-        const outstanding = Number((t as any).outstandingForEntry ?? t.netAmount ?? 0);
-        return outstanding > 0.01;
-      })
-      .map((t: Customer) => t.id)
-      .filter(Boolean);
-    
-    // Calculate averages - use weighted average for rate (rate * weight / total weight)
-    const totalWeightedRate = filteredTransactions.reduce((sum, t) => {
-      const rate = Number(t.rate) || 0;
-      const netWeight = Number(t.netWeight) || 0;
-      return sum + rate * netWeight;
-    }, 0);
-    
     const safeNetWeight = totalNetWeight || 0;
     const averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
     
     // Calculate average original price (adjusted original / net weight)
     const totalAdjustedOriginalForAvg = totalAdjustedOriginal || totalOriginalAmount || 0;
     const averageOriginalPrice = safeNetWeight > 0 ? totalAdjustedOriginalForAvg / safeNetWeight : 0;
-    
-    const minRate = filteredTransactions.length > 0 
-      ? Math.min(...filteredTransactions.map(t => Number(t.rate) || 0).filter(r => r > 0))
-      : 0;
-    const maxRate = filteredTransactions.length > 0 
-      ? Math.max(...filteredTransactions.map(t => Number(t.rate) || 0))
-      : 0;
-    
-    const totalKartaPercentage = filteredTransactions.reduce((sum, t) => sum + (Number(t.kartaPercentage) || 0), 0);
+
     const averageKartaPercentage = filteredTransactions.length > 0 ? totalKartaPercentage / filteredTransactions.length : 0;
-    
-    const totalLabouryRate = filteredTransactions.reduce((sum, t) => sum + (Number(t.labouryRate) || 0), 0);
     const averageLabouryRate = filteredTransactions.length > 0 ? totalLabouryRate / filteredTransactions.length : 0;
 
     const allPaymentsForSummary = Array.from(
@@ -918,6 +961,21 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   
     return (
         <div className="space-y-2 text-[12px]">
+             {showProcessingOverlay && (
+               <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+                 <div className="flex items-center gap-3 rounded-lg bg-background px-6 py-4 shadow-lg">
+                   <Loader2 className="h-5 w-5 animate-spin" />
+                   <div className="flex flex-col">
+                     <span className="text-sm font-medium">
+                       {isDeleteProcessing ? "Deleting payment..." : "Processing payment..."}
+                     </span>
+                     <span className="text-xs text-muted-foreground">
+                       Please wait, background tasks are completing.
+                     </span>
+                   </div>
+                 </div>
+               </div>
+             )}
              {type === 'outsider' ? (
                 // For outsider: No tabs, just show payment content directly
                 <>
@@ -983,7 +1041,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                 <PaymentHistoryCompact
                                   payments={outsiderPayments}
                                   onEdit={hook.handleEditPayment}
-                                  onDelete={hook.handleDeletePayment}
+                                  onDelete={handleDeletePayment}
                                 />
                               </div>
                             </div>
@@ -996,7 +1054,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 <>
                     <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
                         <div className="w-full px-2 md:px-2.5 py-2.5">
-                            <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[500px_minmax(0,1fr)] gap-2 items-start">
+                            <div className="grid grid-cols-1 lg:grid-cols-[480px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)] gap-2 items-start">
                                 <div className="min-w-0 flex flex-col gap-2">
                                     <div className="flex items-center gap-1.5 w-full">
                                         <Button
@@ -1132,7 +1190,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                         <PaymentHistoryCompact
                                           payments={selectedSupplierPayments}
                                           onEdit={hook.handleEditPayment}
-                                          onDelete={hook.handleDeletePayment}
+                                          onDelete={handleDeletePayment}
                                         />
                                       </div>
                                     </div>
@@ -1833,7 +1891,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 }
                 
                 // Force refresh of supplier data and summary
-                setRefreshKey(Date.now());
                 setSupplierDataRefreshKey(Date.now());
                 
                 // Wait a bit for the local update to propagate to IndexedDB
@@ -1858,7 +1915,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
               entry={selectedEntryForEdit}
               onSuccess={async () => {
                 // Force immediate refresh of customer data and summary for hand-to-hand update
-                setRefreshKey(Date.now());
                 setSupplierDataRefreshKey(Date.now());
                 
                 // Highlight and scroll to entry in table

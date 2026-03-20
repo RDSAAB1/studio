@@ -277,7 +277,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                         ...editableInvoiceDetails,
                         ...recalculated,
                         id: customer.id,
-                        updatedAt: Timestamp.now().toMillis(),
+                        updatedAt: new Date().toISOString(),
                     } as Customer;
                     await db.customers.put(customerToUpdate);
                 } catch (error) {

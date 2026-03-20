@@ -45,7 +45,11 @@ type CreatedUser = {
   password: string;
 };
 
-export function AddCompanyUserCard() {
+type AddCompanyUserCardProps = {
+  onSuccess?: () => void;
+};
+
+export function AddCompanyUserCard({ onSuccess }: AddCompanyUserCardProps) {
   const { selection } = useErpSelection();
   const { toast } = useToast();
   const [username, setUsername] = useState("");
@@ -55,20 +59,10 @@ export function AddCompanyUserCard() {
   const [loading, setLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null);
   const [copied, setCopied] = useState(false);
-  const [listRefresh, setListRefresh] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
-  const [isCompanyUser, setIsCompanyUser] = useState(false);
 
   const companyId = selection?.companyId;
-
-  useEffect(() => {
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setIsCompanyUser(!!u?.uid?.startsWith("cu_"));
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!companyId) {
@@ -128,12 +122,7 @@ export function AddCompanyUserCard() {
           permissions,
         }),
       });
-      let data: {
-        error?: string;
-        userId?: string;
-        username?: string;
-        password?: string;
-      } = {};
+      let data: any = {};
       try {
         data = await res.json();
       } catch {
@@ -162,7 +151,7 @@ export function AddCompanyUserCard() {
       setUsername("");
       setPassword("");
       setPermissions([]);
-      setListRefresh((r) => r + 1);
+      onSuccess?.();
       toast({
         title: "User created successfully",
         description: "Credentials saved in companyUsers. Check the popup for username and password.",
@@ -195,20 +184,17 @@ export function AddCompanyUserCard() {
 
   if (!companyId) {
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Add Company User
-            </CardTitle>
-            <CardDescription>
-              Select a company first (from the header dropdown) to add users.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <ChangePasswordCard isCompanyUser={isCompanyUser} />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5" />
+            Add Company User
+          </CardTitle>
+          <CardDescription>
+            Select a company first (from the header dropdown) to add users.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
@@ -222,25 +208,21 @@ export function AddCompanyUserCard() {
 
   if (userRole === "member") {
     return (
-      <div className="space-y-6">
-        <Card className="access-restricted-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl font-semibold text-primary">
-              <Info className="h-5 w-5 text-primary" />
-              Access Restricted
-            </CardTitle>
-            <p className="text-primary/90 dark:text-primary text-base leading-relaxed mt-2">
-              You are a member. Only owner and admin can create users and view the user list. Contact your company owner or admin if you need these permissions.
-            </p>
-          </CardHeader>
-        </Card>
-        <ChangePasswordCard isCompanyUser={isCompanyUser} />
-      </div>
+      <Card className="access-restricted-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl font-semibold text-primary">
+            <Info className="h-5 w-5 text-primary" />
+            Access Restricted
+          </CardTitle>
+          <p className="text-primary/90 dark:text-primary text-base leading-relaxed mt-2">
+            You are a member. Only owner and admin can create users. Contact your company owner or admin if you need these permissions.
+          </p>
+        </CardHeader>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -248,7 +230,7 @@ export function AddCompanyUserCard() {
           Add Company User
         </CardTitle>
         <CardDescription>
-          Create username and password. User logs in with Username + Password only (no email, no company code).
+          Create username and password. User logs in with Username + Password only.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -330,7 +312,7 @@ export function AddCompanyUserCard() {
           <DialogHeader>
             <DialogTitle className="text-green-600 dark:text-green-500">User Created Successfully</DialogTitle>
             <DialogDescription>
-              Share these credentials with the user. They login at Intro → Company User Login with Username + Password only.
+              Share these credentials with the user.
             </DialogDescription>
           </DialogHeader>
           {createdUser && (
@@ -342,7 +324,7 @@ export function AddCompanyUserCard() {
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Password (save & share with user – won&apos;t be shown again)</p>
+                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Password</p>
                 <p className="text-xl font-mono font-bold break-all text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded border-2 border-zinc-300 dark:border-zinc-600 tracking-wide select-all">
                   {createdUser.password}
                 </p>
@@ -358,10 +340,6 @@ export function AddCompanyUserCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </Card>
-    <CompanyUserList refreshTrigger={listRefresh} />
-    <ChangePasswordCard isCompanyUser={isCompanyUser} />
-    </div>
   );
 }

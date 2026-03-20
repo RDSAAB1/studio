@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { CalendarClock, CircleDollarSign, Users, Calendar as CalendarIcon, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { electronNavigate } from '@/lib/electron-navigate';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -84,7 +85,7 @@ export default function DailyPaymentsPage() {
 
     const handleGoToPayments = (supplier: Customer) => {
         const customerId = supplier.customerId;
-        router.push(`/sales/supplier-payments?customerId=${encodeURIComponent(customerId)}`);
+        electronNavigate(`/sales/supplier-payments?customerId=${encodeURIComponent(customerId)}`, router, { method: 'push' });
     }
     
     return (

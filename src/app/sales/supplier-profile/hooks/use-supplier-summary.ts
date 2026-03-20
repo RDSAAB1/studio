@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, CustomerPayment, Payment, SupplierPayment } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
 import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "../utils/fuzzy-matching";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
+
+type AnyPayment = SupplierPayment | CustomerPayment;
 
 const toNumber = (value: unknown): number => {
   if (typeof value === "number") {
@@ -106,7 +108,7 @@ const sortPaymentByIdAscending = (a: Payment, b: Payment): number => {
 };
 
 // Sort payment by ID (descending for display - highest ID first)
-const sortPaymentByIdDescending = (a: Payment, b: Payment): number => {
+const sortPaymentByIdDescending = (a: AnyPayment, b: AnyPayment): number => {
   try {
     const idA = (a.paymentId || a.id || '').toString().trim();
     const idB = (b.paymentId || b.id || '').toString().trim();
@@ -139,7 +141,7 @@ const sortPaymentByIdDescending = (a: Payment, b: Payment): number => {
 
 export const useSupplierSummary = (
   suppliers: Supplier[],
-  paymentHistory: Payment[],
+  paymentHistory: AnyPayment[],
   startDate?: Date,
   endDate?: Date
 ) => {
@@ -158,7 +160,7 @@ export const useSupplierSummary = (
       let totalCashPaidForEntry = 0;
       let totalRtgsPaidForEntry = 0;
       const entrySrNo = String(s.srNo || '').trim().toLowerCase();
-      result.paymentsForEntry.forEach((p: Payment) => {
+      result.paymentsForEntry.forEach((p: AnyPayment) => {
         const paidForThis = p.paidFor?.find(pf => String(pf.srNo || '').trim().toLowerCase() === entrySrNo);
         if (paidForThis) {
           const amt = Number(paidForThis.amount || 0);

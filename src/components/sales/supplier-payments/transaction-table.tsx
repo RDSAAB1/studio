@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { format, isValid } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info, Loader2, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Info, Loader2, Pencil } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,11 +46,30 @@ export const TransactionTable = React.memo(
         const activeTab = externalActiveTab ?? internalActiveTab;
         const setActiveTab = onTabChange ?? setInternalActiveTab;
 
+        type SortKey = "entry" | "date" | "original" | "extra" | "paid" | "cd" | "outstanding" | "advanceFreight";
+        type SortDirection = "asc" | "desc";
+
+        const shouldSkipInitialSort = Boolean(embed && compact && !maxRows && (suppliers?.length || 0) > 800);
+        const userSortTouchedRef = useRef(false);
+
+        const [sortKey, setSortKey] = useState<SortKey | null>(() => (shouldSkipInitialSort ? null : "entry"));
+        const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+        const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(() => new Set());
+
+        useEffect(() => {
+            if (userSortTouchedRef.current) return;
+            if (shouldSkipInitialSort) {
+                if (sortKey !== null) setSortKey(null);
+                return;
+            }
+            if (sortKey === null) setSortKey("entry");
+        }, [shouldSkipInitialSort, sortKey]);
+
         const headerHeightClass = compact ? "h-7" : "h-9";
         const rowHeightClass = compact ? "h-6" : "h-8";
         const headTextClass = compact ? "text-[9px]" : "text-[11px]";
-        const checkboxClass = compact ? "h-2.5 w-2.5" : "h-3 w-3";
-        const rowCheckboxClass = compact ? "h-3 w-3" : "h-3.5 w-3.5";
+        const checkboxClass = compact ? "h-2.5 w-2.5 rounded-full" : "h-3 w-3 rounded-full";
+        const rowCheckboxClass = compact ? "h-3 w-3 rounded-full" : "h-3.5 w-3.5 rounded-full";
         const entrySrClass = compact ? "text-[10px]" : "text-[12px]";
         const entryMetaClass = compact ? "text-[9px]" : "text-[11px]";
         const amountMainClass = compact ? "text-[10px]" : "text-[12px]";
@@ -68,81 +87,154 @@ export const TransactionTable = React.memo(
             return numericMatch ? parseInt(numericMatch[0], 10) : 0;
         };
 
-        const sortedSuppliers = useMemo(() => {
-            return [...suppliers].sort((a: any, b: any) => {
-                // Sort by serial number (descending - high to low)
-                const srNoA = getSerialNumberForSort(a);
-                const srNoB = getSerialNumberForSort(b);
-                return srNoB - srNoA; // Descending order
-            });
-        }, [suppliers]);
-
-        // Categorize transactions
-        const { outstandingTransactions, runningTransactions, profitableTransactions, paidTransactions } = useMemo(() => {
-            const outstanding = sortedSuppliers.filter((t: any) => {
-                const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
-                return totalPaid === 0 && (t.originalNetAmount || 0) > 0;
-            });
-            
-            const paid = sortedSuppliers.filter((t: any) => {
-                const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-                return outstanding < 1;
-            });
-            
-            const profitable = sortedSuppliers.filter((t: any) => {
-                const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-                return outstanding >= 1 && outstanding < 200;
-            });
-            
-            const running = sortedSuppliers.filter((t: any) => {
-                const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
-                const totalPaid = (t.totalPaidForEntry || t.totalPaid || 0);
-                return outstanding >= 200 && totalPaid > 0;
-            });
-
-            return { outstandingTransactions: outstanding, runningTransactions: running, profitableTransactions: profitable, paidTransactions: paid };
-        }, [sortedSuppliers]);
+        const supplierList = suppliers;
 
         const transactionCounts = useMemo(() => {
-            return {
-                all: sortedSuppliers.length,
-                outstanding: outstandingTransactions.length,
-                running: runningTransactions.length,
-                profitable: profitableTransactions.length,
-                paid: paidTransactions.length,
-            };
-        }, [sortedSuppliers, outstandingTransactions, runningTransactions, profitableTransactions, paidTransactions]);
+            const counts = { all: 0, outstanding: 0, running: 0, profitable: 0, paid: 0 };
+            if (!Array.isArray(supplierList) || supplierList.length === 0) return counts;
 
-        // Get filtered suppliers based on active tab
-        const filteredSuppliers = useMemo(() => {
-            switch (activeTab) {
-                case "all":
-                    return sortedSuppliers;
-                case "outstanding":
-                    return outstandingTransactions;
-                case "running":
-                    return runningTransactions;
-                case "profitable":
-                    return profitableTransactions;
-                case "paid":
-                    return paidTransactions;
-                default:
-                    return sortedSuppliers;
+            counts.all = supplierList.length;
+            for (const t of supplierList) {
+                const totalPaid = (t as any).totalPaidForEntry || (t as any).totalPaid || 0;
+                const original = (t as any).originalNetAmount || 0;
+                const outstanding = Number((t as any).outstandingForEntry || (t as any).netAmount || 0);
+
+                if (outstanding < 1) counts.paid += 1;
+                else if (outstanding < 200) counts.profitable += 1;
+                else if (outstanding >= 200 && totalPaid > 0) counts.running += 1;
+
+                if (totalPaid === 0 && original > 0) counts.outstanding += 1;
             }
-        }, [activeTab, outstandingTransactions, runningTransactions, profitableTransactions, paidTransactions, sortedSuppliers]);
+            return counts;
+        }, [supplierList]);
+
+        const filteredSuppliers = useMemo(() => {
+            if (!Array.isArray(supplierList) || supplierList.length === 0) return [];
+            if (!activeTab || activeTab === "all") return supplierList;
+
+            return supplierList.filter((t: any) => {
+                const totalPaid = t.totalPaidForEntry || t.totalPaid || 0;
+                const original = t.originalNetAmount || 0;
+                const outstanding = Number(t.outstandingForEntry || t.netAmount || 0);
+
+                switch (activeTab) {
+                    case "outstanding":
+                        return totalPaid === 0 && original > 0;
+                    case "running":
+                        return outstanding >= 200 && totalPaid > 0;
+                    case "profitable":
+                        return outstanding >= 1 && outstanding < 200;
+                    case "paid":
+                        return outstanding < 1;
+                    default:
+                        return true;
+                }
+            });
+        }, [activeTab, supplierList]);
+
+        const sortedFilteredSuppliers = useMemo(() => {
+            if (!sortKey) return filteredSuppliers;
+            const items = [...filteredSuppliers];
+
+            const compareNumber = (a: number, b: number) => {
+                if (a < b) return -1;
+                if (a > b) return 1;
+                return 0;
+            };
+
+            const compareMaybeNumber = (a: number | null, b: number | null) => {
+                if (a === null && b === null) return 0;
+                if (a === null) return 1;
+                if (b === null) return -1;
+                return compareNumber(a, b);
+            };
+
+            const getSortValue = (entry: any) => {
+                switch (sortKey) {
+                    case "entry":
+                        return getSerialNumberForSort(entry);
+                    case "date": {
+                        const dateObj = entry?.date ? new Date(entry.date) : null;
+                        if (!dateObj || !isValid(dateObj)) return null;
+                        return dateObj.getTime();
+                    }
+                    case "original":
+                        return Number(
+                            (entry as any).adjustedOriginal !== undefined
+                                ? (entry as any).adjustedOriginal
+                                : entry.originalNetAmount || 0
+                        );
+                    case "extra":
+                        return Number((entry as any).totalExtraForEntry ?? (entry as any).totalGovExtraForEntry ?? 0);
+                    case "paid":
+                        return Number((entry as any).totalPaidForEntry || entry.totalPaid || 0);
+                    case "cd":
+                        return Number((entry as any).totalCdForEntry || entry.totalCd || 0);
+                    case "outstanding":
+                        return Number((entry as any).outstandingForEntry || entry.netAmount || 0);
+                    case "advanceFreight":
+                        return Number(entry.advanceFreight || 0);
+                    default:
+                        return 0;
+                }
+            };
+
+            const directionMultiplier = sortDirection === "asc" ? 1 : -1;
+
+            items.sort((a, b) => {
+                const valueA = getSortValue(a);
+                const valueB = getSortValue(b);
+
+                const raw =
+                    sortKey === "date"
+                        ? compareMaybeNumber(valueA as number | null, valueB as number | null)
+                        : compareNumber(Number(valueA), Number(valueB));
+
+                if (raw !== 0) return raw * directionMultiplier;
+
+                const srFallback = compareNumber(getSerialNumberForSort(a), getSerialNumberForSort(b));
+                return srFallback === 0 ? 0 : srFallback * -1;
+            });
+
+            return items;
+        }, [filteredSuppliers, sortDirection, sortKey]);
+
+        const requestSort = (key: SortKey) => {
+            userSortTouchedRef.current = true;
+            setSortKey((currentKey) => {
+                if (currentKey === key) {
+                    setSortDirection((currentDirection) => (currentDirection === "asc" ? "desc" : "asc"));
+                    return currentKey;
+                }
+                // Outstanding (Net): default high to low (desc); other columns default asc (low to high)
+                setSortDirection(key === "outstanding" ? "desc" : "asc");
+                return key;
+            });
+        };
+
+        const toggleExpanded = (id: string) => {
+            setExpandedEntryIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+            });
+        };
+
+        const shouldShowBreakdown = (id: string) => !compact || expandedEntryIds.has(id);
 
         // Infinite scroll pagination
-        const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(filteredSuppliers, {
-            totalItems: filteredSuppliers.length,
+        const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedFilteredSuppliers, {
+            totalItems: sortedFilteredSuppliers.length,
             initialLoad: 30,
             loadMore: 30,
             threshold: 5,
-            enabled: !maxRows && filteredSuppliers.length > 30,
+            enabled: !maxRows && sortedFilteredSuppliers.length > 30,
         });
 
-        const visibleSuppliers = maxRows ? filteredSuppliers.slice(0, maxRows) : filteredSuppliers.slice(0, visibleItems);
+        const visibleSuppliers = maxRows ? sortedFilteredSuppliers.slice(0, maxRows) : sortedFilteredSuppliers.slice(0, visibleItems);
 
-        const allSuppliers = useMemo(() => filteredSuppliers, [filteredSuppliers]);
+        const allSuppliers = useMemo(() => sortedFilteredSuppliers, [sortedFilteredSuppliers]);
 
         // Highlight entry when highlightEntryId changes (no scrolling to avoid unresponsiveness)
 
@@ -186,6 +278,16 @@ export const TransactionTable = React.memo(
         );
 
         const headCellBaseClass = `${headerHeightClass} ${headTextClass} font-extrabold sticky top-0 z-10 bg-muted/50`;
+        const headSortButtonClass = `w-full h-full flex items-center gap-1 ${compact ? "text-[9px]" : "text-[11px]"} font-extrabold`;
+
+        const SortIndicator = ({ columnKey }: { columnKey: SortKey }) => {
+            if (sortKey !== columnKey) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+            return sortDirection === "asc" ? (
+                <ArrowUp className="h-3 w-3 opacity-80" />
+            ) : (
+                <ArrowDown className="h-3 w-3 opacity-80" />
+            );
+        };
 
         const tableHeader = (
             <TableHeader>
@@ -199,14 +301,56 @@ export const TransactionTable = React.memo(
                             />
                         </div>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>Entry</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>Date</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit – Total Amount">Original (Income)</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit">Extra (Income)</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit – Total Paid">Paid (Expense)</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit">CD (Expense)</TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Net balance">Outstanding (Net)</TableHead>
-                    {isCustomer && <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Advance Freight taken (recover in payment)">Adv. Freight</TableHead>}
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>
+                        <button type="button" className={headSortButtonClass} onClick={() => requestSort("entry")}>
+                            <SortIndicator columnKey="entry" />
+                            <span>Entry</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>
+                        <button type="button" className={headSortButtonClass} onClick={() => requestSort("date")}>
+                            <SortIndicator columnKey="date" />
+                            <span>Date</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit – Total Amount">
+                        <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("original")}>
+                            <SortIndicator columnKey="original" />
+                            <span>Original (Income)</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit">
+                        <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("extra")}>
+                            <SortIndicator columnKey="extra" />
+                            <span>Extra (Income)</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit – Total Paid">
+                        <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("paid")}>
+                            <SortIndicator columnKey="paid" />
+                            <span>Paid (Expense)</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit">
+                        <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("cd")}>
+                            <SortIndicator columnKey="cd" />
+                            <span>CD (Expense)</span>
+                        </button>
+                    </TableHead>
+                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Net balance">
+                        <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("outstanding")}>
+                            <SortIndicator columnKey="outstanding" />
+                            <span>Outstanding (Net)</span>
+                        </button>
+                    </TableHead>
+                    {isCustomer && (
+                        <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Advance Freight taken (recover in payment)">
+                            <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("advanceFreight")}>
+                                <SortIndicator columnKey="advanceFreight" />
+                                <span>Adv. Freight</span>
+                            </button>
+                        </TableHead>
+                    )}
                     <TableHead className={`py-0 px-1 ${headCellBaseClass} text-center align-middle`}>Actions</TableHead>
                 </TableRow>
             </TableHeader>
@@ -295,6 +439,7 @@ export const TransactionTable = React.memo(
                                 const paymentBreakdown = Array.isArray((entry as any).paymentBreakdown) ? (entry as any).paymentBreakdown : [];
                                 const isHighlighted = highlightEntryId === entry.id;
                                 const uniqueKey = `${entry.id || 'entry'}-${index}`;
+                                const entryKey = String(entry.id || entry.srNo || uniqueKey);
 
                                 return (
                                     <React.Fragment key={uniqueKey}>
@@ -368,6 +513,21 @@ export const TransactionTable = React.memo(
                                             )}
                                             <TableCell className="text-center py-0 px-1 align-middle">
                                                 <div className="flex items-center justify-center gap-1">
+                                                    {paymentBreakdown.length > 0 && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} hover:bg-primary/10 hover:text-primary`}
+                                                            onClick={() => toggleExpanded(entryKey)}
+                                                            title={shouldShowBreakdown(entryKey) ? "Hide Payments" : "Show Payments"}
+                                                        >
+                                                            {shouldShowBreakdown(entryKey) ? (
+                                                                <ChevronUp className={compact ? "h-2 w-2" : "h-2.5 w-2.5"} />
+                                                            ) : (
+                                                                <ChevronDown className={compact ? "h-2 w-2" : "h-2.5 w-2.5"} />
+                                                            )}
+                                                        </Button>
+                                                    )}
                                                     {onEditEntry && (
                                                         <Button 
                                                             variant="ghost" 
@@ -391,7 +551,7 @@ export const TransactionTable = React.memo(
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                        {paymentBreakdown.length > 0 &&
+                                        {paymentBreakdown.length > 0 && shouldShowBreakdown(entryKey) &&
                                             paymentBreakdown.map((payment: any, idx: number) => {
                                                 const paymentDate =
                                                     payment.date && isValid(new Date(payment.date))
@@ -454,14 +614,14 @@ export const TransactionTable = React.memo(
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!hasMore && filteredSuppliers.length > 30 && (
+                            {!hasMore && sortedFilteredSuppliers.length > 30 && (
                                 <TableRow>
                                     <TableCell colSpan={isCustomer ? 10 : 9} className={`text-center py-0.5 ${compact ? "text-[9px]" : "text-[11px]"} text-muted-foreground h-6`}>
-                                        Showing all {filteredSuppliers.length} entries
+                                        Showing all {sortedFilteredSuppliers.length} entries
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {filteredSuppliers.length === 0 && (
+                            {sortedFilteredSuppliers.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={isCustomer ? 10 : 9} className={`text-center text-muted-foreground h-12 ${compact ? "text-[9px]" : "text-[11px]"}`}>
                                         No {activeTab === "outstanding" ? "outstanding" : activeTab === "running" ? "running" : activeTab === "profitable" ? "profitable" : "paid"} transactions found.
@@ -484,6 +644,7 @@ export const TransactionTable = React.memo(
                                     const paymentBreakdown = Array.isArray((entry as any).paymentBreakdown) ? (entry as any).paymentBreakdown : [];
                                     const isHighlighted = highlightEntryId === entry.id;
                                     const uniqueKey = `${entry.id || 'entry'}-${index}`;
+                                    const entryKey = String(entry.id || entry.srNo || uniqueKey);
 
                                     return (
                                         <React.Fragment key={uniqueKey}>
@@ -557,6 +718,21 @@ export const TransactionTable = React.memo(
                                                 )}
                                                 <TableCell className="text-center py-0 px-1 align-middle">
                                                     <div className="flex items-center justify-center gap-1">
+                                                        {paymentBreakdown.length > 0 && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className={`${actionBtnClass} hover:bg-primary/10 hover:text-primary`} 
+                                                                onClick={() => toggleExpanded(entryKey)}
+                                                                title={shouldShowBreakdown(entryKey) ? "Hide Payments" : "Show Payments"}
+                                                            >
+                                                                {shouldShowBreakdown(entryKey) ? (
+                                                                    <ChevronUp className={actionIconClass} />
+                                                                ) : (
+                                                                    <ChevronDown className={actionIconClass} />
+                                                                )}
+                                                            </Button>
+                                                        )}
                                                         {onEditEntry && (
                                                             <Button 
                                                                 variant="ghost" 
@@ -580,7 +756,7 @@ export const TransactionTable = React.memo(
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
-                                            {paymentBreakdown.length > 0 &&
+                                            {paymentBreakdown.length > 0 && shouldShowBreakdown(entryKey) &&
                                                 paymentBreakdown.map((payment: any, idx: number) => {
                                                     const paymentDate =
                                                         payment.date && isValid(new Date(payment.date))
@@ -644,14 +820,14 @@ export const TransactionTable = React.memo(
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {!hasMore && filteredSuppliers.length > 30 && (
+                                {!hasMore && sortedFilteredSuppliers.length > 30 && (
                                     <TableRow>
                                         <TableCell colSpan={isCustomer ? 10 : 9} className="text-center py-0.5 text-[11px] text-muted-foreground h-6">
-                                            Showing all {filteredSuppliers.length} entries
+                                            Showing all {sortedFilteredSuppliers.length} entries
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {filteredSuppliers.length === 0 && (
+                                {sortedFilteredSuppliers.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={isCustomer ? 10 : 9} className="text-center text-muted-foreground h-12 text-[11px]">
                                             No {activeTab === "outstanding" ? "outstanding" : activeTab === "running" ? "running" : activeTab === "profitable" ? "profitable" : "paid"} transactions found.

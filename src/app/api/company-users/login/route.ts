@@ -6,6 +6,8 @@
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
+
+export const dynamic = 'force-static';
 import { FieldValue, type DocumentReference } from "firebase-admin/firestore";
 import { compare } from "bcryptjs";
 

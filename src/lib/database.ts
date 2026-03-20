@@ -1,10 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
-import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings } from './definitions';
-import { getSuppliersRealtime, getPaymentsRealtime, getAllSuppliers, getAllPayments, getAllCustomers, getAllCustomerPayments, getAllIncomes, getAllExpenses, getAllSupplierBankAccounts, getAllBanks, getAllBankBranches, getAllBankAccounts, getAllProjects, getAllLoans, getAllFundTransactions, fetchMandiReports, getAllIncomeCategories, getAllExpenseCategories, getAllEmployees, getAllPayroll, getAllAttendance, getAllInventoryItems, getAllExpenseTemplates, getAllLedgerAccounts, fetchAllLedgerEntries, getAllLedgerCashAccounts, getAllKantaParchi, getAllCustomerDocuments, getAllManufacturingCosting } from './firestore';
+import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings } from './definitions';
 import { logError } from './error-logger';
-import { firestoreDB } from './firebase';
-import { collection, getDocs } from 'firebase/firestore';
 import { chunkedBulkPut } from './chunked-operations';
 import { getTenantCollectionPath, getStorageKeySuffix } from './tenancy';
 
@@ -12,6 +9,52 @@ import { getTenantCollectionPath, getStorageKeySuffix } from './tenancy';
 function handleSilentError(error: unknown, context: string): void {
   // Log error using error logging service
   logError(error, context, 'low');
+}
+
+const DEFAULT_RECEIPT_FIELDS: ReceiptFieldSettings = {
+  date: true, name: true, contact: true, address: true, vehicleNo: true, term: true, rate: true,
+  grossWeight: true, teirWeight: true, weight: true, amount: true, dueDate: true, kartaWeight: true,
+  netAmount: true, srNo: true, variety: true, netWeight: true,
+};
+
+/** Load receipt settings from local IndexedDB (SQLite-only mode) */
+export async function getReceiptSettingsFromLocal(): Promise<ReceiptSettings | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const d = getDb();
+    const data = await d.settings.get('companyDetails') as Partial<ReceiptSettings> | undefined;
+    if (!data) {
+      return {
+        companyName: 'JAGDAMBE RICE MILL',
+        companyAddress1: 'Devkali Road, Banda, Shajahanpur',
+        companyAddress2: 'Near Devkali, Uttar Pradesh',
+        contactNo: '9555130735',
+        gmail: 'JRMDofficial@gmail.com',
+        fields: DEFAULT_RECEIPT_FIELDS,
+      };
+    }
+    let defaultBank: BankAccount | undefined;
+    if (data.defaultBankAccountId) {
+      const acc = await d.bankAccounts.get(data.defaultBankAccountId);
+      if (acc) defaultBank = acc as BankAccount;
+    }
+    return {
+      companyName: data.companyName || 'JAGDAMBE RICE MILL',
+      companyAddress1: data.companyAddress1 || 'Devkali Road, Banda, Shajahanpur',
+      companyAddress2: data.companyAddress2 || 'Near Devkali, Uttar Pradesh',
+      contactNo: data.contactNo || '9555130735',
+      gmail: data.gmail || 'JRMDofficial@gmail.com',
+      fields: { ...DEFAULT_RECEIPT_FIELDS, ...(data.fields || {}) },
+      defaultBankAccountId: data.defaultBankAccountId,
+      defaultBank: data.defaultBank ?? defaultBank,
+      companyGstin: data.companyGstin,
+      companyStateName: data.companyStateName,
+      companyStateCode: data.companyStateCode,
+      panNo: data.panNo,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Get lastSync localStorage key with tenant suffix so data is never mixed across companies */
@@ -245,7 +288,8 @@ export class AppDatabase extends Dexie {
 // Per-company/tenant IndexedDB: each context gets its own DB so data stays local and we don't re-fetch from Firebase on next visit.
 function getDbName(): string {
   const suffix = getStorageKeySuffix();
-  return suffix ? `bizsuiteDB_v2_${suffix}` : 'bizsuiteDB_v2';
+  // Bump name to force a clean IndexedDB when schema changes (SQLite is source of truth).
+  return suffix ? `bizsuiteDB_v3_${suffix}` : 'bizsuiteDB_v3';
 }
 
 let dbInstance: AppDatabase | null = null;
@@ -258,10 +302,14 @@ export function getDb(): AppDatabase {
   const name = getDbName();
   if (dbInstance && lastDbName === name) return dbInstance;
   if (dbInstance) {
-    try {
-      dbInstance.close();
-    } catch {}
+    const old = dbInstance;
     dbInstance = null;
+    lastDbName = '';
+    if (typeof setTimeout !== 'undefined') {
+      setTimeout(() => { try { old.close(); } catch { /* ignore */ } }, 0);
+    } else {
+      try { old.close(); } catch { /* ignore */ }
+    }
   }
   lastDbName = name;
   dbInstance = new AppDatabase(name);
@@ -269,25 +317,127 @@ export function getDb(): AppDatabase {
 }
 
 // Invalidate DB reference when company/tenant changes so next access opens the new context's DB.
+// Do not close while folder load is in progress (avoids DatabaseClosedError). Defer close so in-flight ops can finish.
+const DB_CLOSE_DEFER_MS = 2500;
+let dbInUseByFolderLoad = false;
+let pendingInvalidation = false;
+let closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+export function setDbInUseByFolderLoad(inUse: boolean): void {
+  dbInUseByFolderLoad = inUse;
+  if (!inUse && pendingInvalidation && typeof window !== 'undefined') {
+    pendingInvalidation = false;
+    scheduleDbClose();
+  }
+}
+
+function runPendingDbClose(): void {
+  if (dbInstance) {
+    try { dbInstance.close(); } catch { /* ignore */ }
+    dbInstance = null;
+    lastDbName = '';
+  }
+  if (closeTimeoutId != null) {
+    clearTimeout(closeTimeoutId);
+    closeTimeoutId = null;
+  }
+}
+
+function scheduleDbClose(): void {
+  if (closeTimeoutId != null) clearTimeout(closeTimeoutId);
+  closeTimeoutId = setTimeout(() => {
+    closeTimeoutId = null;
+    if (dbInUseByFolderLoad) {
+      pendingInvalidation = true;
+      return;
+    }
+    runPendingDbClose();
+  }, DB_CLOSE_DEFER_MS);
+}
+
 if (typeof window !== 'undefined') {
   const invalidateDb = () => {
-    if (dbInstance) {
-      try {
-        dbInstance.close();
-      } catch {}
-      dbInstance = null;
-      lastDbName = '';
+    if (dbInUseByFolderLoad) {
+      pendingInvalidation = true;
+      return;
     }
+    scheduleDbClose();
   };
   window.addEventListener('erp:selection-changed', invalidateDb);
   window.addEventListener('tenant:changed', invalidateDb);
 }
 
-// Proxy so existing code using `db` always gets the current context's database.
+// SQLite only: source of truth. Dexie is cache; all writes mirror to SQLite.
+const SQLITE_SYNC_TABLES = [
+  'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+  'ledgerAccounts', 'ledgerEntries', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts',
+  'loans', 'fundTransactions', 'mandiReports', 'employees', 'payroll', 'attendance',
+  'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
+  'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
+  'manufacturingCosting', 'transactions',
+];
+
+function wrapTableForSqliteSync(table: unknown, tableName: string): unknown {
+  if (!table || typeof table !== 'object') return table;
+  const t = table as Record<string, unknown>;
+  let sqlitePut: ((tn: string, r: Record<string, unknown>) => Promise<{ success: boolean }>) | null = null;
+  let sqliteDelete: ((tn: string, id: string) => Promise<{ success: boolean }>) | null = null;
+  let sqliteBulkPut: ((tn: string, rows: unknown[]) => Promise<{ success: boolean }>) | null = null;
+  import('./sqlite-storage').then((m) => {
+    sqlitePut = m.sqlitePut;
+    sqliteDelete = m.sqliteDelete;
+    sqliteBulkPut = m.sqliteBulkPut;
+  });
+  return new Proxy(table, {
+    get(target, prop: string) {
+      const orig = (target as Record<string, unknown>)[prop];
+      if (prop === 'put' && typeof orig === 'function') {
+        return async (row: unknown) => {
+          const out = await (orig as (this: unknown, r: unknown) => Promise<unknown>).call(target, row);
+          // During SQLite->Dexie load (folder switch / refresh), we must NOT mirror writes back to SQLite,
+          // otherwise old Dexie state can leak into a newly selected empty DB.
+          if (!dbInUseByFolderLoad && row && typeof row === 'object' && sqlitePut) {
+            sqlitePut!(tableName, row as Record<string, unknown>).catch(() => {});
+          }
+          return out;
+        };
+      }
+      if (prop === 'bulkPut' && typeof orig === 'function') {
+        return async (rows: unknown) => {
+          const arr = Array.isArray(rows) ? rows : [rows];
+          const out = await (orig as (this: unknown, r: unknown[]) => Promise<unknown>).call(target, arr);
+          if (!dbInUseByFolderLoad && sqliteBulkPut && arr.length) {
+            sqliteBulkPut!(tableName, arr).catch(() => {});
+          }
+          return out;
+        };
+      }
+      if (prop === 'delete' && typeof orig === 'function') {
+        return async (key: unknown) => {
+          const id = typeof key === 'string' ? key : (key && typeof key === 'object' && 'id' in key) ? String((key as { id: unknown }).id) : String(key);
+          await (orig as (this: unknown, k: unknown) => Promise<void>).call(target, key);
+          if (!dbInUseByFolderLoad && sqliteDelete) {
+            sqliteDelete!(tableName, id).catch(() => {});
+          }
+        };
+      }
+      return typeof orig === 'function' ? orig.bind(target) : orig;
+    },
+  });
+}
+
+// Proxy: SQLite mode = mirror writes to SQLite.
 const dbProxy = typeof window !== 'undefined'
   ? new Proxy({} as AppDatabase, {
-      get(_, prop) {
-        return (getDb() as Record<string, unknown>)[prop as string];
+      get(_, prop: string) {
+        const target = getDb() as unknown as Record<string, unknown>;
+        const value = target[prop];
+        const tableLike = value && typeof value === 'object' && typeof (value as { put?: unknown }).put === 'function';
+        const inSqliteMode = typeof window !== 'undefined' && localStorage.getItem('bizsuite:sqliteMode') === '1';
+        if (inSqliteMode && SQLITE_SYNC_TABLES.includes(prop) && tableLike) {
+          return wrapTableForSqliteSync(value, prop);
+        }
+        return value;
       },
     })
   : (undefined as unknown as AppDatabase);
@@ -298,51 +448,23 @@ export { db };
 
 
 // --- Synchronization Logic ---
-// ✅ UPDATED: Use incremental sync from local-first-sync instead of reading entire collections
+// SQLite only: load from SQLite into Dexie.
+let sqliteLoadInFlight: Promise<void> | null = null;
 export async function syncAllData() {
     if (!db) return;
-
-    // ✅ Use incremental sync from local-first-sync manager
-    // This will only sync changed documents, not entire collections
-    try {
-        const { forceSyncFromFirestore } = await import('./local-first-sync');
-        await forceSyncFromFirestore();
-
-    } catch (error) {
-        // Fallback to old method if local-first-sync fails (only for first time)
-        handleSilentError(error, 'initializeDatabase - local-first-sync fallback');
-
-        // First sync - get all (only once)
-        getSuppliersRealtime(async (suppliers) => {
-            if (suppliers.length > 0 && db) {
-                try {
-                    await db.suppliers.bulkPut(suppliers);
-
-                    // Save last sync time
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('lastSync:suppliers', String(Date.now()));
-                    }
-                } catch (error: unknown) {
-                    handleSilentError(error, 'initializeDatabase - suppliers bulkPut fallback');
-                }
-            }
-        }, (error) => {});
-
-        getPaymentsRealtime(async (payments) => {
-            if (payments.length > 0 && db) {
-                try {
-                    await db.payments.bulkPut(payments);
-
-                    // Save last sync time
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('lastSync:payments', String(Date.now()));
-                    }
-                } catch (error: unknown) {
-                    handleSilentError(error, 'initializeDatabase - suppliers bulkPut fallback');
-                }
-            }
-        }, (error) => {});
-    }
+    const { isSqliteMode, loadFromSqliteToDexie } = await import('./sqlite-storage');
+    if (!isSqliteMode()) return;
+    if (sqliteLoadInFlight) return sqliteLoadInFlight;
+    sqliteLoadInFlight = (async () => {
+        try {
+            await loadFromSqliteToDexie();
+        } catch (e) {
+            handleSilentError(e, 'syncAllData - loadFromSqliteToDexie');
+        } finally {
+            sqliteLoadInFlight = null;
+        }
+    })();
+    return sqliteLoadInFlight;
 }
 
 // Sync collection info type
@@ -363,556 +485,72 @@ export async function syncAllDataWithDetails(
 ): Promise<SyncCollectionInfo[]> {
   if (!db) return [];
 
+  // SQLite only
+  const { isSqliteMode } = await import('./sqlite-storage');
+  if (!isSqliteMode()) return [];
+  const localOnlyConfigs = [
+      { name: 'suppliers', displayName: 'Suppliers', localTable: () => db.suppliers },
+      { name: 'customers', displayName: 'Customers', localTable: () => db.customers },
+      { name: 'payments', displayName: 'Payments', localTable: () => db.payments },
+      { name: 'customerPayments', displayName: 'Customer Payments', localTable: () => db.customerPayments },
+      { name: 'banks', displayName: 'Banks', localTable: () => db.banks },
+      { name: 'bankBranches', displayName: 'Bank Branches', localTable: () => db.bankBranches },
+      { name: 'bankAccounts', displayName: 'Bank Accounts', localTable: () => db.bankAccounts },
+      { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', localTable: () => db.supplierBankAccounts },
+      { name: 'fundTransactions', displayName: 'Fund Transactions', localTable: () => db.fundTransactions },
+      { name: 'projects', displayName: 'Projects', localTable: () => db.projects },
+      { name: 'loans', displayName: 'Loans', localTable: () => db.loans },
+      { name: 'mandiReports', displayName: 'Mandi Reports', localTable: () => db.mandiReports },
+      { name: 'employees', displayName: 'Employees', localTable: () => db.employees },
+      { name: 'payroll', displayName: 'Payroll', localTable: () => db.payroll },
+      { name: 'attendance', displayName: 'Attendance', localTable: () => db.attendance },
+      { name: 'inventoryItems', displayName: 'Inventory Items', localTable: () => db.inventoryItems },
+      { name: 'ledgerAccounts', displayName: 'Ledger Accounts', localTable: () => db.ledgerAccounts },
+      { name: 'ledgerEntries', displayName: 'Ledger Entries', localTable: () => db.ledgerEntries },
+    ];
+  const filter = selectedCollections
+    ? (c: { name: string }) => selectedCollections.includes(c.name)
+    : () => true;
+  const configs = localOnlyConfigs.filter(filter);
   const collections: SyncCollectionInfo[] = [];
-  
-  // Helper to update progress
-  const updateProgress = () => {
-    if (onProgress) {
-      onProgress([...collections]);
-    }
-  };
-  
-  // Define all collections to sync
-  const allCollectionConfigs = [
-    { name: 'suppliers', displayName: 'Suppliers', getAllFn: getAllSuppliers, localTable: () => db.suppliers },
-    { name: 'customers', displayName: 'Customers', getAllFn: getAllCustomers, localTable: () => db.customers },
-    { name: 'payments', displayName: 'Payments', getAllFn: getAllPayments, localTable: () => db.payments },
-    { name: 'customerPayments', displayName: 'Customer Payments', getAllFn: getAllCustomerPayments, localTable: () => db.customerPayments },
-    { name: 'incomes', displayName: 'Incomes', getAllFn: getAllIncomes, localTable: () => db.transactions, isSpecial: true },
-    { name: 'expenses', displayName: 'Expenses', getAllFn: getAllExpenses, localTable: () => db.transactions, isSpecial: true },
-    { name: 'supplierBankAccounts', displayName: 'Supplier Bank Accounts', getAllFn: getAllSupplierBankAccounts, localTable: () => db.supplierBankAccounts },
-    { name: 'banks', displayName: 'Banks', getAllFn: getAllBanks, localTable: () => db.banks },
-    { name: 'bankBranches', displayName: 'Bank Branches', getAllFn: getAllBankBranches, localTable: () => db.bankBranches },
-    { name: 'bankAccounts', displayName: 'Bank Accounts', getAllFn: getAllBankAccounts, localTable: () => db.bankAccounts },
-    { name: 'projects', displayName: 'Projects', getAllFn: getAllProjects, localTable: () => db.projects },
-    { name: 'loans', displayName: 'Loans', getAllFn: getAllLoans, localTable: () => db.loans },
-    { name: 'fundTransactions', displayName: 'Fund Transactions', getAllFn: getAllFundTransactions, localTable: () => db.fundTransactions },
-    { name: 'mandiReports', displayName: 'Mandi Reports', getAllFn: fetchMandiReports, localTable: () => db.mandiReports },
-    { name: 'incomeCategories', displayName: 'Income Categories', getAllFn: getAllIncomeCategories, localTable: () => db.incomeCategories },
-    { name: 'expenseCategories', displayName: 'Expense Categories', getAllFn: getAllExpenseCategories, localTable: () => db.expenseCategories },
-    { name: 'employees', displayName: 'Employees', getAllFn: getAllEmployees, localTable: () => db.employees },
-    { name: 'payroll', displayName: 'Payroll', getAllFn: getAllPayroll, localTable: () => db.payroll },
-    { name: 'attendance', displayName: 'Attendance', getAllFn: getAllAttendance, localTable: () => db.attendance },
-    { name: 'inventoryItems', displayName: 'Inventory Items', getAllFn: getAllInventoryItems, localTable: () => db.inventoryItems },
-    { name: 'expenseTemplates', displayName: 'Expense Templates', getAllFn: getAllExpenseTemplates, localTable: () => db.options, isSpecial: true },
-    { name: 'ledgerAccounts', displayName: 'Ledger Accounts', getAllFn: getAllLedgerAccounts, localTable: () => db.ledgerAccounts },
-    { name: 'ledgerEntries', displayName: 'Ledger Entries', getAllFn: fetchAllLedgerEntries, localTable: () => db.ledgerEntries },
-    { name: 'ledgerCashAccounts', displayName: 'Ledger Cash Accounts', getAllFn: getAllLedgerCashAccounts, localTable: () => db.ledgerAccounts, isSpecial: true },
-    { name: 'kantaParchi', displayName: 'Kanta Parchi', getAllFn: getAllKantaParchi, localTable: () => db.kantaParchi },
-    { name: 'customerDocuments', displayName: 'Customer Documents', getAllFn: getAllCustomerDocuments, localTable: () => db.options, isSpecial: true },
-    { name: 'manufacturingCosting', displayName: 'Manufacturing Costing', getAllFn: getAllManufacturingCosting, localTable: () => db.manufacturingCosting },
-  ];
-
-  // Filter collections based on selection
-  const collectionConfigs = selectedCollections 
-    ? allCollectionConfigs.filter(config => selectedCollections.includes(config.name))
-    : allCollectionConfigs;
-
-  // Sync each collection
-  for (let i = 0; i < collectionConfigs.length; i++) {
-    const config = collectionConfigs[i];
-    const info: SyncCollectionInfo = {
-      collectionName: config.name,
-      displayName: config.displayName,
-      totalInFirestore: 0,
-      fetched: 0,
-      sent: 0,
-      status: 'syncing',
-    };
-    collections.push(info);
-    updateProgress();
-
+  for (const config of configs) {
     try {
-      info.status = 'syncing';
-      info.error = `Fetching data from Firestore...`;
-      updateProgress();
-      // Get total count in Firestore
-      info.error = `Fetching ${config.displayName} from Firestore...`;
-      updateProgress();
-      const allData = await config.getAllFn();
-      info.totalInFirestore = allData.length;
-      info.error = `Found ${allData.length} records. Processing...`;
-      updateProgress();
-      
-      // Save to local
-      if (allData.length > 0) {
-        const localTable = config.localTable();
-        if (localTable) {
-          // Get existing local data count before sync
-          const existingCount = await localTable.count();
-          
-          // Handle duplicates for collections with unique indexes
-          let dataToSync = allData;
-          if (config.name === 'bankBranches') {
-            // First, clean up existing duplicates in local database
-            info.error = `Cleaning up duplicates in ${config.displayName}...`;
-            updateProgress();
-            try {
-              const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, BankBranch[]>();
-              
-              // Group existing branches by IFSC code
-              existingBranches.forEach((branch: any) => {
-                const ifscCode = branch.ifscCode?.toUpperCase()?.trim() || '';
-                if (ifscCode) {
-                  if (!ifscMap.has(ifscCode)) {
-                    ifscMap.set(ifscCode, []);
-                  }
-                  ifscMap.get(ifscCode)!.push(branch);
-                }
-              });
-              
-              // Remove duplicate existing records (keep the most recent one)
-              for (const [ifscCode, branches] of ifscMap.entries()) {
-                if (branches.length > 1) {
-                  // Sort by updatedAt/createdAt, keep the most recent
-                  branches.sort((a, b) => {
-                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
-                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
-                    return String(timeB).localeCompare(String(timeA));
-                  });
-                  
-                  // Delete all except the first (most recent)
-                  const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
-                  if (deleteIds.length > 0) {
-                    await localTable.bulkDelete(deleteIds);
-
-                  }
-                }
-              }
-            } catch (cleanupError) {
-
-            }
-            
-            // Remove duplicates from incoming data, keep the most recent one
-            info.error = `Removing duplicates from ${config.displayName}...`;
-            updateProgress();
-            const uniqueMap = new Map<string, BankBranch>();
-            const itemsWithoutIfsc: BankBranch[] = [];
-            
-            allData.forEach((item: BankBranch) => {
-              const ifscCode = item.ifscCode?.toUpperCase()?.trim() || '';
-              if (ifscCode) {
-                const existing = uniqueMap.get(ifscCode);
-                if (!existing) {
-                  uniqueMap.set(ifscCode, item);
-                } else {
-                  // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
-                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
-                  if (currentTime > existingTime) {
-                    uniqueMap.set(ifscCode, item);
-                  }
-                }
-              } else {
-                // Items without IFSC code - add them separately (they won't conflict with unique index)
-                itemsWithoutIfsc.push(item);
-              }
-            });
-            
-            dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutIfsc];
-            if (dataToSync.length < allData.length) {
-
-            }
-          } else if (config.name === 'bankAccounts' || config.name === 'supplierBankAccounts') {
-            // First, clean up existing duplicates in local database
-            try {
-              const existingAccounts = await localTable.toArray();
-              const accountMap = new Map<string, BankAccount[]>();
-              
-              // Group existing accounts by account number
-              existingAccounts.forEach((account: any) => {
-                const accountNumber = account.accountNumber?.trim() || '';
-                if (accountNumber) {
-                  if (!accountMap.has(accountNumber)) {
-                    accountMap.set(accountNumber, []);
-                  }
-                  accountMap.get(accountNumber)!.push(account);
-                }
-              });
-              
-              // Remove duplicate existing records (keep the most recent one)
-              for (const [accountNumber, accounts] of accountMap.entries()) {
-                if (accounts.length > 1) {
-                  // Sort by updatedAt/createdAt, keep the most recent
-                  accounts.sort((a, b) => {
-                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
-                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
-                    return String(timeB).localeCompare(String(timeA));
-                  });
-                  
-                  // Delete all except the first (most recent)
-                  const toDelete = accounts.slice(1);
-                  const deleteIds = toDelete.map((a: BankAccount) => a.id).filter((id: string | undefined): id is string => id !== undefined);
-                  if (deleteIds.length > 0) {
-                    await localTable.bulkDelete(deleteIds);
-
-                  }
-                }
-              }
-            } catch (cleanupError) {
-
-            }
-          } else if (config.name === 'bankBranches') {
-            // First, clean up existing duplicates in local database
-            try {
-              const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, BankBranch[]>();
-              
-              // Group existing branches by IFSC code
-              existingBranches.forEach((branch: any) => {
-                const ifscCode = branch.ifscCode?.trim() || '';
-                if (ifscCode) {
-                  if (!ifscMap.has(ifscCode)) {
-                    ifscMap.set(ifscCode, []);
-                  }
-                  ifscMap.get(ifscCode)!.push(branch);
-                }
-              });
-              
-              // Remove duplicate existing records (keep the most recent one)
-              for (const [ifscCode, branches] of ifscMap.entries()) {
-                if (branches.length > 1) {
-                  // Sort by updatedAt/createdAt, keep the most recent
-                  branches.sort((a, b) => {
-                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
-                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
-                    return String(timeB).localeCompare(String(timeA));
-                  });
-                  
-                  // Delete all except the first (most recent)
-                  const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
-                  if (deleteIds.length > 0) {
-                    await localTable.bulkDelete(deleteIds);
-
-                  }
-                }
-              }
-            } catch (cleanupError) {
-
-            }
-            
-            // Remove duplicates from incoming data, keep the most recent one
-            const uniqueMap = new Map<string, BankAccount>();
-            const itemsWithoutAccount: BankAccount[] = [];
-            
-            allData.forEach((item: BankAccount) => {
-              const accountNumber = item.accountNumber?.trim() || '';
-              if (accountNumber) {
-                const existing = uniqueMap.get(accountNumber);
-                if (!existing) {
-                  uniqueMap.set(accountNumber, item);
-                } else {
-                  // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
-                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
-                  if (currentTime > existingTime) {
-                    uniqueMap.set(accountNumber, item);
-                  }
-                }
-              } else {
-                // Items without account number - add them separately
-                itemsWithoutAccount.push(item);
-              }
-            });
-            
-            dataToSync = [...Array.from(uniqueMap.values()), ...itemsWithoutAccount];
-            if (dataToSync.length < allData.length) {
-
-            }
-          } else if (config.name === 'bankBranches') {
-            // First, clean up existing duplicates in local database
-            try {
-              const existingBranches = await localTable.toArray();
-              const ifscMap = new Map<string, BankBranch[]>();
-              
-              // Group existing branches by IFSC code
-              existingBranches.forEach((branch: any) => {
-                const ifscCode = branch.ifscCode?.trim() || '';
-                if (ifscCode) {
-                  if (!ifscMap.has(ifscCode)) {
-                    ifscMap.set(ifscCode, []);
-                  }
-                  ifscMap.get(ifscCode)!.push(branch);
-                }
-              });
-              
-              // Remove duplicate existing records (keep the most recent one)
-              for (const [ifscCode, branches] of ifscMap.entries()) {
-                if (branches.length > 1) {
-                  // Sort by updatedAt/createdAt, keep the most recent
-                  branches.sort((a, b) => {
-                    const timeA = (a as any).updatedAt || (a as any).createdAt || '';
-                    const timeB = (b as any).updatedAt || (b as any).createdAt || '';
-                    return String(timeB).localeCompare(String(timeA));
-                  });
-                  
-                  // Delete all except the first (most recent)
-                  const toDelete = branches.slice(1);
-                  const deleteIds = toDelete.map((b: BankBranch) => b.id).filter((id: string | undefined): id is string => id !== undefined);
-                  if (deleteIds.length > 0) {
-                    await localTable.bulkDelete(deleteIds);
-
-                  }
-                }
-              }
-            } catch (cleanupError) {
-
-            }
-            
-            // Remove duplicates from incoming data, keep the most recent one
-            const uniqueMap = new Map<string, BankBranch>();
-            
-            allData.forEach((item: BankBranch) => {
-              const ifscCode = item.ifscCode?.trim() || '';
-              if (ifscCode) {
-                const existing = uniqueMap.get(ifscCode);
-                if (!existing) {
-                  uniqueMap.set(ifscCode, item);
-                } else {
-                  // Keep the one with more recent updatedAt or createdAt
-                  const existingTime = (existing as any).updatedAt || (existing as any).createdAt || '';
-                  const currentTime = (item as any).updatedAt || (item as any).createdAt || '';
-                  if (currentTime > existingTime) {
-                    uniqueMap.set(ifscCode, item);
-                  }
-                }
-              } else {
-                // Items without IFSC code - add them with unique key
-                uniqueMap.set(item.id || `no-ifsc-${Date.now()}-${Math.random()}`, item);
-              }
-            });
-            
-            dataToSync = Array.from(uniqueMap.values());
-            if (dataToSync.length < allData.length) {
-
-            }
-          }
-          
-          // Handle special collections (incomes, expenses) that need type conversion
-          if (config.name === 'incomes' || config.name === 'expenses') {
-            // Convert to transactions with type field
-            // ✅ FIX: Use capitalized type to match everywhere else ('Expense' not 'expense')
-            const transactions = dataToSync.map(item => ({
-              ...item,
-              type: config.name === 'incomes' ? 'Income' : 'Expense',
-              transactionType: config.name === 'incomes' ? 'Income' : 'Expense'
-            } as Transaction));
-            dataToSync = transactions;
-          }
-          
-          // Use bulkPut to update/insert with error handling
-          let actualFetched = dataToSync.length;
-          info.error = `Syncing ${dataToSync.length} ${config.displayName} records...`;
-          updateProgress();
-          try {
-            await chunkedBulkPut(localTable, dataToSync as any[], 100);
-            info.error = undefined;
-          } catch (bulkError: unknown) {
-            // If bulkPut fails, try individual puts to identify problematic records
-            const error = bulkError as { name?: string; failures?: unknown };
-            if (error.name === 'BulkError' || error.failures) {
-
-              let successCount = 0;
-              let failureCount = 0;
-              const failedItems: string[] = [];
-              
-              for (const item of dataToSync) {
-                try {
-                  await localTable.put(item);
-                  successCount++;
-                } catch (itemError: unknown) {
-                  failureCount++;
-                  const itemId = (item as { id?: string; ifscCode?: string; accountNumber?: string }).id || (item as { ifscCode?: string }).ifscCode || (item as { accountNumber?: string }).accountNumber || 'unknown';
-                  failedItems.push(itemId);
-
-                }
-              }
-              
-              actualFetched = successCount;
-              
-              // Log warning but don't fail the entire sync if some items succeeded
-              if (failureCount > 0) {
-                const warningMsg = `${failureCount} of ${dataToSync.length} ${config.name} items failed to sync. ${successCount} succeeded. Failed items: ${failedItems.join(', ')}`;
-
-                // Only throw error if ALL items failed
-                if (successCount === 0) {
-                  throw new Error(warningMsg);
-                } else {
-                  // Some succeeded, some failed - log but continue
-                  info.error = `${failureCount} items failed (see console for details)`;
-                }
-              }
-            } else {
-              throw bulkError;
-            }
-          }
-          
-          info.fetched = actualFetched;
-          
-          // Count pending changes for this collection (data to be sent to Firestore)
-          // Check sync queue for pending tasks related to this collection
-          if (db) {
-            try {
-              const allPendingTasks = await db.syncQueue
-                .where('status')
-                .anyOf(['pending', 'failed'])
-                .toArray();
-              const pendingTasks = allPendingTasks.filter(task => {
-                const taskType = (task as any).type || '';
-                return taskType.includes(config.name) || taskType.includes(`:${config.name}`);
-              });
-              info.sent = pendingTasks.length;
-            } catch {
-              info.sent = 0;
-            }
-          } else {
-            info.sent = 0;
-          }
-          
-          info.status = 'success';
-          info.error = undefined;
-          updateProgress();
-        } else {
-          info.status = 'error';
-          info.error = 'Local table not found';
-          updateProgress();
-        }
-      } else {
-        // Even if no data, check for pending changes
-        if (db) {
-          try {
-            const allPendingTasks = await db.syncQueue
-              .where('status')
-              .anyOf(['pending', 'failed'])
-              .toArray();
-            const pendingTasks = allPendingTasks.filter(task => {
-              const taskType = (task as any).type || '';
-              return taskType.includes(config.name) || taskType.includes(`:${config.name}`);
-            });
-            info.sent = pendingTasks.length;
-          } catch {
-            info.sent = 0;
-          }
-        }
-        info.status = 'success';
-      }
-    } catch (error: unknown) {
-      info.status = 'error';
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      info.error = errorMessage;
-
+      const table = config.localTable();
+      const count = table ? await table.count().catch(() => 0) : 0;
+      collections.push({
+        collectionName: config.name,
+        displayName: config.displayName,
+        totalInFirestore: count,
+        fetched: count,
+        sent: count,
+        status: 'success',
+      });
+      if (onProgress) onProgress([...collections]);
+    } catch {
+      collections.push({
+        collectionName: config.name,
+        displayName: config.displayName,
+        totalInFirestore: 0,
+        fetched: 0,
+        sent: 0,
+        status: 'error',
+        error: 'Read failed',
+      });
     }
   }
-
-  // Note: incomes and expenses are already handled in the main loop above
-  // No need to add them again here - they're already in allCollectionConfigs
-
-  // Update lastSync times (per-tenant keys)
-  if (typeof window !== 'undefined') {
-    const now = Date.now();
-    collections.forEach(col => {
-      if (col.status === 'success') {
-        localStorage.setItem(getLastSyncKey(col.collectionName), String(now));
-      }
-    });
-  }
-
   return collections;
 }
 
-// Hard sync: replace local IndexedDB with fresh Firestore data (all collections)
-// This clears all lastSync times and forces a full sync from Firestore
+async function _syncAllDataWithDetailsFirestore(
+  _selectedCollections?: string[],
+  _onProgress?: (collections: SyncCollectionInfo[]) => void
+): Promise<SyncCollectionInfo[]> {
+  return [];
+}
+
+// Hard sync: reload from SQLite
 export async function hardSyncAllData() {
-    if (!db) return;
-    
-    try {
-
-        // ✅ Clear all lastSync times to force full sync on next realtime listener update (per-tenant keys)
-        if (typeof window !== 'undefined') {
-            const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'projects', 'loans', 'fundTransactions', 'incomeCategories', 'expenseCategories', 'manufacturingCosting'];
-            collections.forEach(col => localStorage.removeItem(getLastSyncKey(col)));
-        }
-        
-        // ✅ Fetch all data from Firestore in parallel
-        const [
-            suppliers,
-            customers,
-            payments,
-            customerPayments,
-            incomes,
-            expenses,
-            manufacturingCosting,
-            incomeCategories,
-            expenseCategories
-        ] = await Promise.all([
-            getAllSuppliers().catch(e => { return []; }),
-            getAllCustomers().catch(e => { return []; }),
-            getAllPayments().catch(e => { return []; }),
-            getAllCustomerPayments().catch(e => { return []; }),
-            getAllIncomes().catch(e => { return []; }),
-            getAllExpenses().catch(e => { return []; }),
-            getAllManufacturingCosting().catch(e => { return []; }),
-            getAllIncomeCategories().catch(e => { return []; }),
-            getAllExpenseCategories().catch(e => { return []; }),
-        ]);
-        
-        // ✅ Update IndexedDB with fresh data
-        await db.transaction('rw', [
-            db.suppliers, 
-            db.customers, 
-            db.payments, 
-            db.customerPayments, 
-            db.transactions, 
-            db.manufacturingCosting,
-            db.incomeCategories,
-            db.expenseCategories
-        ], async () => {
-            // Clear existing data
-            await db.suppliers.clear();
-            await db.customers.clear();
-            await db.payments.clear();
-            await db.customerPayments.clear();
-            await db.manufacturingCosting.clear();
-            await db.incomeCategories.clear();
-            await db.expenseCategories.clear();
-            
-            // Add fresh data
-            if (suppliers?.length) await db.suppliers.bulkAdd(suppliers);
-            if (customers?.length) await db.customers.bulkAdd(customers);
-            if (payments?.length) await db.payments.bulkAdd(payments);
-            if (customerPayments?.length) await db.customerPayments.bulkAdd(customerPayments);
-            if (manufacturingCosting?.length) await db.manufacturingCosting.bulkAdd(manufacturingCosting);
-            if (incomeCategories?.length) await db.incomeCategories.bulkAdd(incomeCategories);
-            if (expenseCategories?.length) await db.expenseCategories.bulkAdd(expenseCategories);
-            
-            // Handle incomes and expenses (stored in transactions table)
-            // ✅ Standardize type casing and use bulkPut to avoid ConstraintError on existing keys
-            if (incomes?.length || expenses?.length) {
-                const allTransactions: Transaction[] = [
-                    ...(incomes?.map(inc => ({ ...inc, type: 'Income', transactionType: 'Income' } as Transaction)) || []),
-                    ...(expenses?.map(exp => ({ ...exp, type: 'Expense', transactionType: 'Expense' } as Transaction)) || [])
-                ];
-                if (allTransactions.length > 0) {
-                    await db.transactions.bulkPut(allTransactions);
-                }
-            }
-        });
-        
-        // ✅ Update lastSync times after successful sync (per-tenant keys)
-        if (typeof window !== 'undefined') {
-            const now = Date.now();
-            ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'manufacturingCosting', 'incomeCategories', 'expenseCategories'].forEach(col => {
-                localStorage.setItem(getLastSyncKey(col), String(now));
-            });
-        }
-
-    } catch (e) {
-
-        throw e;
-    }
+    await syncAllData();
 }
 
 export async function ensureFirstFullSync() {
@@ -943,21 +581,13 @@ export async function getSyncCounts(): Promise<SyncCountRow[]> {
     const incomesIndexed = await db.transactions.where('type').equals('Income').count().catch(() => 0);
     const expensesIndexed = await db.transactions.where('type').equals('Expense').count().catch(() => 0);
     const fundTransactionsIndexed = await db.fundTransactions.count().catch(() => 0);
-    const suppliersFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('suppliers')))).size;
-    const customersFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('customers')))).size;
-    const paymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('payments')))).size;
-    const govPaymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('governmentFinalizedPayments')))).size;
-    const customerPaymentsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('customer_payments')))).size;
-    const incomesFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('incomes')))).size;
-    const expensesFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('expenses')))).size;
-    const fundTransactionsFirestore = (await getDocs(collection(firestoreDB, ...getTenantCollectionPath('fundTransactions')))).size;
-    rows.push({ collection: 'suppliers', indexeddb: suppliersIndexed, firestore: suppliersFirestore });
-    rows.push({ collection: 'customers', indexeddb: customersIndexed, firestore: customersFirestore });
-    rows.push({ collection: 'payments', indexeddb: paymentsIndexed + govPaymentsIndexed, firestore: paymentsFirestore + govPaymentsFirestore });
-    rows.push({ collection: 'customerPayments', indexeddb: customerPaymentsIndexed, firestore: customerPaymentsFirestore });
-    rows.push({ collection: 'incomes', indexeddb: incomesIndexed, firestore: incomesFirestore });
-    rows.push({ collection: 'expenses', indexeddb: expensesIndexed, firestore: expensesFirestore });
-    rows.push({ collection: 'fundTransactions', indexeddb: fundTransactionsIndexed, firestore: fundTransactionsFirestore });
+    rows.push({ collection: 'suppliers', indexeddb: suppliersIndexed, firestore: 0 });
+    rows.push({ collection: 'customers', indexeddb: customersIndexed, firestore: 0 });
+    rows.push({ collection: 'payments', indexeddb: paymentsIndexed + govPaymentsIndexed, firestore: 0 });
+    rows.push({ collection: 'customerPayments', indexeddb: customerPaymentsIndexed, firestore: 0 });
+    rows.push({ collection: 'incomes', indexeddb: incomesIndexed, firestore: 0 });
+    rows.push({ collection: 'expenses', indexeddb: expensesIndexed, firestore: 0 });
+    rows.push({ collection: 'fundTransactions', indexeddb: fundTransactionsIndexed, firestore: 0 });
     return rows;
 }
 
@@ -970,12 +600,11 @@ export async function updateSupplierInLocalDB(id: string, data: Partial<Customer
 }
 
 export async function deletePaymentFromLocalDB(paymentId: string) {
-    if (db) {
-        await db.payments.delete(paymentId as any);
-        await db.payments.where('paymentId').equals(paymentId).delete();
-        await db.governmentFinalizedPayments.delete(paymentId as any);
-        await db.governmentFinalizedPayments.where('paymentId').equals(paymentId).delete();
-    }
+    if (!db) return;
+    await db.payments.delete(paymentId as any);
+    await db.payments.where('paymentId').equals(paymentId).delete();
+    await db.governmentFinalizedPayments.delete(paymentId as any);
+    await db.governmentFinalizedPayments.where('paymentId').equals(paymentId).delete();
 }
 
 

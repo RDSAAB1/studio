@@ -15,6 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter, usePathname } from "next/navigation";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { syncAllData, hardSyncAllData, syncAllDataWithDetails, getLastSyncKey } from "@/lib/database";
@@ -101,7 +102,7 @@ const NotificationBell = () => {
             payee: loan.lenderName || loan.productName || 'Loan Payment',
             description: `EMI for ${loan.loanName}`
         }).toString();
-        router.push(`/expense-tracker?${params}`);
+        electronNavigate(`/expense-tracker?${params}`, router, { method: 'push' });
     };
 
     return (
@@ -311,7 +312,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
             variant="ghost"
             size="icon"
             className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
-            onClick={() => router.push('/settings')}
+            onClick={() => electronNavigate('/settings', router, { method: 'push' })}
           >
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>

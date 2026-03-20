@@ -32,9 +32,12 @@ const nextConfig: NextConfig = {
     ],
     unoptimized: process.env.ELECTRON === 'true', // Disable image optimization for Electron
   },
-  // For Electron builds, we might want to use static export
-  output: process.env.ELECTRON === 'true' ? 'export' : undefined,
-  trailingSlash: true,
+  // Standalone output for Electron - more reliable than next start in packaged app
+  output: process.env.ELECTRON === 'true' ? 'standalone' : undefined,
+  // Electron: trailingSlash false avoids blank pages on navigation (client-side routing issues)
+  trailingSlash: process.env.ELECTRON === 'true' ? false : true,
 };
 
 export default nextConfig;
+
+// Touched to trigger dev server reload

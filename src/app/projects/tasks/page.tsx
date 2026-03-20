@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDoc, where, orderBy, Timestamp } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase";
-import { getTenantCollectionPath, getTenantDocPath } from "@/lib/tenancy";
+import { getActiveTenant, getTenantCollectionPath, getTenantDocPath } from "@/lib/tenancy";
 import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } from "@/lib/audit";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

@@ -3,6 +3,8 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { rateLimit } from '@/lib/rate-limit';
 
+export const dynamic = 'force-static';
+
 export async function GET(request: Request) {
   try {
     // Rate limiting: 60 requests per minute per IP

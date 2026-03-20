@@ -9,6 +9,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import type { Payment } from "@/lib/definitions";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 interface PaymentHistoryCompactProps {
   payments: Payment[];
@@ -175,9 +176,19 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     return 0;
   }, []);
 
+  const infiniteScrollEnabled = !maxRows && sortedPayments.length > 30;
+  const { visibleItems, hasMore, isLoading, scrollRef } = useInfiniteScroll(sortedPayments, {
+    totalItems: sortedPayments.length,
+    initialLoad: 30,
+    loadMore: 30,
+    threshold: 5,
+    enabled: infiniteScrollEnabled,
+  });
+
   const visiblePayments = React.useMemo(() => {
-    return maxRows ? sortedPayments.slice(0, maxRows) : sortedPayments;
-  }, [maxRows, sortedPayments]);
+    if (maxRows) return sortedPayments.slice(0, maxRows);
+    return sortedPayments.slice(0, visibleItems);
+  }, [maxRows, sortedPayments, visibleItems]);
 
   return (
     <Card className="text-[9px] flex flex-col h-full overflow-hidden rounded-md">
@@ -239,17 +250,18 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
             </Table>
           </div>
           {/* Scrollable Body – no gap, no rounding at top */}
-          <div className={`flex-1 min-h-0 ${maxRows ? "overflow-x-hidden overflow-y-hidden" : "overflow-x-hidden overflow-y-auto"}`}>
-            <Table className="table-fixed w-full">
-              <TableBody>
-                {visiblePayments.length === 0 ? (
-                    <TableRow>
-                    <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-4">
-                      No payments found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  visiblePayments.map((payment, index) => {
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ScrollArea ref={scrollRef} className={`h-full w-full ${maxRows ? "pointer-events-none" : ""}`}>
+              <Table className="table-fixed w-full">
+                <TableBody>
+                  {visiblePayments.length === 0 ? (
+                      <TableRow>
+                      <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-4">
+                        No payments found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visiblePayments.map((payment, index) => {
                     const receiptNumbers = getReceiptNumbers(payment);
                     const cdAmount = getCdAmount(payment);
                     const extraAmountFromPaidFor =
@@ -278,7 +290,7 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                       : '-';
                     
                     return (
-                      <TableRow key={`${payment.id || payment.paymentId || 'pay'}-${index}`} className="h-5 border-b border-slate-200/70 text-slate-900 odd:bg-card/50 hover:bg-primary/5 transition-colors">
+                      <TableRow key={payment.paymentId || payment.id || `${index}`} className="h-5 border-b border-slate-200/70 text-slate-900 odd:bg-card/50 hover:bg-primary/5 transition-colors">
                         {historyType === 'cash' && (
                           <>
                             <TableCell className="text-[10px] px-2 py-0.5 w-[14%] text-left align-middle">
@@ -572,8 +584,23 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                     );
                   })
                 )}
-              </TableBody>
-            </Table>
+                  {isLoading && (
+                    <TableRow>
+                      <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-2">
+                        Loading...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!hasMore && !maxRows && sortedPayments.length > 30 && (
+                    <TableRow>
+                      <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-2">
+                        Showing all {sortedPayments.length} payments
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           </div>
         </div>
       </CardContent>

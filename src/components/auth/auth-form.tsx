@@ -35,6 +35,7 @@ import {
 } from "@/lib/tenancy";
 import { createCompanyForNewUser } from "@/lib/create-company";
 import { AuthTransitionScreen } from "@/components/auth/auth-transition-screen";
+import { electronNavigate } from "@/lib/electron-navigate";
 
 const unifiedLoginSchema = z.object({
   identifier: z
@@ -139,7 +140,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
         await signInWithEmailAndPassword(auth, data.identifier, data.password);
         toast({ title: "Login Successful", variant: "success" });
         if (typeof window !== "undefined") {
-          window.location.href = "/";
+          electronNavigate("/");
         }
       } catch (error: unknown) {
         const err = error as { code?: string };
@@ -199,11 +200,11 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
           const hasValidSubSeason = firstSub && Object.keys(seasons).length > 0;
           setErpSelectionStorage({ companyId: result.companyId, subCompanyId: subId, seasonKey });
           toast({ title: "Login Successful", variant: "success" });
-          window.location.href = hasValidSubSeason ? "/" : "/company-setup?login=1";
+          electronNavigate(hasValidSubSeason ? "/" : "/company-setup?login=1");
           return;
         }
         toast({ title: "Login Successful", variant: "success" });
-        window.location.href = "/";
+        electronNavigate("/");
       } catch {
         setShowTransitionScreen(false);
         setLoginError("Network error. Please try again.");
@@ -240,7 +241,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
 
       if (typeof window !== "undefined") {
         await clearLocalDataForContextSwitch();
-        window.location.href = "/company-setup?new=1";
+        electronNavigate("/company-setup?new=1");
       }
     } catch (error: unknown) {
       setShowTransitionScreen(false);

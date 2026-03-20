@@ -137,39 +137,54 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     }, [paymentMethod, parchiNo, editingPayment]);
 
 
+    // Next incremental numeric ID from all payments (1588 → 1589). Works with plain numbers or prefixed (SP1588, EX001).
+    const getMaxNumericFromPayments = useCallback(() => {
+        if (!paymentHistory || paymentHistory.length === 0) return 0;
+        let max = 0;
+        for (const p of paymentHistory) {
+            const raw = String(p.paymentId ?? p.id ?? '').trim();
+            if (!raw) continue;
+            let num = 0;
+            if (/^\d+$/.test(raw)) {
+                num = parseInt(raw, 10);
+            } else {
+                const digits = raw.replace(/\D/g, '');
+                if (digits) num = parseInt(digits, 10);
+            }
+            if (Number.isFinite(num)) max = Math.max(max, num);
+        }
+        return max;
+    }, [paymentHistory]);
+
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
         if (!paymentHistory || !expenses) return '';
     
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const lastNum = rtgsPayments.reduce((max, p) => {
-                // Match both RT##### and R##### formats (for backward compatibility)
                 const rtMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
                 const rMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
                 const num = rtMatch ? parseInt(rtMatch[1], 10) : (rMatch ? parseInt(rMatch[1], 10) : 0);
                 return num > max ? num : max;
             }, 0);
-            // Always generate RT##### format (not R#####)
-            return generateReadableId('RT', lastNum, 5);
+            return generateReadableId('R', lastNum, 5); // Changed from RT to R
         }
     
         if (method === 'Gov.') {
-            const govPayments = paymentHistory.filter(p => p.receiptType === 'Gov.' && p.paymentId.startsWith('GV'));
+            const govPayments = paymentHistory.filter(p => p.receiptType === 'Gov.' && (p.paymentId?.startsWith('GV') || p.paymentId?.startsWith('G')));
             const lastGovNum = govPayments.reduce((max, p) => {
-                const numMatch = p.paymentId.match(/^GV(\d+)$/);
-                if (numMatch && numMatch[1]) {
-                    const num = parseInt(numMatch[1], 10);
-                    return Math.max(max, num);
-                }
-                return max;
+                const gvMatch = p.paymentId?.match(/^GV(\d+)$/);
+                const gMatch = p.paymentId?.match(/^G(\d+)$/);
+                const num = gvMatch ? parseInt(gvMatch[1], 10) : (gMatch ? parseInt(gMatch[1], 10) : 0);
+                return Math.max(max, num);
             }, 0);
-            return generateReadableId('GV', lastGovNum, 5);
+            return generateReadableId('G', lastGovNum, 5); // Changed from GV to G
         }
     
         if (method === 'Online') {
-            const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online' && p.paymentId.startsWith('P'));
+            const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online' && p.paymentId?.startsWith('P'));
             const lastNum = onlinePayments.reduce((max, p) => {
-                const numMatch = p.paymentId.match(/^P(\d+)$/);
+                const numMatch = p.paymentId?.match(/^P(\d+)$/);
                 const num = numMatch ? parseInt(numMatch[1], 10) : 0;
                 return num > max ? num : max;
             }, 0);
@@ -177,35 +192,26 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
 
         if (method === 'Ledger') {
-            const ledgerPayments = paymentHistory.filter(p => p.receiptType === 'Ledger' && p.paymentId.startsWith('L'));
+            const ledgerPayments = paymentHistory.filter(p => p.receiptType === 'Ledger' && p.paymentId?.startsWith('L'));
             const lastNum = ledgerPayments.reduce((max, p) => {
-                const numMatch = p.paymentId.match(/^L(\d+)$/);
+                const numMatch = p.paymentId?.match(/^L(\d+)$/);
                 const num = numMatch ? parseInt(numMatch[1], 10) : 0;
                 return num > max ? num : max;
             }, 0);
             return generateReadableId('L', lastNum, 5);
         }
     
-        // For Cash payment
-        const cashPrefix = paymentCategory === 'customer' ? 'IX' : 'EX';
-        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash' && (p.paymentId.startsWith('EX') || p.paymentId.startsWith('IX')));
-        const lastCashNum = cashPayments.reduce((max, p) => {
-            const exMatch = p.paymentId.match(/^EX(\d+)$/);
-            const ixMatch = p.paymentId.match(/^IX(\d+)$/);
-            const num = exMatch ? parseInt(exMatch[1], 10) : (ixMatch ? parseInt(ixMatch[1], 10) : 0);
-            return num > max ? num : max;
+        // Cash (and unified incremental): use EX/IX prefix with 5-digit padding
+        const prefix = paymentCategory === 'customer' ? 'IX' : 'EX';
+        const maxNumeric = getMaxNumericFromPayments();
+        const lastExpenseNum = (expenses || []).reduce((max, e) => {
+            const raw = String(e.transactionId ?? '').trim();
+            const num = /^\d+$/.test(raw) ? parseInt(raw, 10) : (parseInt(raw.replace(/\D/g, ''), 10) || 0);
+            return Number.isFinite(num) ? Math.max(max, num) : max;
         }, 0);
-        
-        const lastExpenseNum = expenses.reduce((max, e) => {
-            const numMatch = e.transactionId?.match(/^EX(\d+)$/);
-            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-            return num > max ? num : max;
-        }, 0);
-    
-        const lastNum = Math.max(lastCashNum, lastExpenseNum);
-        return generateReadableId(cashPrefix, lastNum, 5);
-
-    }, [paymentHistory, expenses]);
+        const lastNum = Math.max(maxNumeric, lastExpenseNum, 0);
+        return generateReadableId(prefix, lastNum, 5);
+    }, [paymentHistory, expenses, getMaxNumericFromPayments, paymentCategory]);
     
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         const value = e.target.value.trim().toUpperCase();
@@ -215,7 +221,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (!numericPartStr) return;
 
         const num = parseInt(numericPartStr, 10);
-        const formattedId = 'RT' + String(num).padStart(5, '0');
+        const formattedId = 'R' + String(num).padStart(5, '0'); // Changed from RT to R
         setRtgsSrNo(formattedId);
 
         const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
@@ -225,7 +231,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
 
     const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
-        const value = e.target.value.trim().toUpperCase();
+        const value = e.target.value.trim();
         if (!value) return;
 
         const prefix =
@@ -236,20 +242,30 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                     : 'P';
         let formattedId = value;
 
-        // Auto-format if it's just a number
+        // Auto-format numeric entries into prefixed ID (e.g., 5 -> EX00005)
         if (/^\d+$/.test(value)) {
             const num = parseInt(value, 10);
-            formattedId = generateReadableId(prefix, num - 1, 5); // generateReadableId adds 1
+            formattedId = generateReadableId(prefix, num - 1, 5);
             setPaymentId(formattedId);
         }
 
-        const existingPayment = paymentHistory.find(p => p.paymentId === formattedId);
-        const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
+        const existingPayment = paymentHistory.find(
+            p => (p.paymentId && (p.paymentId === formattedId || p.paymentId === value)) || (p.id === formattedId || p.id === value)
+        );
+        const existingExpense = expenses.find(ex => ex.transactionId === formattedId || ex.transactionId === value);
 
         if (existingPayment) {
             onEditCallback(existingPayment);
         } else if (existingExpense) {
             onConflict(`This ID is used for an expense: ${existingExpense.description}`);
+        }
+    };
+
+    /** Auto-format check number to 6 digits on blur */
+    const handleCheckNoBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const value = e.target.value.trim();
+        if (value && /^\d+$/.test(value)) {
+            setCheckNo(value.padStart(6, '0'));
         }
     };
 
@@ -344,7 +360,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         sixRDate, setSixRDate,
         parchiNo, setParchiNo,
         utrNo, setUtrNo,
-        checkNo, setCheckNo,
+        checkNo, setCheckNo, handleCheckNoBlur,
         centerName, setCenterName,
         rtgsQuantity, setRtgsQuantity,
         rtgsRate, setRtgsRate,

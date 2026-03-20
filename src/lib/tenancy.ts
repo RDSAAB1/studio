@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { firestoreDB, getFirebaseAuth } from "@/lib/firebase";
+import { navigateTo } from "@/lib/electron-navigate";
 import { createCompanyForNewUser } from "@/lib/create-company";
 
 export type TenantStorageMode = "root" | "tenant";
@@ -97,7 +98,7 @@ function getErpMode(): boolean {
   return localStorage.getItem(ERP_MODE_KEY) === "1";
 }
 
-function getErpSelection(): { companyId: string; subCompanyId: string; seasonKey: string } | null {
+export function getErpSelection(): { companyId: string; subCompanyId: string; seasonKey: string } | null {
   if (!isBrowser()) return null;
   try {
     const raw = localStorage.getItem(ERP_SELECTION_KEY);
@@ -287,7 +288,7 @@ export async function ensureTenantForUser(user: User): Promise<{
         });
         setActiveTenant({ id: "root", storageMode: "root" });
         setCachedTenants([]);
-        window.location.href = "/company-setup?login=1";
+        navigateTo("/company-setup?login=1");
         return { active: { id: "root", storageMode: "root" }, tenants: [] };
       }
     }

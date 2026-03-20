@@ -468,6 +468,8 @@ export type CustomerSummary = {
     totalCd?: number;
     totalGovExtraAmount?: number; // Total Gov Extra Amount
     totalBaseOriginalAmount?: number; // Base Original Amount (without Extra)
+    ledgerCreditAmount?: number;
+    ledgerDebitAmount?: number;
 }
 
 export type OptionItem = {

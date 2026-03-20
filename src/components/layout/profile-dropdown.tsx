@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, RefreshCw, Pencil, Users2 } from "lucide-react";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { getProfilePhotoUrl } from "@/lib/profile-photo";
+import { electronNavigate } from "@/lib/electron-navigate";
 
 export function ProfileDropdown() {
   const [user, setUser] = useState<User | null>(null);
@@ -52,16 +53,16 @@ export function ProfileDropdown() {
       const provider = getGoogleProvider();
       await signInWithRedirect(auth, provider);
     } catch {
-      router.push("/login");
+      electronNavigate("/login", router);
     }
   };
 
   const handleLogout = async () => {
     try {
       await signOut(getFirebaseAuth());
-      router.push("/intro");
+      electronNavigate("/intro", router);
     } catch {
-      router.push("/intro");
+      electronNavigate("/intro", router);
     }
   };
 
@@ -115,7 +116,7 @@ export function ProfileDropdown() {
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer focus:bg-white/10"
-            onClick={() => router.push("/sales?menu=settings&tab=settings-team")}
+            onClick={() => electronNavigate("/settings?tab=team", router, { method: "push" })}
           >
             <Users2 className="mr-2 h-4 w-4" />
             Team

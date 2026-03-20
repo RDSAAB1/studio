@@ -49,7 +49,8 @@ export default function ActivityHistoryPage({ initialTab = "new" }: { initialTab
   const [loadFailed, setLoadFailed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const selection = useErpSelectionOptional();
+  const erp = useErpSelectionOptional();
+  const selection = erp?.selection;
 
   useEffect(() => {
     const cid = selection?.companyId;

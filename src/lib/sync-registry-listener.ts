@@ -1,11 +1,15 @@
 import { firestoreDB } from "./firebase";
 import { collection, doc, onSnapshot, getDocs, query, orderBy, Timestamp, Query } from "firebase/firestore";
 import { db } from "./database";
+import { isLocalFolderMode } from "./local-folder-storage";
 import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtime-guard";
 import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
 import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
 import { getTenantCollectionPath, getStorageKeySuffix } from "./tenancy";
+
+/** Log Safety Valve warnings only once per collection per session to reduce console spam */
+const safetyValveLogged = new Set<string>();
 
 /** Retry a fetch up to 4 times with backoff so transient failures don't leave data empty */
 async function fetchWithRetry<T>(fetchFn: () => Promise<T[]>, maxRetries = 4): Promise<T[]> {
@@ -52,7 +56,28 @@ export function createMetadataBasedListener<T extends { id: string }>(
     callback: (data: T[]) => void,
     onError: (error: Error) => void
 ): () => void {
-    const { collectionName, fetchFunction, localTableName } = config;
+    const { collectionName, localTableName } = config;
+
+    // Local folder mode: only read from IndexedDB, no Firestore
+    if (typeof window !== "undefined" && isLocalFolderMode()) {
+        if (db && localTableName) {
+            const localTable = (db as any)[localTableName];
+            if (localTable) {
+                const pushLocal = (data: T[]) => {
+                    const filtered = config.localFilter ? data.filter(config.localFilter) : data;
+                    if (filtered.length) callback(filtered);
+                };
+                chunkedToArray<T>(localTable, 500, "date", true).then(pushLocal).catch(() =>
+                    chunkedToArray<T>(localTable, 500, "srNo", true).then(pushLocal).catch(() =>
+                        chunkedToArray<T>(localTable, 500).then(pushLocal)
+                    )
+                );
+            }
+        }
+        return () => {};
+    }
+
+    const { fetchFunction } = config;
     
     // Track last known timestamp
     let lastKnownTimestamp: Timestamp | null = null;
@@ -141,7 +166,11 @@ export function createMetadataBasedListener<T extends { id: string }>(
                             // Only allow wiping everything if we have a small amount of data (< 5 items)
                             // or if we are sure it's a valid sync (hard to know, so err on side of caution)
                             if (freshData.length === 0 && existingIds.size > 5 && idsToDelete.length === existingIds.size) {
-                                console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${existingIds.size} local items after empty sync.`);
+                                const key = `${collectionName}-local`;
+                                if (!safetyValveLogged.has(key)) {
+                                    safetyValveLogged.add(key);
+                                    console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${existingIds.size} local items after empty sync.`);
+                                }
                                 // Treat as "Keep Local" - don't delete anything
                                 // But we should still update items? freshData is empty, so nothing to update.
                                 // We essentially ignore this sync result for deletion purposes.
@@ -174,7 +203,11 @@ export function createMetadataBasedListener<T extends { id: string }>(
                         
                         // ✅ SAFETY: Prevent accidental mass deletion
                         if (freshData.length === 0 && localIds.size > 5 && extraIds.length === localIds.size) {
-                             console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${localIds.size} transaction items.`);
+                            const key = `${collectionName}-transactions`;
+                            if (!safetyValveLogged.has(key)) {
+                                safetyValveLogged.add(key);
+                                console.warn(`[${collectionName}] Safety Valve: Prevented wiping ${localIds.size} transaction items.`);
+                            }
                         } else if (extraIds.length > 0) {
                             await chunkedBulkDelete(db.transactions, extraIds, 200);
                         }

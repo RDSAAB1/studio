@@ -208,7 +208,58 @@ export default function DashboardClient() {
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
     const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
-    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived, expenseBreakdown, incomeBreakdown } = useMemo(() => {
+    const totalCustomerReceivables = useMemo(() => {
+        const customerReceivablesMap = new Map<string, number>();
+
+        kantaParchi.forEach(kp => {
+            const originalAmount = Number(kp.originalNetAmount) || Number(kp.netAmount) || 0;
+            customerReceivablesMap.set(kp.srNo, originalAmount);
+        });
+
+        customers.forEach(customer => {
+            if (!customerReceivablesMap.has(customer.srNo)) {
+                const originalAmount = Number(customer.originalNetAmount) || Number(customer.netAmount) || 0;
+                customerReceivablesMap.set(customer.srNo, originalAmount);
+            }
+        });
+
+        customerPayments.forEach(payment => {
+            if (payment.paidFor && payment.paidFor.length > 0) {
+                payment.paidFor.forEach((paidFor: PaidFor) => {
+                    const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
+                    const paidAmount = (Number(paidFor.amount) || 0) + (Number(paidFor.cdAmount) || 0);
+                    const newReceivable = Math.max(0, currentReceivable - paidAmount);
+                    customerReceivablesMap.set(paidFor.srNo, newReceivable);
+                });
+            }
+        });
+
+        return Array.from(customerReceivablesMap.values()).reduce((sum, amount) => sum + amount, 0);
+    }, [kantaParchi, customers, customerPayments]);
+
+    const totalSupplierDues = useMemo(() => {
+        const supplierDuesMap = new Map<string, number>();
+
+        suppliers.forEach(s => {
+            const originalAmount = Number(s.originalNetAmount) || Number(s.netAmount) || 0;
+            supplierDuesMap.set(s.srNo, originalAmount);
+        });
+
+        supplierPayments.forEach(payment => {
+            if (payment.paidFor && payment.paidFor.length > 0) {
+                payment.paidFor.forEach((pf: PaidFor) => {
+                    const currentDue = supplierDuesMap.get(pf.srNo) || 0;
+                    const paidAmount = (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
+                    const newDue = Math.max(0, currentDue - paidAmount);
+                    supplierDuesMap.set(pf.srNo, newDue);
+                });
+            }
+        });
+
+        return Array.from(supplierDuesMap.values()).reduce((sum, amt) => sum + amt, 0);
+    }, [suppliers, supplierPayments]);
+
+    const { totalIncome, totalExpense, netProfit, totalCdReceived, expenseBreakdown, incomeBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
         // Calculate CD received - use SAME logic as CD Granted (unified-payments): paidFor.cdAmount first, else proportional from payment.cdAmount
@@ -240,66 +291,10 @@ export default function DashboardClient() {
         const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
         const currentTotalExpense = expenseFromEntries + expenseForSuppliers;
 
-        // Calculate Customer Receivables: For each kanta parchi entry, calculate outstanding
-        // Outstanding = Original Net Amount - (Sum of all payments for that entry)
-        const customerReceivablesMap = new Map<string, number>();
-        
-        // Initialize with original amounts from kanta parchi entries
-        // Note: We use all kanta parchi entries (not filtered by date) because receivables are cumulative
-        kantaParchi.forEach(kp => {
-            const originalAmount = Number(kp.originalNetAmount) || Number(kp.netAmount) || 0;
-            customerReceivablesMap.set(kp.srNo, originalAmount);
-        });
-        
-        // Also include customer entries (for backward compatibility with old data)
-        customers.forEach(customer => {
-            // Only add if not already in map (kanta parchi takes priority)
-            if (!customerReceivablesMap.has(customer.srNo)) {
-                const originalAmount = Number(customer.originalNetAmount) || Number(customer.netAmount) || 0;
-                customerReceivablesMap.set(customer.srNo, originalAmount);
-            }
-        });
-        
-        // Subtract payments from receivables (amount + CD both reduce receivable)
-        // Note: We use all customer payments (not filtered by date) because receivables are cumulative
-        customerPayments.forEach(payment => {
-            if (payment.paidFor && payment.paidFor.length > 0) {
-                payment.paidFor.forEach((paidFor: PaidFor) => {
-                    const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
-                    const paidAmount = (Number(paidFor.amount) || 0) + (Number(paidFor.cdAmount) || 0);
-                    const newReceivable = Math.max(0, currentReceivable - paidAmount);
-                    customerReceivablesMap.set(paidFor.srNo, newReceivable);
-                });
-            }
-        });
-        
-        // Sum all outstanding receivables
-        const totalCustomerReceivables = Array.from(customerReceivablesMap.values()).reduce((sum, amount) => sum + amount, 0);
-
-        // Supplier Dues: Use ALL suppliers (not date-filtered), outstanding = originalNetAmount - totalPaid - totalCd
-        const supplierDuesMap = new Map<string, number>();
-        suppliers.forEach(s => {
-            const originalAmount = Number(s.originalNetAmount) || Number(s.netAmount) || 0;
-            supplierDuesMap.set(s.srNo, originalAmount);
-        });
-        supplierPayments.forEach(payment => {
-            if (payment.paidFor && payment.paidFor.length > 0) {
-                payment.paidFor.forEach((pf: PaidFor) => {
-                    const currentDue = supplierDuesMap.get(pf.srNo) || 0;
-                    const paidAmount = (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
-                    const newDue = Math.max(0, currentDue - paidAmount);
-                    supplierDuesMap.set(pf.srNo, newDue);
-                });
-            }
-        });
-        const totalSupplierDues = Array.from(supplierDuesMap.values()).reduce((sum, amt) => sum + amt, 0);
-
         return {
             totalIncome: currentTotalIncome,
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
-            totalSupplierDues,
-            totalCustomerReceivables: totalCustomerReceivables,
             totalCdReceived: cdReceived,
             expenseBreakdown: {
                 supplierPayment: supplierPaymentRegular,
@@ -312,7 +307,7 @@ export default function DashboardClient() {
                 cdReceived,
             }
         }
-    }, [filteredData, kantaParchi, customers, customerPayments, suppliers, supplierPayments]);
+    }, [filteredData]);
     
     const appCountsMap = useMemo(() => ({
         suppliers: suppliers.length,
@@ -457,18 +452,26 @@ export default function DashboardClient() {
     const incomeExpenseChartData = useMemo(() => {
         try {
             const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
-                const day = format(new Date(t.date), 'MMM dd');
-                if (!acc[day]) acc[day] = { date: day, income: 0, expense: 0 };
+                const dayDate = toStartOfDay(t.date);
+                const dayTs = dayDate.getTime();
+                const dayKey = String(dayTs);
+
+                if (!acc[dayKey]) acc[dayKey] = { dayTs, date: format(dayDate, 'MMM dd'), income: 0, expense: 0 };
+
                 const isIncomeEntry = 'transactionType' in t && t.transactionType === 'Income';
                 const isCustomerPayment = 'customerId' in t && 'paymentId' in t && t.paymentId.startsWith('CP');
                 if (isIncomeEntry || isCustomerPayment) {
-                    acc[day].income += t.amount;
+                    acc[dayKey].income += t.amount;
                 } else {
-                    acc[day].expense += t.amount;
+                    acc[dayKey].expense += t.amount;
                 }
+
                 return acc;
-            }, {} as Record<string, { date: string; income: number; expense: number }>);
-            return Object.values(grouped).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            }, {} as Record<string, { dayTs: number; date: string; income: number; expense: number }>);
+
+            return Object.values(grouped)
+                .sort((a, b) => a.dayTs - b.dayTs)
+                .map(({ date, income, expense }) => ({ date, income, expense }));
         } catch (error) {
             logError(error, "dashboard-client: incomeExpenseChartData", "medium");
             return [];
@@ -486,11 +489,17 @@ export default function DashboardClient() {
             return [];
         }
     }, [financialState]);
+
+    const bankAccountById = useMemo(() => {
+        const map = new Map<string, BankAccount>();
+        bankAccounts.forEach(acc => map.set(acc.id, acc));
+        return map;
+    }, [bankAccounts]);
     
     const fundSourcesData = useMemo(() => {
         try {
             return Array.from(financialState.balances.entries()).map(([key, value]) => {
-                const account = bankAccounts.find(acc => acc.id === key);
+                const account = bankAccountById.get(key);
                 let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
                 if (account) {
                     name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
@@ -501,7 +510,7 @@ export default function DashboardClient() {
             logError(error, "dashboard-client: fundSourcesData", "medium");
             return [];
         }
-    }, [financialState.balances, bankAccounts]);
+    }, [financialState.balances, bankAccountById]);
 
 
     const paymentMethodData = useMemo(() => {
@@ -509,7 +518,7 @@ export default function DashboardClient() {
             const groupedBySource = [...allIncomes, ...allExpenses].reduce((acc, item) => {
                 let key = 'Other';
                 if (item.bankAccountId) {
-                    const bank = bankAccounts.find(b => b.id === item.bankAccountId);
+                    const bank = bankAccountById.get(item.bankAccountId);
                     key = bank ? bank.accountHolderName : 'Other Bank';
                 } else if (('paymentMethod' in item && item.paymentMethod === 'Cash') || ('receiptType' in item && item.receiptType === 'Cash')) {
                     key = 'Cash in Hand';
@@ -524,7 +533,7 @@ export default function DashboardClient() {
             logError(error, "dashboard-client: paymentMethodData", "medium");
             return [];
         }
-    }, [allIncomes, allExpenses, bankAccounts]);
+    }, [allIncomes, allExpenses, bankAccountById]);
 
     // ✅ OPTIMIZED: Memoize breadcrumbs to prevent recreation on every render
     const breadcrumbs = useMemo(() => {

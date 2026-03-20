@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { useErpSelection } from "@/contexts/erp-selection-context";
 import { listErpCompanies, addErpSubCompany, addErpSeason } from "@/lib/erp-migration";
 import { useToast } from "@/hooks/use-toast";
@@ -110,7 +111,7 @@ export default function CompanySetupPage() {
   };
 
   const handleContinue = () => {
-    router.push("/");
+    electronNavigate("/", router, { method: "push" });
   };
 
   if (loading) {

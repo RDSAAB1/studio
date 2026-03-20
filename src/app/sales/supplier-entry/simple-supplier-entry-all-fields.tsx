@@ -293,7 +293,11 @@ export default function SimpleSupplierEntryAllFields() {
     }, [toast, yieldToBrowser]);
 
 
+    const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+
     const handleMultiDelete = useCallback(async (supplierIds: string[]) => {
+        if (supplierIds.length === 0) return;
+        setIsDeletingSelected(true);
         try {
             // Import deleteMultipleSuppliers function
             const { deleteMultipleSuppliers } = await import("@/lib/firestore");
@@ -308,8 +312,10 @@ export default function SimpleSupplierEntryAllFields() {
                 description: "Failed to delete some suppliers", 
                 variant: "destructive"
             });
+        } finally {
+            setIsDeletingSelected(false);
         }
-    }, []);
+    }, [toast]);
 
     const handleViewChange = useCallback((view: 'entry' | 'data') => {
         // NO LOADING - Instant switch

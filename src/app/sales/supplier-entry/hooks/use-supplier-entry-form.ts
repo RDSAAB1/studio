@@ -37,7 +37,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, lat
         teirWeight: 0,
         rate: 0,
         kartaPercentage: 1,
-        labouryRate: 2,
+        labouryRate: 0,
         brokerage: 0,
         brokerageRate: 0,
         brokerageAddSubtract: true,
@@ -74,7 +74,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
             id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
             name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
             weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-            labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
             receiptType: 'Cash', paymentType: 'Full', customerId: '',
         };
     });
@@ -445,7 +445,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
                 name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
                 weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
                 receiptType: 'Cash', paymentType: 'Full', customerId: '',
             });
             toast({ title: 'Form cleared' });
@@ -473,7 +473,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
                 name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
                 weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 2, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
                 receiptType: 'Cash', paymentType: 'Full', customerId: '',
             });
         } catch (error) {

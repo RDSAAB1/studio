@@ -442,6 +442,14 @@ const LedgerPage: React.FC = () => {
         localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(updatedAccounts));
         window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
       }
+
+      // Local folder mode: persist ledger cash accounts to Excel (file-first)
+      void (async () => {
+        try {
+          const { writeLedgerCashAccountsToFolder } = await import("@/lib/local-folder-storage");
+          await writeLedgerCashAccountsToFolder();
+        } catch {}
+      })();
       
       toast({ title: "Cash account created" });
     } catch (error: any) {
@@ -489,6 +497,14 @@ const LedgerPage: React.FC = () => {
         localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
         window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
       }
+
+      // Local folder mode: persist ledger cash accounts to Excel (file-first)
+      void (async () => {
+        try {
+          const { writeLedgerCashAccountsToFolder } = await import("@/lib/local-folder-storage");
+          await writeLedgerCashAccountsToFolder();
+        } catch {}
+      })();
       
       return next;
     });
@@ -583,6 +599,14 @@ const LedgerPage: React.FC = () => {
           localStorage.setItem("ledgerCashAccountsCache", JSON.stringify(next));
           window.localStorage.setItem("ledgerCashAccountsLastSynced", String(Date.now()));
         }
+
+        // Local folder mode: persist ledger cash accounts to Excel (file-first)
+        void (async () => {
+          try {
+            const { writeLedgerCashAccountsToFolder } = await import("@/lib/local-folder-storage");
+            await writeLedgerCashAccountsToFolder();
+          } catch {}
+        })();
         
         return next;
       });

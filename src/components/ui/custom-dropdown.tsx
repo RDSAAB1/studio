@@ -86,7 +86,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         setCurrentSearchType(searchType);
     }, [searchType]);
 
-    // Calculate dropdown position when opening and on scroll
+    // Calculate dropdown position when opening and on scroll (viewport coords for position:fixed)
     const updateDropdownPosition = useCallback(() => {
         if (isOpen && inputRef.current) {
             const rect = inputRef.current.getBoundingClientRect();
@@ -97,18 +97,17 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             // Simple logic: if enough space below (200px), open below; otherwise open above
             const openAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
             
+            // Use viewport coordinates only: getBoundingClientRect() is viewport-relative, and dropdown uses position:fixed
             let top: number;
             if (openAbove) {
-                // Position above the input, right next to it
-                top = rect.top + window.scrollY;
+                top = rect.top;
             } else {
-                // Position below the input, right next to it
-                top = rect.bottom + window.scrollY;
+                top = rect.bottom;
             }
             
             setDropdownPosition({
                 top,
-                left: rect.left + window.scrollX,
+                left: rect.left,
                 width: rect.width,
                 openAbove
             });

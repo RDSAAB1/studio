@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes, Briefcase, Edit2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { electronNavigate } from "@/lib/electron-navigate";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 import { db } from "@/lib/database";
 
@@ -90,7 +91,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                     } else {
                                         // Navigate to supplier entry page with customer data
                                         localStorage.setItem('editSupplierData', JSON.stringify(customer));
-                                        router.push('/sales/supplier-entry');
+                                        electronNavigate('/sales/supplier-entry', router, { method: 'push' });
                                         onOpenChange(false);
                                         toast({
                                             title: "Navigating to Supplier Entry",
@@ -120,7 +121,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                     <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
                                     {!isCustomer && <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(customer.so || '')} />}
                                     {isCustomer && <DetailItem icon={<Briefcase size={14} />} label="Company Name" value={toTitleCase(customer.companyName || '')} />}
-                                    <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
+                                    <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={customer.date && !isNaN(new Date(customer.date).getTime()) ? format(new Date(customer.date), "PPP") : '-'} />
                                     <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
                                 </div>
                             </CardContent>
@@ -131,10 +132,10 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                 <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0 space-y-3">
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                        <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
-                                        <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
-                                        <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} />
-                                        {!isCustomer && <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(customer.dueDate), "PPP")} />}
+                                        <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={(customer.vehicleNo || '').toUpperCase()} />
+                                        <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety || '')} />
+                                        <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType || '-'} />
+                                        {!isCustomer && <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={customer.dueDate && !isNaN(new Date(customer.dueDate).getTime()) ? format(new Date(customer.dueDate), "PPP") : '-'} />}
                                         {isCustomer && <DetailItem icon={<Boxes size={14} />} label="Bags" value={customer.bags || 0} />}
                                     </div>
                                     <Separator />
@@ -321,7 +322,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                                             } else {
                                                                                 // Navigate to supplier payments page with payment data
                                                                                 localStorage.setItem('editPaymentData', JSON.stringify(payment));
-                                                                                router.push('/sales/supplier-payments');
+                                                                                electronNavigate('/sales/supplier-payments', router, { method: 'push' });
                                                                                 onOpenChange(false);
                                                                                 toast({
                                                                                     title: "Navigating to Payments",

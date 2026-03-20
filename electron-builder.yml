@@ -2,20 +2,34 @@ appId: com.jrmdsoftware.studio
 productName: JRMD Studio
 copyright: Copyright © 2024 JRMD Software
 
+# asar: true to avoid NSIS "path not found" for deep node_modules (yaml, yargs, zod, etc.).
+# Only .next/standalone is unpacked so the Next server can run with real dir as cwd.
+asar: true
+asarUnpack:
+  - ".next/standalone/**/*"
+  - "node_modules/sql.js/**/*"
+
 directories:
   buildResources: build
   output: dist
 
 files:
-  - 'out/**/*'
+  - '.next/**/*'
   - 'node_modules/**/*'
   - 'electron/**/*'
   - 'package.json'
+  - 'next.config.ts'
+  - 'next.config.js'
+  - 'public/**/*'
   - '!node_modules/.cache/**/*'
+  # Exclude zod v3/v4 subpaths - app only uses main "zod" entry; avoids NSIS "path not found" for export-only paths
+  - '!node_modules/zod/v3/**/*'
+  - '!node_modules/zod/v4/**/*'
+  - '!node_modules/zod/v4-mini/**/*'
+  - '!node_modules/zod/src/**/*'
   - '!**/*.{md,ts,tsx,jsx}'
   - '!**/*.test.{ts,tsx,js,jsx}'
   - '!src/**/*'
-  - '!.next/**/*'
   - '!scripts/**/*'
   - '!docs/**/*'
 
@@ -34,9 +48,6 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: JRMD Studio
-  installerIcon: PUBLIC/icon-512.png
-  uninstallerIcon: PUBLIC/icon-512.png
-  installerHeaderIcon: PUBLIC/icon-512.png
   deleteAppDataOnUninstall: false
 
 mac:

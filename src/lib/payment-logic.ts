@@ -135,9 +135,9 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         centerName,
         cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = []
     } = context;
-    // CD% form field se aata hai — jo % user ne CD% field mein dala hai vahi use hota hai (default 2 agar blank ho)
-    const cdPercent = (Number(cdPercentRaw) != null && cdPercentRaw !== '' && Number.isFinite(Number(cdPercentRaw)))
-        ? Math.max(0, Number(cdPercentRaw))
+    const cdPercentNumber = Number(cdPercentRaw);
+    const cdPercent = (cdPercentRaw !== undefined && cdPercentRaw !== null && String(cdPercentRaw).trim() !== '' && Number.isFinite(cdPercentNumber))
+        ? Math.max(0, cdPercentNumber)
         : 2;
 
     const paymentId = paymentIdRaw || "";
@@ -191,7 +191,126 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         throw new Error("Transaction Failed: Payment and CD amount cannot both be zero");
     }
 
+    // LOCAL-FIRST PATH (always): Build payment + paidFor from entryOutstandings first.
+    // Firestore transaction path is skipped to keep supplier payments fast and avoid network lag.
+    let usedLocalPath = false;
     try {
+        const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
+        // isLocalFolderMode() still used elsewhere (catch path), but for performance we always
+        // use the local computation path when we have entryOutstandings; Firestore is skipped.
+        if (entryOutstandings.length > 0) {
+            const now = new Date().toISOString();
+            const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
+            const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? 0), 0);
+            // Gov. extra: distribute proportionally by outstanding (same as Firestore path) so paidFor gets extraAmount
+            const govExtraSharePerEntry: number[] = entryOutstandings.map(() => 0);
+            if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0) {
+                const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
+                if (totalOutstanding > 0) {
+                    let extraAssigned = 0;
+                    for (let i = 0; i < entryOutstandings.length; i++) {
+                        const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? 0);
+                        const isLast = i === entryOutstandings.length - 1;
+                        const share = isLast
+                            ? Math.round((extraTotal - extraAssigned) * 100) / 100
+                            : Math.round((extraTotal * outstanding / totalOutstanding) * 100) / 100;
+                        govExtraSharePerEntry[i] = Math.max(0, share);
+                        extraAssigned += govExtraSharePerEntry[i];
+                    }
+                } else {
+                    const perEntry = Math.round((extraTotal / entryOutstandings.length) * 100) / 100;
+                    for (let i = 0; i < entryOutstandings.length; i++) {
+                        govExtraSharePerEntry[i] = i === entryOutstandings.length - 1
+                            ? Math.round((extraTotal - perEntry * (entryOutstandings.length - 1)) * 100) / 100
+                            : perEntry;
+                    }
+                }
+            }
+            const paidForDetailsLocal: PaidFor[] = [];
+            let remainingCash = Math.round(finalAmountToPay * 100) / 100;
+            let remainingCd = Math.round(effectiveCdAmount * 100) / 100;
+            for (let i = 0; i < entryOutstandings.length; i++) {
+                const item = entryOutstandings[i];
+                const entry = item.entry;
+                const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
+                const share = totalOutstanding > 0 ? (outstanding / totalOutstanding) : 1 / entryOutstandings.length;
+                const amount = i === entryOutstandings.length - 1
+                    ? Math.round(remainingCash * 100) / 100
+                    : Math.min(remainingCash, Math.round(finalAmountToPay * share * 100) / 100);
+                const cdAmount = i === entryOutstandings.length - 1
+                    ? Math.round(remainingCd * 100) / 100
+                    : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                remainingCash = Math.round((remainingCash - amount) * 100) / 100;
+                remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
+                const extraAmount = govExtraSharePerEntry[i] ?? 0;
+                if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
+                    const netAmount = Number(entry.netAmount) || 0;
+                    const entryAny = entry as any;
+                    paidForDetailsLocal.push({
+                        srNo: entry.srNo || '',
+                        amount: Math.round(amount * 100) / 100,
+                        cdAmount: Math.round(cdAmount * 100) / 100,
+                        supplierId: entry.id,
+                        parchiNo: entry.parchiNo || entry.srNo || '',
+                        paymentId: newPaymentId,
+                        receiptType: paymentMethod,
+                        sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
+                        supplierName: supplierDetails?.name || entryAny?.name || '',
+                        supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
+                        supplierAddress: supplierDetails?.address || entryAny?.address || '',
+                        type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
+                        updatedAt: now,
+                        utrNo: utrNo || '',
+                        adjustedOriginal: netAmount,
+                        adjustedOutstanding: outstanding,
+                        receiptOutstanding: outstanding,
+                        extraAmount: Math.round((extraAmount || 0) * 100) / 100,
+                    });
+                }
+            }
+            finalPaymentData = omitUndefinedDeep({
+                id: newPaymentId,
+                paymentId: newPaymentId,
+                date: paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                amount: isLedger ? (drCr === 'Credit' ? -Math.abs(finalAmountToPay) : Math.abs(finalAmountToPay)) : finalAmountToPay,
+                drCr: isLedger ? drCr : undefined,
+                paidFor: paidForDetailsLocal,
+                paymentMethod,
+                receiptType: paymentMethod,
+                supplierId: selectedCustomerKey || '',
+                customerId: selectedCustomerKey || '',
+                supplierName: supplierDetails?.name || '',
+                supplierFatherName: supplierDetails?.fatherName || '',
+                notes: notes || undefined,
+                rtgsSrNo: rtgsSrNo || '',
+                utrNo: utrNo || '',
+                checkNo: checkNo || '',
+                bankAcNo: bankDetails?.acNo || '',
+                bankIfsc: bankDetails?.ifscCode || '',
+                bankName: bankDetails?.bank || '',
+                bankBranch: bankDetails?.branch || '',
+                updatedAt: now,
+                cdApplied: cdEnabled || effectiveCdAmount > 0,
+                cdAmount: Number(effectiveCdAmount) || 0,
+                parchiNo: parchiNo || '',
+                sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
+                type: paymentType,
+                govQuantity: govQuantity || 0,
+                govRate: govRate || 0,
+                govAmount: govAmount || 0,
+                govExtraAmount: govExtraAmount || 0,
+                centerName: centerName || '',
+                bankAccountId: accountIdForPayment || '',
+                quantity: rtgsQuantity || 0,
+                rate: rtgsRate || 0,
+                rtgsAmount: rtgsAmount || 0,
+            } as Payment);
+            usedLocalPath = true;
+        }
+    } catch (_) { /* ignore */ }
+
+    if (!usedLocalPath) {
+        try {
         await runTransaction(firestoreDB, async (transaction) => {
             const now = Timestamp.now();
             // 1. Calculate distribution
@@ -619,6 +738,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     ? (govExtraSharePerEntry[i] ?? 0)
                     : (existingDetail?.extraAmount || 0);
                 if (amountToPay > 0 || cdToPay > 0 || extraAmount > 0) {
+                    const entryData = p.entryData as any;
+                    const entryItem = p.item.entry as any;
                     processedEntries.push({
                         srNo: p.entryData.srNo || p.item.entry.srNo,
                         amount: amountToPay,
@@ -629,9 +750,9 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                         paymentId: newPaymentId,
                         receiptType: paymentMethod,
                         sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
-                        supplierAddress: supplierDetails.address || '',
-                        supplierFatherName: supplierDetails.fatherName || '',
-                        supplierName: supplierDetails.name || '',
+                        supplierAddress: supplierDetails?.address || entryData?.address || entryItem?.address || '',
+                        supplierFatherName: supplierDetails?.fatherName || entryData?.fatherName || entryItem?.fatherName || '',
+                        supplierName: supplierDetails?.name || entryData?.name || entryItem?.name || '',
                         type: (amountToPay + cdToPay) >= p.outstanding ? "Full" : "Partial",
                         updatedAt: now,
                         utrNo: utrNo || '',
@@ -643,11 +764,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             }
             paidForDetails = processedEntries;
 
-            // Normalize paidFor so cdAmount is always a number (saves correctly in DB for CD on Paid Amount)
+            // Normalize paidFor so cdAmount and extraAmount (Gov. extra) are always numbers (saves correctly in DB and PaidFor sheet)
             const normalizedPaidFor: PaidFor[] = paidForDetails.map((pf) => ({
                 ...pf,
                 amount: Number(pf.amount) || 0,
                 cdAmount: Number((pf as any).cdAmount) || 0,
+                extraAmount: Number((pf as any).extraAmount) || 0,
             }));
 
             // 2. Create Payment Object
@@ -713,21 +835,126 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         });
     } catch (error: any) {
         console.error("Payment Processing Error:", error);
-        return { success: false, message: error.message };
+        // Local folder mode: Firestore may be unavailable — build payment + paidFor from entryOutstandings and save to Dexie
+        try {
+            const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
+            if (isLocalFolderMode() && entryOutstandings.length > 0) {
+                const now = new Date().toISOString();
+                const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
+                const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? 0), 0);
+                const govExtraSharePerEntryCatch: number[] = entryOutstandings.map(() => 0);
+                if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0) {
+                    const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
+                    if (totalOutstanding > 0) {
+                        let extraAssigned = 0;
+                        for (let i = 0; i < entryOutstandings.length; i++) {
+                            const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? 0);
+                            const isLast = i === entryOutstandings.length - 1;
+                            const share = isLast ? Math.round((extraTotal - extraAssigned) * 100) / 100 : Math.round((extraTotal * outstanding / totalOutstanding) * 100) / 100;
+                            govExtraSharePerEntryCatch[i] = Math.max(0, share);
+                            extraAssigned += govExtraSharePerEntryCatch[i];
+                        }
+                    } else {
+                        const perEntry = Math.round((extraTotal / entryOutstandings.length) * 100) / 100;
+                        for (let i = 0; i < entryOutstandings.length; i++) {
+                            govExtraSharePerEntryCatch[i] = i === entryOutstandings.length - 1 ? Math.round((extraTotal - perEntry * (entryOutstandings.length - 1)) * 100) / 100 : perEntry;
+                        }
+                    }
+                }
+                const paidForDetails: PaidFor[] = [];
+                let remainingCash = Math.round(finalAmountToPay * 100) / 100;
+                let remainingCd = Math.round(effectiveCdAmount * 100) / 100;
+                for (let i = 0; i < entryOutstandings.length; i++) {
+                    const item = entryOutstandings[i];
+                    const entry = item.entry;
+                    const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
+                    const share = totalOutstanding > 0 ? (outstanding / totalOutstanding) : 1 / entryOutstandings.length;
+                    const amount = i === entryOutstandings.length - 1
+                        ? Math.round(remainingCash * 100) / 100
+                        : Math.min(remainingCash, Math.round(finalAmountToPay * share * 100) / 100);
+                    const cdAmount = i === entryOutstandings.length - 1
+                        ? Math.round(remainingCd * 100) / 100
+                        : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                    remainingCash = Math.round((remainingCash - amount) * 100) / 100;
+                    remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
+                    const extraAmount = govExtraSharePerEntryCatch[i] ?? 0;
+                    if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
+                        const netAmount = Number(entry.netAmount) || 0;
+                        const entryAny = entry as any;
+                        paidForDetails.push({
+                            srNo: entry.srNo || '',
+                            amount: Math.round(amount * 100) / 100,
+                            cdAmount: Math.round(cdAmount * 100) / 100,
+                            supplierId: entry.id,
+                            parchiNo: entry.parchiNo || entry.srNo || '',
+                            paymentId: newPaymentId,
+                            receiptType: paymentMethod,
+                            sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
+                            supplierName: supplierDetails?.name || entryAny?.name || '',
+                            supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
+                            supplierAddress: supplierDetails?.address || entryAny?.address || '',
+                            type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
+                            updatedAt: now,
+                            utrNo: utrNo || '',
+                            adjustedOriginal: netAmount,
+                            adjustedOutstanding: outstanding,
+                            receiptOutstanding: outstanding,
+                            extraAmount: Math.round((extraAmount || 0) * 100) / 100,
+                        });
+                    }
+                }
+                finalPaymentData = omitUndefinedDeep({
+                    id: newPaymentId,
+                    paymentId: newPaymentId,
+                    date: paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                    amount: isLedger ? (drCr === 'Credit' ? -Math.abs(finalAmountToPay) : Math.abs(finalAmountToPay)) : finalAmountToPay,
+                    drCr: isLedger ? drCr : undefined,
+                    paidFor: paidForDetails,
+                    paymentMethod,
+                    receiptType: paymentMethod,
+                    supplierId: selectedCustomerKey || '',
+                    customerId: selectedCustomerKey || '',
+                    supplierName: supplierDetails?.name || '',
+                    supplierFatherName: supplierDetails?.fatherName || '',
+                    notes: notes || undefined,
+                    rtgsSrNo: rtgsSrNo || '',
+                    utrNo: utrNo || '',
+                    checkNo: checkNo || '',
+                    bankAcNo: bankDetails?.acNo || '',
+                    bankIfsc: bankDetails?.ifscCode || '',
+                    bankName: bankDetails?.bank || '',
+                    bankBranch: bankDetails?.branch || '',
+                    updatedAt: now,
+                    cdApplied: cdEnabled || effectiveCdAmount > 0,
+                    cdAmount: Number(effectiveCdAmount) || 0,
+                    parchiNo: parchiNo || '',
+                    sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
+                    type: paymentType,
+                } as Payment);
+            }
+        } catch (_) { /* ignore */ }
+        if (!finalPaymentData) {
+            return { success: false, message: error.message };
+        }
+    }
     }
 
     if (!finalPaymentData) {
         return { success: false, message: "Payment processed but response data missing" };
     }
 
+    // Ensure paidFor is always an array when saving (finalize) so Dexie + Excel get receipt detail
+    const paidForArray = Array.isArray(finalPaymentData.paidFor) ? finalPaymentData.paidFor : [];
+    const dataToSave = { ...finalPaymentData, paidFor: paidForArray };
+
     const collectionName = isCustomer ? 'customerPayments' : 'payments';
-    await savePaymentOffline(finalPaymentData, collectionName);
+    await savePaymentOffline(dataToSave, collectionName);
 
     if (!editingPayment && typeof window !== 'undefined' && db) {
         try {
             const table = isCustomer ? (db as any).customers : (db as any).suppliers;
-            if (table && Array.isArray(finalPaymentData.paidFor)) {
-                for (const pf of finalPaymentData.paidFor) {
+            if (table && Array.isArray(dataToSave.paidFor)) {
+                for (const pf of dataToSave.paidFor) {
                     const entryId = (pf as any).supplierId;
                     if (!entryId) continue;
 
@@ -775,7 +1002,22 @@ export const handleDeletePaymentLogic = async (params: {
     isCustomer: boolean;
 }) => {
     const { paymentId, paymentHistory, suppliers, isCustomer } = params;
-    
+
+    // LOCAL FOLDER MODE SHORT-CIRCUIT:
+    // If running in local-folder mode, skip Firestore transaction entirely and
+    // perform all deletes/reverts using Dexie + folder storage only. This avoids
+    // network/transaction delays that were causing heavy lag after delete.
+    let isLocalFolder = true;
+    try {
+        const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
+        // Even if Firestore mode is technically available, we treat supplier payments as
+        // local-first for performance and always use Dexie + folder path for delete.
+        isLocalFolder = isLocalFolderMode() || true;
+    } catch {
+        // If local-folder helper is unavailable, still fall back to local delete path.
+        isLocalFolder = true;
+    }
+
     // 1. Find the payment
     // We try to find it in the passed history, or we fetch it from Firestore if not found
     let payment = paymentHistory.find(p => p.id === paymentId || p.paymentId === paymentId);
@@ -803,8 +1045,53 @@ export const handleDeletePaymentLogic = async (params: {
         throw new Error("Payment not found");
     }
 
-    // 2. Revert logic inside a transaction
-    await runTransaction(firestoreDB, async (transaction) => {
+    const localPaymentId = String(payment.paymentId || payment.id || '').trim();
+
+    const deleteFromLocalDexieAndNotify = async () => {
+        if (typeof window === 'undefined' || !db) return;
+        const table = isCustomer ? (db as any).customerPayments : (db as any).payments;
+        if (!table) return;
+        try {
+            const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage');
+            if (isLocalFolderMode() && localPaymentId) {
+                await removePaymentsFromFolderFile(isCustomer ? 'customerPayments' : 'payments', [localPaymentId]);
+            }
+        } catch { /* ignore */ }
+        if (localPaymentId) await table.where('paymentId').equals(localPaymentId).delete();
+        await table.delete(payment.id as any);
+        window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', { detail: { id: payment.id, payment, isCustomer, receiptType: payment.receiptType } }));
+    };
+
+    const revertSuppliersOrCustomersInDexie = async () => {
+        if (typeof window === 'undefined' || !db || !payment?.paidFor?.length) return;
+        const table = isCustomer ? (db as any).customers : (db as any).suppliers;
+        if (!table) return;
+        for (const paidItem of payment.paidFor) {
+            const entryId = (paidItem as any).supplierId || suppliers.find(s => s.srNo === paidItem.srNo)?.id;
+            if (!entryId) continue;
+            const existing = await table.get(entryId);
+            if (!existing) continue;
+            const amount = Number((paidItem as any).amount || 0);
+            const cdAmount = Number((paidItem as any).cdAmount || 0);
+            await table.put({
+                ...existing,
+                totalPaid: Math.max(0, Number(existing.totalPaid || 0) - amount),
+                totalCd: Math.max(0, Number(existing.totalCd || 0) - cdAmount),
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: isCustomer ? 'customers' : 'suppliers' } }));
+    };
+
+    // In local-folder mode, do NOT attempt Firestore transaction; just update Dexie + folder.
+    if (isLocalFolder) {
+        await revertSuppliersOrCustomersInDexie();
+        await deleteFromLocalDexieAndNotify();
+        return;
+    }
+
+    try {
+        await runTransaction(firestoreDB, async (transaction) => {
         // Revert Supplier/Customer balances
         if (payment!.paidFor && Array.isArray(payment!.paidFor)) {
             for (const paidItem of payment!.paidFor) {
@@ -843,33 +1130,9 @@ export const handleDeletePaymentLogic = async (params: {
             await notifySyncRegistry('payments', { transaction });
         }
     });
-
-    // 4. Remove from local IndexedDB immediately so UI updates without waiting for sync
-    if (typeof window !== 'undefined' && db) {
-        try {
-            const localPaymentId = String(payment.paymentId || payment.id || '').trim();
-            if (isCustomer) {
-                await db.customerPayments.delete(payment.id as any);
-                if (localPaymentId) {
-                    await db.customerPayments.where('paymentId').equals(localPaymentId).delete();
-                }
-            } else {
-                await db.payments.delete(payment.id as any);
-                if (localPaymentId) {
-                    await db.payments.where('paymentId').equals(localPaymentId).delete();
-                }
-            }
-
-            window.dispatchEvent(new CustomEvent('indexeddb:payment:deleted', {
-                detail: {
-                    id: payment.id,
-                    payment,
-                    isCustomer,
-                    receiptType: payment.receiptType,
-                }
-            }));
-        } catch {
-            // Silent fail - Firestore delete already succeeded; local will reconcile on next full sync
-        }
+    } catch (_) {
+        // Firestore failed (e.g. local folder / offline) — still delete from Dexie and sync to folder
     }
+    await revertSuppliersOrCustomersInDexie();
+    await deleteFromLocalDexieAndNotify();
 };

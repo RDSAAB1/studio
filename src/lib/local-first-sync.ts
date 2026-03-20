@@ -68,9 +68,12 @@ let eventListenersAttached = false;
 /**
  * Attach event listeners for user interactions
  * Only sync when user is actively using the software
+ * Skipped in local folder mode — no Firestore sync at all
  */
-function attachEventListeners() {
+async function attachEventListeners() {
     if (eventListenersAttached || typeof window === 'undefined') return;
+    const { isLocalFolderMode } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) return; // Local folder: do not attach Firestore sync
     eventListenersAttached = true;
 
     const events = ['click', 'input', 'change', 'blur', 'focus', 'submit', 'keydown'];
@@ -78,12 +81,10 @@ function attachEventListeners() {
         scheduleSyncFromFirestore();
     };
 
-    // Use passive listeners for better performance
     events.forEach(event => {
         window.addEventListener(event, syncHandler, { passive: true, once: false });
     });
 
-    // Also sync on visibility change (when user switches back to tab)
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             scheduleSyncFromFirestore();
@@ -92,12 +93,11 @@ function attachEventListeners() {
 }
 
 /**
- * Initialize local-first sync
+ * Initialize local-first sync (skipped in local folder mode — data is folder/IndexedDB only)
  */
 export function initLocalFirstSync() {
     if (typeof window === 'undefined') return;
-    attachEventListeners();
-
+    void attachEventListeners();
 }
 
 /**
@@ -395,6 +395,20 @@ export async function syncToFirestore() {
     const changes = Array.from(pendingChanges.values());
     pendingChanges.clear();
 
+    // ✅ Local folder mode: sync to folder instead of Firestore
+    const { isLocalFolderMode, syncCollectionToFolder } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) {
+        const collections = [...new Set(changes.map((c) => c.collection))];
+        for (const col of collections) {
+            try {
+                await syncCollectionToFolder(col);
+            } catch (e) {
+                handleSilentError(e, `syncToFolder - ${col}`);
+            }
+        }
+        return;
+    }
+
     for (const change of changes) {
         try {
             const firestoreCollection = getFirestoreCollection(change.collection);
@@ -558,9 +572,11 @@ let syncFromFirestoreScheduled = false;
 let lastSyncTime = 0;
 const SYNC_COOLDOWN = 60_000; // Minimum 60 seconds between syncs to reduce reads
 
-function scheduleSyncFromFirestore() {
+async function scheduleSyncFromFirestore() {
     if (syncFromFirestoreScheduled) return;
     if (Date.now() - lastSyncTime < SYNC_COOLDOWN) return;
+    const { isLocalFolderMode } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) return; // Local folder: no Firestore sync
 
     syncFromFirestoreScheduled = true;
 
@@ -602,6 +618,10 @@ function saveLastSyncTime(collectionName: string, timestamp: number): void {
  */
 async function syncFromFirestore() {
     if (!db || typeof window === 'undefined') return;
+
+    // ✅ Local folder mode: do not sync from Firestore (would overwrite local data)
+    const { isLocalFolderMode } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) return;
 
     try {
         // ✅ OPTIMIZED: Sync collections in parallel (non-blocking)
@@ -835,13 +855,18 @@ export async function forceSyncToFirestore(): Promise<void> {
 
 /**
  * Force sync from Firestore (for testing/manual sync)
+ * No-op in local folder mode — data is only from folder/IndexedDB.
  */
 export async function forceSyncFromFirestore(): Promise<void> {
+    const { isLocalFolderMode } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) return;
     await syncFromFirestore();
 }
 
 /** Clear lastSync for a collection and sync it - use after restore to refresh local data */
 export async function forceSyncCollectionFromFirestore(collectionName: string): Promise<void> {
+    const { isLocalFolderMode } = await import('./local-folder-storage');
+    if (isLocalFolderMode()) return; // Local folder: no Firestore read
     if (typeof window !== 'undefined') {
         const suffix = getStorageKeySuffix();
         const key = `lastSync:${collectionName}${suffix ? `_${suffix}` : ''}`;
