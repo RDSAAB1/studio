@@ -67,48 +67,49 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     });
     
      useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || !customer) return;
 
         const initialize = async () => {
-            if (customer) {
-                 // Verify expense ID exists before setting state
-                let verifiedExpenseId = customer.advanceExpenseId;
-                if (customer.advanceExpenseId) {
+            // 1. Verify expense ID exists before setting state
+            let verifiedExpenseId = customer.advanceExpenseId;
+            if (customer.advanceExpenseId) {
+                try {
                     const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", customer.advanceExpenseId));
                     const expenseSnap = await getDoc(expenseRef);
                     if (!expenseSnap.exists()) {
-
                         verifiedExpenseId = undefined;
-                         setInvoiceDetails(prev => ({ ...prev, advanceFreight: 0, advancePaymentMethod: 'CashInHand'}));
                     }
+                } catch (error) {
+                    console.error("Error verifying expense:", error);
+                    verifiedExpenseId = undefined;
                 }
+            }
 
-                setEditableInvoiceDetails({ ...customer, advanceExpenseId: verifiedExpenseId });
-                setIsSameAsBilling(
-                    (!customer.shippingName || customer.shippingName === customer.name) &&
-                    (!customer.shippingAddress || customer.shippingAddress === customer.address) &&
-                    (!customer.shippingContact || customer.shippingContact === customer.contact) &&
-                    (!customer.shippingGstin || customer.shippingGstin === customer.gstin)
-                );
-                setInvoiceDetails(prev => ({
-                    ...prev,
-                    nineRNo: customer.nineRNo || '',
-                    gatePassNo: customer.gatePassNo || '',
-                    grNo: customer.grNo || '',
-                    grDate: customer.grDate || '',
-                    transport: customer.transport || '',
-                    advanceFreight: verifiedExpenseId ? customer.advanceFreight || 0 : 0,
-                    advancePaymentMethod: verifiedExpenseId ? customer.advancePaymentMethod || 'CashInHand' : 'CashInHand'
-                }));
-            }
-            if (receiptSettings) {
-                setInvoiceDetails(prev => ({
-                    ...prev,
-                    companyGstin: receiptSettings.companyGstin || prev.companyGstin,
-                    companyStateName: receiptSettings.companyStateName || prev.companyStateName,
-                    companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
-                }));
-            }
+            // 2. Set editable details with verified ID
+            setEditableInvoiceDetails({ ...customer, advanceExpenseId: verifiedExpenseId });
+
+            // 3. Update non-editable view state
+            setInvoiceDetails(prev => ({
+                ...prev,
+                advanceFreight: verifiedExpenseId ? customer.advanceFreight || 0 : 0,
+                advancePaymentMethod: verifiedExpenseId ? customer.advancePaymentMethod || 'CashInHand' : 'CashInHand',
+                nineRNo: customer.nineRNo || '',
+                gatePassNo: customer.gatePassNo || '',
+                grNo: customer.grNo || '',
+                grDate: customer.grDate || '',
+                transport: customer.transport || '',
+                companyGstin: receiptSettings?.companyGstin || prev.companyGstin,
+                companyStateName: receiptSettings?.companyStateName || prev.companyStateName,
+                companyStateCode: receiptSettings?.companyStateCode || prev.companyStateCode,
+            }));
+
+            // 4. Determine if shipping matches billing
+            setIsSameAsBilling(
+                (!customer.shippingName || customer.shippingName === customer.name) &&
+                (!customer.shippingAddress || customer.shippingAddress === customer.address) &&
+                (!customer.shippingContact || customer.shippingContact === customer.contact) &&
+                (!customer.shippingGstin || customer.shippingGstin === customer.gstin)
+            );
         };
 
         initialize();
@@ -182,10 +183,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
                 }
 
-                if (newAdvanceAmount > 0) {
+                 if (newAdvanceAmount > 0) {
                     if (currentExpenseId) {
                         const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", currentExpenseId));
-                        transaction.update(expenseRef, expenseData);
+                        transaction.set(expenseRef, expenseData, { merge: true });
                     } else {
                         const newExpenseRef = doc(collection(firestoreDB, ...getTenantCollectionPath("expenses")));
                         transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
@@ -255,17 +256,17 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 }
                 
                 // Firestore does not allow 'undefined' values.
-                if (dataToSave.advanceExpenseId === undefined) {
-                    delete dataToSave.advanceExpenseId;
-                }
+                const cleanData = Object.fromEntries(
+                    Object.entries(dataToSave).filter(([_, v]) => v !== undefined)
+                );
 
                 // Add updatedAt timestamp for sync detection
                 const dataWithTimestamp = {
-                    ...dataToSave,
+                    ...cleanData,
                     updatedAt: Timestamp.now(),
                 };
 
-                transaction.update(customerRef, dataWithTimestamp);
+                transaction.set(customerRef, dataWithTimestamp, { merge: true });
             });
 
             // Update local database for immediate sync
@@ -285,79 +286,41 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 }
             }
 
-            // ----- PRINTING LOGIC -----
+             // ----- PRINTING LOGIC (Using Native Electron IPC for Preview) -----
             const receiptNode = document.getElementById(id);
             if (!receiptNode) return;
 
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.left = '-9999px';
-            iframe.style.top = '0';
-            iframe.style.width = '210mm';
-            iframe.style.height = '297mm';
-            iframe.style.border = '0';
-            document.body.appendChild(iframe);
-            
-            const iframeDoc = iframe.contentWindow?.document;
-            if (!iframeDoc) {
-                toast({ title: "Print Error", description: "Could not create print window.", variant: "destructive" });
-                document.body.removeChild(iframe);
-                return;
+            // Send ONLY the raw invoice HTML - main process adds clean print CSS
+            // Do NOT send the app CSS (it has dark Tailwind theme that causes blank PDF)
+            const fullContent = receiptNode.outerHTML;
+                // Call the native Electron print handler
+            const electron = (window as any).electron;
+            if (electron?.printHtml) {
+                electron.printHtml(fullContent)
+                    .then((result: { success: boolean; error?: string }) => {
+                        if (!result.success && result.error) {
+                            const isCanceled = /cancel/i.test(result.error);
+                            if (isCanceled) {
+                                console.log('[Print] Operation canceled by user.');
+                            } else {
+                                console.error('Print failed:', result.error);
+                                toast({ title: "Print Error", description: result.error, variant: "destructive" });
+                            }
+                        }
+                    })
+                    .catch((err: any) => {
+                        console.error('IPC Print error:', err);
+                        toast({ title: "Print Error", description: "Operation failed.", variant: "destructive" });
+                    });
+            } else {
+                // Fallback for non-electron or legacy
+                window.print();
             }
-
-            iframeDoc.open();
-            iframeDoc.write('<html><head><title>Print Document</title>');
-            iframeDoc.write(`
-                <style>
-                    html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
-                    body * { background-color: transparent; }
-                    .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
-                    @media print { html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
-                </style>`);
-
-            Array.from(document.styleSheets).forEach(styleSheet => {
-                try {
-                    const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                    const style = iframeDoc.createElement('style');
-                    style.appendChild(iframeDoc.createTextNode(cssText));
-                    iframeDoc.head.appendChild(style);
-                } catch (e) {
-                    handleSilentError(e, 'saveAndPrint - iframe style injection');
-                }
-            });
-
-            const printOverride = iframeDoc.createElement('style');
-            printOverride.textContent = `@media print {
-              body, body *, .printable-area, .printable-area * {
-                visibility: visible !important;
-                opacity: 1 !important;
-                box-shadow: none !important;
-                text-shadow: none !important;
-                backdrop-filter: none !important;
-                -webkit-backdrop-filter: none !important;
-              }
-            }`;
-            iframeDoc.head.appendChild(printOverride);
-
-            iframeDoc.write('</head><body></body></html>');
-            iframeDoc.body.innerHTML = receiptNode.innerHTML;
-            iframeDoc.close();
-
-            let printed = false;
-            const doPrint = () => {
-                if (printed) return;
-                printed = true;
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-                document.body.removeChild(iframe);
-            };
-            iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-            setTimeout(doPrint, 800);
 
             toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
 
         } catch (error) {
-
+            console.error('Error saving document:', error);
             toast({ title: "Save Failed", description: "The changes could not be saved due to an error.", variant: "destructive" });
         }
     };
@@ -458,18 +421,23 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                      <DialogHeader className="mb-4 flex-shrink-0">
                          <div className="flex items-center justify-between">
                              <DialogTitle>Edit Invoice Details</DialogTitle>
-                             <DropdownMenu>
-                                 <DropdownMenuTrigger asChild>
-                                     <Button variant="outline" size="sm" className="ml-2">
-                                         {documentType === 'tax-invoice' ? 'Tax Invoice' : documentType === 'bill-of-supply' ? 'Bill of Supply' : 'Challan'} <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                                     </Button>
-                                 </DropdownMenuTrigger>
-                                 <DropdownMenuContent>
-                                     <DropdownMenuItem onClick={() => setDocumentType('tax-invoice')}>Tax Invoice</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setDocumentType('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setDocumentType('challan')}>Challan</DropdownMenuItem>
-                                 </DropdownMenuContent>
-                             </DropdownMenu>
+                             <div className="w-[160px] ml-2">
+                                 <CustomDropdown
+                                     options={[
+                                         { value: 'tax-invoice', label: 'Tax Invoice' },
+                                         { value: 'bill-of-supply', label: 'Bill of Supply' },
+                                         { value: 'challan', label: 'Challan' },
+                                     ]}
+                                     value={documentType}
+                                     onChange={(value) => value && setDocumentType(value as DocumentType)}
+                                     placeholder="Select Type"
+                                     showArrow={true}
+                                     showClearButton={false}
+                                     showSearch={false}
+                                     maxRows={3}
+                                     inputClassName="h-7 text-[10px] font-bold bg-white text-black border-purple-200"
+                                 />
+                             </div>
                          </div>
                          <DialogDescription>Make on-the-fly changes before printing.</DialogDescription>
                      </DialogHeader>

@@ -6,8 +6,11 @@ copyright: Copyright © 2024 JRMD Software
 # Only .next/standalone is unpacked so the Next server can run with real dir as cwd.
 asar: true
 asarUnpack:
-  - ".next/standalone/**/*"
-  - "node_modules/sql.js/**/*"
+  - ".next/standalone/**"
+  - "node_modules/next/**"
+  - "node_modules/react/**"
+  - "node_modules/react-dom/**"
+  - "node_modules/sql.js/**"
 
 directories:
   buildResources: build

@@ -242,6 +242,7 @@ export type Transaction = {
   loanId?: string; 
   bankAccountId?: string;
   isRecurring?: boolean;
+  isInternal?: boolean; // New field for account-only balancing entries
   isDeleted?: boolean;
   createdAt?: string; // ISO timestamp for sorting/ordering
   updatedAt?: string;
@@ -752,5 +753,20 @@ export type Holiday = {
     id: string;
     date: string;
     name: string;
+}
+
+// --- Electron IPC Bridge Types ---
+declare global {
+  interface Window {
+    electron: {
+      sqliteAll: (tableName: string) => Promise<any[]>;
+      sqliteGet: (tableName: string, id: string) => Promise<any>;
+      sqlitePut: (tableName: string, row: any) => Promise<{ success: boolean; error?: string }>;
+      sqliteBulkPut: (tableName: string, rows: any[]) => Promise<{ success: boolean; error?: string }>;
+      sqliteDelete: (tableName: string, id: string) => Promise<{ success: boolean; error?: string }>;
+      sqliteGetFolder: () => Promise<{ folder: string | null; error?: string }>;
+      sqliteSetFolder: (folderPath: string) => Promise<{ success: boolean; folder?: string; error?: string }>;
+    };
+  }
 }
     

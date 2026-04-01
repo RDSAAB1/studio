@@ -49,11 +49,9 @@ export function ProfileDropdown() {
   const handleSwitchAccount = async () => {
     try {
       await signOut(getFirebaseAuth());
-      const auth = getFirebaseAuth();
-      const provider = getGoogleProvider();
-      await signInWithRedirect(auth, provider);
+      electronNavigate("/intro", router);
     } catch {
-      electronNavigate("/login", router);
+      electronNavigate("/intro", router);
     }
   };
 

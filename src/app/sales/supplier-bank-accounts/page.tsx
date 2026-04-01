@@ -720,7 +720,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
               <CardContent className="p-0">
                 <ScrollArea className="h-[420px]">
                   <div className="overflow-x-auto">
-                    <Table className="table-fixed w-full">
+                    <Table className="table-fixed w-full min-w-[800px]">
               <TableHeader>
                 <TableRow>
                           <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Account Holder Name</TableHead>

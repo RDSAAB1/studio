@@ -73,11 +73,11 @@ export const getInitialFormState = (lastVariety?: string, lastPaymentType?: stri
   const dateStr = formatDateLocal(today);
   const srNo = initialSrNo ?? getNextCustomerSrNo([]);
 
-  // Set default values for RICE BRAN
-  const isRiceBran = (lastVariety || '').toUpperCase().trim() === 'RICE BRAN';
-  const defaultBaseReport = isRiceBran ? 15 : 0;
-  const defaultRiceBranGst = isRiceBran ? 5 : 0;
-  const defaultBagWeightKg = isRiceBran ? 0.2 : 0;
+  // Set default values for quality-based varieties (RICE BRAN, POLISH)
+  const isQualityBasedVariety = ['RICE BRAN', 'POLISH'].includes((lastVariety || '').toUpperCase().trim());
+  const defaultBaseReport = isQualityBasedVariety ? 15 : 0;
+  const defaultRiceBranGst = isQualityBasedVariety ? 5 : 0;
+  const defaultBagWeightKg = isQualityBasedVariety ? 0.2 : 0;
 
   return {
     id: "", srNo, date: dateStr, term: '0', dueDate: dateStr, 
@@ -358,9 +358,9 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
     
     setTimeout(() => {
         const currentVariety = form.getValues('variety') || lastVariety || '';
-        const isRiceBran = currentVariety.toUpperCase().trim() === 'RICE BRAN';
+        const isQualityBasedVariety = ['RICE BRAN', 'POLISH'].includes(currentVariety.toUpperCase().trim());
         
-        if (isRiceBran) {
+        if (isQualityBasedVariety) {
             form.setValue('baseReport', 15, { shouldValidate: false, shouldDirty: false });
             form.setValue('riceBranGst', 5, { shouldValidate: false, shouldDirty: false });
             form.setValue('bagWeightKg', 0.2, { shouldValidate: false, shouldDirty: false });

@@ -13,9 +13,14 @@ ipcRenderer.on('folder:file-changed', (_, data) => {
 // Extra guard: ensure renderer is always recognized as Electron, even if URL param sync fails.
 try { window.__ELECTRON__ = true; } catch {}
 
+// Override navigator.onLine to always return true.
+// Firebase Auth SDK explicitly checks this and immediately throws auth/network-request-failed
+// if it evaluates to false, which is a known bug in Electron environments with virtual network adapters.
+Object.defineProperty(navigator, 'onLine', { get: () => true });
+
 contextBridge.exposeInMainWorld('electron', {
   /** Base URL for Next.js server - use this for navigation to avoid app:// protocol bug */
-  appUrl: 'http://127.0.0.1:3000',
+  appUrl: 'http://localhost:3000',
   platform: process.platform,
   versions: {
     node: process.versions.node,
@@ -34,14 +39,24 @@ contextBridge.exposeInMainWorld('electron', {
   debugExcelPaths: (folderPath) => ipcRenderer.invoke('folder:debugExcelPaths', folderPath),
   // SQLite migration / basic access
   sqliteImportTable: (tableName, rows) => ipcRenderer.invoke('sqlite:importTable', tableName, rows),
+  sqliteBulkPut: (tableName, rows) => ipcRenderer.invoke('sqlite:bulkPut', tableName, rows),
   sqliteAll: (tableName) => ipcRenderer.invoke('sqlite:all', tableName),
+  sqliteGet: (tableName, id) => ipcRenderer.invoke('sqlite:get', tableName, id),
   sqlitePut: (tableName, row) => ipcRenderer.invoke('sqlite:put', tableName, row),
   sqliteDelete: (tableName, id) => ipcRenderer.invoke('sqlite:delete', tableName, id),
   sqliteGetFolder: () => ipcRenderer.invoke('sqlite:getFolder'),
   sqliteSetFolder: (folderPath) => ipcRenderer.invoke('sqlite:setFolder', folderPath),
   sqliteVacuum: () => ipcRenderer.invoke('sqlite:vacuum'),
   sqliteGetFileSize: () => ipcRenderer.invoke('sqlite:getFileSize'),
+  // Window controls (for frameless window)
+  minimize: () => ipcRenderer.send('window:minimize'),
+  maximize: () => ipcRenderer.send('window:maximize'),
+  close: () => ipcRenderer.send('window:close'),
+  isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+  // Native print
+  printHtml: (htmlContent, options) => ipcRenderer.invoke('print:html', htmlContent, options),
 });
+
 
 
 

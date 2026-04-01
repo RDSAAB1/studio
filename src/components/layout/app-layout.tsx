@@ -960,7 +960,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         </div>
 
       {!pathname.startsWith('/sales') && (
-        <div className="sticky top-12 z-40 bg-background/70 backdrop-blur-[18px]">
+        <div className="sticky top-0 z-40 bg-background/70 backdrop-blur-[18px]">
           <TabBar
             openTabs={openTabs}
             activeTabId={activeTabId}

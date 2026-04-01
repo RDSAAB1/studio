@@ -38,6 +38,7 @@ interface CustomerFormValues {
     bagRate?: number;
     isBrokerageIncluded?: boolean;
     advanceFreight?: number;
+    cdRate?: number;
 }
 
 
@@ -315,20 +316,20 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
 };
 
 export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory?: (SupplierPayment | CustomerPayment)[]) => {
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
+    const grossWeight = Number(values.grossWeight || 0);
+    const teirWeight = Number(values.teirWeight || 0);
     const weight = grossWeight - teirWeight;
     
     // ✅ Calculate KRTA (same logic as supplier)
-    const kartaPercentage = values.kartaPercentage || 0;
-    let rate = values.rate || 0;
+    const kartaPercentage = Number(values.kartaPercentage || 0);
+    let rate = Number(values.rate || 0);
     
     // ✅ RICE BRAN special rate calculation
     const variety = (values.variety || '').toUpperCase().trim();
-    const isRiceBran = variety === 'RICE BRAN';
+    const isQualityBasedVariety = ['RICE BRAN', 'POLISH'].includes(variety);
     let calculatedRate = rate;
     
-    if (isRiceBran) {
+    if (isQualityBasedVariety) {
         const baseReport = Number((values as any).baseReport || 0);
         const collectedReport = Number((values as any).collectedReport || 0);
         const riceBranGst = Number((values as any).riceBranGst || 0);
@@ -337,8 +338,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
             // Step 1: Calculate intermediate rate: (rate / baseReport) * collectedReport
             const intermediateRate = (rate / baseReport) * collectedReport;
             // Step 2: Apply GST percentage: intermediateRate * (1 + GST/100)
-            // Keep full precision with 2 decimal places (paise)
-            const fullRate = intermediateRate * (1 + riceBranGst / 100);
+            const fullRate = intermediateRate * (1 + (riceBranGst / 100));
             // Round to 2 decimal places properly
             calculatedRate = Number(fullRate.toFixed(2)); // Keep 2 decimal places (paise)
         }
@@ -346,7 +346,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     }
     
     // Use calculated rate for all calculations
-    const effectiveRate = isRiceBran ? calculatedRate : rate;
+    const effectiveRate = isQualityBasedVariety ? calculatedRate : rate;
     
     const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
     const rawKartaWeight = weight * kartaPercentage / 100;
@@ -384,11 +384,12 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         finalCdAmount = Math.round(values.cdAmount);
     } else {
         // User entered CD% - calculate amount from percentage
-        const cdRate = Number(values.cd) || 0;
+        // Prefer cdRate if available, fallback to cd (which might be the rate during import or form entry)
+        const cdRate = Number(values.cdRate ?? values.cd) || 0;
         finalCdAmount = Math.round((amount * cdRate) / 100);
     }
     
-    const bagRate = Number(values.bagRate) || 0;
+    const bagRate = Number(values.bagRate || 0);
     const bagAmount = Math.round(bags * bagRate);
 
     // ✅ Calculate Transport Amount: Transportation Rate × Final Weight (per QTL)
@@ -398,7 +399,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     // ✅ For RICE BRAN: Calculate Net Receivable using Net Weight × Calculated Rate
     // For others: Use existing formula
     let originalNetAmount;
-    if (isRiceBran && calculatedRate) {
+    if (isQualityBasedVariety && calculatedRate) {
         // Keep net weight to 2 decimal places, then multiply with calculated rate
         const roundedNetWeight = Math.round(netWeight * 100) / 100; // Round to 2 decimal places
         // Net Receivable = (Net Weight × Calculated Rate) + Bag Amount - CD - Transport - Brokerage
@@ -453,16 +454,19 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         kartaWeight: kartaWeight,
         kartaAmount: kartaAmount,
         netWeight: netWeight,
-        amount: amount,
+        // ✅ Show CD effect on Amount: Gross Amount - CD
+        amount: amount - finalCdAmount,
         brokerage: brokerageAmount,
         cd: finalCdAmount,
+        cdAmount: finalCdAmount,
+        cdRate: Number(values.cdRate ?? values.cd) || 0,
         bagAmount: bagAmount,
         bagWeightDeductionAmount: bagWeightDeductionAmount, // Bag Weight deduction amount
         transportationRate: transportationRate,
         transportAmount: transportAmount, // Transport Amount = Transportation Rate × Final Weight
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
-        calculatedRate: isRiceBran ? calculatedRate : undefined, // Store calculated rate for RICE BRAN
+        calculatedRate: isQualityBasedVariety ? calculatedRate : undefined, // Store calculated rate for quality-based varieties
     }
 };
 

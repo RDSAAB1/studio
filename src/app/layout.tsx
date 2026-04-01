@@ -12,6 +12,7 @@ import { GlobalDataProvider } from '@/contexts/global-data-context';
 import { ErpSelectionProvider } from '@/contexts/erp-selection-context';
 import { ScrollContainerProvider } from '@/contexts/scroll-container-context';
 import AppLayoutWrapper from '@/components/layout/app-layout';
+import { WindowControls } from '@/components/layout/window-controls';
 import { AuthTransitionScreen } from '@/components/auth/auth-transition-screen';
 import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -410,7 +411,15 @@ type LayoutProps = {
 export default function RootLayout({ children, params }: LayoutProps) {
   if (params) React.use(params);
   const { toast } = useToast();
-    useSyncQueue();
+  const [isElectron, setIsElectron] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electron) {
+        setIsElectron(true);
+    }
+  }, []);
+
+  useSyncQueue();
 
     // Electron: if we're on app://, force redirect to http (works even when preload didn't run)
     useEffect(() => {
@@ -418,7 +427,7 @@ export default function RootLayout({ children, params }: LayoutProps) {
       if (window.location.protocol === 'app:') {
         const path = window.location.pathname || '/';
         const search = window.location.search || '';
-        const base = (window as any).electron?.appUrl ?? 'http://127.0.0.1:3000';
+        const base = (window as any).electron?.appUrl ?? 'http://localhost:3000';
         window.location.replace(base.replace(/\/$/, '') + path + search);
       }
     }, []);
@@ -427,8 +436,18 @@ export default function RootLayout({ children, params }: LayoutProps) {
     useEffect(() => {
         const handleUnhandled = (e: ErrorEvent | PromiseRejectionEvent) => {
             const msg = (e instanceof PromiseRejectionEvent ? (e.reason?.message ?? String(e.reason)) : e.message) || '';
-            if (msg.includes("reading 'call'") || msg.includes('reading "call"')) {
+            const errorName = (e instanceof PromiseRejectionEvent ? (e.reason?.name ?? '') : (e.error?.name ?? ''));
+            
+            const isChunkError = 
+                msg.includes("reading 'call'") || 
+                msg.includes('reading "call"') ||
+                msg.includes("ChunkLoadError") ||
+                msg.includes("Loading chunk") ||
+                errorName === "ChunkLoadError";
+
+            if (isChunkError) {
                 if (typeof window !== 'undefined') {
+                    console.warn('[RootLayout] ChunkLoadError detected, reloading...', msg);
                     window.location.reload();
                 }
             }
@@ -518,6 +537,19 @@ export default function RootLayout({ children, params }: LayoutProps) {
             <head>
                 <title>JRMD Studio</title>
                 <ElectronBaseTag />
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `
+                            window.addEventListener('error', function(e) {
+                                var msg = (e && e.message) || "";
+                                if (msg.indexOf("ChunkLoadError") !== -1 || msg.indexOf("Loading chunk") !== -1 || (e.error && e.error.name === "ChunkLoadError")) {
+                                    console.warn("Inline ChunkLoadError recovery: reloading...", msg);
+                                    window.location.reload();
+                                }
+                            }, true);
+                        `
+                    }}
+                />
                 <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#000000" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -525,7 +557,8 @@ export default function RootLayout({ children, params }: LayoutProps) {
                 <meta name="apple-mobile-web-app-title" content="JRMD Studio" />
                 <meta name="mobile-web-app-capable" content="yes" />
             </head>
-            <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} ${plusJakartaSans.variable} font-body antialiased`}>
+            <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} ${plusJakartaSans.variable} font-body antialiased ${isElectron ? 'electron-content' : ''}`}>
+                <WindowControls />
                 <Suspense fallback={null}>
                     <ElectronParamSync />
                 </Suspense>

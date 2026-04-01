@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from "@/lib/database";
 import { getOptionsRealtime } from "@/lib/firestore";
 
@@ -516,3 +516,4 @@ export default function InventoryAddPage() {
     </div>
   );
 }
+

@@ -10,6 +10,8 @@ import { Printer } from 'lucide-react';
 import { ReceiptPreview, ConsolidatedReceiptPreview } from './receipt-previews';
 import type { Customer, ReceiptSettings, ConsolidatedReceiptData } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
+import { printHtmlContent } from '@/lib/electron-print';
+
 
 interface ReceiptPrintDialogProps {
     receipts: Customer[];
@@ -25,75 +27,8 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
     const handlePrint = () => {
         const node = contentRef.current;
         if (!node) return;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Receipt</title>');
-        iframeDoc.write(`
-            <style>
-                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
-                body * { background-color: transparent; }
-                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
-                @media print {
-                    @page { size: A6 landscape; margin: 5mm; }
-                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .receipt-container { page-break-after: always; }
-                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
-                }
-            </style>`);
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                iframeDoc.head.appendChild(style);
-            } catch (e) { /* CORS - skip cross-origin styles */ }
-        });
-
-        const overrideStyle = iframeDoc.createElement('style');
-        overrideStyle.id = 'print-override';
-        overrideStyle.textContent = `@media print {
-          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
-            visibility: visible !important;
-            opacity: 1 !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            filter: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-          }
-        }`;
-        iframeDoc.head.appendChild(overrideStyle);
-        
-        iframeDoc.write(`</head><body></body></html>`);
-        iframeDoc.body.innerHTML = node.innerHTML;
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+        const pageStyles = `@page { size: A6 landscape; margin: 5mm; } .receipt-container { page-break-after: always; }`;
+        printHtmlContent(node.innerHTML, pageStyles);
     };
 
     return (
@@ -133,77 +68,10 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
     const contentRef = useRef<HTMLDivElement>(null);
 
     const handlePrint = () => {
-         const node = contentRef.current;
+        const node = contentRef.current;
         if (!node) return;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Consolidated Receipt</title>');
-        iframeDoc.write(`
-            <style>
-                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
-                body * { background-color: transparent; }
-                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
-                @media print {
-                    @page { size: A4; margin: 10mm; }
-                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .receipt-container { page-break-after: always; }
-                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
-                }
-            </style>`);
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                iframeDoc.head.appendChild(style);
-            } catch (e) { /* CORS - skip cross-origin styles */ }
-        });
-
-        const overrideStyle2 = iframeDoc.createElement('style');
-        overrideStyle2.id = 'print-override';
-        overrideStyle2.textContent = `@media print {
-          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
-            visibility: visible !important;
-            opacity: 1 !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            filter: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-          }
-        }`;
-        iframeDoc.head.appendChild(overrideStyle2);
-        
-        iframeDoc.write(`</head><body></body></html>`);
-        iframeDoc.body.innerHTML = node.innerHTML;
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+        const pageStyles = `@page { size: A4; margin: 10mm; } .receipt-container { page-break-after: always; }`;
+        printHtmlContent(node.innerHTML, pageStyles);
     }
     
     return (
@@ -247,75 +115,8 @@ export const CombinedReceiptPrintDialog = ({ receipts, consolidatedData, allCons
     const handlePrint = () => {
         const node = contentRef.current;
         if (!node) return;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print All Receipts</title>');
-        iframeDoc.write(`
-            <style>
-                html, body { background: white !important; color: black !important; margin: 0; padding: 0; }
-                body * { background-color: transparent; }
-                .printable-area, .printable-area * { color: #000 !important; background-color: #fff !important; }
-                @media print {
-                    @page { size: A6 landscape; margin: 5mm; }
-                    html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .receipt-container, .consolidated-receipt { page-break-after: always; }
-                    .printable-area * { color: #000 !important; background-color: #fff !important; border-color: #333 !important; }
-                }
-            </style>`);
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                iframeDoc.head.appendChild(style);
-            } catch (e) { /* CORS - skip cross-origin styles */ }
-        });
-
-        const overrideStyle3 = iframeDoc.createElement('style');
-        overrideStyle3.id = 'print-override';
-        overrideStyle3.textContent = `@media print {
-          body, body *, .printable-area, .printable-area *, .receipt-container, .receipt-container *, .consolidated-receipt, .consolidated-receipt * {
-            visibility: visible !important;
-            opacity: 1 !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            filter: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-          }
-        }`;
-        iframeDoc.head.appendChild(overrideStyle3);
-        
-        iframeDoc.write(`</head><body></body></html>`);
-        iframeDoc.body.innerHTML = node.innerHTML;
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+        const pageStyles = `@page { size: A6 landscape; margin: 5mm; } .receipt-container, .consolidated-receipt { page-break-after: always; }`;
+        printHtmlContent(node.innerHTML, pageStyles);
     };
 
     const hasData = receipts.length > 0 || allConsolidatedGroups.length > 0;

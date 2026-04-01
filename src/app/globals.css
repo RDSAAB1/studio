@@ -3,6 +3,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Electron title bar padding */
+.electron-content {
+  padding-top: 32px !important; /* Fixed height of WindowControls */
+}
+
+/* Ensure sticky elements start below the Electron title bar */
+.electron-content .sticky {
+  top: 32px !important;
+}
+
+.electron-content .sticky.top-0 {
+  top: 32px !important;
+}
+
+.electron-content .sticky\.top-\[48px\] {
+  top: 80px !important; /* 32px + 48px header */
+}
+
 :root {
   --background: 0 0% 80%;
   --foreground: 210 12% 19%;
@@ -177,36 +195,34 @@ body {
     box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.15) !important;
   }
   
-  /* Enhanced table styling with teal theme - no borders for 3D look */
+
+  
+  /* Refined table resets - removed aggressive border removal */
   table {
     border-collapse: separate;
     border-spacing: 0;
-    border: none !important;
-    outline: none !important;
   }
-  
-  th {
-    background-color: transparent !important;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none !important;
-    outline: none !important;
-    font-weight: 600;
-    color: hsl(var(--foreground));
+
+  /* Specific overrides for unified table headers - MUST match or beat global th !important */
+  .table-header-compact th {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    height: 28px !important;
+    border-bottom: 2px solid hsl(var(--primary) / 0.3) !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
   }
-  
-  td {
-    border: none !important;
-    outline: none !important;
-    transition: none;
-    background-color: transparent !important;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-  
-  table, thead, tbody, tr, th, td {
-    border: none !important;
-    outline: none !important;
+
+  /* Dark version if needed */
+  .dark .table-header-compact th {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border-bottom: 2px solid hsl(var(--primary) / 0.5) !important;
   }
 
   table [class*="border-"],

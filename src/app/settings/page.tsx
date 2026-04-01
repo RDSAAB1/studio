@@ -235,7 +235,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                     }
                 }
                 
-                const emailSettings = await getCompanyEmailSettings(erp);
+                const emailSettings = await getCompanyEmailSettings(erp || undefined);
                 if(emailSettings) {
                     emailForm.reset({ 
                         email: emailSettings.email || currentUser.email || '', 
@@ -350,7 +350,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         if (!user) return;
         setSaving(true);
         try {
-            await saveCompanyEmailSettings({ email: data.email, appPassword: data.appPassword.replace(/\s/g, '') }, erp);
+            await saveCompanyEmailSettings({ email: data.email, appPassword: data.appPassword.replace(/\s/g, '') }, erp || undefined);
             toast({ title: "Email settings connected successfully", variant: "success" });
         } catch(e) { toast({ title: "Failed to connect email", variant: "destructive" }); }
         finally { setSaving(false); }
@@ -360,7 +360,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
         if (!user) return;
         setSaving(true);
         try {
-            await deleteCompanyEmailSettings(erp);
+            await deleteCompanyEmailSettings(erp || undefined);
             emailForm.reset({ email: user.email || '', appPassword: '' });
             toast({ title: "Email disconnected successfully", variant: "success" });
         } catch (e) { toast({ title: "Failed to disconnect email", variant: "destructive" }); }

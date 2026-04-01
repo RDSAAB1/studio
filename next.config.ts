@@ -9,10 +9,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.cache = false;
-    }
+  webpack: (config) => {
+    // Webpack caching is enabled by default in Next.js 15 for faster rebuilds
     return config;
   },
   images: {

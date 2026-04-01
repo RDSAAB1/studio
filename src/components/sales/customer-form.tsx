@@ -188,8 +188,8 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
         riceBranGst
     ] = watchedValues;
     
-    // Check if RICE BRAN is selected
-    const isRiceBran = (variety || '').toUpperCase().trim() === 'RICE BRAN';
+    // Check if RICE BRAN or POLISH is selected (quality-based varieties)
+    const isQualityBasedVariety = ['RICE BRAN', 'POLISH'].includes((variety || '').toUpperCase().trim());
 
     // Calculate values for display
     const calculated = useMemo(() => {
@@ -228,9 +228,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
         }
     }, [cd, cdInputMode, calculated.amount, form]);
 
-    // Set default values when RICE BRAN is selected
+    // Set default values when quality-based variety is selected
     useEffect(() => {
-        if (isRiceBran) {
+        if (isQualityBasedVariety) {
             // Use setTimeout to ensure form values are updated after reset
             const timer = setTimeout(() => {
                 const currentBaseReport = form.getValues('baseReport');
@@ -251,7 +251,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
             
             return () => clearTimeout(timer);
         }
-    }, [isRiceBran, form]);
+    }, [isQualityBasedVariety, form]);
 
     // Calculate tax amounts
     const taxCalculations = useMemo(() => {
@@ -351,7 +351,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                             </div>
                         </div>
                         {/* RICE BRAN specific fields */}
-                        {isRiceBran && (
+                        {isQualityBasedVariety && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-2 border-t border-border/50">
                                 <div className="space-y-0.5">
                                     <Label htmlFor="baseReport" className="text-xs">Base Report</Label>

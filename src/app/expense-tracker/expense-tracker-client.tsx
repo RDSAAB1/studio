@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +40,7 @@ import { firestoreDB } from "@/lib/firebase";
 import { ErrorBoundary } from "@/components/error-boundary"; 
 
 
-import { Loader2, Pen, Save, Trash, FileText, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X, User, Calculator } from "lucide-react";
+import { Loader2, Pen, Save, Trash, FileText, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X, User, Calculator, ChevronLeft, ChevronRight, MoreVertical, History as HistoryIcon, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { format, addMonths, parse, isValid } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
@@ -67,6 +68,7 @@ const transactionFormSchema = z.object({
   expenseNature: z.string().optional(),
   projectId: z.string().optional(),
   loanId: z.string().optional(),
+  isInternal: z.boolean().optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
@@ -98,6 +100,7 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
     cdAmount: 0,
     expenseType: 'Business',
     projectId: 'none',
+    isInternal: false,
   };
 };
 
@@ -696,6 +699,8 @@ export default function IncomeExpenseClient() {
         });
         
         allTransactions.forEach(t => {
+            if (t.isInternal) return; // ✅ Skip internal/adjustment entries for bank balance
+            
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
                 if (t.transactionType === 'Income') {
@@ -746,8 +751,8 @@ export default function IncomeExpenseClient() {
         toast({ title: "Amount Required", description: "Amount must be greater than zero.", variant: "destructive" });
         return;
     }
-
-    if (activeType === 'Expense') {
+    // Skip balance check for internal entries
+    if (activeType === 'Expense' && !values.isInternal) {
         const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
         const availableBalance = financialState.balances.get(balanceKey) || 0;
         
@@ -805,11 +810,12 @@ export default function IncomeExpenseClient() {
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
-        paymentMethod: values.paymentMethod as Transaction['paymentMethod'],
         status: values.status as Transaction['status'],
         expenseType: values.expenseType as Transaction['expenseType'],
         expenseNature: values.expenseNature as Transaction['expenseNature'],
-        bankAccountId: values.paymentMethod === 'Cash' ? undefined : values.bankAccountId,
+        isInternal: values.isInternal,
+        bankAccountId: (values.isInternal || values.paymentMethod === 'Cash') ? undefined : values.bankAccountId,
+        paymentMethod: values.isInternal ? 'Other' : (values.paymentMethod as Transaction['paymentMethod']),
       };
 
       if (editingTransaction) {
@@ -1066,130 +1072,222 @@ export default function IncomeExpenseClient() {
 </body>
 </html>`;
 
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      toast({ title: 'Popup blocked', description: 'Allow popups to print the statement.' });
-      return;
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+      
+      // Wait for content to render, then print and cleanup
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
     }
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
   }, [toast]);
   
   const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
-    const incomeTotal = filteredTransactions
+    // 💡 Accounting Logic: 
+    // If NO account is selected (Overall View), exclude internal entries to show real cash flow.
+    // If an account IS selected, include everything for ledger balancing.
+    const totalsTransactions = selectedAccount 
+        ? filteredTransactions 
+        : filteredTransactions.filter(t => !t.isInternal);
+
+    const incomeTotal = totalsTransactions
       .filter((t) => t.transactionType === 'Income')
       .reduce((sum, t) => sum + t.amount, 0);
-    const expenseTotal = filteredTransactions
+    const expenseTotal = totalsTransactions
       .filter((t) => t.transactionType === 'Expense')
       .reduce((sum, t) => sum + t.amount, 0);
     
     // Calculate final running balance
-    // Mathematically, final balance = Total Income - Total Expense
-    // This should match the running balance of the newest transaction in the ledger
     const finalRunningBalance = incomeTotal - expenseTotal;
     
     return {
       totalIncome: incomeTotal,
       totalExpense: expenseTotal,
       netProfitLoss: finalRunningBalance,
-      totalTransactions: filteredTransactions.length,
+      totalTransactions: totalsTransactions.length,
     };
-  }, [filteredTransactions, runningLedger]);
+  }, [filteredTransactions, selectedAccount]);
     
-  // NO PAGE LOADING - Always render immediately
+  // ⌨️ KEYBOARD NAVIGATION (ARROW KEYS)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in an input or textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
+
+      if (e.key === 'ArrowLeft') {
+        const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+        if (currentIndex > 0) {
+          setSelectedAccount(accountOptions[currentIndex - 1].value);
+        } else if (accountOptions.length > 0) {
+          setSelectedAccount(accountOptions[accountOptions.length - 1].value);
+        }
+      } else if (e.key === 'ArrowRight') {
+        const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+        if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) {
+          setSelectedAccount(accountOptions[currentIndex + 1].value);
+        } else if (accountOptions.length > 0) {
+          setSelectedAccount(accountOptions[0].value);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedAccount, accountOptions]);
 
   return (
     <ErrorBoundary>
-      <div className="space-y-3">
-      <Card>
-        <CardContent className="p-3 sm:p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 flex-1">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap min-w-[100px]">
-                Account / Payee
-              </p>
-              <CustomDropdown
-                options={accountOptions}
-                value={selectedAccount}
-                onChange={(value) => {
-                    const normalized = value ? toTitleCase(value) : null;
-                    setSelectedAccount(normalized);
-                }}
-                onAdd={(newValue) => {
-                    const normalized = toTitleCase(newValue);
-                    setSelectedAccount(normalized);
-                    setValue('payee', normalized, { shouldValidate: true });
-                }}
-                placeholder="Search or select an account..."
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleAddAccount} size="sm" variant="outline" className="whitespace-nowrap" title="Add New Account">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Account
-              </Button>
-              {selectedAccount && (
-                <>
-                  <Button onClick={handleEditAccount} size="sm" variant="outline" className="whitespace-nowrap" title="Edit Account Name">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button onClick={() => setIsDeleteAccountOpen(true)} size="sm" variant="outline" className="whitespace-nowrap text-destructive hover:text-destructive" title="Delete Account">
-                    <X className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </>
-              )}
-              <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="whitespace-nowrap" title="Manage Categories & Subcategories">
-                <Settings className="mr-2 h-4 w-4" />
-                Categories
-              </Button>
-            </div>
-            {selectedAccount && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="whitespace-nowrap"
-                onClick={() => handlePrintStatement(selectedAccount, runningLedger)}
-              >
-                <Printer className="mr-2 h-4 w-4" /> Print Statement
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+      {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD */}
+      <div className="w-full relative rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
+        <div className="absolute left-0 top-0 w-1.5 h-full bg-purple-600" />
+        
+        <div className="p-2.5 space-y-2.5">
+          {/* Row 1: Balanced Identity & Metadata Layout (Dark Purple Theme) */}
+          <div className="flex flex-row items-start justify-between gap-4">
+            <div className="flex items-start gap-3.5 flex-1 min-w-0">
+              {/* Profile Avatar (Dark Purple Theme) */}
+              <div className="shrink-0 mt-0.5">
+                <div className="h-11 w-11 bg-purple-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-purple-800 transition-all">
+                   {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5" />}
+                </div>
+              </div>
+              
+              {/* Search & Metadata Stack (Equal Width) */}
+              <div className="flex flex-col min-w-0">
+                <div className="w-[350px] shrink-0 h-8">
+                  <CustomDropdown
+                    options={accountOptions}
+                    value={selectedAccount}
+                    onChange={(value) => {
+                        const normalized = value ? toTitleCase(value) : null;
+                        setSelectedAccount(normalized);
+                    }}
+                    onAdd={(newValue) => {
+                        const normalized = toTitleCase(newValue);
+                        setSelectedAccount(normalized);
+                        setValue('payee', normalized, { shouldValidate: true });
+                    }}
+                    placeholder="Search Account..."
+                    inputClassName="rounded-[4px] border-purple-800 focus:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
+                  />
+                </div>
 
-      <div className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-4">
-          <div className="px-2.5 py-1.5 border-b sm:border-b-0 border-slate-200/80">
-            <div className="text-[10px] font-semibold text-slate-500">Total Income</div>
-            <div className="text-[13px] font-bold text-slate-900 tabular-nums leading-5">{formatCurrency(totalIncome)}</div>
-          </div>
-          <div className="px-2.5 py-1.5 border-b sm:border-b-0 border-slate-200/80 sm:border-l border-slate-200/80">
-            <div className="text-[10px] font-semibold text-slate-500">Total Expense</div>
-            <div className="text-[13px] font-bold text-slate-900 tabular-nums leading-5">{formatCurrency(totalExpense)}</div>
-          </div>
-          <div className="px-2.5 py-1.5 sm:border-l border-slate-200/80">
-            <div className="text-[10px] font-semibold text-slate-500">Net Balance</div>
-            <div className={cn(
-              "text-[13px] font-bold tabular-nums leading-5",
-              netProfitLoss >= 0 ? "text-primary" : "text-rose-700"
-            )}>
-              {formatCurrency(netProfitLoss)}
+                {selectedAccount && (() => {
+                  const account = accounts.get(selectedAccount);
+                  const nature = account?.nature || (filteredTransactions.find(tx => toTitleCase(tx.payee) === selectedAccount) as any)?.expenseNature;
+                  const category = account?.category;
+                  const subCategory = (account as any)?.subCategory;
+                  
+                  return (
+                    <div className="w-[350px] mt-1 px-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-bold uppercase tracking-tight overflow-hidden leading-tight">
+                      <div className="flex items-center gap-3">
+                         {nature && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
+                         {category && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
+                         {subCategory && <span className="flex items-center gap-0.5"><span className="text-purple-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
+                      </div>
+
+                      <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
+                        {account?.contact && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">TEL:</span> <span className="text-slate-700 font-extrabold">{account.contact}</span></span>}
+                        {account?.address && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">LOC:</span> <span className="text-slate-700 font-extrabold truncate max-w-[120px]">{account.address}</span></span>}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Actions Toolbar (Dark Purple Theme) */}
+            <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
+                <div className="flex items-center bg-purple-950 p-0.5 rounded-[4px] border border-purple-800 shadow-sm h-8">
+                  <Button onClick={() => {
+                    const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+                    if (currentIndex > 0) setSelectedAccount(accountOptions[currentIndex - 1].value);
+                    else if (accountOptions.length > 0) setSelectedAccount(accountOptions[accountOptions.length - 1].value);
+                  }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
+                  <span className="px-2 text-[9px] font-black text-white tabular-nums min-w-[32px] text-center">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
+                  <Button onClick={() => {
+                    const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+                    if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) setSelectedAccount(accountOptions[currentIndex + 1].value);
+                    else if (accountOptions.length > 0) setSelectedAccount(accountOptions[0].value);
+                  }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-8 rounded-[4px] border-purple-800 bg-purple-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-purple-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
+                       MENU <MoreVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
+                    <DropdownMenuItem onClick={handleAddAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">NEW ACCOUNT</DropdownMenuItem>
+                    {selectedAccount && (
+                      <>
+                        <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePrintStatement(selectedAccount, runningLedger)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">PRINT LEDGER</DropdownMenuItem>
+                        <DropdownMenuSeparator className="my-1 bg-slate-50" />
+                        <DropdownMenuItem onClick={() => setIsDeleteAccountOpen(true)} className="text-[10px] font-bold text-rose-600 focus:bg-rose-600 focus:text-white h-8 border-0 outline-none px-3 cursor-pointer rounded-[4px]">DELETE ACCOUNT</DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
             </div>
           </div>
-          <div className="px-2.5 py-1.5 sm:border-l border-slate-200/80">
-            <div className="text-[10px] font-semibold text-slate-500">Transactions</div>
-            <div className="text-[13px] font-bold text-slate-900 tabular-nums leading-5">{totalTransactions}</div>
+
+          {/* Row 2: Compact Metrics (Dark Purple Theme) */}
+          <div className="grid grid-cols-4 gap-1.5">
+            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+               <div className="space-y-0.5 min-w-0">
+                  <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">TOTAL CREDIT</p>
+                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalIncome)}</p>
+               </div>
+               <ArrowUpCircle className="h-3.5 w-3.5 text-emerald-500/40" />
+            </div>
+
+            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+               <div className="space-y-0.5 min-w-0">
+                  <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">TOTAL DEBIT</p>
+                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalExpense)}</p>
+               </div>
+               <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500/40" />
+            </div>
+
+            <div className="bg-purple-600 border border-purple-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
+               <div className="space-y-0.5 min-w-0">
+                  <p className="text-[9px] font-bold text-purple-100 uppercase tracking-widest leading-none">NET BALANCE</p>
+                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
+               </div>
+               <Landmark className="h-3.5 w-3.5 text-white/40" />
+            </div>
+
+            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+               <div className="space-y-0.5 min-w-0">
+                  <p className="text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
+                  <p className="text-xs font-black text-white tabular-nums truncate">{totalTransactions}</p>
+               </div>
+               <HistoryIcon className="h-3.5 w-3.5 text-purple-400/40" />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="grid gap-2 md:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)] h-auto items-start">
         <div className="min-w-0 flex flex-col gap-2">
-          <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] flex flex-col min-h-0">
+          <Card className="rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] hover:translate-y-[-2px] border-b-[3px] border-b-primary/20 flex flex-col min-h-0">
             <CardContent className="space-y-1 p-2.5 flex-1 overflow-auto">
               <TransactionForm
                 form={form}
@@ -1207,59 +1305,7 @@ export default function IncomeExpenseClient() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] flex flex-col min-h-0">
-            <CardContent className="flex-1 flex flex-col gap-1.5 p-2.5 overflow-auto">
-              {selectedAccount && (() => {
-                const accountName = selectedAccount;
-                const account = accounts.get(accountName);
-                const accountTransactions = filteredTransactions.filter(
-                  tx => toTitleCase(tx.payee) === accountName
-                );
-                const nature = account?.nature || accountTransactions.find(tx => (tx as any).expenseNature)?.expenseNature || null;
-                const category = account?.category || accountTransactions.find(tx => tx.category)?.category || null;
-                const subCategory = account?.subCategory || accountTransactions.find(tx => tx.subCategory)?.subCategory || null;
-                
-                return (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 pb-1 border-b border-slate-200/80">
-                      <User className="h-3.5 w-3.5 text-slate-600" />
-                      <h3 className="font-semibold text-sm text-slate-900">Account Details</h3>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                        <span className="text-slate-600 font-medium">Name</span>
-                        <span className="text-slate-900 font-bold truncate" title={accountName}>{accountName}</span>
-                      </div>
-                      {account?.contact && (
-                        <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                          <span className="text-slate-600 font-medium">Contact</span>
-                          <span className="text-slate-900 font-bold truncate" title={account.contact}>{account.contact}</span>
-                        </div>
-                      )}
-                      {account?.address && (
-                        <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                          <span className="text-slate-600 font-medium">Address</span>
-                          <span className="text-slate-900 font-bold truncate" title={account.address}>{account.address}</span>
-                        </div>
-                      )}
-                      <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                        <span className="text-slate-600 font-medium">Nature</span>
-                        <span className="text-slate-900 font-bold truncate">{nature ? toTitleCase(nature) : '—'}</span>
-                      </div>
-                      <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                        <span className="text-slate-600 font-medium">Category</span>
-                        <span className="text-slate-900 font-bold truncate">{category ? toTitleCase(category) : '—'}</span>
-                      </div>
-                      <div className="h-7 flex items-center justify-between px-2.5 text-xs bg-white/70 border border-slate-200/80 rounded-lg shrink-0 backdrop-blur-[14px]">
-                        <span className="text-slate-600 font-medium">Sub Category</span>
-                        <span className="text-slate-900 font-bold truncate">{subCategory ? toTitleCase(subCategory) : '—'}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
+
         </div>
 
         <div className="min-w-0 h-[430px]">
@@ -1268,6 +1314,7 @@ export default function IncomeExpenseClient() {
             onEdit={handleEdit}
             onDelete={handleDeleteTransaction}
             totalExpenseCount={totalExpenseCount}
+            selectedAccount={selectedAccount}
           />
         </div>
       </div>
@@ -1407,74 +1454,7 @@ export default function IncomeExpenseClient() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-          <CardHeader className="flex flex-col gap-0 p-0">
-            {(() => {
-              const accountName = selectedAccount;
-              
-              // Only show if we have account selected
-              if (!accountName) return null;
-              
-              // Get account details from accounts map
-              const account = accounts.get(accountName);
-              
-              // Get details from transactions
-              const accountTransactions = filteredTransactions.filter(
-                tx => toTitleCase(tx.payee) === accountName
-              );
-              
-              // Get nature from account or transactions
-              const nature = account?.nature || accountTransactions.find(tx => (tx as any).expenseNature)?.expenseNature || null;
-              
-              // Get category from account or transactions
-              const category = account?.category || accountTransactions.find(tx => tx.category)?.category || null;
-              
-              // Get subCategory from account or transactions
-              const subCategory = account?.subCategory || accountTransactions.find(tx => tx.subCategory)?.subCategory || null;
-              
-              return (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 pt-4 pb-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Name</p>
-                    <p className="text-xs text-foreground">{accountName || '—'}</p>
-                  </div>
-                  {account?.contact && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Contact</p>
-                      <p className="text-xs text-foreground">{account.contact}</p>
-                    </div>
-                  )}
-                  {account?.address && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Address</p>
-                      <p className="text-xs text-foreground">{account.address}</p>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Nature</p>
-                    <p className="text-xs text-foreground">{nature ? toTitleCase(nature) : '—'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Category</p>
-                    <p className="text-xs text-foreground">{category ? toTitleCase(category) : '—'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold whitespace-nowrap">Sub Category</p>
-                    <p className="text-xs text-foreground">{subCategory ? toTitleCase(subCategory) : '—'}</p>
-                  </div>
-                </div>
-              );
-            })()}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 pt-2 pb-0">
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                {/* Bulk actions removed */}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
 
-          </CardContent>
-        </Card>
 
       {/* Add Account Dialog */}
       <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>

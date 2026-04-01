@@ -161,27 +161,27 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                 <ScrollArea ref={scrollRef} className="h-96">
                     <Table className="w-full table-fixed">
                         <colgroup>
-                            <col className="w-[9%]" />
-                            <col className="w-[8%]" />
-                            <col className="w-[21%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[16%]" />
-                            <col className="w-[8%]" />
-                            <col className="w-[5%]" />
-                            <col className="w-[5%]" />
+                            <col className="w-[12%]" /> {/* ID */}
+                            <col className="w-[10%]" /> {/* Method */}
+                            <col className="w-[18%]" /> {/* Payee & Receipt */}
+                            <col className="w-[12%]" /> {/* Bank / Gov. Base */}
+                            <col className="w-[12%]" /> {/* Branch & Details */}
+                            <col className="w-[14%]" /> {/* Wt & Rate / Gov. */}
+                            <col className="w-[7%]" /> {/* Amount */}
+                            <col className="w-[5%]" /> {/* CD */}
+                            <col className="w-[10%]" /> {/* Actions */}
                         </colgroup>
-                        <TableHeader>
-                            <TableRow className="bg-primary/20 border-b border-primary/30">
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">ID</TableHead>
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Method</TableHead>
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Payee & Receipt</TableHead>
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Bank / Gov. Base</TableHead>
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Branch & Details</TableHead>
-                                <TableHead className="p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Weight & Rate / Gov. Details</TableHead>
-                                <TableHead className="text-right p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Amount</TableHead>
-                                <TableHead className="text-right p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">CD</TableHead>
-                                <TableHead className="text-center p-1 text-xs font-bold text-foreground sticky top-0 z-10 bg-primary/20">Actions</TableHead>
+                        <TableHeader className="table-header-compact">
+                            <TableRow className="border-b-0">
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">ID</TableHead>
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Method</TableHead>
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Payee & Receipt</TableHead>
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Bank / Gov. Base</TableHead>
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Branch & Details</TableHead>
+                                <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Wt & Rate / Gov.</TableHead>
+                                <TableHead className="text-right py-1 px-1.5 text-[10px] font-extrabold">Amount</TableHead>
+                                <TableHead className="text-right py-1 px-1.5 text-[10px] font-extrabold">CD</TableHead>
+                                <TableHead className="text-center py-1 px-1.5 text-[10px] font-extrabold">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

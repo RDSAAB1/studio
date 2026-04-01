@@ -84,15 +84,25 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                     )}
                 </div>
                 <ScrollArea className="max-h-[60vh]">
-                    <Table>
-                    <TableHeader>
-                    <TableRow className="bg-primary/20 border-b border-primary/30">
-                        <TableHead><Checkbox onCheckedChange={onSelectAll} checked={entries.length > 0 && selectedIds.size === entries.length} /></TableHead>
-                        <TableHead>SR No</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Outstanding</TableHead>
+                    <Table className="table-fixed w-full">
+                    <colgroup>
+                        <col className="w-10" />
+                        <col className="w-[15%]" />
+                        <col className="w-[25%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[20%]" />
+                    </colgroup>
+                    <TableHeader className="table-header-compact">
+                        <TableRow className="border-b-0">
+                        <TableHead className="py-1 px-2">
+                            <Checkbox onCheckedChange={onSelectAll} checked={entries.length > 0 && selectedIds.size === entries.length} />
+                        </TableHead>
+                        <TableHead className="py-1 px-2 text-[11px] font-extrabold">SR No</TableHead>
+                        <TableHead className="py-1 px-2 text-[11px] font-extrabold">Name</TableHead>
+                        <TableHead className="py-1 px-2 text-[11px] font-extrabold">Date</TableHead>
+                        <TableHead className="py-1 px-2 text-[11px] font-extrabold">Due Date</TableHead>
+                        <TableHead className="py-1 px-2 text-[11px] font-extrabold text-right">Outstanding</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>

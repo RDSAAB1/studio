@@ -4,7 +4,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, AlertCircle, Download, Upload, FolderOpen, FolderInput } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Download, Upload, FolderOpen, FolderInput } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +42,7 @@ import { exportToFolder, importFromFolder } from '@/lib/folder-structure-export'
 import { cn } from '@/lib/utils';
 import { DataMigrationCard } from '@/components/settings/data-migration-card';
 import { SqliteMigrationCard } from '@/components/admin/sqlite-migration-card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type MigrationError = { message?: string } | string;
 
@@ -668,11 +669,23 @@ export default function MigrationsPage() {
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold">Data Migration</h1>
-                <p className="text-muted-foreground mt-2">Run data fixes, ERP migrations and backups</p>
-            </div>
+        <div className="mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-500 min-h-screen bg-background">
+            {/* Standard Dashboard Header - Refined & Subtle */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/60">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Data Migration</h1>
+                    <p className="text-muted-foreground text-xs font-medium">
+                        Administrative node for structural synchronization and local storage protocols
+                    </p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <div className="px-4 py-2 flex items-center gap-2 text-[11px] font-bold text-muted-foreground bg-card border border-border/80 rounded-[6px] shadow-sm">
+                        <CheckCircle2 className="h-4 w-4 text-primary/80" />
+                        Infrastructure Secure
+                    </div>
+                </div>
+            </header>
 
             <input
                 ref={fileInputRef}
@@ -682,259 +695,251 @@ export default function MigrationsPage() {
                 onChange={handleFileChange}
             />
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {/* Left Column: ERP & SQLite */}
-                <div className="space-y-8">
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <ArrowRightLeft className="h-6 w-6 text-primary" />
-                            ERP Season Migration
-                        </h2>
-                        <DataMigrationCard />
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <DatabaseZap className="h-6 w-6 text-primary" />
-                            SQLite Database Management
-                        </h2>
-                        <SqliteMigrationCard />
-                    </section>
+            <Tabs defaultValue="sqlite" className="w-full space-y-6">
+                {/* Theme-Consistent Tab Bar - Standard 3D style */}
+                <div className="flex justify-center md:justify-start">
+                    <TabsList className="bg-muted/80 backdrop-blur-sm border shadow-sm h-11">
+                        <TabsTrigger value="sqlite" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
+                            <DatabaseZap className="h-4 w-4" />
+                            Local Hub
+                        </TabsTrigger>
+                        <TabsTrigger value="erp" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
+                            <ArrowRightLeft className="h-4 w-4" />
+                            ERP Migrate
+                        </TabsTrigger>
+                        <TabsTrigger value="backups" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Secure Vault
+                        </TabsTrigger>
+                        <TabsTrigger value="tools" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
+                            <Wrench className="h-4 w-4" />
+                            Logic Repair
+                        </TabsTrigger>
+                    </TabsList>
                 </div>
 
-                {/* Right Column: Excel & Folder Backup */}
-                <div className="space-y-8">
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <FileSpreadsheet className="h-6 w-6 text-primary" />
-                            Excel Backup & Sync
-                        </h2>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Backup & Sync</CardTitle>
-                                <CardDescription>
-                                    Export all Firestore collections to Excel or import curated workbooks. 
-                                    Supplier amounts and ledger balances are recalculated automatically.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex flex-wrap gap-3">
+                {/* Content Sections */}
+                <TabsContent value="sqlite" className="focus-visible:outline-none focus-visible:ring-0 animate-in slide-in-from-left-2 duration-300">
+                    <SqliteMigrationCard />
+                </TabsContent>
+
+                <TabsContent value="erp" className="space-y-8 focus-visible:outline-none focus-visible:ring-0 animate-in slide-in-from-left-2 duration-300">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+                        <div className="lg:col-span-3">
+                             <div className="flex items-center gap-4 mb-6">
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">ERP Segment Migration</h3>
+                                <div className="h-[2px] flex-1 bg-slate-200" />
+                             </div>
+                             <DataMigrationCard />
+                        </div>
+                        
+                        <div className="space-y-6 pt-12">
+                            <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
+                                <h4 className="font-black flex items-center gap-3 text-indigo-600 uppercase tracking-widest text-[11px]">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Integrity Shield
+                                </h4>
+                                <p className="text-xs text-slate-600 leading-relaxed font-bold">
+                                    Records are cross-verified to maintain structural consistency and prevent duplicates during season resets. Automated validation layer active.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="backups" className="space-y-6 focus-visible:outline-none focus-visible:ring-0 animate-in slide-in-from-left-2 duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="ui-card p-6 bg-white space-y-6 flex flex-col justify-between min-h-[250px]">
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                        <FileSpreadsheet className="h-5 w-5" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <h4 className="text-sm font-bold text-foreground">Excel Workbook Sync</h4>
+                                        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Spreadsheet compatibility mode</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                                    Export system data into Spreadsheet format for offline analytics or manual workbook restoration. Supports .xlsx and .xls signatures.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                                <div className="flex gap-3">
                                     <Button
                                         onClick={handleExport}
                                         disabled={isExporting || isImporting}
-                                        size="sm"
+                                        className="flex-1 rounded-md h-10 shadow-md shadow-primary/10 text-[11px] font-bold uppercase tracking-widest bg-primary hover:bg-primary/90"
                                     >
-                                        {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isExporting ? 'Exporting...' : (
-                                            <>
-                                                <Download className="mr-2 h-4 w-4" />
-                                                Export to Excel
-                                            </>
-                                        )}
+                                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Export Workbook'}
                                     </Button>
                                     <Button
                                         onClick={handleImportClick}
                                         disabled={isImporting || isExporting}
-                                        variant="secondary"
-                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 rounded-md h-10 text-[11px] font-bold uppercase tracking-widest"
                                     >
-                                        {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isImporting ? 'Importing...' : (
-                                            <>
-                                                <Upload className="mr-2 h-4 w-4" />
-                                                Import from Excel
-                                            </>
-                                        )}
+                                        {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Restore File'}
                                     </Button>
                                 </div>
-
                                 {importSummary && (
-                                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                                        {importSummary}
+                                    <div className="rounded-md bg-emerald-50 border border-emerald-100 p-2.5 flex items-center gap-3">
+                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                        <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-widest truncate">{importSummary}</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
 
-                                {importErrors.length > 0 && (
-                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1">
-                                        <p className="font-semibold text-xs uppercase tracking-wider opacity-70">Warnings</p>
-                                        {importErrors.map((error, index) => (
-                                            <p key={index}>• {error}</p>
-                                        ))}
+                        <div className="ui-card p-6 bg-white space-y-6 flex flex-col justify-between min-h-[250px]">
+                             <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-md bg-primary/5 text-primary border border-primary/10">
+                                        <FolderOpen className="h-5 w-5" />
                                     </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </section>
+                                    <div className="space-y-0.5">
+                                        <h4 className="text-sm font-bold text-foreground">Directory Snapshot</h4>
+                                        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Fast local storage mirror</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                                    Safeguard massive datasets directly to local directories. Provides rapid, high-throughput synchronization for critical workloads.
+                                </p>
+                            </div>
 
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <FolderOpen className="h-6 w-6 text-primary" />
-                            Local Folder Backup
-                        </h2>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Folder Export / Import</CardTitle>
-                                <CardDescription>
-                                    Export data to a folder with menu-based structure (Entry, Payments, etc.). 
-                                    Requires Electron desktop app.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex flex-wrap gap-3">
+                            <div className="space-y-3 pt-2">
+                                <div className="flex gap-3">
                                     <Button
                                         onClick={handleExportToFolder}
                                         disabled={isFolderExporting || isFolderImporting}
-                                        variant="outline"
-                                        size="sm"
+                                        className="flex-1 rounded-md h-10 shadow-md shadow-primary/10 text-[11px] font-bold uppercase tracking-widest bg-primary hover:bg-primary/90"
                                     >
-                                        {isFolderExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isFolderExporting ? 'Exporting...' : (
-                                            <>
-                                                <FolderOpen className="mr-2 h-4 w-4" />
-                                                Export to Folder
-                                            </>
-                                        )}
+                                        {isFolderExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Folder Export'}
                                     </Button>
                                     <Button
                                         onClick={handleImportFromFolder}
                                         disabled={isFolderImporting || isFolderExporting}
                                         variant="outline"
-                                        size="sm"
+                                        className="flex-1 rounded-md h-10 text-[11px] font-bold uppercase tracking-widest"
                                     >
-                                        {isFolderImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isFolderImporting ? 'Importing...' : (
-                                            <>
-                                                <FolderInput className="mr-2 h-4 w-4" />
-                                                Import from Folder
-                                            </>
-                                        )}
+                                        {isFolderImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sync Path'}
                                     </Button>
                                 </div>
-
                                 {folderResult && (
-                                    <div className={cn(
-                                        "rounded-lg border p-4 text-sm",
-                                        folderResult.success ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"
-                                    )}>
-                                        <p className="font-semibold">{folderResult.success ? 'Success' : 'Failed'}</p>
-                                        <p>{folderResult.message}</p>
-                                        {folderResult.details && <p className="mt-1 text-xs opacity-80">{folderResult.details}</p>}
+                                    <div className={cn("rounded-md p-2.5 flex items-center gap-3 border", folderResult.success ? "bg-emerald-50 border-emerald-100 text-emerald-800" : "bg-rose-50 border-rose-100 text-rose-800")}>
+                                        {folderResult.success ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                                        <p className="text-[10px] font-bold uppercase tracking-widest truncate">{folderResult.message}</p>
                                     </div>
                                 )}
-                            </CardContent>
-                        </Card>
-                    </section>
-                </div>
-            </div>
-
-            <div className="border-t pt-8 mt-4">
-                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <Wrench className="h-7 w-7 text-primary" />
-                    Database Utilities & Fixes
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Fix RTGS Payment IDs</CardTitle>
-                            <CardDescription>Updates paymentId field to match rtgsSrNo.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Button onClick={handleFixRtgsPaymentIds} disabled={isRunning1} size="sm" className="w-full">
-                                {isRunning1 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Run Migration'}
-                            </Button>
-                            {result1 && (
-                                <div className={cn("p-3 rounded-lg border text-[10px]", result1.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800')}>
-                                    {result1.success ? `Success: ${result1.count || 0} updated` : `Error: ${typeof result1.error === 'string' ? result1.error : (result1.error as any)?.message || 'Unknown'}`}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Fix Transaction ID Mismatch</CardTitle>
-                            <CardDescription>Resolves "already exists" errors in history.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Button onClick={handleFixTransactionIdMismatch} disabled={isRunning2} size="sm" className="w-full">
-                                {isRunning2 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Run Migration'}
-                            </Button>
-                            {result2 && (
-                                <div className={cn("p-3 rounded-lg border text-[10px]", result2.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800')}>
-                                    {result2.success ? `Success: ${result2.count || 0} fixed` : `Error: ${result2.error || 'Unknown'}`}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Check/Fix Supplier Duplicates</CardTitle>
-                            <CardDescription>Finds and fixes duplicate srNo or ID values.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                                <Button onClick={handleCheckSupplierDuplicates} disabled={isRunning3} size="sm" variant="outline" className="flex-1">
-                                    Check
-                                </Button>
-                                <Button onClick={handleFixSupplierDuplicates} disabled={isRunning4} size="sm" className="flex-1">
-                                    Fix
-                                </Button>
                             </div>
-                            {result3 && <div className="text-[10px] text-muted-foreground bg-muted p-2 rounded">{result3.analysis?.summary}</div>}
-                            {result4 && <div className="text-[10px] text-green-700 font-medium">{result4.summary}</div>}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
+                </TabsContent>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Gov Finalized \u2192 Payments</CardTitle>
-                            <CardDescription>Copies Gov Payments to main Payments collection.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <input type="checkbox" id="gov-migrate-delete" checked={govMigrateDeleteSource} onChange={(e) => setGovMigrateDeleteSource(e.target.checked)} className="rounded border-gray-300 h-3 w-3" />
-                                <Label htmlFor="gov-migrate-delete" className="text-[10px] cursor-pointer">Delete from source</Label>
+                <TabsContent value="tools" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 pb-16 animate-in slide-in-from-left-2 duration-300">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="ui-card p-5 bg-white space-y-5 flex flex-col justify-between overflow-hidden relative">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-primary/40" />
+                             <div className="space-y-0.5">
+                                 <h4 className="text-sm font-bold text-foreground">RTGS Correction</h4>
+                                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Payment ID standardization</p>
+                             </div>
+                             <div className="space-y-2">
+                                 <Button onClick={handleFixRtgsPaymentIds} disabled={isRunning1} size="sm" className="w-full h-9 rounded-md font-bold text-[10px] uppercase tracking-widest bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-sm">
+                                     {isRunning1 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Run Correction'}
+                                 </Button>
+                                 {result1 && (
+                                     <div className={cn("py-1.5 px-3 rounded-md border text-[10px] font-bold text-center uppercase tracking-widest", result1.success ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700')}>
+                                         {result1.success ? `Updated: ${result1.count}` : 'Failed'}
+                                     </div>
+                                 )}
+                             </div>
+                        </div>
+
+                        <div className="ui-card p-5 bg-white space-y-5 flex flex-col justify-between overflow-hidden relative">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/40" />
+                             <div className="space-y-0.5">
+                                 <h4 className="text-sm font-bold text-foreground">Key Conflict Resolve</h4>
+                                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Transaction key Regeneration</p>
+                             </div>
+                             <div className="space-y-2">
+                                 <Button onClick={handleFixTransactionIdMismatch} disabled={isRunning2} size="sm" className="w-full h-9 rounded-md font-bold text-[10px] uppercase tracking-widest bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-sm">
+                                     {isRunning2 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Resolve Conflicts'}
+                                 </Button>
+                                 {result2 && (
+                                     <div className={cn("py-1.5 px-3 rounded-md border text-[10px] font-bold text-center uppercase tracking-widest", result2.success ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700')}>
+                                         {result2.success ? `Resolved: ${result2.count}` : 'Failed'}
+                                     </div>
+                                 )}
+                             </div>
+                        </div>
+
+                        <div className="ui-card p-5 bg-white space-y-5 flex flex-col justify-between overflow-hidden relative">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/40" />
+                             <div className="space-y-0.5">
+                                 <h4 className="text-sm font-bold text-foreground">Identity Analysis</h4>
+                                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Profile deduplication engine</p>
+                             </div>
+                             <div className="space-y-2">
+                                 <div className="flex gap-2">
+                                     <Button onClick={handleCheckSupplierDuplicates} disabled={isRunning3} size="sm" variant="outline" className="flex-1 h-9 rounded-md font-bold text-[10px] uppercase tracking-widest">
+                                         Audit
+                                     </Button>
+                                     <Button onClick={handleFixSupplierDuplicates} disabled={isRunning4} size="sm" className="flex-1 h-9 rounded-md font-bold text-[10px] bg-amber-600 hover:bg-amber-700 text-white shadow-sm uppercase tracking-widest">
+                                         Correct
+                                     </Button>
+                                 </div>
+                                 {result3 && <div className="text-[9px] text-muted-foreground bg-muted/30 rounded-md p-2 border border-border/40 font-semibold leading-tight line-clamp-2">{result3.analysis?.summary}</div>}
+                             </div>
+                        </div>
+
+                         <div className="ui-card p-5 bg-white space-y-5 flex flex-col justify-between overflow-hidden relative">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/40" />
+                             <div className="space-y-0.5">
+                                 <h4 className="text-sm font-bold text-foreground">Gov Records Finalize</h4>
+                                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Secondary to Primary storage sync</p>
+                             </div>
+                             <div className="space-y-2">
+                                 <div className="flex items-center gap-3 bg-muted/20 p-2 rounded-md border border-border/40 justify-between">
+                                     <Label htmlFor="gov-migrate-delete" className="text-[10px] cursor-pointer font-bold text-muted-foreground uppercase tracking-widest">Purge Source</Label>
+                                     <input type="checkbox" id="gov-migrate-delete" checked={govMigrateDeleteSource} onChange={(e) => setGovMigrateDeleteSource(e.target.checked)} className="rounded h-4 w-4 accent-primary" />
+                                 </div>
+                                 <Button onClick={handleMigrateGovFinalizedToPayments} disabled={isRunning6} size="sm" className="w-full h-9 rounded-md font-bold text-[10px] uppercase tracking-widest bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/10">
+                                     Finalize All
+                                 </Button>
+                             </div>
+                        </div>
+
+                        <div className="ui-card p-6 bg-slate-900 text-white shadow-xl space-y-5 lg:col-span-2 flex flex-col justify-between relative overflow-hidden group">
+                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
+                            <div className="space-y-0.5 relative z-10">
+                                <h4 className="text-base font-bold uppercase tracking-tight">Emergency Global Re-Index</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest opacity-80">Full structural synchronization service</p>
                             </div>
-                            <Button onClick={handleMigrateGovFinalizedToPayments} disabled={isRunning6} size="sm" className="w-full">
-                                Migrate
-                            </Button>
-                            {result6 && (
-                                <div className={cn("p-2 rounded border text-[10px]", result6.success ? "bg-green-50" : "bg-red-50")}>
-                                    {result6.success ? `${result6.migrated} migrated` : result6.error}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <CardTitle>Sync Metadata: UpdatedAt Migration</CardTitle>
-                            <CardDescription>Updates all docs with 'updatedAt' for efficient syncing.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Button onClick={handleUpdatedAtMigration} disabled={isRunning5} size="sm">
-                                {isRunning5 ? 'Migrating...' : 'Run Update Migration'}
-                            </Button>
-                            {result5 && (
-                                <ScrollArea className="h-32 mt-2 rounded border bg-white">
-                                    <div className="divide-y text-[10px]">
-                                        {result5.map((res, i) => (
-                                            <div key={i} className="p-1 px-3 flex justify-between">
-                                                <span className="font-medium text-muted-foreground">{res.collection}</span>
-                                                <span className={res.status === 'success' ? 'text-green-600 font-bold' : 'text-red-600'}>
-                                                    {res.status === 'success' ? res.updated : 'Err'}
-                                                </span>
-                                            </div>
-                                        ))}
+                            <div className="flex items-center gap-4 relative z-10">
+                                <Button onClick={handleUpdatedAtMigration} disabled={isRunning5} size="sm" className="h-10 px-8 rounded-md font-bold text-[10px] uppercase tracking-widest bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl transition-all active:scale-95 shrink-0">
+                                    {isRunning5 ? 'RE-INDEXING...' : 'INITIATE SYNC'}
+                                </Button>
+                                {result5 && (
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="flex gap-1.5 pb-1 overflow-x-auto custom-scrollbar-mini">
+                                            {result5.map((res, i) => (
+                                                <div key={i} className="whitespace-nowrap py-1.5 px-2 bg-white/5 border border-white/10 rounded text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-sm">
+                                                    <span className="opacity-60">{res.collection.substring(0,8)}</span>
+                                                    <span className={res.status === 'success' ? 'text-emerald-400' : 'text-rose-400'}>
+                                                        {res.status === 'success' ? res.updated : 'ERR'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </ScrollArea>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                                )}
+                            </div>
+                        </div>
+                     </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

@@ -291,7 +291,9 @@ export const useSupplierSummary = (
         return sum + linkedToGroup.reduce((s: number, pf: any) => s + Number(pf.amount || 0), 0);
       }, 0);
       
-      const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount + totalLinkedLedgerCredit;
+      // Ledger credit is now correctly signed (negative) in totalGovExtraAmount via calculateOutstandingForEntry.
+      // We subtract totalLinkedLedgerCredit only if it's not already covered by totalGovExtraAmount fallback.
+      const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount;
       const totalCdAmount = groupSuppliers.reduce((sum, s) => sum + toNumber(s.totalCdForEntry), 0);
       
       // IMPORTANT: Use totalPaid (from paidFor.amount) for outstanding calculation, not totalCashPaid + totalRtgsPaid
@@ -334,7 +336,11 @@ export const useSupplierSummary = (
       const baseOutstanding = groupSuppliers.reduce((sum, s) => sum + toNumber(s.outstandingForEntry), 0);
       // Credit = charge (outstanding badhe), Debit = payment (outstanding ghathe)
       // totalLinkedLedgerCredit: paidFor wala ledger credit outstandingForEntry mein nahi (calcTotalExtra skip karta hai)
-      const totalOutstanding = Math.round((baseOutstanding + totalLinkedLedgerCredit + ledgerAdjustment.credit - ledgerAdjustment.debit) * 100) / 100;
+      // totalGovExtraAmount (in baseOutstanding) already includes correctly signed Linked Ledger Credits.
+      // For unlinked Ledger adjustments: Credit (Income) should SUBTRACT, Debit (Expense/Paid) should ADD to outstanding?
+      // Wait, for a supplier, Debit is a payment (Subtract). LedgerAdjustment.debit is "Expense/Debit isse" which is a payment to supplier.
+      // So debit should subtract. Credit (Income) should also subtract from what we owe.
+      const totalOutstanding = Math.round((baseOutstanding - ledgerAdjustment.credit - ledgerAdjustment.debit) * 100) / 100;
 
       // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
       const totalAmountFromEntries = groupSuppliers.reduce((sum, s) => {

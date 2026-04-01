@@ -1,7 +1,7 @@
-import { db } from './database';
+import { db, setDbInUseByFolderLoad } from './database';
 
 type ElectronWithSqlite = {
-  sqliteImportTable?: (table: string, rows: unknown[]) => Promise<{ success: boolean; count?: number; error?: string }>;
+  sqliteImportTable?: (table: string, rows: unknown[], options?: { clear?: boolean }) => Promise<{ success: boolean; count?: number; error?: string }>;
 };
 
 function getElectron(): ElectronWithSqlite | null {
@@ -16,19 +16,32 @@ function getElectron(): ElectronWithSqlite | null {
  * - Excel -> Dexie -> SQLite (one-way migration)
  * - Current DB -> selected collections -> new SQLite (when creating a new DB from existing data)
  *
- * If selectedCollections is provided, only those tables are imported.
+ * If selectedCollections is provided, ONLY those tables are modified.
+ * Tables NOT in selectedCollections are LEFT UNTOUCHED in SQLite.
  */
 export async function importDexieToSqlite(selectedCollections?: string[]): Promise<{
   success: boolean;
   details: Record<string, { sourceCount: number; sqliteCount: number; error?: string }>;
 }> {
-  const electron = getElectron();
+  setDbInUseByFolderLoad(true);
+  try {
+    return await _importDexieToSqlite(selectedCollections);
+  } finally {
+    setDbInUseByFolderLoad(false);
+  }
+}
+
+async function _importDexieToSqlite(selectedCollections?: string[]): Promise<{
+  success: boolean;
+  details: Record<string, { sourceCount: number; sqliteCount: number; error?: string }>;
+}> {
+  const electron = getElectron() as any;
   if (!electron?.sqliteImportTable) {
-    return { success: false, details: { _global: { count: 0, error: 'sqlite bridge not available (Electron only)' } } };
+    return { success: false, details: { _global: { sourceCount: 0, sqliteCount: 0, error: 'sqlite bridge not available (Electron only)' } } };
   }
 
   if (!db) {
-    return { success: false, details: { _global: { count: 0, error: 'Dexie database not initialized' } } };
+    return { success: false, details: { _global: { sourceCount: 0, sqliteCount: 0, error: 'Dexie database not initialized' } } };
   }
 
   const details: Record<string, { sourceCount: number; sqliteCount: number; error?: string }> = {};
@@ -37,34 +50,10 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
   const isSelected = (tableName: string): boolean =>
     !hasSelection || selectedCollections!.includes(tableName);
 
-  // Jab hum "selected collections se NEW DB" bana rahe hote hain,
-  // to expectation hai ki baaki tables ka data clean ho jaye,
-  // na ki purane folder ka data waha bacha rahe.
-  // Is helper se non-selected tables ko explicitly EMPTY import kar dete hain.
-  const clearIfNotSelected = async (tableName: string) => {
-    if (!hasSelection) return;
-    if (isSelected(tableName)) return;
-    try {
-      const res = await electron.sqliteImportTable!(tableName, []);
-      details[tableName] = {
-        sourceCount: 0,
-        sqliteCount: res.count ?? 0,
-        error: res.success ? undefined : res.error ?? 'import failed',
-      };
-    } catch (e) {
-      details[tableName] = {
-        count: 0,
-        error: e instanceof Error ? e.message : String(e),
-      };
-    }
-  };
-
   // Helper to read from Dexie (if table exists) and push to SQLite
   const importTable = async (tableName: string, dexieTable: any | undefined) => {
-    if (!isSelected(tableName)) {
-      await clearIfNotSelected(tableName);
-      return;
-    }
+    if (!isSelected(tableName)) return; // Skip if not selected
+    
     if (!dexieTable) {
       details[tableName] = { sourceCount: 0, sqliteCount: 0, error: 'dexie table missing' };
       return;
@@ -72,7 +61,8 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
     try {
       const rows = await dexieTable.toArray();
       const sourceCount = rows.length ?? 0;
-      const res = await electron.sqliteImportTable!(tableName, rows as unknown[]);
+      // We use clear: true here because we are mirroring the full Dexie table to SQLite
+      const res = await electron.sqliteImportTable!(tableName, rows as unknown[], { clear: true });
       details[tableName] = {
         sourceCount,
         sqliteCount: res.count ?? sourceCount,
@@ -80,7 +70,8 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
       };
     } catch (e) {
       details[tableName] = {
-        count: 0,
+        sourceCount: 0,
+        sqliteCount: 0,
         error: e instanceof Error ? e.message : String(e),
       };
     }
@@ -88,14 +79,11 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
 
   // Helper for incomes/expenses: read from transactions table with type filter
   const importFromTransactions = async (tableName: string, type: 'Income' | 'Expense') => {
-    if (!isSelected(tableName)) {
-      await clearIfNotSelected(tableName);
-      return;
-    }
+    if (!isSelected(tableName)) return;
     try {
       const rows = await (db as any).transactions?.where('type').equals(type).toArray() ?? [];
       const sourceCount = rows.length ?? 0;
-      const res = await electron.sqliteImportTable!(tableName, rows as unknown[]);
+      const res = await electron.sqliteImportTable!(tableName, rows as unknown[], { clear: true });
       details[tableName] = {
         sourceCount,
         sqliteCount: res.count ?? sourceCount,
@@ -103,7 +91,8 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
       };
     } catch (e) {
       details[tableName] = {
-        count: 0,
+        sourceCount: 0,
+        sqliteCount: 0,
         error: e instanceof Error ? e.message : String(e),
       };
     }
@@ -111,14 +100,11 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
 
   // Helper for expenseTemplates: stored in options table with type filter
   const importFromOptions = async (tableName: string, optionType: string) => {
-    if (!isSelected(tableName)) {
-      await clearIfNotSelected(tableName);
-      return;
-    }
+    if (!isSelected(tableName)) return;
     try {
       const rows = await (db as any).options?.where('type').equals(optionType).toArray() ?? [];
       const sourceCount = rows.length ?? 0;
-      const res = await electron.sqliteImportTable!(tableName, rows as unknown[]);
+      const res = await electron.sqliteImportTable!(tableName, rows as unknown[], { clear: true });
       details[tableName] = {
         sourceCount,
         sqliteCount: res.count ?? sourceCount,
@@ -126,7 +112,8 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
       };
     } catch (e) {
       details[tableName] = {
-        count: 0,
+        sourceCount: 0,
+        sqliteCount: 0,
         error: e instanceof Error ? e.message : String(e),
       };
     }
@@ -134,19 +121,16 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
 
   // Helper for ledgerCashAccounts: stored in localStorage (no Dexie table)
   const importFromLocalStorage = async (tableName: string, cacheKey: string) => {
-    if (!isSelected(tableName)) {
-      await clearIfNotSelected(tableName);
-      return;
-    }
+    if (!isSelected(tableName)) return;
     try {
       if (typeof window === 'undefined') {
-        details[tableName] = { count: 0, error: 'localStorage not available' };
+        details[tableName] = { sourceCount: 0, sqliteCount: 0, error: 'localStorage not available' };
         return;
       }
       const raw = localStorage.getItem(cacheKey);
       const rows = raw ? (JSON.parse(raw) as unknown[]) : [];
       const sourceCount = rows.length ?? 0;
-      const res = await electron.sqliteImportTable!(tableName, rows);
+      const res = await electron.sqliteImportTable!(tableName, rows, { clear: true });
       details[tableName] = {
         sourceCount,
         sqliteCount: res.count ?? sourceCount,
@@ -154,7 +138,8 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
       };
     } catch (e) {
       details[tableName] = {
-        count: 0,
+        sourceCount: 0,
+        sqliteCount: 0,
         error: e instanceof Error ? e.message : String(e),
       };
     }
@@ -205,7 +190,6 @@ export async function importDexieToSqlite(selectedCollections?: string[]): Promi
   await importTable('manufacturingCosting', (db as any).manufacturingCosting);
   await importFromOptions('expenseTemplates', 'expenseTemplates');
 
-  const hasError = Object.values(details).some((d) => d.error);
+  const hasError = Object.values(details).some((d) => (d as any).error);
   return { success: !hasError, details };
 }
-

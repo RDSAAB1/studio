@@ -9,8 +9,8 @@ interface SummaryMetricsCardProps {
 }
 
 export const SummaryMetricsCard = ({ metrics }: SummaryMetricsCardProps) => (
-  <Card>
-    <CardContent className="p-2 sm:p-3">
+  <Card className="rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] hover:translate-y-[-2px] border-b-[3px] border-b-primary/20">
+    <CardContent className="p-2 sm:p-2.5">
       <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
         {metrics.map((metric, index) => (
           <div

@@ -194,66 +194,60 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
     <Card className="text-[9px] flex flex-col h-full overflow-hidden rounded-md">
       <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
-          {/* Fixed Header – flat, no rounding, so it reads as part of the table */}
-          <div className="sticky top-0 z-30 bg-muted/50 border-b border-border rounded-none">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
+          <ScrollArea ref={scrollRef} className={`h-full w-full ${maxRows ? "pointer-events-none" : ""}`}>
             <Table className="table-fixed w-full">
-              <TableHeader>
-                <TableRow className="h-1 border-b-0 overflow-hidden">
+              <TableHeader className="table-header-compact z-20">
+                <TableRow className="border-b-0 overflow-hidden">
                   {historyType === 'cash' && (
                     <>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">ID</TableHead>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden">Date</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[34%] text-left align-middle overflow-hidden">Paid For</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-right align-middle overflow-hidden">Paid</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">CD</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-center align-middle overflow-hidden">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none text-left align-middle overflow-hidden">ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none text-left align-middle overflow-hidden">Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none text-left align-middle overflow-hidden">Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none text-right align-middle overflow-hidden">Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none text-right align-middle overflow-hidden">CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none text-center align-middle overflow-hidden">Actions</TableHead>
                     </>
                   )}
                   {historyType === 'rtgs' && (
                     <>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">ID</TableHead>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">Date</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">Account Holder</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Bank / IFSC</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden">Check</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[28%] text-left align-middle overflow-hidden">Paid For</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden">Paid</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[6%] text-center align-middle overflow-hidden">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[10%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[10%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Holder</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Bank / IFSC</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[6%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Check</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[22%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-center align-middle overflow-hidden" style={{ height: '28px !important' }}>Act.</TableHead>
                     </>
                   )}
                   {historyType === 'gov' && (
                     <>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[7%] text-left align-middle overflow-hidden">ID</TableHead>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[7%] text-left align-middle overflow-hidden">Date</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden">Center</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[38%] text-left align-middle overflow-hidden">Paid For</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Paid</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-center align-middle overflow-hidden">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[10%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[10%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Center</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[32%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-center align-middle overflow-hidden" style={{ height: '28px !important' }}>Actions</TableHead>
                     </>
                   )}
                   {historyType === 'payment' && (
                     <>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[8%] text-left align-middle overflow-hidden">ID</TableHead>
-                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden">Date</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[22%] text-left align-middle overflow-hidden">Account Holder</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[16%] text-left align-middle overflow-hidden">Paid For</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Extra</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-right align-middle overflow-hidden">Paid</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden">CD</TableHead>
-                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-center align-middle overflow-hidden">Actions</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[12%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>ID</TableHead>
+                      <TableHead className="text-[10px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Date</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[20%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Account Holder</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[14%] text-left align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid For</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>Extra</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[10%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>Paid</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[8%] text-right align-middle overflow-hidden" style={{ height: '28px !important' }}>CD</TableHead>
+                      <TableHead className="text-[9px] px-2 py-0 font-extrabold leading-none w-[12%] text-center align-middle overflow-hidden" style={{ height: '28px !important' }}>Actions</TableHead>
                     </>
                   )}
                 </TableRow>
               </TableHeader>
-            </Table>
-          </div>
-          {/* Scrollable Body – no gap, no rounding at top */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <ScrollArea ref={scrollRef} className={`h-full w-full ${maxRows ? "pointer-events-none" : ""}`}>
-              <Table className="table-fixed w-full">
-                <TableBody>
+              <TableBody>
                   {visiblePayments.length === 0 ? (
                       <TableRow>
                       <TableCell colSpan={historyType === 'cash' ? 6 : historyType === 'rtgs' ? 9 : historyType === 'gov' ? 7 : historyType === 'payment' ? 8 : 7} className="text-center text-[9px] text-muted-foreground py-4">

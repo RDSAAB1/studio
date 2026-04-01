@@ -331,7 +331,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             
             const processedEntries: PaidFor[] = [];
             // Ledger: Debit = payment (entries ko distribute/update karo). Credit = charge (entries ko update nahi, summary me extra side se treat hota hai).
-            const shouldDistributeToEntries = !(isLedger && drCr === 'Credit');
+            // UPDATE: Allow distribution for Ledger Credit too, so it can be linked to specific entries if selected.
+            const shouldDistributeToEntries = true;
             const entriesToProcess = shouldDistributeToEntries ? entryOutstandings : [];
 
             // Phase 1: ALL READS FIRST (Firestore transaction rule)
@@ -875,15 +876,25 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     const cdAmount = i === entryOutstandings.length - 1
                         ? Math.round(remainingCd * 100) / 100
                         : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                    
+                    let extraAmount = govExtraSharePerEntryCatch[i] ?? 0;
+                    let entryAmount = amount;
+
+                    // If Ledger Credit (Income), treat the amount as a negative extra (deduction)
+                    if (isLedger && drCr === 'Credit') {
+                        extraAmount -= amount;
+                        entryAmount = 0;
+                    }
+
                     remainingCash = Math.round((remainingCash - amount) * 100) / 100;
                     remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
-                    const extraAmount = govExtraSharePerEntryCatch[i] ?? 0;
-                    if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
+                    
+                    if (entryAmount > 0 || cdAmount > 0 || extraAmount !== 0) {
                         const netAmount = Number(entry.netAmount) || 0;
                         const entryAny = entry as any;
                         paidForDetails.push({
                             srNo: entry.srNo || '',
-                            amount: Math.round(amount * 100) / 100,
+                            amount: Math.round(entryAmount * 100) / 100,
                             cdAmount: Math.round(cdAmount * 100) / 100,
                             supplierId: entry.id,
                             parchiNo: entry.parchiNo || entry.srNo || '',
@@ -893,7 +904,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                             supplierName: supplierDetails?.name || entryAny?.name || '',
                             supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
                             supplierAddress: supplierDetails?.address || entryAny?.address || '',
-                            type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
+                            type: (entryAmount + cdAmount + (extraAmount < 0 ? 0 : extraAmount)) >= outstanding ? 'Full' : 'Partial',
                             updatedAt: now,
                             utrNo: utrNo || '',
                             adjustedOriginal: netAmount,

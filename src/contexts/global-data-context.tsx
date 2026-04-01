@@ -273,13 +273,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             const collection = detail?.collection;
             if (!collection) return;
 
-            // In local-folder mode we already do incremental updates for payments/suppliers via
-            // indexeddb:payment:* / indexeddb:supplier:* events. To avoid heavy full-table reloads
-            // after every finalize/delete/edit, skip automatic refresh for these collections.
-            if (isSqliteMode() && (collection === 'payments' || collection === 'customerPayments' || collection === 'suppliers')) {
-                return;
-            }
-
             scheduleRefresh(collection);
         };
 

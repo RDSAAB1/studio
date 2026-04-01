@@ -40,7 +40,13 @@ export async function chunkedBulkPut<T extends { id: string }>(
     // ✅ Process in chunks with yields to prevent blocking
     for (let i = 0; i < items.length; i += chunkSize) {
         const chunk = items.slice(i, i + chunkSize);
-        await table.bulkPut(chunk);
+        try {
+            await table.bulkPut(chunk);
+        } catch (error) {
+            console.error(`[chunkedBulkPut] Error in chunk ${i}-${i + chunkSize}:`, error);
+            // Re-throw so the caller (safeBulkReplace) can handle the fallback
+            throw error;
+        }
         
         // Yield to main thread every chunk (except last)
         if (i + chunkSize < items.length) {

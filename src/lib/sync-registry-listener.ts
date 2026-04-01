@@ -58,8 +58,8 @@ export function createMetadataBasedListener<T extends { id: string }>(
 ): () => void {
     const { collectionName, localTableName } = config;
 
-    // Local folder mode: only read from IndexedDB, no Firestore
-    if (typeof window !== "undefined" && isLocalFolderMode()) {
+    // Local folder mode or SQLite only mode: only read from local data, no Firestore
+    if (typeof window !== "undefined") {
         if (db && localTableName) {
             const localTable = (db as any)[localTableName];
             if (localTable) {

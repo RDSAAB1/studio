@@ -4,8 +4,15 @@ import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, FolderOpen, DatabaseZap, ArrowRightLeft, FileSpreadsheet, Database, CheckCircle2 } from "lucide-react";
-import { isSqliteMode, setSqliteMode, setSqliteFolderPath, getSqliteFolderPath, switchToSqliteFolder } from "@/lib/sqlite-storage";
+import { 
+  Loader2, FolderOpen, DatabaseZap, ArrowRightLeft, FileSpreadsheet, Database, CheckCircle2, CheckCircle, HardDrive,
+  Truck, Users, CreditCard, Gavel, BookText, ListPlus, Wallet, TrendingUp, TrendingDown,
+  Landmark, MapPin, Banknote, Repeat, FileText, UserRound, Coins, CalendarCheck,
+  Package, PlusCircle, Files, Briefcase, Settings2, Settings, Tags, Tag, UserCircle,
+  Factory, LayoutTemplate, CheckSquare, Square, HandCoins
+} from "lucide-react";
+import { cn, toTitleCase } from "@/lib/utils";
+import { isSqliteMode, setSqliteMode, setSqliteFolderPath, getSqliteFolderPath, switchToSqliteFolder, SQLITE_TABLES } from "@/lib/sqlite-storage";
 import { clearAllLocalData } from "@/lib/database";
 import {
   Dialog,
@@ -14,7 +21,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 
 export function SqliteMigrationCard() {
   const { toast } = useToast();
@@ -28,9 +34,7 @@ export function SqliteMigrationCard() {
     'settings',
     'options',
     'banks',
-    'bankBranches',
     'bankAccounts',
-    'supplierBankAccounts',
   ]);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +46,7 @@ export function SqliteMigrationCard() {
 
   const [dbSize, setDbSize] = useState<number | null>(null);
   const [isVacuuming, setIsVacuuming] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
 
   useEffect(() => {
     setSqliteModeActive(isSqliteMode());
@@ -350,6 +355,8 @@ export function SqliteMigrationCard() {
           electron?: {
             selectFolder?: () => Promise<string | null>;
             sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }>;
+            sqliteAll?: (tableName: string) => Promise<any[]>;
+            sqliteImportTable?: (tableName: string, rows: any[], opts?: { clear?: boolean }) => Promise<{ success: boolean; count?: number; error?: string }>;
           };
         }).electron
       : undefined;
@@ -371,48 +378,64 @@ export function SqliteMigrationCard() {
 
     setIsCreatingNewDb(true);
     try {
-      const setRes = await electron.sqliteSetFolder(targetFolder);
+      // ✅ STEP 1: Read all data from CURRENT folder BEFORE switching
+      toast({ title: "Reading data...", description: "Current database se data padha ja raha hai..." });
+      const tableData: Record<string, any[]> = {};
+      let totalRead = 0;
+      for (const tableName of selectedCollectionsForNewDb) {
+        try {
+          const rows = await electron.sqliteAll!(tableName) ?? [];
+          tableData[tableName] = rows;
+          totalRead += rows.length;
+        } catch {
+          tableData[tableName] = [];
+        }
+      }
+
+      // ✅ STEP 2: Switch to the new folder
+      const setRes = await electron.sqliteSetFolder!(targetFolder);
       if (!setRes?.success) {
         toast({ title: "Failed", description: setRes?.error || "Could not set SQLite folder.", variant: "destructive" });
         return;
       }
 
-      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
-      const out = await importDexieToSqlite(selectedCollectionsForNewDb);
-      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
-        table,
-        fromDexie: d.sourceCount,
-        toSqlite: d.sqliteCount,
-        error: d.error ?? "",
-      }));
-      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
-      const hasError = tableRows.some((r) => !!r.error || (r.table !== 'ledgerCashAccounts' && r.fromDexie !== r.toSqlite));
+      // ✅ STEP 3: Write data into the new folder's SQLite
+      toast({ title: "Writing data...", description: `${totalRead} records nayi DB me likh rahe hain...` });
+      const tableRows: { table: string; fromSource: number; toSqlite: number; error: string }[] = [];
+      for (const [tableName, rows] of Object.entries(tableData)) {
+        try {
+          const res = await electron.sqliteImportTable!(tableName, rows, { clear: true });
+          tableRows.push({ table: tableName, fromSource: rows.length, toSqlite: res.count ?? rows.length, error: res.success ? "" : (res.error ?? "import failed") });
+        } catch (e) {
+          tableRows.push({ table: tableName, fromSource: rows.length, toSqlite: 0, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
 
       if (typeof window !== "undefined") {
         // eslint-disable-next-line no-console
         console.table(tableRows);
       }
 
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error);
+
       if (!hasError) {
-        toast({ title: "New DB created", description: `${total} records selected collections se nayi DB me copy ho gaye.`, variant: "success" });
+        toast({ title: "New DB created ✅", description: `${total} records selected collections se nayi DB me copy ho gaye.`, variant: "success" });
       } else {
         const firstErr = tableRows.find((r) => r.error)?.error;
-        const msg = firstErr || "Kuch collections copy nahi ho payeen. DevTools console.table me per-table detail dekh sakte hain.";
-        toast({ title: "New DB partial", description: msg, variant: "destructive" });
+        toast({ title: "New DB partial", description: firstErr || "Kuch collections copy nahi ho payeen.", variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
     } finally {
+      // Restore back to original folder
       if (currentFolder) {
-        try {
-          await electron.sqliteSetFolder(currentFolder);
-        } catch {
-          // ignore
-        }
+        try { await electron.sqliteSetFolder!(currentFolder); } catch { /* ignore */ }
       }
       setIsCreatingNewDb(false);
     }
   };
+
 
   const handleVacuumSqlite = async () => {
     const electron = typeof window !== "undefined" ? (window as any).electron : undefined;
@@ -439,222 +462,237 @@ export function SqliteMigrationCard() {
   const handleSwitchFromSqlite = () => {
     setSqliteMode(false);
     setSqliteModeActive(false);
-    toast({ title: "SQLite off", description: "Page refresh karein." });
+    toast({ title: "Local Storage Offline", description: "System has defaulted to legacy cloud storage." });
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-48 border rounded-lg">
-        <Loader2 className="animate-spin h-6 w-6 text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading SQLite settings...</span>
+      <div className="flex justify-center items-center h-48 border border-slate-800 rounded-lg bg-slate-950/20 backdrop-blur-sm">
+        <Loader2 className="animate-spin h-6 w-6 text-indigo-500" />
+        <span className="ml-2 text-sm text-slate-400 font-black uppercase tracking-widest">Initialising Settings...</span>
       </div>
     );
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DatabaseZap className="h-5 w-5 text-primary" />
-            SQLite Database Management
-          </CardTitle>
-          <CardDescription>
-            Sirf SQLite use hota hai. Folder select karein jahan jrmd.sqlite store hoga. Sab data wahi se read/write hoga.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={onClickSelectSqliteFolder} variant="outline" size="sm">
-              <FolderOpen className="mr-2 h-4 w-4" />
-              Select SQLite folder
-            </Button>
-            <Button
-              onClick={handleImportExcelFolderToSqlite}
-              disabled={isImportingExcelToSqlite}
-              variant="outline"
-              size="sm"
-            >
-              {isImportingExcelToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {isImportingExcelToSqlite ? "Importing..." : "Import Excel folder \u2192 SQLite"}
-            </Button>
-            <Button
-              onClick={handleMigrateCurrentDataToSqlite}
-              disabled={isMigratingToSqlite}
-              variant="outline"
-              size="sm"
-            >
-              {isMigratingToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-              {isMigratingToSqlite ? "Migrating..." : "Migrate current data \u2192 SQLite"}
-            </Button>
-            <Button
-              onClick={handleUseSqliteForData}
-              disabled={isEnablingSqlite}
-              size="sm"
-              className="bg-primary text-primary-foreground"
-            >
-              {isEnablingSqlite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEnablingSqlite ? "Loading..." : (
-                <>
-                  <DatabaseZap className="mr-2 h-4 w-4" />
-                  Use SQLite for data
-                </>
-              )}
-            </Button>
-            {sqliteModeActive && (
-              <Button onClick={handleSwitchFromSqlite} variant="destructive" size="sm">
-                SQLite off
-              </Button>
-            )}
-          </div>
-          {(sqliteFolderPath || sqliteModeActive) && (
-            <div className="flex flex-col gap-2 mt-2 bg-muted/30 p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground break-all">
-                <strong>SQLite folder:</strong> {sqliteFolderPath || getSqliteFolderPath() || "\u2014"}
-              </p>
-              {dbSize !== null && (
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span><strong>DB Size:</strong> {(dbSize / 1024).toFixed(1)} KB</span>
-                  <Button
-                    onClick={handleVacuumSqlite}
-                    disabled={isVacuuming || !sqliteModeActive}
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-primary"
-                  >
-                    {isVacuuming ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <DatabaseZap className="mr-1 h-3 w-3" />}
-                    Optimize Size
-                  </Button>
-                </div>
-              )}
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {/* Subtle Theme-Aware Status Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 p-2 bg-card border border-border/80 rounded-[6px] shadow-sm">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-muted/30 rounded-[4px] border border-border/50">
+                <div className={cn("h-1.5 w-1.5 rounded-full", sqliteModeActive ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-muted-foreground/40")} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {sqliteModeActive ? 'Sync Online' : 'Offline Mode'}
+                </span>
             </div>
-          )}
 
-          <div className="mt-4 space-y-2 border-t pt-4">
-            <p className="text-sm font-medium">Create new DB from selected collections</p>
-            <div className="flex flex-wrap gap-2 text-[10px]">
-              {[
-                'settings',
-                'options',
-                'banks',
-                'bankBranches',
-                'bankAccounts',
-                'supplierBankAccounts',
-              ].map((name) => {
-                const labelMap: Record<string, string> = {
-                  settings: 'Settings',
-                  options: 'Options',
-                  banks: 'Banks',
-                  bankBranches: 'Bank Branches',
-                  bankAccounts: 'Bank Accounts',
-                  supplierBankAccounts: 'Supplier Bank Accounts',
-                };
+            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-muted/30 rounded-[4px] border border-border/50 flex-1 min-w-[200px]">
+                <Database className="h-3.5 w-3.5 text-primary/70" />
+                <span className="text-[10px] font-semibold text-foreground/80 truncate">
+                    {sqliteFolderPath || getSqliteFolderPath() || 'Local App Data'}
+                </span>
+            </div>
+
+            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-muted/30 rounded-[4px] border border-border/50">
+                <div className="flex items-center gap-1.5">
+                    <HardDrive className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <span className="text-[11px] font-bold text-foreground/70">{dbSize !== null ? (dbSize / 1024 / 1024).toFixed(1) : 0} MB</span>
+                </div>
+                {sqliteModeActive && (
+                   <Button onClick={handleVacuumSqlite} disabled={isVacuuming} variant="ghost" size="icon" className="h-6 w-6 rounded hover:bg-muted">
+                      {isVacuuming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingDown className="h-3.5 w-3.5 text-primary/60" />}
+                   </Button>
+                )}
+            </div>
+
+            <div className="flex gap-1.5">
+                <Button
+                    onClick={onClickSelectSqliteFolder}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 rounded-[4px] text-[10px] font-bold uppercase tracking-wider"
+                >
+                    <FolderOpen className="h-3.5 w-3.5 mr-2" />
+                    Change Directory
+                </Button>
+                {!sqliteModeActive ? (
+                  <Button
+                      onClick={handleUseSqliteForData}
+                      disabled={isEnablingSqlite}
+                      size="sm"
+                      className="h-8 px-4 rounded-[4px] bg-primary hover:bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wider shadow-sm transition-all"
+                  >
+                      {isEnablingSqlite ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
+                      Connect Hub
+                  </Button>
+                ) : (
+                  <Button
+                      onClick={handleSwitchFromSqlite}
+                      disabled={isEnablingSqlite}
+                      size="sm"
+                      className="h-8 px-4 rounded-[4px] variant-destructive text-[10px] font-bold uppercase tracking-wider transition-all"
+                  >
+                      Disconnect
+                  </Button>
+                )}
+            </div>
+        </div>
+
+        {/* Portable Backup Builder Section - 3D White Look using theme tokens */}
+        <div className="ui-card p-6 bg-white space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-5">
+            <div className="space-y-0.5">
+              <h4 className="text-base font-bold text-foreground flex items-center gap-2">
+                 <div className="p-1.5 bg-primary/5 rounded-md">
+                    <DatabaseZap className="h-4 w-4 text-primary" />
+                 </div>
+                 Portable Datasets
+              </h4>
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest ml-1">Administrative Migration Logic</p>
+            </div>
+            
+            <div className="flex items-center gap-1.5 p-1 bg-muted/40 border border-border/50 rounded-md">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCollectionsForNewDb([...SQLITE_TABLES])} className="h-7 px-3 text-[10px] font-bold uppercase text-muted-foreground hover:text-primary hover:bg-white rounded-sm transition-all">All</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCollectionsForNewDb([])} className="h-7 px-3 text-[10px] font-bold uppercase text-muted-foreground hover:text-destructive hover:bg-white rounded-sm transition-all">None</Button>
+              <div className="h-7 px-3 flex items-center bg-primary/10 text-primary text-[10px] font-bold rounded-sm border border-primary/20 uppercase tracking-tight">{selectedCollectionsForNewDb.length} Selected</div>
+            </div>
+          </div>
+
+          <div className="relative rounded-md border border-border/40 bg-muted/20 p-2 overflow-hidden shadow-inner">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 p-1 max-h-[400px] overflow-y-auto custom-scrollbar-mini">
+              {SQLITE_TABLES.map((name) => {
                 const checked = selectedCollectionsForNewDb.includes(name);
+                const getIcon = (table: string) => {
+                    const map: Record<string, any> = {
+                      suppliers: Truck, customers: Users, payments: CreditCard, customerPayments: HandCoins, governmentFinalizedPayments: Gavel,
+                      ledgerAccounts: BookText, ledgerEntries: ListPlus, ledgerCashAccounts: Wallet, incomes: TrendingUp, expenses: TrendingDown,
+                      transactions: ArrowRightLeft, banks: Landmark, bankBranches: MapPin, bankAccounts: CreditCard, supplierBankAccounts: Repeat,
+                      loans: Banknote, fundTransactions: Repeat, mandiReports: FileText, employees: UserRound, payroll: Coins, attendance: CalendarCheck,
+                      inventoryItems: Package, inventoryAddEntries: PlusCircle, kantaParchi: FileText, customerDocuments: Files, projects: Briefcase,
+                      options: Settings2, settings: Settings, incomeCategories: Tags, expenseCategories: Tag, accounts: UserCircle, manufacturingCosting: Factory, expenseTemplates: LayoutTemplate
+                    };
+                    const IconComp = map[table] || Database;
+                    return <IconComp className={cn("h-4 w-4", checked ? "text-primary" : "text-muted-foreground/50")} />;
+                };
+
                 return (
                   <button
                     key={name}
                     type="button"
                     onClick={() => toggleCollectionForNewDb(name)}
                     className={cn(
-                      "px-2 py-1 rounded-full border transition-colors",
-                      checked ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-accent"
+                      "flex flex-col items-center justify-center gap-2 p-4 rounded-md border transition-all duration-200 group/tile relative",
+                      checked 
+                        ? "bg-white text-primary border-primary/30 shadow-md scale-[1.02] z-10" 
+                        : "bg-white text-muted-foreground border-border/40 hover:border-primary/20 hover:shadow-sm hover:scale-[1.01]"
                     )}
                   >
-                    {labelMap[name] || name}
+                    <div className={cn("p-2 rounded-md transition-all duration-200", checked ? "bg-primary/5 text-primary" : "bg-muted/30")}>
+                        {getIcon(name)}
+                    </div>
+                    <span className="truncate text-[10px] font-bold uppercase tracking-tight text-center w-full">
+                        {toTitleCase(name.replace(/([A-Z])/g, ' $1').trim())}
+                    </span>
+                    {checked && (
+                       <div className="absolute top-1.5 right-1.5 flex items-center justify-center">
+                          <CheckCircle2 className="h-3 w-3 text-primary" />
+                       </div>
+                    )}
                   </button>
                 );
               })}
             </div>
-            <Button
-              onClick={handleCreateNewDbFromSelectedCollections}
-              disabled={isCreatingNewDb}
-              variant="outline"
-              size="sm"
-              className="mt-2"
-            >
-              {isCreatingNewDb ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-              {isCreatingNewDb ? "Creating..." : "Create new DB from selected collections"}
-            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Select SQLite Folder Popup Dialog */}
-      <Dialog open={isSelectFolderDialogOpen} onOpenChange={setIsSelectFolderDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Switch SQLite Folder</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {selectFolderFlowStep === "initial" && (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600">
-                  Folder switch karne se pehle current app data ko SQLite mein zaroor save/sync kar lein taki koi recent data loss na ho.
-                </p>
-                <Button 
-                  onClick={handleFlowSyncData} 
-                  disabled={isFlowSyncing} 
-                  className="w-full"
-                >
-                  {isFlowSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-                  {isFlowSyncing ? "Syncing..." : "Switch data (Sync to SQLite)"}
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/40">
+             <div className="flex gap-3">
+                <Button onClick={handleMigrateCurrentDataToSqlite} disabled={isMigratingToSqlite} variant="outline" size="sm" className="h-10 px-6 rounded-md text-[11px] font-bold uppercase tracking-widest hover:text-primary transition-all shadow-sm">
+                  {isMigratingToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4 text-primary/60" />}
+                  Safe Export
                 </Button>
-              </div>
-            )}
+                <Button onClick={handleImportExcelFolderToSqlite} disabled={isImportingExcelToSqlite} variant="outline" size="sm" className="h-10 px-6 rounded-md text-[11px] font-bold uppercase tracking-widest hover:text-emerald-600 transition-all shadow-sm">
+                  {isImportingExcelToSqlite ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600/60" />}
+                  Bulk Sync
+                </Button>
+             </div>
 
-            {selectFolderFlowStep === "synced" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-md border border-emerald-200">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <p className="text-sm font-medium">
-                    Data sync successful. {syncStats.total} records transfer hue.
+             <Button
+                onClick={handleCreateNewDbFromSelectedCollections}
+                disabled={isCreatingNewDb}
+                className="h-11 px-8 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 font-bold border-none"
+             >
+                {isCreatingNewDb ? <Loader2 className="mr-3 h-5 w-5 animate-spin" /> : <DatabaseZap className="mr-3 h-5 w-5" />}
+                Init Portable Sync
+             </Button>
+          </div>
+
+          {importSummary && (
+              <div className="p-4 rounded-md bg-emerald-50 border border-emerald-100 flex items-center gap-3 animate-in fade-in slide-in-from-top-1 shadow-sm">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  <p className="text-xs font-bold text-emerald-800 uppercase tracking-widest truncate">{importSummary}</p>
+              </div>
+          )}
+        </div>
+
+        {/* Select SQLite Folder Popup Dialog */}
+        <Dialog open={isSelectFolderDialogOpen} onOpenChange={setIsSelectFolderDialogOpen}>
+          <DialogContent className="sm:max-w-md bg-white border-slate-200 text-slate-900 rounded-3xl shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                 <FolderOpen className="h-5 w-5 text-indigo-600" />
+                 Switch Memory Hub
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {selectFolderFlowStep === "initial" && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                    <p className="text-xs text-amber-800 font-bold leading-relaxed">
+                      ⚠️ Data Safety Protocol: Ensure current session data is synchronized to Local Storage before switching directories. Unsaved cache may be lost.
+                    </p>
+                  </div>
+                  <Button onClick={handleFlowSyncData} disabled={isFlowSyncing} className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-indigo-600/20">
+                    {isFlowSyncing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRightLeft className="mr-2 h-5 w-5" />}
+                    {isFlowSyncing ? "Syncing Logic..." : "Sync & Proceed"}
+                  </Button>
+                </div>
+              )}
+
+              {selectFolderFlowStep === "synced" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-emerald-700 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
+                    <CheckCircle2 className="h-6 w-6" />
+                    <div>
+                        <p className="text-sm font-black uppercase tracking-tight">System Synced</p>
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{syncStats.total} Records safely moved.</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed text-center px-4">
+                    Dynamic cache (Dexie) can now be safely evacuated to restore baseline performance.
                   </p>
+                  <Button onClick={handleFlowClearDexie} className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-slate-900/20">
+                    Clear Engine Cache
+                  </Button>
                 </div>
-                {syncStats.error && (
-                  <p className="text-xs text-red-600 bg-red-50 p-2 rounded">{syncStats.error}</p>
-                )}
-                <p className="text-sm text-slate-600">
-                  Ab baari hai purane app cache (Dexie data) ko clear karne ki, taki nayi DB open karte waqt dono mix na hon.
-                </p>
-                <Button 
-                  onClick={handleFlowClearDexie} 
-                  className="w-full"
-                >
-                  Continue (Clear Dexie Data)
-                </Button>
-              </div>
-            )}
+              )}
 
-            {selectFolderFlowStep === "cleared" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-md border border-emerald-200">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <p className="text-sm font-medium">Cache completely cleared.</p>
+              {selectFolderFlowStep === "cleared" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-indigo-700 bg-indigo-50 px-4 py-3 rounded-2xl border border-indigo-100">
+                    <CheckCircle2 className="h-6 w-6" />
+                    <p className="text-sm font-black uppercase tracking-tight">Cache Evacuated</p>
+                  </div>
+                  <Button onClick={handleFlowSelectFolder} className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-indigo-600/20 shadow-indigo-600/20">
+                    <FolderOpen className="mr-2 h-5 w-5 font-bold" />
+                    Mount New Directory
+                  </Button>
                 </div>
-                <p className="text-sm text-slate-600">
-                  Aap completely safe hain naya folder select karne ke liye. Naya folder chunen.
-                </p>
-                <Button 
-                  onClick={handleFlowSelectFolder} 
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  Select folder
-                </Button>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="sm:justify-start">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsSelectFolderDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              )}
+            </div>
+            <DialogFooter className="sm:justify-center border-t border-slate-50 pt-4">
+               <Button type="button" variant="ghost" onClick={() => setIsSelectFolderDialogOpen(false)} className="text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest text-[11px] transition-colors">Abort Switch</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+    </div>
   );
 }

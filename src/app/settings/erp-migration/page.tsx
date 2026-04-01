@@ -358,6 +358,8 @@ export default function ErpMigrationPage() {
           electron?: {
             selectFolder?: () => Promise<string | null>;
             sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }>;
+            sqliteAll?: (tableName: string) => Promise<any[]>;
+            sqliteImportTable?: (tableName: string, rows: any[], opts?: { clear?: boolean }) => Promise<{ success: boolean; count?: number; error?: string }>;
           };
         }).electron
       : undefined;
@@ -379,51 +381,64 @@ export default function ErpMigrationPage() {
 
     setIsCreatingNewDb(true);
     try {
-      // Switch SQLite backend to target folder temporarily (sirf is operation ke liye)
-      const setRes = await electron.sqliteSetFolder(targetFolder);
+      // ✅ STEP 1: Read all data from CURRENT folder BEFORE switching
+      toast({ title: "Reading data...", description: "Current database se data padha ja raha hai..." });
+      const tableData: Record<string, any[]> = {};
+      let totalRead = 0;
+      for (const tableName of selectedCollectionsForNewDb) {
+        try {
+          const rows = await electron.sqliteAll!(tableName) ?? [];
+          tableData[tableName] = rows;
+          totalRead += rows.length;
+        } catch {
+          tableData[tableName] = [];
+        }
+      }
+
+      // ✅ STEP 2: Switch SQLite backend to target folder
+      const setRes = await electron.sqliteSetFolder!(targetFolder);
       if (!setRes?.success) {
         toast({ title: "Failed", description: setRes?.error || "Could not set SQLite folder.", variant: "destructive" });
         return;
       }
 
-      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
-      const out = await importDexieToSqlite(selectedCollectionsForNewDb);
-      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
-        table,
-        fromDexie: d.sourceCount,
-        toSqlite: d.sqliteCount,
-        error: d.error ?? "",
-      }));
-      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
-      const hasError = tableRows.some((r) => !!r.error || (r.table !== 'ledgerCashAccounts' && r.fromDexie !== r.toSqlite));
+      // ✅ STEP 3: Write data into the new folder's SQLite
+      toast({ title: "Writing data...", description: `${totalRead} records nayi DB me likh rahe hain...` });
+      const tableRows: { table: string; fromSource: number; toSqlite: number; error: string }[] = [];
+      for (const [tableName, rows] of Object.entries(tableData)) {
+        try {
+          const res = await electron.sqliteImportTable!(tableName, rows, { clear: true });
+          tableRows.push({ table: tableName, fromSource: rows.length, toSqlite: res.count ?? rows.length, error: res.success ? "" : (res.error ?? "import failed") });
+        } catch (e) {
+          tableRows.push({ table: tableName, fromSource: rows.length, toSqlite: 0, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
 
       if (typeof window !== "undefined") {
-        // Selected collections -> new DB diagnostics
         // eslint-disable-next-line no-console
         console.table(tableRows);
       }
 
+      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
+      const hasError = tableRows.some((r) => !!r.error);
+
       if (!hasError) {
-        toast({ title: "New DB created", description: `${total} records selected collections se nayi DB me copy ho gaye.`, variant: "success" });
+        toast({ title: "New DB created ✅", description: `${total} records selected collections se nayi DB me copy ho gaye.`, variant: "success" });
       } else {
         const firstErr = tableRows.find((r) => r.error)?.error;
-        const msg = firstErr || "Kuch collections copy nahi ho payeen. DevTools console.table me per-table detail dekh sakte hain.";
-        toast({ title: "New DB partial", description: msg, variant: "destructive" });
+        toast({ title: "New DB partial", description: firstErr || "Kuch collections copy nahi ho payeen.", variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
     } finally {
       // Hamesha purane active folder par backend ko wapas le aao
       if (currentFolder) {
-        try {
-          await electron.sqliteSetFolder(currentFolder);
-        } catch {
-          // ignore
-        }
+        try { await electron.sqliteSetFolder!(currentFolder); } catch { /* ignore */ }
       }
       setIsCreatingNewDb(false);
     }
   };
+
 
   const handleVacuumSqlite = async () => {
     const electron = typeof window !== "undefined" ? (window as any).electron : undefined;

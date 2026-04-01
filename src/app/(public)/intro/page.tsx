@@ -119,35 +119,32 @@ export default function IntroPage() {
                 <p className="text-slate-500 text-xs mt-0.5">Shuru karein</p>
               </div>
             </div>
-            <p className="text-slate-400 text-sm mb-6">
-              Naya user? Create se company banao. Pehle se account hai? Login karo.
+            <p className="text-slate-400 text-sm mb-6 text-center">
+              BizSuite use karne ke liye "Get Started" par click karein.
+              Aap wahi se Login kar sakte hain ya Nayi Company bana sakte hain.
             </p>
-            <div className="space-y-3">
-              <Link href="/create-company" className="block">
-                <Button
-                  className="w-full h-14 rounded-xl font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white border-0 shadow-[0_8px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300 text-base flex flex-col items-center justify-center gap-0.5 py-3"
-                  size="lg"
-                >
-                  <span className="flex items-center gap-2">
-                    <UserPlus className="h-5 w-5" />
-                    Create Company
-                  </span>
-                  <span className="text-xs font-normal text-white/80">Naya user — folder select karke company banao</span>
-                </Button>
-              </Link>
+            <div className="space-y-4">
               <Link href="/login" className="block">
                 <Button
-                  variant="outline"
-                  className="w-full h-14 rounded-xl border border-white/15 bg-slate-800/40 hover:bg-slate-700/50 hover:border-white/25 text-slate-300 transition-all text-base flex flex-col items-center justify-center gap-0.5 py-3"
+                  className="w-full h-16 rounded-2xl font-bold bg-gradient-to-r from-violet-500 via-indigo-600 to-purple-600 hover:from-violet-600 hover:via-indigo-700 hover:to-purple-700 text-white border-0 shadow-[0_12px_32px_rgba(99,102,241,0.35)] hover:shadow-[0_16px_40px_rgba(99,102,241,0.45)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-300 text-lg flex flex-col items-center justify-center gap-0.5"
                   size="lg"
                 >
-                  <span className="flex items-center gap-2">
-                    <LogIn className="h-5 w-5" />
-                    Login
+                  <span className="flex items-center gap-2.5">
+                    <Zap className="h-6 w-6 fill-white/20" />
+                    Get Started
                   </span>
-                  <span className="text-xs font-normal text-slate-400">Pehle se account hai</span>
+                  <span className="text-[11px] font-normal text-white/70 uppercase tracking-widest">
+                    Login / Create Company
+                  </span>
                 </Button>
               </Link>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <div className="h-px w-8 bg-white/10" />
+                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">
+                  Everything in one place
+                </span>
+                <div className="h-px w-8 bg-white/10" />
+              </div>
             </div>
           </div>
         </div>

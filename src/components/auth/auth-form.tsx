@@ -187,17 +187,21 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
           const { setErpMode, setErpSelectionStorage } = await import("@/lib/tenancy");
           const { doc, getDoc } = await import("firebase/firestore");
           const { firestoreDB } = await import("@/lib/firebase");
+
+          // signInWithCustomToken now goes through the local /api/firebase-auth-proxy
+          // because firebase.ts initializes auth with a custom fetchImpl in Electron.
           await signInWithCustomToken(getFirebaseAuth(), result.customToken);
           setErpMode(true);
+          
           const companySnap = await getDoc(doc(firestoreDB, "companies", result.companyId));
           const d = companySnap.exists() ? companySnap.data() : {};
-          const subCompanies =
-            (d.subCompanies as Record<string, { seasons?: Record<string, string> }>) || {};
+          const subCompanies = (d.subCompanies as Record<string, { seasons?: Record<string, string> }>) || {};
           const firstSub = Object.entries(subCompanies)[0];
           const subId = firstSub?.[0] || "main";
           const seasons = firstSub?.[1]?.seasons || {};
           const seasonKey = Object.keys(seasons)[0] || String(new Date().getFullYear());
           const hasValidSubSeason = firstSub && Object.keys(seasons).length > 0;
+
           setErpSelectionStorage({ companyId: result.companyId, subCompanyId: subId, seasonKey });
           toast({ title: "Login Successful", variant: "success" });
           electronNavigate(hasValidSubSeason ? "/" : "/company-setup?login=1");
@@ -205,10 +209,13 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
         }
         toast({ title: "Login Successful", variant: "success" });
         electronNavigate("/");
-      } catch {
+      } catch (error: any) {
+        console.error("[Login try-catch Error]:", error ? error.message || error.code || String(error) : "Unknown error");
+        try { console.error("[Login try-catch Stack]:", JSON.stringify(error, Object.getOwnPropertyNames(error))); } catch(e) {}
         setShowTransitionScreen(false);
-        setLoginError("Network error. Please try again.");
-        toast({ title: "Login Failed", description: "Network error", variant: "destructive" });
+        const errorMsg = error?.message || "Network error. Please try again.";
+        setLoginError(`Network/Client error: ${errorMsg}`);
+        toast({ title: "Login Failed", description: errorMsg, variant: "destructive" });
       } finally {
         setLoading(false);
       }

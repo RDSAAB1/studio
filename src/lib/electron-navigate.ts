@@ -2,7 +2,7 @@
  * Electron-aware navigation - use current origin when already on http(s) to avoid
  * SecurityError: replaceState cannot use a URL from a different origin.
  */
-const ELECTRON_APP_URL = 'http://127.0.0.1:3000';
+const ELECTRON_APP_URL = 'http://localhost:3000';
 
 /** Detect Electron: preload exposes .electron, or we set __ELECTRON__ from ?electron=1 (when preload fails in packaged app) */
 export function isElectron(): boolean {

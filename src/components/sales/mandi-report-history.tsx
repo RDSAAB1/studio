@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
 import { fetchMandiReports, getMandiReportsRealtime } from '@/lib/firestore';
 import { formatCurrency, toTitleCase } from "@/lib/utils";
@@ -333,4 +333,5 @@ export function MandiReportHistory() {
     </Card>
   );
 }
+
 

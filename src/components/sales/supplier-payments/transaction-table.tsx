@@ -65,9 +65,9 @@ export const TransactionTable = React.memo(
             if (sortKey === null) setSortKey("entry");
         }, [shouldSkipInitialSort, sortKey]);
 
-        const headerHeightClass = compact ? "h-7" : "h-9";
-        const rowHeightClass = compact ? "h-6" : "h-8";
-        const headTextClass = compact ? "text-[9px]" : "text-[11px]";
+        const headerHeightClass = compact ? "h-7" : "h-8";
+        const rowHeightClass = compact ? "h-7" : "h-9";
+        const headTextClass = compact ? "text-[10px]" : "text-[12px]";
         const checkboxClass = compact ? "h-2.5 w-2.5 rounded-full" : "h-3 w-3 rounded-full";
         const rowCheckboxClass = compact ? "h-3 w-3 rounded-full" : "h-3.5 w-3.5 rounded-full";
         const entrySrClass = compact ? "text-[10px]" : "text-[12px]";
@@ -263,22 +263,11 @@ export const TransactionTable = React.memo(
 
         const isCustomer = type === 'customer';
         const tableColumnGroup = (
-            <colgroup>
-                <col className="w-[4%]" />
-                <col className={isCustomer ? "w-[11%]" : "w-[13%]"} />
-                <col className={isCustomer ? "w-[11%]" : "w-[12%]"} />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                {isCustomer && <col className="w-[10%]" />}
-                <col className="w-[6%]" />
-            </colgroup>
+            <colgroup><col className="w-[4%]" /><col className={isCustomer ? "w-[15%]" : "w-[15%]"} /><col className={isCustomer ? "w-[15%]" : "w-[15%]"} /><col className={isCustomer ? "w-[10%]" : "w-[12%]"} /><col className={isCustomer ? "w-[9%]" : "w-[11%]"} /><col className={isCustomer ? "w-[9%]" : "w-[11%]"} /><col className={isCustomer ? "w-[8%]" : "w-[10%]"} /><col className={isCustomer ? "w-[10%]" : "w-[12%]"} />{isCustomer && <col className="w-[10%]" />}<col className="w-[10%]" /></colgroup>
         );
 
-        const headCellBaseClass = `${headerHeightClass} ${headTextClass} font-extrabold sticky top-0 z-10 bg-muted/50`;
-        const headSortButtonClass = `w-full h-full flex items-center gap-1 ${compact ? "text-[9px]" : "text-[11px]"} font-extrabold`;
+        const headSortButtonClass = `flex w-full items-center gap-1.5 hover:text-primary transition-colors py-1`;
+        const headCellBaseClass = `${headTextClass} font-extrabold`;
 
         const SortIndicator = ({ columnKey }: { columnKey: SortKey }) => {
             if (sortKey !== columnKey) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
@@ -290,68 +279,93 @@ export const TransactionTable = React.memo(
         };
 
         const tableHeader = (
-            <TableHeader>
-                <TableRow className={`border-b border-border ${headerHeightClass} rounded-none bg-transparent`}>
-                    <TableHead className={`py-0 px-1 ${headCellBaseClass} text-center`}>
-                        <div className="flex items-center justify-center">
-                            <Checkbox
-                                checked={(selectedIds?.size ?? 0) > 0 && selectedIds.size === allSuppliers.length}
-                                onCheckedChange={handleSelectAll}
-                                className={checkboxClass}
-                            />
-                        </div>
+            <TableHeader
+                className="table-header-compact z-20"
+            >
+                <TableRow className="border-b-0">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} align-middle text-center`}
+                    >
+                        <Checkbox
+                            checked={(selectedIds?.size ?? 0) > 0 && selectedIds.size === allSuppliers.length}
+                            onCheckedChange={handleSelectAll}
+                            className={checkboxClass}
+                        />
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>
-                        <button type="button" className={headSortButtonClass} onClick={() => requestSort("entry")}>
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}
+                    >
+                        <button type="button" className={`${headSortButtonClass} whitespace-nowrap`} onClick={() => requestSort("entry")}>
                             <SortIndicator columnKey="entry" />
                             <span>Entry</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}>
-                        <button type="button" className={headSortButtonClass} onClick={() => requestSort("date")}>
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} align-middle`}
+                    >
+                        <button type="button" className={`${headSortButtonClass} whitespace-nowrap`} onClick={() => requestSort("date")}>
                             <SortIndicator columnKey="date" />
                             <span>Date</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit – Total Amount">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                    >
                         <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("original")}>
                             <SortIndicator columnKey="original" />
-                            <span>Original (Income)</span>
+                            <span>Original</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Income/Credit">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                        title="Income/Credit"
+                    >
                         <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("extra")}>
                             <SortIndicator columnKey="extra" />
-                            <span>Extra (Income)</span>
+                            <span>Extra</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit – Total Paid">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                        title="Expense/Debit – Total Paid"
+                    >
                         <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("paid")}>
                             <SortIndicator columnKey="paid" />
-                            <span>Paid (Expense)</span>
+                            <span>Paid</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Expense/Debit">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                        title="Expense/Debit"
+                    >
                         <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("cd")}>
                             <SortIndicator columnKey="cd" />
-                            <span>CD (Expense)</span>
+                            <span>CD</span>
                         </button>
                     </TableHead>
-                    <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Net balance">
+                    <TableHead
+                        className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                        title="Net balance"
+                    >
                         <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("outstanding")}>
                             <SortIndicator columnKey="outstanding" />
-                            <span>Outstanding (Net)</span>
+                            <span>Outstanding</span>
                         </button>
                     </TableHead>
                     {isCustomer && (
-                        <TableHead className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`} title="Advance Freight taken (recover in payment)">
+                        <TableHead
+                            className={`py-0 px-1.5 ${headCellBaseClass} text-right align-middle`}
+                            title="Advance Freight taken (recover in payment)"
+                        >
                             <button type="button" className={`${headSortButtonClass} justify-end`} onClick={() => requestSort("advanceFreight")}>
                                 <SortIndicator columnKey="advanceFreight" />
                                 <span>Adv. Freight</span>
                             </button>
                         </TableHead>
                     )}
-                    <TableHead className={`py-0 px-1 ${headCellBaseClass} text-center align-middle`}>Actions</TableHead>
+                    <TableHead
+                        className={`py-0 px-1 ${headCellBaseClass} text-center align-middle`}
+                    >Actions</TableHead>
                 </TableRow>
             </TableHeader>
         );

@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import type { Customer, OptionItem, Payment, Holiday } from "@/lib/definitions";
 import { calculateSupplierEntry, calculateSupplierEntryWithValidation, toTitleCase } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
 import { updateSupplier, getOptionsRealtime, getHolidays, getDailyPaymentLimit, addOption, updateOption, deleteOption } from "@/lib/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -529,7 +529,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                                             />
                                         </div>
                                         <p className="text-[10px] text-muted-foreground">
-                                            Brokerage Amount = Final Weight × Brokerage Rate
+                                            Brokerage Amount = Final Weight Ã— Brokerage Rate
                                         </p>
                                     </div>
                                 </CardContent>
@@ -555,3 +555,4 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
         </Dialog>
     );
 };
+

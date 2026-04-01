@@ -1,0 +1,44 @@
+﻿src/app/sales/ledger/page.tsx(365,26): error TS2554: Expected 0 arguments, but got 3.
+src/app/settings/erp-migration/page.tsx(182,17): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(183,58): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(184,17): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(184,33): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(184,47): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(185,51): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(185,73): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(185,86): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(185,108): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(193,22): error TS2339: Property 'loaded' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(194,22): error TS2339: Property 'loaded' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(198,50): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(201,32): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/app/settings/erp-migration/page.tsx(203,23): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(204,22): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(205,24): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/erp-migration/page.tsx(206,22): error TS18046: 'info' is of type 'unknown'.
+src/app/settings/page.tsx(238,69): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/app/settings/page.tsx(353,117): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/app/settings/page.tsx(363,46): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/components/admin/sqlite-migration-card.tsx(181,17): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(182,58): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(183,17): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(183,33): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(183,47): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(184,51): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(184,73): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(184,86): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(184,108): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(192,22): error TS2339: Property 'loaded' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(193,22): error TS2339: Property 'loaded' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(197,50): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(200,32): error TS2339: Property 'details' does not exist on type '{ success: boolean; folder?: string | undefined; error?: string | undefined; }'.
+src/components/admin/sqlite-migration-card.tsx(202,23): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(203,22): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(204,24): error TS18046: 'info' is of type 'unknown'.
+src/components/admin/sqlite-migration-card.tsx(205,22): error TS18046: 'info' is of type 'unknown'.
+src/components/layout/erp-company-selector.tsx(667,28): error TS2304: Cannot find name 'Database'.
+src/components/layout/header.tsx(21,40): error TS2305: Module '"@/lib/database"' has no exported member 'syncAllDataWithDetails'.
+src/components/layout/header.tsx(21,64): error TS2305: Module '"@/lib/database"' has no exported member 'getLastSyncKey'.

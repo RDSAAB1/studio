@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Building2, Layers, FileText, Plus, X, HardDrive, Loader2 } from "lucide-react";
+import { Building2, Layers, FileText, Plus, X, HardDrive, Loader2, Database } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,

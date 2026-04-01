@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { Loader2, Save, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { UseFormReturn } from "react-hook-form";
 import type { BankAccount, Project } from "@/lib/definitions";
 
@@ -33,6 +34,7 @@ type TransactionFormValues = {
   expenseNature?: string;
   projectId?: string;
   loanId?: string;
+  isInternal?: boolean;
 };
 
 interface TransactionFormProps {
@@ -103,14 +105,40 @@ export const TransactionForm = memo(function TransactionForm({
         />
       </div>
 
+      <div className="flex items-center space-x-2 py-1 px-1 bg-violet-50/50 rounded-lg border border-violet-100/50">
+        <Checkbox 
+          id="isInternal" 
+          checked={watch('isInternal')}
+          onCheckedChange={(checked) => {
+            setValue('isInternal', checked === true);
+            if (checked === true) {
+              setValue('paymentMethod', 'Other');
+              setValue('bankAccountId', undefined);
+            } else {
+              setValue('paymentMethod', 'Cash');
+            }
+          }}
+          className="h-3.5 w-3.5 border-violet-300 data-[state=checked]:bg-violet-600"
+        />
+        <Label 
+          htmlFor="isInternal" 
+          className="text-[10px] font-bold text-violet-700 cursor-pointer select-none"
+        >
+          Non-Cash / Balance Adjustment
+        </Label>
+      </div>
+
       <Controller
         name="incomeAmount"
         control={control}
         render={({ field }) => {
           const incomeAmountId = `incomeAmount-${field.name}`;
+          const isInternal = watch('isInternal');
           return (
             <div className="space-y-0.5">
-              <Label htmlFor={incomeAmountId} className="text-[10px] font-semibold text-slate-600">Credit (Income)</Label>
+              <Label htmlFor={incomeAmountId} className="text-[10px] font-semibold text-slate-600">
+                {isInternal ? 'Add to Balance (Credit)' : 'Credit (Income)'}
+              </Label>
               <Input
                 id={incomeAmountId}
                 type="number"
@@ -134,9 +162,12 @@ export const TransactionForm = memo(function TransactionForm({
         control={control}
         render={({ field }) => {
           const expenseAmountId = `expenseAmount-${field.name}`;
+          const isInternal = watch('isInternal');
           return (
             <div className="space-y-0.5">
-              <Label htmlFor={expenseAmountId} className="text-[10px] font-semibold text-slate-600">Debit (Expense)</Label>
+              <Label htmlFor={expenseAmountId} className="text-[10px] font-semibold text-slate-600">
+                {isInternal ? 'Subtract from Balance (Debit)' : 'Debit (Expense)'}
+              </Label>
               <Input
                 id={expenseAmountId}
                 type="number"
@@ -160,6 +191,9 @@ export const TransactionForm = memo(function TransactionForm({
         control={control}
         render={({ field }) => {
           const paymentMethodId = `paymentMethod-${field.name}`;
+          const isInternal = watch('isInternal');
+          if (isInternal) return <></>;
+
           return (
             <div className="space-y-0.5">
               <Label htmlFor={paymentMethodId} className="text-[10px] font-semibold text-slate-600">Payment Method</Label>

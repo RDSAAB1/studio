@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
 import { deleteSupplier, updateSupplier } from "@/lib/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -1329,3 +1329,4 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
 };
 
 export const SimpleSupplierTable = memo(SimpleSupplierTableComponent);
+

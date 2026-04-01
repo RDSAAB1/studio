@@ -17,12 +17,30 @@ function safeNumeric(val: any): number {
 }
 
 /**
- * Parses date string, specifically handles DD-MM-YYYY to YYYY-MM-DD
+ * Parses date string, specifically handles Excel serial dates and DD-MM-YYYY
  */
 function parseImportDate(val: any): string {
-    if (!val) return new Date().toISOString().split('T')[0];
+    const today = new Date();
+    // Use local time zone offset to prevent off-by-one errors when formatting
+    const offset = today.getTimezoneOffset() * 60000;
+    const localToday = new Date(today.getTime() - offset).toISOString().split('T')[0];
+    
+    if (!val) return localToday;
+
+    // Handle Excel Serial Dates (e.g., 45123)
+    if (typeof val === 'number' || !isNaN(Number(val))) {
+        const serial = Number(val);
+        if (serial > 10000) { // Likely an Excel date
+            // Excel dates are days since Dec 30 1899
+            const d = new Date(Date.UTC(1899, 11, 30));
+            d.setUTCDate(d.getUTCDate() + serial);
+            return d.toISOString().split('T')[0];
+        }
+    }
+
     const s = String(val).trim();
-    // Match DD-MM-YYYY or DD/MM/YYYY
+    
+    // Match DD-MM-YYYY, DD/MM/YYYY, D-M-YYYY etc.
     const dmyMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
     if (dmyMatch) {
         const day = dmyMatch[1].padStart(2, '0');
@@ -30,7 +48,15 @@ function parseImportDate(val: any): string {
         const year = dmyMatch[3];
         return `${year}-${month}-${day}`;
     }
-    return s; // Fallback to original
+
+    // Try native parsing as a fallback
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+        const localParsed = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+        return localParsed.toISOString().split('T')[0];
+    }
+
+    return localToday;
 }
 
 /**
@@ -63,7 +89,7 @@ export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): C
     }
 
     const srNo = formatSrNo(numericSrNo, 'S');
-    const date = parseImportDate(getFlexValue(row, 'DATE'));
+    let date = parseImportDate(getFlexValue(row, 'DATE'));
     const vehicleNo = String(getFlexValue(row, 'VEHICLE NO') || getFlexValue(row, 'VEHICLE') || getFlexValue(row, 'TRUCK') || '').trim().toUpperCase();
     const name = String(getFlexValue(row, 'CUSTOMER') || getFlexValue(row, 'NAME') || getFlexValue(row, 'SUPPLIER') || '').trim();
     
@@ -111,17 +137,6 @@ export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): C
         labouryRate = safeNumeric(rawLabour);
     }
 
-    // Term/Bags logic: Extract numeric part. Default to 21 days if not clear.
-    const termValue = String(getFlexValue(row, 'TERM') || '').trim();
-    let term = '21';
-    if (termValue) {
-        // If it says "224 BAG", it might be bags. But if it says "21 DAYS", it's term.
-        const matches = termValue.match(/\d+/);
-        if (matches && !termValue.toUpperCase().includes('BAG') && !termValue.toUpperCase().includes('KATTA')) {
-            term = matches[0];
-        }
-    }
-
     // 3. Core Calculations (Matching screenshot logic)
     const kartaPercentage = 1; // Standard 1% default for these imports
     const kartaWeight = Number((weight * 0.01).toFixed(2));
@@ -134,29 +149,50 @@ export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): C
     const kartaAmount = Number((amount * (kartaPercentage / 100)).toFixed(2));
     const netAmount = Number((amount - kartaAmount - labouryAmount - kanta).toFixed(2));
 
-    // Calculate Due Date based on date + term
-    let dueDate = '';
+    // Term/Days logic: Extract numeric part. Default to 0 if not clear.
+    const rawTerm = String(getFlexValue(row, 'TERM') || '').trim();
+    let termDays = 0;
+    if (rawTerm) {
+        const matches = rawTerm.match(/\d+/);
+        if (matches) termDays = parseInt(matches[0]);
+    }
+
+    // Calculate Due Date based on the parsed transaction date + term
+    let dueDate = date; 
     try {
-        const entryDate = date ? parseISO(date) : new Date();
-        const termDays = parseInt(term) || 0;
+        const entryDate = new Date(date);
         if (!isNaN(entryDate.getTime())) {
-            dueDate = format(addDays(entryDate, termDays), 'yyyy-MM-dd');
+            // Use local date methods to add days
+            entryDate.setDate(entryDate.getDate() + termDays);
+            
+            // Format to YYYY-MM-DD avoiding timezone shifts
+            const offset = entryDate.getTimezoneOffset() * 60000;
+            const localFormatted = new Date(entryDate.getTime() - offset).toISOString().split('T')[0];
+            dueDate = localFormatted;
         }
-    } catch {
-        dueDate = date; // Fallback to entry date if calculation fails
+    } catch (e) {
+        console.warn('[Import] Due Date calculation failed for date:', date, e);
+    }
+    
+    // Final safety check to absolutely prevent empty strings
+    if (!dueDate || dueDate.trim() === '') {
+        const today = new Date();
+        const offset = today.getTimezoneOffset() * 60000;
+        dueDate = new Date(today.getTime() - offset).toISOString().split('T')[0];
+        date = dueDate;
     }
 
     return {
         id: `imp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         srNo: srNo,
-        date: date || new Date().toISOString().split('T')[0],
+        date: date,
         name: toTitleCase(name),
         so: toTitleCase(so),
         address: toTitleCase(address),
         contact: contact,
         vehicleNo: vehicleNo,
         variety: toTitleCase(variety),
-        term: term,
+        term: String(termDays),
         dueDate: dueDate,
         grossWeight,
         teirWeight,

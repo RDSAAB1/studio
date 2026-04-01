@@ -35,12 +35,14 @@ interface CustomDropdownProps {
     onGoClick?: () => void;
     maxRows?: number;
     showScrollbar?: boolean;
-    searchType?: SearchType; // Search by specific field: name, fatherName, address, contact, or all
+     searchType?: SearchType; // Search by specific field: name, fatherName, address, contact, or all
     onSearchTypeChange?: (type: SearchType) => void; // Callback when search type changes
     id?: string; // ID for accessibility
+    className?: string; // Custom class for container
+    showSearch?: boolean; // Whether to show the search input
 }
-
-export const CustomDropdown: React.FC<CustomDropdownProps> = ({
+ 
+ export const CustomDropdown: React.FC<CustomDropdownProps & { className?: string }> = ({
     options,
     value,
     onChange,
@@ -59,6 +61,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     searchType = 'name',
     onSearchTypeChange,
     id,
+    className,
+    showSearch = true,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -378,11 +382,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         return allMatches.map(m => m.item);
     }, [debouncedSearchTerm, options, selectedItem, currentSearchType]);
 
-    // Virtual scrolling: only render visible items
-    const ITEM_HEIGHT = 32; // Approximate height of each item (reduced for smaller text)
+     // Virtual scrolling: only render visible items
+    const ITEM_HEIGHT = 28; // Reduced for compact, high-density UI
     const VISIBLE_ITEMS = 20; // Number of items visible at once
     const BUFFER = 5; // Extra items to render for smooth scrolling
-    const maxHeightValue = maxRows ? maxRows * ITEM_HEIGHT : 320; // Max height in pixels
+     const maxHeightValue = maxRows ? maxRows * ITEM_HEIGHT : 200; // Max height in pixels (reduced for compact UI)
     const maxHeight = maxRows ? `${maxHeightValue}px` : '20rem';
     // Calculate actual height based on items count
     const PADDING = 8; // py-1 = 4px top + 4px bottom
@@ -527,7 +531,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
 
     return (
-        <div className="relative w-full" ref={dropdownRef}>
+        <div className={cn("relative w-full", className)} ref={dropdownRef}>
             {/* Search Type Dropdown - Only show if onSearchTypeChange is provided */}
             {onSearchTypeChange && (
                 <div className="mb-2">
@@ -545,7 +549,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 </div>
             )}
             <div className="relative">
-                <Search className={cn("absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none", iconClassName)} />
+                {showSearch && <Search className={cn("absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none", iconClassName)} />}
                 <Input
                     ref={inputRef}
                     id={id}
@@ -596,26 +600,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         // Handle keyboard navigation when dropdown is open
                         if (e.key === "ArrowDown") {
                             e.preventDefault();
-                            const nextIndex = highlightedIndex < filteredItems.length - 1 
-                                ? highlightedIndex + 1 
-                                : 0;
-                            setHighlightedIndex(nextIndex);
-                            // Scroll to highlighted item
-                            if (listRef.current) {
-                                const targetScrollTop = nextIndex * ITEM_HEIGHT;
-                                listRef.current.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-                            }
+                            e.stopPropagation();
+                            setIsOpen(true);
+                            setHighlightedIndex(prev => (prev < filteredItems.length - 1 ? prev + 1 : prev));
                         } else if (e.key === "ArrowUp") {
                             e.preventDefault();
-                            const prevIndex = highlightedIndex > 0 
-                                ? highlightedIndex - 1 
-                                : filteredItems.length - 1;
-                            setHighlightedIndex(prevIndex);
-                            // Scroll to highlighted item
-                            if (listRef.current) {
-                                const targetScrollTop = prevIndex * ITEM_HEIGHT;
-                                listRef.current.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-                            }
+                            e.stopPropagation();
+                            setIsOpen(true);
+                            setHighlightedIndex(prev => (prev > 0 ? prev - 1 : 0));
                         } else if (e.key === "Enter") {
                             e.preventDefault();
                             e.stopPropagation(); // Prevent form submission or other handlers
@@ -643,7 +635,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     data-lpignore="true"
                     data-1p-ignore="true"
                     name={`custom-dropdown-${Math.random().toString(36).substring(7)}`}
-                    className={cn("w-full pl-8 h-8 text-sm", showGoButton ? "pr-14" : "pr-8", inputClassName)}
+                    className={cn("w-full h-8 text-sm", showSearch ? "pl-8" : "pl-3", showGoButton ? "pr-14" : "pr-8", inputClassName)}
+                    readOnly={!showSearch}
                 />
                 {showGoButton && (
                     <div className="absolute inset-y-0 right-1 flex items-center">
@@ -682,7 +675,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
             {isOpen && isMounted && createPortal(
                 <div 
-                    className="fixed bg-popover border border-border rounded-md shadow-lg z-[100]" 
+                    className="fixed bg-popover border border-border rounded-none shadow-lg z-[100]" 
                     style={{ 
                         position: 'fixed', 
                         top: `${dropdownPosition.top}px`, 

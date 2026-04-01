@@ -1,36 +1,9 @@
 
 "use client"
 
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from "@/components/ui/toast"
-import { useToast } from "@/hooks/use-toast"
-
+// The <Toaster> (bottom popup) is suppressed.
+// All notifications are now shown as a compact single-line pill
+// in the header bar via DynamicIslandToaster.
 export function Toaster() {
-  const { toasts } = useToast()
-
-  return (
-    <ToastProvider duration={20000}>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid flex-1 gap-0.5 py-0.5 pr-6 text-left">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        )
-      })}
-      <ToastViewport />
-    </ToastProvider>
-  )
+  return null;
 }

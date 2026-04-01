@@ -523,10 +523,6 @@ export default function RtgsReportClient() {
                                     }
                                     await db.payments.put(localUpdateData);
                                     updateCount++;
-                                    // Dispatch event to trigger global data context reload (auto-refresh)
-                                    if (typeof window !== 'undefined') {
-                                        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'payments' } }));
-                                    }
                                 }
                             } catch (localError) {
                                 console.error(`Local update failed for ${id}:`, localError);

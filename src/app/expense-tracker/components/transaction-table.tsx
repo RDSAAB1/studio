@@ -19,13 +19,15 @@ interface TransactionTableProps {
   onEdit: (transaction: DisplayTransaction) => void;
   onDelete: (transaction: DisplayTransaction) => void;
   totalExpenseCount?: number | null;
+  selectedAccount?: string | null;
 }
 
 export function TransactionTable({ 
   transactions, 
   onEdit, 
   onDelete,
-  totalExpenseCount
+  totalExpenseCount,
+  selectedAccount
 }: TransactionTableProps) {
   
   // Calculate running balance and sort
@@ -58,16 +60,10 @@ export function TransactionTable({
     }, { income: 0, expense: 0 });
   }, [transactions]);
 
-  if (transactions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-        <p>No transactions found.</p>
-      </div>
-    );
-  }
+
 
   return (
-    <div className="w-full rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] overflow-hidden flex flex-col h-full">
+    <div className="w-full rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] border-b-[3px] border-b-primary/20 overflow-hidden flex flex-col h-full">
       {/* Dark Top Bar */}
       <div className="bg-primary/20 text-slate-900 px-4 py-2 flex justify-between items-center shrink-0 border-b border-primary/30">
         <div className="font-bold text-sm">Transaction History</div>
@@ -89,7 +85,7 @@ export function TransactionTable({
 
       <div className="bg-white overflow-hidden flex-1 flex flex-col">
         <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-          <table className="w-full text-xs text-left table-fixed">
+          <table className="w-full min-w-[800px] text-xs text-left table-fixed">
             <colgroup>
               <col className="w-[6%]" />
               <col className="w-[14%]" />
@@ -100,20 +96,33 @@ export function TransactionTable({
               <col className="w-[10%]" />
               <col className="w-[6%]" />
             </colgroup>
-            <TableHeader className="sticky top-0 z-10 bg-primary/15 backdrop-blur-[14px]">
+            <TableHeader className="table-header-compact">
               <TableRow className="border-none h-7">
                 <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">S.No</TableHead>
                 <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">Date</TableHead>
                 <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">ID</TableHead>
                 <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">Payee / Description</TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">Income</TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">Expense</TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">Balance</TableHead>
+                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">
+                  {selectedAccount ? 'Credit (+)' : 'Income'}
+                </TableHead>
+                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">
+                  {selectedAccount ? 'Debit (-)' : 'Expense'}
+                </TableHead>
+                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">
+                  {selectedAccount ? 'Net Balance' : 'Running Balance'}
+                </TableHead>
                 <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactionsWithBalance.map((transaction, index) => (
+              {transactions.length === 0 ? (
+                <TableRow className="border-none hover:bg-transparent">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    No transactions found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                transactionsWithBalance.map((transaction, index) => (
                 <TableRow 
                   key={transaction.id} 
                   className="group border-none odd:bg-slate-50/60 even:bg-white hover:bg-primary/10 transition-colors h-7"
@@ -129,7 +138,14 @@ export function TransactionTable({
                   </TableCell>
                   <TableCell className="px-2 py-1">
                     <div className="flex flex-col text-slate-900">
-                      <span className="font-bold text-xs truncate">{transaction.payee}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs truncate">{transaction.payee}</span>
+                        {transaction.isInternal && (
+                          <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-bold rounded uppercase leading-none border border-violet-200">
+                            Adjust
+                          </span>
+                        )}
+                      </div>
                       {transaction.description && (
                         <span className="text-[10px] text-slate-600 mt-0.5 truncate">
                           {transaction.description}
@@ -172,7 +188,7 @@ export function TransactionTable({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )))}
             </TableBody>
           </table>
         </div>

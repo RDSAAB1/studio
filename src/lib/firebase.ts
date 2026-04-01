@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { initializeFirestore, setLogLevel, type Firestore } from 'firebase/firestore';
@@ -25,60 +24,44 @@ const firebaseConfig = {
   appId: "1:1083654429292:web:735c2b52865c1f394a5e0f"
 };
 
-// Initialize Firebase
+// Initialize Firebase app (singleton)
 let app: FirebaseApp;
-if (typeof window !== 'undefined') {
-    if (getApps().length === 0) {
-        app = initializeApp(firebaseConfig);
-    } else {
-        app = getApp();
-    }
+if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
 } else {
-    // For server-side rendering, we might not need to initialize the app
-    // or we can use a mock. However, for auth, client-side init is crucial.
-    // This block is mainly a safeguard.
-    if (getApps().length === 0) {
-        app = initializeApp(firebaseConfig);
-    } else {
-        app = getApp();
-    }
+    app = getApp();
 }
 
-
-// No persistent cache in browser — persistentLocalCache was causing setDoc to hang on company creation.
-// Use default (in-memory) so writes go straight to server. Re-enable later if offline support is needed.
+// No persistent cache — persistentLocalCache was causing setDoc to hang on company creation.
 const firestoreDB: Firestore = initializeFirestore(app, {});
 const storage = getStorage(app);
 
-// Suppress Firestore connectivity logs.
 if (typeof window !== 'undefined') {
     setLogLevel('silent');
 }
 
-
-// Use a function to get auth instance to ensure it's client-side
+// Auth singleton.
+// NOTE: Electron network issues (auth/network-request-failed) are handled at the
+// Electron main process level. In electron/main.js, we inject a global window.fetch
+// override into the renderer's main world that transparently proxies all
+// identitytoolkit.googleapis.com calls through /api/firebase-auth-proxy (which 
+// runs in Node.js and has full internet access). This means the SDK's own fetch
+// calls are intercepted automatically — no Firebase SDK internals needed here.
 let authInstance: Auth | null = null;
 const getFirebaseAuth = (): Auth => {
-    if (typeof window === 'undefined') {
-        // Return a mock or minimal auth object on the server
-        return {} as Auth;
-    }
-    if (!authInstance) {
-        authInstance = getAuth(app);
-    }
+    if (typeof window === 'undefined') return {} as Auth;
+    if (!authInstance) authInstance = getAuth(app);
     return authInstance;
-}
+};
 
 const getGoogleProvider = (): GoogleAuthProvider => {
     const provider = new GoogleAuthProvider();
-    // No advanced scopes are needed here since we use App Password for sending emails.
-    // The sign-in is purely for authentication.
     return provider;
 };
 
 export { 
     app, 
-    firestoreDB, // Changed export name
+    firestoreDB,
     storage, 
     getFirebaseAuth, 
     getGoogleProvider, 

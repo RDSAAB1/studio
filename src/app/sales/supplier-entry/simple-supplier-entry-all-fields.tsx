@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type React from "react";
@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
 import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, getSupplierIdBySrNo } from "@/lib/firestore";
 import { useGlobalData } from '@/contexts/global-data-context';
@@ -689,3 +689,4 @@ export default function SimpleSupplierEntryAllFields() {
         </div>
     );
 }
+

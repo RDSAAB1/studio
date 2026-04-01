@@ -11,8 +11,21 @@ if (typeof isDev !== 'boolean') {
   isDev = isDev && isDev.default !== undefined ? isDev.default : !!isDev;
 }
 
-let SERVER_PORT = 3000;
-let SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
+// Security, Proxy, and SSL workarounds for locked-down local environments (AV/Firewalls)
+app.commandLine.appendSwitch('ignore-certificate-errors');
+app.commandLine.appendSwitch('enable-print-browser');
+app.commandLine.appendSwitch('disable-print-view'); // Sometimes needed to force the MODERN chromium preview over the system one
+
+// Enable low-level Chromium network logging to capture the exact fetch failure reason
+const netLogPath = path.join(app.getPath('userData'), 'net-log.json');
+app.commandLine.appendSwitch('log-net-log', netLogPath);
+console.log('[Electron] Writing NetLog to:', netLogPath);
+// app.commandLine.appendSwitch('no-proxy-server'); // Removed as this breaks Firebase Auth if a proxy is needed
+
+let SERVER_PORT = isDev ? 3010 : 3000;
+let SERVER_URL = `http://localhost:${SERVER_PORT}`;
+let mainWindow = null;
+let nextServerProcess = null;
 
 function findFreePort(startPort) {
   const net = require('net');
@@ -62,7 +75,16 @@ function getUnpackedAppPath() {
 
 function startNextServer(port) {
   const cwd = getUnpackedAppPath();
-  const env = { ...process.env, PORT: String(port), HOSTNAME: '127.0.0.1', NODE_ENV: 'production' };
+  const appPath = app.getAppPath();
+  const asarNodeModules = path.join(appPath, 'node_modules'); // Path inside ASAR (or root in dev)
+  
+  const env = { 
+    ...process.env, 
+    PORT: String(port), 
+    HOSTNAME: '0.0.0.0', 
+    NODE_ENV: 'production',
+    NODE_PATH: asarNodeModules // Critical: allow server to find hoisted deps in ASAR
+  };
   
   // Run Next.js standalone server in a separate process to avoid blocking the main thread.
   const standaloneDir = path.join(cwd, '.next', 'standalone');
@@ -119,7 +141,6 @@ function startNextServer(port) {
 let sqliteDb = null;
 let sqliteFolderPath = null;
 let sqliteError = null;
-let sqliteLib = null;
 
 function getConfigPath() {
   try {
@@ -166,10 +187,8 @@ function getSqliteFolder() {
 function setSqliteFolder(folderPath) {
   const safePath = path.normalize(folderPath);
   
-  // Save the currently open database to its CURRENT folder FIRST
   if (sqliteDb) {
     try {
-      saveSqliteToFile();
       sqliteDb.close();
     } catch {
       // ignore
@@ -177,50 +196,14 @@ function setSqliteFolder(folderPath) {
     sqliteDb = null;
   }
 
-  // NOW update the folder path to the NEW folder
   sqliteFolderPath = safePath;
   const cfg = loadConfig();
   cfg.sqliteFolder = safePath;
   saveConfig(cfg);
 }
 
-async function initSqliteLib() {
-  if (sqliteLib) return sqliteLib;
-  try {
-    const initSqlJs = require('sql.js');
-    const appPath = app.getAppPath();
-    const unpackedPath = path.join(appPath, 'app.asar.unpacked', 'node_modules', 'sql.js', 'dist');
-    const asarPath = path.join(appPath, 'node_modules', 'sql.js', 'dist');
-    sqliteLib = await initSqlJs({
-      locateFile: (file) => {
-        const unpacked = path.join(unpackedPath, file);
-        if (fs.existsSync(unpacked)) return unpacked;
-        return path.join(asarPath, file);
-      },
-    });
-    return sqliteLib;
-  } catch (e) {
-    sqliteError = e;
-    throw e;
-  }
-}
-
-function saveSqliteToFile() {
-  if (!sqliteDb) return;
-  const baseFolder = getSqliteFolder();
-  const dbPath = path.join(baseFolder, 'jrmd.sqlite');
-  try {
-    const data = sqliteDb.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
-  } catch {
-    // ignore
-  }
-}
-
-async function getSqliteDb() {
+function getSqliteDb() {
   if (sqliteDb) return sqliteDb;
-  const SQL = await initSqliteLib();
   const baseFolder = getSqliteFolder();
   try {
     if (!fs.existsSync(baseFolder)) {
@@ -230,28 +213,95 @@ async function getSqliteDb() {
     // ignore
   }
   const dbPath = path.join(baseFolder, 'jrmd.sqlite');
-  if (fs.existsSync(dbPath)) {
-    const buf = fs.readFileSync(dbPath);
-    sqliteDb = new SQL.Database(buf);
-  } else {
-    sqliteDb = new SQL.Database();
+  try {
+    const Database = require('better-sqlite3');
+    sqliteDb = new Database(dbPath);
+    
+    // ✅ Add busy_timeout to handle temporary file locks (prevent instant I/O error)
+    sqliteDb.pragma('busy_timeout = 5000');
+    
+    try {
+      // ✅ Try WAL mode but fallback to DELETE if platform/drive doesn't support shared memory
+      sqliteDb.pragma('journal_mode = WAL');
+    } catch {
+      sqliteDb.pragma('journal_mode = DELETE');
+    }
+    
+    sqliteDb.pragma('synchronous = NORMAL');
+    
+    const tables = [
+      'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+      'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
+      'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
+      'mandiReports', 'employees', 'payroll', 'attendance',
+      'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
+      'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
+      'manufacturingCosting', 'expenseTemplates',
+    ];
+    for (const t of tables) {
+      sqliteDb.exec(
+        `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`
+      );
+    }
+    
+    // ✅ Remove heavy automatic vacuums that cause I/O spikes during large migrations
+    sqliteDb.pragma('auto_vacuum = NONE');
+
+    // ✅ CREATE BACKUP ON INIT (100-file rotation)
+    createRotatingBackup(dbPath, baseFolder).catch(e => console.error('[SQLite] Backup failed:', e));
+
+    return sqliteDb;
+  } catch (e) {
+    sqliteError = e;
+    throw e;
   }
-  const tables = [
-    'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
-    'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
-    'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
-    'mandiReports', 'employees', 'payroll', 'attendance',
-    'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
-    'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
-    'manufacturingCosting', 'expenseTemplates',
-  ];
-  for (const t of tables) {
-    sqliteDb.run(
-      `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`
-    );
+}
+
+/** 
+ * ✅ Rotating Backup Logic (Limit 100)
+ */
+async function createRotatingBackup(dbPath, baseFolder) {
+  try {
+    if (!fs.existsSync(dbPath)) return;
+  
+  const backupFolder = path.join(baseFolder, 'backups');
+  if (!fs.existsSync(backupFolder)) fs.mkdirSync(backupFolder, { recursive: true });
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(backupFolder, `jrmd_backup_${timestamp}.sqlite`);
+  
+    // Rotate: Keep only 100 latest
+    try {
+      if (sqliteDb) {
+        await sqliteDb.backup(backupPath);
+        console.log(`[SQLite Backup] Atomic snapshot saved: ${backupPath}`);
+      } else {
+        fs.copyFileSync(dbPath, backupPath);
+      }
+    } catch (e) {
+      console.warn(`[SQLite Backup] Atomic backup failed, falling back to copy: ${e.message}`);
+      fs.copyFileSync(dbPath, backupPath);
+    }
+    
+    // Rotate: Keep only 100 latest
+    const files = fs.readdirSync(backupFolder)
+      .filter(f => f.startsWith('jrmd_backup_') && f.endsWith('.sqlite'))
+      .map(f => ({ name: f, path: path.join(backupFolder, f), mtime: fs.statSync(path.join(backupFolder, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime); // Newest first
+
+    if (files.length > 100) {
+      console.log(`[Backup] Rotating ${files.length - 100} old files...`);
+      for (let i = 100; i < files.length; i++) {
+        try {
+          fs.unlinkSync(files[i].path);
+        } catch (err) {
+          console.error(`[Backup] Failed to delete old backup ${files[i].name}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Backup] Error during rotation:', err);
   }
-  sqliteDb.run("PRAGMA auto_vacuum = FULL;");
-  return sqliteDb;
 }
 
 // --- Register IPC handlers FIRST (before any async code) ---
@@ -413,21 +463,143 @@ Write-Output $closed
 
 function createWindow(loadingOnly = false) {
   mainWindow = new BrowserWindow({
-    width: 1400,
+    width: 1440,
     height: 900,
-    minWidth: 1200,
-    minHeight: 700,
+    minWidth: 800,
+    minHeight: 600,
+    frame: false, // Frameless window
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: true,
+      webSecurity: false, // CORS doesn't apply to Electron desktop apps
     },
     icon: path.join(__dirname, '../PUBLIC/icon-512.png'),
     show: false,
     backgroundColor: '#0f172a',
   });
+
+  // Pipe renderer console to a file for debugging
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    try {
+      const dbgPath = path.join(app.getPath('userData'), 'renderer-debug.log');
+      fs.appendFileSync(dbgPath, `[Renderer LOG] ${message}\n`, 'utf8');
+      console.log(`[Renderer LOG] ${message}`);
+    } catch(e) {}
+  });
+
+  // Spoof User-Agent to prevent Google/Firebase APIs from blocking "Electron" requests
+  const userAgent = mainWindow.webContents.userAgent.replace(/\sElectron\/.+?(\s|$)/, ' ');
+  mainWindow.webContents.userAgent = userAgent;
+
+  // DEFINITIVE FIX: inject into the renderer's PAGE context (main world).
+  // Preload runs in isolated world — its navigator/fetch are NOT the same as the page's.
+  // executeJavaScript runs in the main world where Firebase Auth lives.
+  //
+  // Two fixes in one injection:
+  //   1. navigator.onLine = true — Firebase checks this before every fetch; WPAD failures
+  //      make Windows report offline, causing immediate throw without any HTTP attempt.
+  //   2. Proxy window.fetch + XMLHttpRequest for all Google Auth endpoints — routes
+  //      identitytoolkit + securetoken googleapis calls through /api/firebase-auth-proxy
+  //      (Node.js server that has full internet access) instead of Chromium renderer.
+  const buildAuthFetchScript = (serverPort) => `
+    (function() {
+      var PROXY_BASE = 'http://localhost:${SERVER_PORT}/api/firebase-auth-proxy';
+      var GOOGLE_AUTH_HOSTS = ['identitytoolkit.googleapis.com', 'securetoken.googleapis.com'];
+
+      function isGoogleAuthUrl(url) {
+        try {
+          var u = (url instanceof Request) ? url.url : String(url || '');
+          return GOOGLE_AUTH_HOSTS.some(function(h) { return u.includes(h); });
+        } catch(e) { return false; }
+      }
+
+      function buildProxyUrl(url) {
+        try {
+          var u = (url instanceof Request) ? url.url : String(url);
+          var parsed = new URL(u);
+          return PROXY_BASE + '?path=' + encodeURIComponent(parsed.pathname + parsed.search);
+        } catch(e) { return url; }
+      }
+
+      // Fix 1: navigator.onLine
+      try {
+        Object.defineProperty(navigator, 'onLine', { get: function() { return true; }, configurable: true });
+      } catch(e) {}
+
+      // Fix 2a: Proxy window.fetch
+      if (!window.__firebaseAuthProxyInstalled) {
+        window.__firebaseAuthProxyInstalled = true;
+        var _origFetch = window.fetch.bind(window);
+        window.fetch = function(input, init) {
+          if (isGoogleAuthUrl(input)) {
+            var proxyUrl = buildProxyUrl(input);
+            var proxyInit = init;
+            if (!proxyInit && input instanceof Request) {
+              proxyInit = { method: input.method, headers: {} };
+              try { input.headers.forEach(function(v, k) { proxyInit.headers[k] = v; }); } catch(e) {}
+              // Note: body stream cannot be cloned after consumption; pass init body only
+            }
+            console.log('[ElectronProxy:fetch] Routing to proxy:', proxyUrl);
+            return _origFetch(proxyUrl, proxyInit);
+          }
+          return _origFetch(input, init);
+        };
+
+        // Fix 2b: Proxy XMLHttpRequest (Firebase may use XHR in some paths)
+        var _origXHROpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+          if (isGoogleAuthUrl(url)) {
+            var proxyUrl = buildProxyUrl(url);
+            console.log('[ElectronProxy:xhr] Routing to proxy:', proxyUrl);
+            return _origXHROpen.call(this, method, proxyUrl, async !== false, user, pass);
+          }
+          return _origXHROpen.apply(this, arguments);
+        };
+      }
+    })();
+  `;
+
+  mainWindow.webContents.on('dom-ready', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.executeJavaScript(buildAuthFetchScript(SERVER_PORT)).catch(() => {});
+    }
+  });
+
+  // Hide the default menu bar completely for a native feel
+  const { Menu } = require('electron');
+  Menu.setApplicationMenu(null);
+  
+  // Maximize the window automatically on start
+  mainWindow.maximize();
+
+  // IPC Handlers for window controls
+  const { ipcMain } = require('electron');
+  
+  ipcMain.on('window:minimize', () => {
+    if (mainWindow) mainWindow.minimize();
+  });
+  
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.on('window:close', () => {
+    if (mainWindow) mainWindow.close();
+  });
+
+  ipcMain.handle('window:is-maximized', () => {
+    return mainWindow ? mainWindow.isMaximized() : false;
+  });
+
+
   mainWindow.__loadingOnly = loadingOnly;
 
   const showAndFocus = () => {
@@ -473,6 +645,18 @@ function createWindow(loadingOnly = false) {
       }
       return;
     }
+    
+    // In dev, if we hit a timeout or connection error, retry after a delay
+    if (isDev && (code === -118 || code === -105 || code === -102)) {
+        console.warn(`[Electron] Dev load failed with ${code} (${desc}). Retrying in 2s...`);
+        setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.reload();
+            }
+        }, 2000);
+        return;
+    }
+
     if (!isDev && code !== -3) console.error('[Electron] Load failed:', code, desc, url);
   });
 
@@ -530,16 +714,141 @@ function createWindow(loadingOnly = false) {
 
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow about:blank or local print windows to open internally
+    if (url.startsWith('about:blank') || url === '' || url.includes('localhost')) {
+      return { action: 'allow' };
+    }
     require('electron').shell.openExternal(url);
     return { action: 'deny' };
   });
 }
+
+// ✅ Print handler registered at module level (outside createWindow) to prevent double-registration
+// Strategy: Write invoice HTML to temp file → open in Chrome → window.print() auto-triggers Chrome's print preview
+ipcMain.handle('print:html', async (_event, htmlContent, options = {}) => {
+  try {
+    // Use userData dir to avoid Windows 8.3 short path issues with AppData/Local/Temp
+    const printDir = path.join(app.getPath('userData'), 'print-temp');
+    if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
+    const tmpHtmlPath = path.join(printDir, `print-${Date.now()}.html`);
+
+    // Build clean print HTML with Tailwind CDN (so invoice Tailwind classes render correctly)
+    // We do NOT send the app dark CSS - instead we use fresh Tailwind with print-safe overrides
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Print Preview</title>
+  <!-- Tailwind CSS CDN so invoice Tailwind classes work correctly -->
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <script>
+    // Configure Tailwind to avoid dark mode auto-detection
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = { darkMode: 'class' };
+    }
+  <\/script>
+  <style>
+    /* Force light/print-safe theme regardless of system dark mode */
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 15px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    /* Remove dark backgrounds from any element */
+    [class*="bg-gray-9"], [class*="bg-slate-9"], [class*="bg-zinc-9"],
+    [class*="bg-neutral-9"], [class*="bg-stone-9"] {
+      background-color: #f8f8f8 !important;
+    }
+    /* Ensure text is always dark */
+    [class*="text-white"], [class*="text-gray-1"], [class*="text-gray-2"],
+    [class*="text-slate-1"], [class*="text-slate-2"] {
+      color: #111 !important;
+    }
+    /* Tables: use separate border model so borders on rows/divs don't bleed into adjacent cells */
+    table { border-collapse: separate !important; border-spacing: 0 !important; }
+    /* Reset any browser-default cell borders — let invoice's own Tailwind classes control borders */
+    td, th { border: none; }
+    @media print {
+      html, body { padding: 0; margin: 0; }
+      @page { margin: 8mm; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="invoice-content">
+    ${htmlContent}
+  </div>
+  <script>
+    // Wait for Tailwind CDN to load, then trigger Chrome print preview
+    function triggerPrint() {
+      window.print();
+    }
+    // Try after tailwind loads or after delay
+    if (document.readyState === 'complete') {
+      setTimeout(triggerPrint, 800);
+    } else {
+      window.addEventListener('load', function() {
+        setTimeout(triggerPrint, 800);
+      });
+    }
+  <\/script>
+</body>
+</html>`;
+
+    fs.writeFileSync(tmpHtmlPath, fullHtml, 'utf8');
+
+    // Find Chrome executable on Windows
+    const possibleChromePaths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+    ];
+    let chromePath = null;
+    for (const p of possibleChromePaths) {
+      if (p && fs.existsSync(p)) { chromePath = p; break; }
+    }
+
+    const fileUrl = `file:///${tmpHtmlPath.replace(/\\/g, '/')}`;
+
+    if (chromePath) {
+      spawn(chromePath, [
+        '--new-window', '--no-first-run', '--no-default-browser-check', fileUrl
+      ], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      const { shell } = require('electron');
+      await shell.openExternal(fileUrl);
+    }
+
+    // Clean up after Chrome has loaded the file
+    setTimeout(() => { try { fs.unlinkSync(tmpHtmlPath); } catch {} }, 60000);
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
+});
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   console.log('[Electron] App is ready.');
   console.log('[Electron] isDev:', isDev);
   console.log('[Electron] ELECTRON_DEV_URL:', process.env.ELECTRON_DEV_URL);
+
+  // Force system proxy mode to bypass any corporate proxy connection issues
+  try {
+    await session.defaultSession.setProxy({ mode: 'system' });
+  } catch (err) {
+    console.error('[Electron] Failed to set proxy mode:', err);
+  }
+
+  // NOTE: Origin spoofing for googleapis.com was removed because it broke Firestore CORS.
+  // Google echoes the spoofed Origin back in ACAO header, but browser checks against actual origin (dynamic port).
 
   try {
     // Redirect ALL app:// requests to http at the network level (catches document nav, fetch, XHR, etc.)
@@ -584,7 +893,7 @@ app.whenReady().then(async () => {
     try {
       // 1. Find a free port
       SERVER_PORT = await findFreePort(3600);
-      SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
+      SERVER_URL = `http://localhost:${SERVER_PORT}`;
       console.log(`[Electron] Using port: ${SERVER_PORT}`);
 
       // 2. Initial loading window
@@ -598,12 +907,26 @@ app.whenReady().then(async () => {
       }
       
       // 4. Wait for server port
+      let serverErrorOutput = '';
+      if (nextServerProcess && nextServerProcess.stderr) {
+        nextServerProcess.stderr.on('data', (data) => {
+          serverErrorOutput += data.toString();
+          if (serverErrorOutput.length > 2000) serverErrorOutput = serverErrorOutput.slice(0, 2000);
+        });
+      }
+
       const serverReady = await waitForServer(SERVER_PORT);
       
       if (!serverReady) {
-        const detail = serverExitCode !== null 
-          ? `Server exited with code ${serverExitCode}. Check server.log in AppData for details.`
+        let detail = serverExitCode !== null 
+          ? `Server exited with code ${serverExitCode}.`
           : `Server did not respond on port ${SERVER_PORT} within 60s.`;
+        
+        if (serverErrorOutput) {
+          detail += `\n\nServer Error Output:\n${serverErrorOutput}`;
+        } else {
+          detail += `\n\nCheck server.log in AppData for details.`;
+        }
         throw new Error(detail);
       }
 
@@ -776,7 +1099,7 @@ const SQLITE_ALLOWED_TABLES = new Set([
   'manufacturingCosting', 'expenseTemplates',
 ]);
 
-ipcMain.handle('sqlite:importTable', async (_event, tableName, rows) => {
+ipcMain.handle('sqlite:importTable', async (_event, tableName, rows, options = {}) => {
   if (sqliteError) {
     return { success: false, error: sqliteError?.message || 'SQLite not available' };
   }
@@ -784,15 +1107,19 @@ ipcMain.handle('sqlite:importTable', async (_event, tableName, rows) => {
     return { success: false, error: 'invalid_table' };
   }
   try {
-    const db = await getSqliteDb();
-    db.run(`DELETE FROM ${tableName}`);
+    const db = getSqliteDb();
     const items = rows || [];
     let idx = 0;
     const seen = new Set();
     let inserted = 0;
 
-    db.run('BEGIN TRANSACTION');
-    try {
+    const clearRows = options.clear !== false; // Default to true
+
+    const insert = db.transaction((items) => {
+      if (clearRows) {
+        db.prepare(`DELETE FROM ${tableName}`).run();
+      }
+      const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
       for (const row of items) {
         if (!row || typeof row !== 'object') continue;
         const id = getRowId(row, tableName, idx);
@@ -800,19 +1127,12 @@ ipcMain.handle('sqlite:importTable', async (_event, tableName, rows) => {
         const key = String(id).slice(0, 500);
         if (seen.has(key)) continue;
         seen.add(key);
-        db.run(
-          `INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`,
-          [key, JSON.stringify(row)]
-        );
+        stmt.run(key, JSON.stringify(row));
         inserted++;
       }
-      db.run('COMMIT');
-    } catch (err) {
-      db.run('ROLLBACK');
-      throw err;
-    }
+    });
 
-    saveSqliteToFile();
+    insert(items);
     return { success: true, count: inserted };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -837,31 +1157,67 @@ function getRowId(row, tableName, idx) {
   
   // Only use true unique identifiers as fallbacks if id is missing
   if (!id) {
-    if ((tableName === 'payments' || tableName === 'customerPayments' || tableName === 'governmentFinalizedPayments') && row.paymentId) {
-      id = String(row.paymentId).trim();
-    } else if (tableName === 'transactions' && row.transactionId) {
-      id = String(row.transactionId).trim();
-    } else if (tableName === 'loans' && row.loanId) {
-      id = String(row.loanId).trim();
-    } else if (tableName === 'bankBranches' && row.ifscCode) {
-      id = String(row.ifscCode).trim();
-    } else if (tableName === 'bankAccounts' || tableName === 'supplierBankAccounts') {
-      if (row.accountNumber) id = String(row.accountNumber).trim();
-    }
+    id = (row.paymentId && String(row.paymentId).trim()) ||
+         (row.srNo && String(row.srNo).trim()) ||
+         (row.parchiNo && String(row.parchiNo).trim()) ||
+         (row.transactionId && String(row.transactionId).trim()) ||
+         (row.voucherNo && String(row.voucherNo).trim()) ||
+         (row.employeeId && String(row.employeeId).trim()) ||
+         (row.accountId && String(row.accountId).trim()) ||
+         (row.accountNumber && String(row.accountNumber).trim()) ||
+         (row.ifscCode && String(row.ifscCode).trim()) ||
+         (row.loanId && String(row.loanId).trim()) ||
+         (row.sku && String(row.sku).trim()) ||
+         (row.documentSrNo && String(row.documentSrNo).trim());
   }
 
   return (id || stableFallback()).slice(0, 500);
 }
+
+ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows) => {
+  if (sqliteError) {
+    return { success: false, error: sqliteError?.message || 'SQLite not available' };
+  }
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) {
+    return { success: false, error: 'invalid_table' };
+  }
+  try {
+    const db = getSqliteDb();
+    const items = rows || [];
+    let idx = 0;
+    const seen = new Set();
+    let inserted = 0;
+
+    const upsert = db.transaction((items) => {
+      const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
+      for (const row of items) {
+        if (!row || typeof row !== 'object') continue;
+        const id = getRowId(row, tableName, idx);
+        idx++;
+        const key = String(id).slice(0, 500);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        stmt.run(key, JSON.stringify(row));
+        inserted++;
+      }
+    });
+
+    upsert(items);
+    return { success: true, count: inserted };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
+});
 
 ipcMain.handle('sqlite:put', async (_event, tableName, row) => {
   if (sqliteError) return { success: false, error: sqliteError?.message || 'SQLite not available' };
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
   if (!row || typeof row !== 'object') return { success: false, error: 'invalid_row' };
   try {
-    const db = await getSqliteDb();
+    const db = getSqliteDb();
     const id = getRowId(row, tableName, 0);
-    db.run(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`, [id, JSON.stringify(row)]);
-    saveSqliteToFile();
+    const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
+    stmt.run(id, JSON.stringify(row));
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -871,9 +1227,8 @@ ipcMain.handle('sqlite:put', async (_event, tableName, row) => {
 ipcMain.handle('sqlite:vacuum', async () => {
   if (sqliteError) return { success: false, error: sqliteError?.message || 'SQLite not available' };
   try {
-    const db = await getSqliteDb();
-    db.run("VACUUM;");
-    saveSqliteToFile();
+    const db = getSqliteDb();
+    db.prepare("VACUUM").run();
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -885,9 +1240,9 @@ ipcMain.handle('sqlite:delete', async (_event, tableName, id) => {
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
   if (!id || typeof id !== 'string') return { success: false, error: 'invalid_id' };
   try {
-    const db = await getSqliteDb();
-    db.run(`DELETE FROM ${tableName} WHERE id = ?`, [String(id).slice(0, 500)]);
-    saveSqliteToFile();
+    const db = getSqliteDb();
+    const stmt = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`);
+    stmt.run(String(id).slice(0, 500));
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -895,26 +1250,33 @@ ipcMain.handle('sqlite:delete', async (_event, tableName, id) => {
 });
 
 ipcMain.handle('sqlite:all', async (_event, tableName) => {
-  if (sqliteError) {
-    return [];
-  }
-  if (!SQLITE_ALLOWED_TABLES.has(tableName)) {
-    return [];
-  }
+  if (sqliteError) return [];
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return [];
   try {
-    const db = await getSqliteDb();
-    const result = db.exec(`SELECT id, data FROM ${tableName}`);
-    if (!result.length || !result[0].values) return [];
-    const cols = result[0].columns;
-    const idIdx = cols.indexOf('id');
-    const dataIdx = cols.indexOf('data');
-    return result[0].values.map((row) => ({
-      ...(JSON.parse(row[dataIdx] || '{}')),
-      // Ensure primary key `id` always comes from SQLite row id (don't let JSON overwrite it)
-      id: row[idIdx],
+    const db = getSqliteDb();
+    const rows = db.prepare(`SELECT id, data FROM ${tableName}`).all();
+    return rows.map((row) => ({
+      ...(JSON.parse(row.data || '{}')),
+      id: row.id,
     }));
-  } catch {
+  } catch (e) {
     return [];
+  }
+});
+
+ipcMain.handle('sqlite:get', async (_event, tableName, id) => {
+  if (sqliteError) return null;
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return null;
+  try {
+    const db = getSqliteDb();
+    const row = db.prepare(`SELECT data FROM ${tableName} WHERE id = ?`).get(id);
+    if (!row) return null;
+    return {
+      ...(JSON.parse(row.data || '{}')),
+      id: id,
+    };
+  } catch (e) {
+    return null;
   }
 });
 

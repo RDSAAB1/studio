@@ -45,7 +45,7 @@ export const initialFundTransactions: FundTransaction[] = [
 
 
 export const appOptionsData = {
-    varieties: ['Wheat', 'Rice', 'Corn', 'Barley'],
+    varieties: ['Wheat', 'Rice', 'Corn', 'Barley', 'Rice Bran', 'Polish'],
     receiptTypes: ['Cash', 'Online'],
     paymentTypes: ['Full', 'Partial'],
 };

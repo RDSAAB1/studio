@@ -1054,7 +1054,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 <>
                     <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
                         <div className="w-full px-2 md:px-2.5 py-2.5">
-                            <div className="grid grid-cols-1 lg:grid-cols-[480px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)] gap-2 items-start">
+                            <div className="grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[500px_minmax(0,1fr)] gap-2 items-start">
                                 <div className="min-w-0 flex flex-col gap-2">
                                     <div className="flex items-center gap-1.5 w-full">
                                         <Button

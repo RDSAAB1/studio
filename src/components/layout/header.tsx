@@ -18,8 +18,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { electronNavigate } from "@/lib/electron-navigate";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { syncAllData, hardSyncAllData, syncAllDataWithDetails, getLastSyncKey } from "@/lib/database";
-import { SyncDialog } from "@/components/sync-dialog";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -235,40 +233,6 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const pathname = usePathname();
   const { toast } = useToast();
 
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  
-  const handleSyncClick = async () => {
-    // Always do hard sync (full sync) when user clicks sync button
-    // This ensures all entries are fetched, even if they don't have updatedAt or are old
-    setIsSyncing(true);
-    try {
-      await hardSyncAllData();
-      // Re-setup realtime listeners so any that failed to fetch get retried
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('data:refresh-requested'));
-      }
-      toast({ title: "Full sync completed", description: "All data has been synced from Firestore", variant: "success" });
-    } catch (error) {
-      toast({ title: "Sync failed", description: "Failed to sync data. Please try again.", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleSync = async (selectedCollections?: string[], onProgress?: (collections: any[]) => void) => {
-    // For sync dialog - clear lastSync times for selected collections to force full sync (per-tenant keys)
-    if (typeof window !== 'undefined') {
-      const allCollections = ['suppliers', 'customers', 'payments', 'customerPayments', 'incomes', 'expenses', 'projects', 'loans', 'fundTransactions'];
-      const toClear = selectedCollections && selectedCollections.length > 0
-        ? selectedCollections.filter(c => allCollections.includes(c))
-        : allCollections;
-      toClear.forEach(collectionName => localStorage.removeItem(getLastSyncKey(collectionName)));
-    }
-    
-    // Now do sync - it will do full sync since lastSync times are cleared
-    return await syncAllDataWithDetails(selectedCollections, onProgress);
-  }
 
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-white/18 bg-[linear-gradient(180deg,hsl(var(--primary)/0.42),hsl(var(--primary)/0.28))] px-4 sm:px-6 flex-shrink-0 -mt-px text-white backdrop-blur-[20px] shadow-[0_18px_50px_rgba(2,6,23,0.24)]">
@@ -290,22 +254,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end")}>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white" 
-            onClick={handleSyncClick}
-            disabled={isSyncing}
-            title="Sync all data from Firestore"
-          >
-             <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-             <span className="sr-only">Sync Data</span>
-          </Button>
-          <SyncDialog 
-            open={syncDialogOpen} 
-            onOpenChange={setSyncDialogOpen}
-            onSync={handleSync}
-          />
+
           <NotificationBell />
           <DraggableCalculator />
           <Button

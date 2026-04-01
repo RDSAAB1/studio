@@ -138,7 +138,7 @@ function calcTotalExtra(payments: (Payment | CustomerPayment)[], targetSrNo: str
       isPaymentAttachedToThisEntry && includePaymentLevelExtra
         ? isLedger
           ? isLedgerCredit
-            ? paymentLevelExtraRawFromFields + ledgerShare
+            ? -(paymentLevelExtraRawFromFields + ledgerShare)
             : 0
           : paymentLevelExtraRaw
         : 0;

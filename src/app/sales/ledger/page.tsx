@@ -1065,9 +1065,6 @@ const LedgerPage: React.FC = () => {
   const handlePrint = () => {
     if (!activeAccount) return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) return;
-
     const rowsHtml = displayEntries
       .map((entry) => {
         const formattedDate = entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "-";
@@ -1168,10 +1165,31 @@ const LedgerPage: React.FC = () => {
       </html>
     `;
 
-    printWindow.document.write(documentContent);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(documentContent);
+      iframeDoc.close();
+      
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 500);
+      }, 300);
+    }
   };
 
   const formatCurrency = (value: number) =>
@@ -1450,9 +1468,6 @@ const LedgerPage: React.FC = () => {
       return;
     }
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) return;
-
     const rowsHtml = statementData
       .map((row) => {
         return `
@@ -1689,13 +1704,31 @@ const LedgerPage: React.FC = () => {
       </html>
     `;
 
-    printWindow.document.write(printHtml);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(printHtml);
+      iframeDoc.close();
+      
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 500);
+      }, 300);
+    }
   };
 
   return (
@@ -1916,7 +1949,7 @@ const LedgerPage: React.FC = () => {
               <div className="overflow-x-auto border border-border rounded-lg">
                 <div className="max-h-[320px] overflow-y-auto">
                   <table className="min-w-full text-xs">
-                    <thead className="sticky top-0 z-10">
+                    <thead className="table-header-compact">
                       <tr className="bg-muted/70 text-muted-foreground">
                         <th className="px-3 py-2 text-left font-semibold">Denomination</th>
                         <th className="px-3 py-2 text-left font-semibold">Counts</th>
@@ -2014,7 +2047,7 @@ const LedgerPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <div className="max-h-[420px] overflow-y-auto">
                   <table className="min-w-full text-xs">
-                    <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur">
+                    <thead className="table-header-compact">
                       <tr className="text-muted-foreground">
                         <th className="px-3 py-2 text-left font-semibold">Date</th>
                         <th className="px-3 py-2 text-left font-semibold">Particulars</th>
@@ -2232,7 +2265,7 @@ const LedgerPage: React.FC = () => {
                               </div>
               </div>
               <div className="print-hidden grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Supplier Cash Payments">
                     Supplier Cash
                   </p>
@@ -2240,7 +2273,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.supplierCash)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Supplier RTGS Payments">
                     Supplier RTGS
                   </p>
@@ -2248,7 +2281,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.supplierRtgs)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Gov Distribution">
                     Gov Dist.
                   </p>
@@ -2256,7 +2289,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.govDistribution)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Supplier Payments">
                     Total Payments
                   </p>
@@ -2264,7 +2297,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.supplierPayments)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Expenses">
                     Expenses
                   </p>
@@ -2272,7 +2305,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.expenses)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="rounded-[12px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(0,0,0,0.15)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate" title="Total Incomes">
                     Incomes
                   </p>
@@ -2280,7 +2313,7 @@ const LedgerPage: React.FC = () => {
                     ₹{formatCurrency(statementTotals.incomes)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-colors">
+                <div className="rounded-[12px] border border-primary/30 bg-primary/5 p-4 shadow-[0_10px_30px_rgba(99,102,241,0.15)] backdrop-blur-[14px] hover:shadow-[0_15px_40px_rgba(99,102,241,0.20)] transition-all flex flex-col justify-center">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-primary truncate" title="S/E Cash (Supplier Cash + Expenses)">
                     S/E Cash
                   </p>
@@ -2289,7 +2322,7 @@ const LedgerPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="rounded-[12px] border border-primary/30 bg-gradient-to-r from-primary/10 via-white/80 to-primary/5 p-4 shadow-[0_12px_40px_rgba(99,102,241,0.2)] backdrop-blur-[14px] flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-1 bg-primary rounded-full hidden sm:block"></div>
                   <div>
@@ -2347,17 +2380,19 @@ const LedgerPage: React.FC = () => {
             <CardContent className="p-0">
               <div className="overflow-x-auto max-h-[600px] border rounded-md">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b shadow-sm">
+                  <thead className="table-header-compact">
                     <tr>
-                      <th className="px-3 py-2.5 text-left font-medium uppercase tracking-wider text-muted-foreground w-[100px]">Date</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supplier Cash</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supplier RTGS</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Gov Dist.</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Supp. Payments</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Expenses</th>
-                      <th className="px-3 py-2.5 text-right font-medium uppercase tracking-wider text-muted-foreground">Income</th>
-                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider text-foreground">S/E Cash</th>
-                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider text-foreground bg-muted/50">Net Total</th>
+                      <th className="px-3 py-2.5 text-left font-bold uppercase tracking-wider w-[100px]">Date</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Supplier Cash</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Supplier RTGS</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Gov Dist.</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Supp. Payments</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Expenses</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">Income</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider">S/E Cash</th>
+                      <th className="px-3 py-2.5 text-right font-bold uppercase tracking-wider relative">
+                        <span>Net Total</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">

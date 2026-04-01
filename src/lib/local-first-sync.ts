@@ -45,6 +45,7 @@ type CollectionName =
     | 'projects'
     | 'employees'
     | 'payroll'
+    | 'supplierBankAccounts'
     | 'inventoryItems';
 
 type ChangeType = 'create' | 'update' | 'delete';
@@ -111,6 +112,8 @@ export async function writeLocalFirst<T extends { id: string }>(
     data?: T,
     changes?: Partial<T>
 ): Promise<T | void> {
+    const { isSqliteMode } = await import('./sqlite-storage');
+    const isSqlite = isSqliteMode();
     if (!db) {
         throw new Error('Database not initialized');
     }
@@ -138,6 +141,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                 }
+                if (isSqlite) return dataWithTimestamp;
                 pendingChanges.set(`${collectionName}:${id}`, {
                     id,
                     type: 'create',
@@ -179,6 +183,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                         editedBy: (updated as any).editedBy,
                         editedByName: (updated as any).editedByName,
                     };
+                    if (isSqlite) return updated as unknown as T;
                     pendingChanges.set(`${collectionName}:${id}`, {
                         id,
                         type: 'update',
@@ -213,6 +218,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                             data: dataWithTimestamp,
                             timestamp
                         });
+                        if (isSqlite) return dataWithTimestamp;
                         scheduleSyncToFirestore();
                         // ✅ Force immediate sync for create operations to ensure Firestore is updated
                         await syncToFirestore();
@@ -228,6 +234,7 @@ export async function writeLocalFirst<T extends { id: string }>(
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: collectionName } }));
                 }
+                if (isSqlite) return;
                 pendingChanges.set(`${collectionName}:${id}`, {
                     id,
                     type: 'delete',
@@ -293,6 +300,8 @@ function getLocalTable(collectionName: CollectionName) {
             return db.options;
         case 'bankAccounts':
             return db.bankAccounts;
+        case 'supplierBankAccounts':
+            return db.supplierBankAccounts;
         case 'kantaParchi':
             // KantaParchi might be stored in a different table - adjust as needed
             return null;
@@ -390,6 +399,8 @@ function getSyncTaskType(collectionName: CollectionName, operation: ChangeType):
 }
 
 export async function syncToFirestore() {
+    const { isSqliteMode } = await import('./sqlite-storage');
+    if (isSqliteMode()) return;
     if (!pendingChanges.size || typeof window === 'undefined') return;
 
     const changes = Array.from(pendingChanges.values());

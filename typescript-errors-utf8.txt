@@ -1,0 +1,20 @@
+﻿src/app/settings/page.tsx(238,69): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/app/settings/page.tsx(353,117): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/app/settings/page.tsx(363,46): error TS2345: Argument of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | null' is not assignable to parameter of type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+  Type 'null' is not assignable to type '{ companyId: string; subCompanyId: string; seasonKey: string; } | undefined'.
+src/components/layout/erp-company-selector.tsx(667,28): error TS2304: Cannot find name 'Database'.
+src/lib/sqlite-migration.ts(27,52): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(31,52): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(56,9): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(83,9): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(106,9): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(129,9): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(143,32): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-migration.ts(157,9): error TS2353: Object literal may only specify known properties, and 'count' does not exist in type '{ sourceCount: number; sqliteCount: number; error?: string | undefined; }'.
+src/lib/sqlite-storage.ts(227,22): error TS2352: Conversion of type 'AppDatabase' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AppDatabase'.
+src/lib/sqlite-storage.ts(342,26): error TS2698: Spread types may only be created from object types.
+src/lib/sqlite-storage.ts(368,33): error TS2345: Argument of type 'Record<string, unknown>[]' is not assignable to parameter of type 'readonly Transaction[]'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'Transaction': id, transactionId, date, transactionType, and 6 more.
