@@ -42,7 +42,9 @@ import { exportToFolder, importFromFolder } from '@/lib/folder-structure-export'
 import { cn } from '@/lib/utils';
 import { DataMigrationCard } from '@/components/settings/data-migration-card';
 import { SqliteMigrationCard } from '@/components/admin/sqlite-migration-card';
+import { CollectionMigrationCard } from '@/components/admin/collection-migration-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Workflow } from 'lucide-react';
 
 type MigrationError = { message?: string } | string;
 
@@ -711,6 +713,10 @@ export default function MigrationsPage() {
                             <FileSpreadsheet className="h-4 w-4" />
                             Secure Vault
                         </TabsTrigger>
+                        <TabsTrigger value="collection-sync" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
+                            <Workflow className="h-4 w-4" />
+                            Collection Sync
+                        </TabsTrigger>
                         <TabsTrigger value="tools" className="px-6 gap-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
                             <Wrench className="h-4 w-4" />
                             Logic Repair
@@ -835,6 +841,10 @@ export default function MigrationsPage() {
                             </div>
                         </div>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="collection-sync" className="focus-visible:outline-none focus-visible:ring-0 animate-in slide-in-from-left-2 duration-300">
+                    <CollectionMigrationCard />
                 </TabsContent>
 
                 <TabsContent value="tools" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 pb-16 animate-in slide-in-from-left-2 duration-300">

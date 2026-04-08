@@ -8,6 +8,7 @@ const transferSchema = z.object({
     description: z.string().optional(),
     source: z.string().min(1, "Source is required."),
     destination: z.string().min(1, "Destination is required."),
+    date: z.string().optional(),
 });
 
 export const cashBankFormSchemas = {

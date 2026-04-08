@@ -28,6 +28,7 @@ import { firestoreDB } from '@/lib/firebase';
 import { getTenantCollectionPath, getTenantDocPath } from '@/lib/tenancy';
 import { db } from '@/lib/database';
 import { logError } from "@/lib/error-logger";
+import { printHtmlContent } from "@/lib/electron-print";
 
 // Helper function to handle errors silently (for non-critical operations)
 function handleSilentError(error: unknown, context: string): void {
@@ -293,31 +294,16 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             // Send ONLY the raw invoice HTML - main process adds clean print CSS
             // Do NOT send the app CSS (it has dark Tailwind theme that causes blank PDF)
             const fullContent = receiptNode.outerHTML;
-                // Call the native Electron print handler
-            const electron = (window as any).electron;
-            if (electron?.printHtml) {
-                electron.printHtml(fullContent)
-                    .then((result: { success: boolean; error?: string }) => {
-                        if (!result.success && result.error) {
-                            const isCanceled = /cancel/i.test(result.error);
-                            if (isCanceled) {
-                                console.log('[Print] Operation canceled by user.');
-                            } else {
-                                console.error('Print failed:', result.error);
-                                toast({ title: "Print Error", description: result.error, variant: "destructive" });
-                            }
-                        }
-                    })
-                    .catch((err: any) => {
-                        console.error('IPC Print error:', err);
-                        toast({ title: "Print Error", description: "Operation failed.", variant: "destructive" });
-                    });
-            } else {
-                // Fallback for non-electron or legacy
-                window.print();
+            
+            // Use standard helper which handles Electron detection and IPC
+            try {
+                await printHtmlContent(fullContent);
+                toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
+            } catch (error: any) {
+                if (!/cancel/i.test(error.message)) {
+                    toast({ title: "Print Error", description: error.message, variant: "destructive" });
+                }
             }
-
-            toast({ title: "Saved & Printed", description: "Customer details have been updated in database.", variant: "success" });
 
         } catch (error) {
             console.error('Error saving document:', error);

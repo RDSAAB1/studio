@@ -15,6 +15,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { AlertCircle, UploadCloud } from "lucide-react";
+import { CollectionMigrationCard } from "@/components/admin/collection-migration-card";
 
 export default function ErpMigrationPage() {
   const { toast } = useToast();
@@ -594,6 +599,10 @@ export default function ErpMigrationPage() {
               {isCreatingNewDb ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
               {isCreatingNewDb ? "Creating..." : "Create new DB from selected collections"}
             </Button>
+          </div>
+
+          <div className="mt-8 border-t pt-6">
+             <CollectionMigrationCard />
           </div>
         </CardContent>
       </Card>

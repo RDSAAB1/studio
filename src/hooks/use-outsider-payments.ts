@@ -210,7 +210,7 @@ export const useOutsiderPayments = (data: any) => {
         customerSummaryMap: new Map(),
         handleEditPayment,
         handleDeletePayment,
-        handleProcessPayment,
+        processPayment: handleProcessPayment,
         activeTab,
         setActiveTab,
         selectedEntries: [],

@@ -29,7 +29,7 @@ export const useSupplierFiltering = (
         // IMPORTANT: Recalculate totalOutstanding from merged transactions' outstanding amounts
         // This ensures consistency: Final Outstanding = Sum of all Outstanding column values
         const mergedTotalOutstanding = mergedTransactions.reduce((sum, t) => {
-          const outstanding = (t as any).outstandingForEntry || (t as any).netAmount || 0;
+          const outstanding = (t as any).outstandingForEntry ?? (t as any).netAmount ?? 0;
           return sum + (typeof outstanding === 'number' ? outstanding : 0);
         }, 0);
         

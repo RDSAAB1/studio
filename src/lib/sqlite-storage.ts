@@ -63,10 +63,24 @@ export async function switchToSqliteFolder(folderPath: string): Promise<{
     setSqliteFolderPath(effectiveFolder);
     setSqliteMode(true);
 
+    // Derive Season, Sub Company, Company from folder path hierarchy
+    // Season = current folder, Sub = parent, Company = grandparent
+    const parts = effectiveFolder.split(/[\\/]/).filter((p: string) => !!p.trim());
+    const seasonKey = parts[parts.length - 1] || "DefaultSeason";
+    const subCompanyId = parts[parts.length - 2] || "DefaultSub";
+    // Handle cases where path depth < 3 (e.g. C:\Season)
+    const companyId = parts[parts.length - 3] || (parts.length >= 2 ? "DefaultCompany" : "LocalStore");
+
+    // Auto-update ERP configuration to match the folder context
+    const { setErpSelectionStorage, setErpMode } = await import('@/lib/tenancy');
+    setErpSelectionStorage({ companyId, subCompanyId, seasonKey });
+    setErpMode(true);
+
     // In pure SQLite mode, switching folders just means the IPC bridge points to a new file.
     // We notify the UI to refresh its current views.
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'all' }));
+        window.dispatchEvent(new CustomEvent('erp:selection-changed', { detail: { companyId, subCompanyId, seasonKey } }));
     }
 
     return {

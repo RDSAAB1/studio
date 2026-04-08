@@ -19,7 +19,12 @@ const normalizeProfileField = (value: unknown): string => {
     if (value === null || value === undefined) {
         return "";
     }
-    return String(value).replace(/\s+/g, " ").trim();
+    // Smart normalization: lowercase, single space, and remove common relation prefixes
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/^(f:|s\/o:|d\/o:|w\/o:|c\/o:)\s*/g, "");
 };
 
 const toFuzzyProfile = (source: any): FuzzySupplierProfile => ({
@@ -198,9 +203,9 @@ export const useSupplierPayments = () => {
 
     // Removed heavy console logs to improve typing performance
 
-    // For Partial payments, use debounced toBePaidAmount for CD calculation to prevent lag
+    // For Partial payments, use immediate toBePaidAmountManual for instant settlement updates
     // For Full payments, use settleAmount
-    const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountDebounced : settleAmount;
+    const baseAmountForCd = form.paymentType === 'Partial' ? toBePaidAmountManual : settleAmount;
 
     // CD at finalize (concepts): (1) Only apply when cdEnabled. (2) Full: To Be Paid = settleAmount − CD; Partial: To Be Paid = user amount, settle = To Be Paid + CD. (3) effectiveCdAmount passed to processPaymentLogic so DB gets 0 CD when disabled. (4) paidFor[].amount = cash only, paidFor[].cdAmount = CD only; outstanding = original − paid − cd.
     const { calculatedCdAmount, setCdAmount, ...cdProps } = useCashDiscount({
@@ -253,16 +258,8 @@ export const useSupplierPayments = () => {
         // Update immediately for UI responsiveness
         setToBePaidAmountManual(value);
         
-        // Debounce heavy calculations to prevent lag
-        if (toBePaidDebounceRef.current) {
-            clearTimeout(toBePaidDebounceRef.current);
-        }
-        
-        toBePaidDebounceRef.current = setTimeout(() => {
-            // Update debounced value for CD calculations and settle amount
-            setToBePaidAmountDebounced(value);
-            
-        }, 800); // 800ms delay - increased to significantly reduce lag
+        // No debounce needed for simple math — updates are now instant
+        setToBePaidAmountDebounced(value);
     };
     
     // Cleanup timer on unmount
@@ -289,7 +286,7 @@ export const useSupplierPayments = () => {
     // Use debounced value to prevent lag
     useEffect(() => {
         if (form.paymentType === 'Partial') {
-            const newSettleAmount = toBePaidAmountDebounced + effectiveCdAmount;
+            const newSettleAmount = toBePaidAmountManual + effectiveCdAmount;
             const roundedSettle = Math.round(newSettleAmount * 100) / 100;
             const currentSettle = Math.round(settleAmountManual * 100) / 100;
             
@@ -298,20 +295,37 @@ export const useSupplierPayments = () => {
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [toBePaidAmountDebounced, effectiveCdAmount, form.paymentType]);
+    }, [toBePaidAmountManual, effectiveCdAmount, form.paymentType]);
 
-    // Auto-update To Be Paid amount when Gov Amount/Extra changes - full amount as-is (Normal + Extra)
+    // Auto-update To Be Paid amount when RTGS or Gov Amount changes
     useEffect(() => {
-        if (form.paymentMethod === 'Gov.') {
-            const toBePaid = (form.govAmount || 0) + (form.govExtraAmount || 0);
+        if (form.paymentMethod === 'RTGS') {
+            const amt = Number(form.rtgsAmount) || 0;
+            // Update immediately - handleToBePaidChange handles both immediate and debounced state
+            handleToBePaidChange(amt);
+        } else if (form.paymentMethod === 'Gov.') {
+            const toBePaid = (Number(form.govAmount) || 0) + (Number(form.govExtraAmount) || 0);
             handleToBePaidChange(toBePaid);
         }
-    }, [form.govAmount, form.govExtraAmount, form.paymentMethod]);
+    }, [form.rtgsAmount, form.govAmount, form.govExtraAmount, form.paymentMethod]);
 
-    // Auto-update Target Amount when To Be Paid changes in Full mode
+    // Auto-update RTGS/Gov fields when To Be Paid changes in Full mode
+    // Stabilized dependency array size to 2 to prevent HMR render errors
     useEffect(() => {
         if (form.paymentType === 'Full') {
-            // Target amount update removed
+            const method = form.paymentMethod;
+            const rtgsAmt = Number(form.rtgsAmount) || 0;
+            const govAmt = Number(form.govAmount) || 0;
+            
+            if (method === 'RTGS') {
+                if (Math.abs(rtgsAmt - finalToBePaid) > 0.1) {
+                    form.setRtgsAmount(finalToBePaid);
+                }
+            } else if (method === 'Gov.') {
+                if (Math.abs(govAmt - finalToBePaid) > 0.1) {
+                    form.setGovAmount(finalToBePaid);
+                }
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [finalToBePaid, form.paymentType]);
@@ -497,69 +511,166 @@ export const useSupplierPayments = () => {
         }
 
         form.setEditingPayment(paymentToEdit);
-        setActiveTab('process');
+        // Removed setActiveTab('process') as it causes UI disappearance and is not a valid tab identifier
         setIsProcessing(true);
         
         try {
-            // First try to match by linked entry (most accurate)
-            const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
-            let profileKey = null;
+            // Priority 0: Match by customerId or supplierId field in payment (most reliable) using the new map
+            const directId = paymentToEdit.customerId || (paymentToEdit as any).supplierId;
+            let profileKey: string | null = null;
 
-            if (firstSrNo) {
-                const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
-                if (originalEntry) {
-                     profileKey = originalEntry.id ? supplierIdToProfileKey.get(originalEntry.id) : null;
-    
-                     if (!profileKey) {
-                        profileKey = fuzzyProfileMatcher(
-                            originalEntry.name,
-                            originalEntry.so || "",
-                            originalEntry.address || ""
-                        );
+            if (directId) {
+                const searchId = String(directId).trim().toLowerCase();
+                profileKey = (data as any).supplierIdToKey?.get(searchId) || null;
+            }
+
+            // Priority 0.5: Match by Name|Father|Address directly (Exact match from map)
+            if (!profileKey) {
+                // Try payment root fields first, then check supplierDetails sub-object
+                const name = paymentToEdit.supplierName || (paymentToEdit as any).supplierDetails?.name;
+                const father = paymentToEdit.supplierFatherName || (paymentToEdit as any).supplierDetails?.fatherName || (paymentToEdit as any).supplierDetails?.so;
+                const address = (paymentToEdit as any).supplierAddress || (paymentToEdit as any).supplierDetails?.address;
+
+                if (name) {
+                    const targetKey = `${normalizeProfileField(name)}|${normalizeProfileField(father || '')}|${normalizeProfileField(address || '')}`;
+                    if (data.customerSummaryMap.has(targetKey)) {
+                        profileKey = targetKey;
+                    }
+                }
+            }
+
+            // Priority 1: Try to match by linked entry
+            if (!profileKey) {
+                const firstSrNo = paymentToEdit.paidFor?.[0]?.srNo;
+                if (firstSrNo) {
+                    const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
+                    if (originalEntry && originalEntry.id) {
+                        const searchId = String(originalEntry.id).trim().toLowerCase();
+                        profileKey = (data as any).supplierIdToKey?.get(searchId) || null;
+        
+                        if (!profileKey) {
+                            profileKey = fuzzyProfileMatcher(
+                                originalEntry.name,
+                                originalEntry.so || "",
+                                originalEntry.address || ""
+                            );
+                        }
                     }
                 }
             }
             
-            // Fallback: if no valid entry found or no srNo, try matching by payment supplier details
-            if (!profileKey && paymentToEdit.supplierName) {
+            // Priority 2: Fallback to fuzzy matching
+            if (!profileKey && (paymentToEdit.supplierName || (paymentToEdit as any).supplierDetails?.name)) {
                  profileKey = fuzzyProfileMatcher(
-                    paymentToEdit.supplierName,
-                    paymentToEdit.supplierFatherName || "",
-                    paymentToEdit.supplierAddress || ""
+                    paymentToEdit.supplierName || (paymentToEdit as any).supplierDetails?.name,
+                    paymentToEdit.supplierFatherName || (paymentToEdit as any).supplierDetails?.fatherName || "",
+                    paymentToEdit.supplierAddress || (paymentToEdit as any).supplierDetails?.address || ""
                 );
             }
 
-            if (!profileKey) {
-                 console.warn(`Could not find a matching supplier profile for ${paymentToEdit.supplierName || 'this payment'}.`);
-                 toast({ 
-                    title: "Supplier Profile Not Found", 
-                    description: "Could not link this payment to an existing supplier profile. You can still edit the payment details, but outstanding entries will not be linked.", 
-                    variant: "default" 
-                 });
+            // Priority 3: Last Resort - If name exactly matches any profile name
+            if (!profileKey && (paymentToEdit.supplierName || (paymentToEdit as any).supplierDetails?.name)) {
+                const targetName = normalizeProfileField(paymentToEdit.supplierName || (paymentToEdit as any).supplierDetails?.name);
+                for (const [key, summary] of data.customerSummaryMap.entries()) {
+                    if (normalizeProfileField(summary.name) === targetName) {
+                        profileKey = key;
+                        break;
+                    }
+                }
             }
 
-            form.setSelectedCustomerKey(profileKey);
+            if (!profileKey) {
+                 console.warn(`Could not find a matching supplier profile for ${paymentToEdit.supplierName || 'this payment'}. Searching for ID: ${directId}`);
+            }
+
+            // User Requested Workflow: Populate Search Serial No. from the payment
+            const rawSrNo = paymentToEdit.paidFor?.[0]?.srNo || (paymentToEdit.parchiNo?.split(/[,\s]+/)[0]);
+            let firstPfSrNo = rawSrNo ? String(rawSrNo).trim() : '';
+            
+            if (firstPfSrNo) {
+                // Apply same formatting logic as handleSerialNoBlur
+                let formattedSrNo = firstPfSrNo.toUpperCase().replace(/\s+/g, '');
+                const numericPartFromS = formattedSrNo.startsWith('S') ? formattedSrNo.slice(1) : formattedSrNo;
+                if (/^\d+$/.test(numericPartFromS)) {
+                    formattedSrNo = `S${numericPartFromS.padStart(5, '0')}`;
+                }
+                form.setSerialNoSearch(formattedSrNo);
+                
+                // If we don't have a profileKey yet, try to find it via this serial number (same logic as handleSerialNoBlur)
+                if (!profileKey) {
+                    const normalizedSearch = formattedSrNo.toLowerCase();
+                    for (const [key, summary] of data.customerSummaryMap.entries()) {
+                        if (summary.allTransactions?.some(t => (t.srNo || '').toLowerCase() === normalizedSearch)) {
+                            profileKey = key;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (profileKey) {
+                form.setSelectedCustomerKey(profileKey);
+            } else if (directId) {
+                // If we have an ID but still no profileKey, we try to see if ID exists in map anyway
+                const searchId = String(directId).trim().toLowerCase();
+                const possibleKey = (data as any).supplierIdToKey?.get(searchId);
+                if (possibleKey) {
+                    form.setSelectedCustomerKey(possibleKey);
+                }
+            }
     
-            // Select entries if they exist
+            // Robust Multi-Selection Logic: Collect all serial numbers from both paidFor and parchiNo
+            const allSrNosFromPayment = new Set<string>();
+            
+            // 1. From paidFor array
             if (paymentToEdit.paidFor && paymentToEdit.paidFor.length > 0) {
-                 const paidForIds = data.suppliers
-                    .filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo))
+                paymentToEdit.paidFor.forEach(pf => {
+                    const sn = String(pf.srNo || '').trim();
+                    if (sn) allSrNosFromPayment.add(sn);
+                });
+            }
+            
+            // 2. From parchiNo field (fallback or additional)
+            if (paymentToEdit.parchiNo) {
+                const tokens = paymentToEdit.parchiNo.split(/[,\s]+/).filter(Boolean);
+                tokens.forEach(tk => allSrNosFromPayment.add(tk.trim()));
+            }
+
+            // Normalization & Final selection (using the S00XXX format for better matching)
+            if (allSrNosFromPayment.size > 0) {
+                 const normalizedSearchSet = new Set<string>();
+                 allSrNosFromPayment.forEach(sn => {
+                     let formatted = sn.toUpperCase().replace(/\s+/g, '');
+                     const numPart = formatted.startsWith('S') ? formatted.slice(1) : formatted;
+                     if (/^\d+$/.test(numPart)) {
+                         formatted = `S${numPart.padStart(5, '0')}`;
+                     }
+                     normalizedSearchSet.add(formatted.toLowerCase());
+                 });
+
+                 // Match with existing supplier entries in the database
+                 const matchedIds = data.suppliers
+                    .filter(s => s.srNo && normalizedSearchSet.has(String(s.srNo).trim().toLowerCase()))
                     .map(s => s.id);
-                 form.setSelectedEntryIds(new Set(paidForIds));
+                 
+                 // If we found database IDs, use them; otherwise use the normalized serial numbers directly
+                 if (matchedIds.length > 0) {
+                     form.setSelectedEntryIds(new Set(matchedIds));
+                 } else {
+                     form.setSelectedEntryIds(new Set(Array.from(normalizedSearchSet)));
+                 }
             } else {
                  form.setSelectedEntryIds(new Set());
             }
             
             handlePaySelectedOutstanding(paymentToEdit);
     
-            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: "Details loaded. Make changes and save." });
+            toast({ title: `Editing Payment ${paymentToEdit.paymentId || paymentToEdit.rtgsSrNo}`, description: `Loaded with ${allSrNosFromPayment.size} associated receipts.` });
         } catch (error: any) {
             console.error("Edit error:", error);
-            toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
-            form.setEditingPayment(null);
-            form.resetPaymentForm();
-            handleSettleAmountChange(0);
-            handleToBePaidChange(0);
+            toast({ title: "Cannot Edit", description: "Internal error while loading payment details. Check console for details.", variant: "destructive" });
+            console.error(error);
+            // Don't reset if we were already in some state
         } finally {
             setIsProcessing(false);
         }
@@ -606,25 +717,30 @@ export const useSupplierPayments = () => {
         if (isProcessing) return;
         setIsProcessing(true);
         try {
+            const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
+
             // Balance check: selected "Payment From" must have enough balance (skip for Gov. – no from account)
             if (form.paymentMethod !== 'Gov.') {
-                // Ledger Credit = charge (Income/Credit) — no actual cash/bank outflow.
-                // Adjustment = no account movement.
                 const isLedgerCredit = form.paymentMethod === 'Ledger' && form.drCr === 'Credit';
                 const isAdjustment = form.selectedAccountId === 'Adjustment';
+                
                 if (!(isLedgerCredit || isAdjustment)) {
                     const balanceKey = form.paymentMethod === 'Cash'
                         ? (form.selectedAccountId || 'CashInHand')
                         : form.selectedAccountId;
+                        
                     if (!balanceKey && (form.paymentMethod === 'Online' || form.paymentMethod === 'RTGS' || form.paymentMethod === 'Ledger')) {
                         toast({ title: "Select account", description: "Please select Payment From account.", variant: "destructive" });
                         setIsProcessing(false);
                         return;
                     }
+                    
                     const balances = data.financialState?.balances;
-                    const available = balances && balanceKey ? (balances.get(balanceKey) ?? 0) : 0;
+                    // If balances are not yet loaded, treat as infinite balance instead of blocking
+                    const available = balances && balanceKey ? (balances.get(balanceKey) ?? Infinity) : Infinity;
+                    
                     if (available < finalAmountToPay) {
-                        toast({ title: "Not enough balance", description: "Selected account does not have sufficient balance for this payment.", variant: "destructive" });
+                        toast({ title: "Not enough balance", description: `Selected account has only ${formatCurrency(available)} available. Payment amount is ${formatCurrency(finalAmountToPay)}.`, variant: "destructive" });
                         setIsProcessing(false);
                         return;
                     }
@@ -633,68 +749,65 @@ export const useSupplierPayments = () => {
 
             // CD at finalize: only apply when cdEnabled; actual cash = finalAmountToPay, CD stored separately in paidFor[].cdAmount
             // effectiveCdAmount = 0 when CD disabled so distribution and DB get zero CD; cdAt/cdPercent/paymentHistory drive distribution mode
+            // 1. Map entry IDs to full transaction objects from the active supplier summary
+            const summary = data.customerSummaryMap?.get(form.selectedCustomerKey || '');
+            const selectedEntryObjects = (summary?.allTransactions || []).filter((t: Customer) => form.selectedEntryIds.has(t.srNo || t.id || ''));
+            
+            // 2. Build entry outstandings for breakdown calculation
+            const entryOutstandings = selectedEntryObjects.map(entry => {
+                const res = calculateOutstandingForEntry(entry, data.paymentHistory || []);
+                return {
+                    entry,
+                    outstanding: res.outstanding,
+                    originalOutstanding: res.outstanding,
+                    originalAmount: Number(entry.netAmount) || 0
+                };
+            });
+
+            // 3. Strict numeric conversion for all transaction values
+            const rtgsAmt = Number(form.rtgsAmount) || 0;
+            const currentToBePaid = Number(finalAmountToPay) || 0;
+            const effectiveAmount = (form.paymentMethod === 'RTGS' && currentToBePaid === 0) ? rtgsAmt : currentToBePaid;
+
+            // Prepare Context
             const context: ProcessPaymentContext = {
-                selectedCustomerKey: form.selectedCustomerKey,
-                selectedEntries,
-                notes: form.notes || '',
-                paidForDetails:
-                    form.paymentMethod === 'Gov.' && (form.govExtraAmount || 0) > 0
-                        ? (() => {
-                              // Gov Extra: put on first selected entry (extra paid separately, increases Total Amount in summary)
-                              const firstSrNo = selectedEntries.length >= 1
-                                  ? ((selectedEntries[0] as any)?.srNo || (selectedEntries[0] as any)?.entry?.srNo || '')
-                                  : (form.parchiNo || '').split(/[,\s]+/)[0] || '';
-                              const srNo = String(firstSrNo).trim();
-                              if (!srNo) return undefined;
-                              return [{ srNo, amount: 0, cdAmount: 0, extraAmount: form.govExtraAmount || 0 }];
-                          })()
-                        : form.paymentMethod !== 'Ledger' && (form.extraAmount || 0) > 0
-                        ? (() => {
-                              const srNo = String(
-                                  form.parchiNo ||
-                                      (selectedEntries.length === 1 ? (selectedEntries[0] as any)?.entry?.srNo : '') ||
-                                      ''
-                              ).trim();
-                              if (!srNo) return undefined;
-                              return [{ srNo, amount: 0, cdAmount: 0, extraAmount: form.extraAmount }];
-                          })()
-                        : undefined,
+                selectedCustomerKey: form.selectedCustomerKey || '',
+                selectedEntries: selectedEntryObjects, // Pass full objects, not just IDs
+                entryOutstandings: entryOutstandings, // Pass calculated outstandings for breakdown
+                notes: String(form.notes || '').trim(),
                 editingPayment: form.editingPayment,
-                finalAmountToPay: finalAmountToPay,
+                paymentDate: form.paymentDate,
+                finalAmountToPay: effectiveAmount,
                 paymentMethod: form.paymentMethod,
-                selectedAccountId: form.selectedAccountId,
-                cdEnabled: cdProps.cdEnabled,
-                effectiveCdAmount: effectiveCdAmount,
-                calculatedCdAmount: effectiveCdAmount,
-                settleAmount,
-                totalOutstandingForSelected,
+                isCustomer: false, // Defaulting to false for supplier payments hook
+                accountIdForPayment: form.selectedAccountId,
+                cdEnabled: form.cdEnabled,
+                effectiveCdAmount: Number(effectiveCdAmount) || 0,
+                calculatedCdAmount: Number(effectiveCdAmount) || 0,
+                settleAmount: Number(settleAmount) || 0,
                 paymentType: form.paymentType,
                 drCr: form.drCr,
-                extraAmount: form.extraAmount,
-                financialState: { ...(data.financialState as any), bankAccounts: data.bankAccounts },
+                extraAmount: Number(form.extraAmount) || 0,
                 paymentId: form.paymentId,
                 rtgsSrNo: form.paymentMethod === 'Gov.' ? '' : form.rtgsSrNo,
-                paymentDate: form.paymentDate,
                 utrNo: form.utrNo,
                 checkNo: form.paymentMethod === 'Gov.' ? '' : form.checkNo,
-                sixRNo: form.sixRNo,
-                sixRDate: form.sixRDate,
+                rtgsQuantity: Number(form.rtgsQuantity) || 0,
+                rtgsRate: Number(form.rtgsRate) || 0,
+                rtgsAmount: rtgsAmt,
+                govQuantity: Number(form.govQuantity) || 0,
+                govRate: Number(form.govRate) || 0,
+                govAmount: Number(form.govAmount) || 0,
+                govExtraAmount: Number(form.govExtraAmount) || 0,
+                centerName: form.centerName,
                 parchiNo: form.parchiNo,
-                rtgsQuantity: form.rtgsQuantity,
-                rtgsRate: form.rtgsRate,
-                rtgsAmount: form.rtgsAmount,
-                govQuantity: form.govQuantity,
-                govRate: form.govRate,
-                govAmount: form.govAmount,
-                govExtraAmount: form.govExtraAmount,
+                sixRDate: form.sixRDate,
                 supplierDetails: form.supplierDetails,
                 bankDetails: form.bankDetails,
-                cdAt: cdProps.cdAt,
-                cdPercent: cdProps.cdPercent ?? 2,
                 paymentHistory: data.paymentHistory ?? [],
-                isCustomer: false,
-                centerName: form.centerName,
                 suppliers: data.suppliers,
+                allExpenses: data.expenses,
+                allIncomes: data.incomes,
             };
 
             const result = await processPaymentLogic(context);

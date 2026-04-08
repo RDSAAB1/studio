@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
 import { Loader2, Edit, Save, X, Printer, Mail, Download, CheckSquare, Square } from 'lucide-react';
+import { printHtmlContent } from '@/lib/electron-print';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -229,26 +230,15 @@ export default function RtgsReportClient() {
             return !hasDate || !hasCheckNo;
         });
     }, [filteredReportRows]);
+
+    const selectedPayments = useMemo(() => {
+        if (selectedPaymentIds.size === 0) return completedRows;
+        return filteredReportRows.filter(row => selectedPaymentIds.has(row.id));
+    }, [selectedPaymentIds, completedRows, filteredReportRows]);
     
-    const handlePrint = (_printRef: React.RefObject<HTMLDivElement>) => {
+    const handlePrint = async (_printRef: React.RefObject<HTMLDivElement>) => {
         if (!settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Missing settings for print.' });
-            return;
-        }
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
-            document.body.removeChild(iframe);
             return;
         }
 
@@ -270,7 +260,7 @@ export default function RtgsReportClient() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${filteredReportRows.map(row => {
+                    ${selectedPayments.map(row => {
                         const bankDetails = `${row.bank || 'N/A'}<br/>${row.ifscCode || 'N/A'}<br/>${row.branch || 'N/A'}`;
                         const accountMobileDetails = `${row.acNo || 'N/A'}<br/>${row.contact || 'N/A'}`;
                         const payeeDetails = `${row.supplierName}<br/>S/O: ${row.fatherName}<br/>${row.supplierAddress || ''}`;
@@ -313,105 +303,35 @@ export default function RtgsReportClient() {
             </table>
         `;
 
-        iframeDoc.open();
-        iframeDoc.write(`
-            <html><head><title>RTGS Payment Report</title>
-                <style>
-                    @page { size: portrait; margin: 10mm; }
-                    * { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                        color-adjust: exact !important;
-                    }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                        font-family: sans-serif; 
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                    }
-                    .print-header { 
-                        text-align: center; 
-                        margin-bottom: 1rem; 
-                        color: #000000 !important;
-                    }
-                    h2, p { 
-                        color: #000000 !important; 
-                    }
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        font-size: 10px; 
-                        background-color: #ffffff !important;
-                    }
-                    th, td { 
-                        border: 1px solid #000000 !important; 
-                        padding: 6px !important; 
-                        text-align: left; 
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    thead { 
-                        background-color: #f2f2f2 !important; 
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    thead tr {
-                        background-color: #f2f2f2 !important;
-                    }
-                    th { 
-                        background-color: #f2f2f2 !important; 
-                        color: #000000 !important;
-                        font-weight: bold !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    td { 
-                        vertical-align: top; 
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    tbody tr { 
-                        background-color: #ffffff !important;
-                    }
-                    tbody td {
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                    }
-                </style>
-            </head><body>
-                <div class="print-header">
-                    <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
-                    <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-                </div>
-                ${printTableHTML}
-            </body></html>
-        `);
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+        const printHTML = `
+            <div class="print-header" style="text-align: center; margin-bottom: 2rem;">
+                <h2 style="margin: 0;">${toTitleCase(settings.companyName)}</h2>
+                <p style="margin: 5px 0;">RTGS Payment Report</p>
+                <p style="margin: 5px 0; font-size: 12px;">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+            </div>
+            ${printTableHTML}
+        `;
+
+        const printStyles = `
+            @page { size: landscape; margin: 10mm; }
+            body { font-family: sans-serif; background-color: #ffffff !important; color: #000000 !important; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; background-color: #ffffff !important; }
+            th, td { border: 1px solid #000000 !important; padding: 6px !important; text-align: left; background-color: #ffffff !important; color: #000000 !important; vertical-align: top; }
+            th { background-color: #f2f2f2 !important; font-weight: bold !important; }
+            .text-right { text-align: right; }
+            .whitespace-nowrap { white-space: nowrap; }
+        `;
+
+        await printHtmlContent(printHTML, printStyles);
     };
     
     const handleDownloadExcel = () => {
-        if (filteredReportRows.length === 0) {
+        if (selectedPayments.length === 0) {
             toast({ title: "No data to export", variant: "destructive" });
             return;
         }
 
-        const dataToExport = filteredReportRows.map(p => ({
+        const dataToExport = selectedPayments.map(p => ({
             'Date': format(new Date(p.date), 'dd-MMM-yy'),
             'SR No.': p.srNo,
             'Name': p.supplierName,
@@ -896,7 +816,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    {settings && <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />}
+                    {settings && <ConsolidatedRtgsPrintFormat payments={selectedPayments} settings={settings} />}
                 </DialogContent>
             </Dialog>
 
@@ -982,14 +902,14 @@ export default function RtgsReportClient() {
             <BankMailFormatDialog 
                 isOpen={isBankMailFormatOpen}
                 onOpenChange={setIsBankMailFormatOpen}
-                payments={filteredReportRows}
+                payments={selectedPayments}
                 settings={settings}
             />
 
             <BankMailFormatDialog2 
                 isOpen={isBankMailFormat2Open}
                 onOpenChange={setIsBankMailFormat2Open}
-                payments={filteredReportRows}
+                payments={selectedPayments}
                 settings={settings}
             />
 

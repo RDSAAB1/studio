@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -58,6 +58,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     const { calculateValues } = useSupplierCalculations();
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
@@ -216,15 +217,6 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     }
                 }, 500);
             }
-            
-            const timer = setTimeout(() => {
-                calculateSummary();
-            }, 300);
-            
-            return () => {
-                clearTimeout(timer);
-                clearTimeout(saveTimer);
-            };
         });
         
         return () => {
@@ -295,15 +287,18 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     });
                     
                     setIsEditing(true);
+                    setCurrentSupplier(existingSupplier);
                     
                     setTimeout(() => {
                         calculateSummary();
                     }, 100);
                     
+/* 
                     toast({
                         title: "Existing Entry Found",
-                        description: `Supplier entry with serial number ${formattedSrNo} has been loaded for editing.`,
+                        description: `Record for ${existingSupplier.name}${existingSupplier.so ? ` S/O ${existingSupplier.so}` : ''} (SR# ${formattedSrNo}) has been loaded for editing.`,
                     });
+*/
                 }
             } catch (error) {
                 // Error checking existing supplier
@@ -324,15 +319,18 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     form.setValue('name', existingSupplier.name || '');
                     form.setValue('so', existingSupplier.so || '');
                     form.setValue('address', existingSupplier.address || '');
+                    setCurrentSupplier(existingSupplier);
                     
                     setTimeout(() => {
                         calculateSummary();
                     }, 100);
                     
+/* 
                     toast({
                         title: "Existing Contact Found",
-                        description: `Supplier details for contact ${trimmedContact} have been auto-filled.`,
+                        description: `Details for ${existingSupplier.name}${existingSupplier.so ? ` S/O ${existingSupplier.so}` : ''}, ${existingSupplier.address || 'No Address'} (Contact: ${trimmedContact}) have been auto-filled.`,
                     });
+*/
                 }
             } catch (error) {
                 // Error checking existing contact
@@ -341,8 +339,13 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     };
 
     const onSubmit = async (values: CompleteSupplierFormValues) => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const calculated = calculateValues(values);
+
+            // Capture editing state BEFORE it gets reset below
+            const wasEditing = isEditing;
 
             const termDays = Number(values.term) || 20;
             const dueDate = new Date(values.date);
@@ -396,8 +399,11 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
 
                 updateSupplier(targetId, supplierBase).catch(() => {});
             } else {
-                const existingSupplier = allSuppliers?.find(s => s.srNo === values.srNo);
+                // For non-editing mode, always check DATABASE directly to catch old entries outside the 500-limit cache
+                const existingSupplier = values.srNo ? await db.suppliers.where('srNo').equals(values.srNo.trim()).first() : null;
+                
                 if (existingSupplier?.id) {
+                    // Update instead of add if found
                     updateSupplier(existingSupplier.id, supplierBase).catch(() => {});
                     savedId = existingSupplier.id;
                     setCurrentSupplier({ ...supplierBase, id: existingSupplier.id } as Customer);
@@ -419,14 +425,66 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 setTimeout(() => setHighlightEntryId(null), 3000);
             }
             
-            if (!isEditing) {
-                setTimeout(() => {
-                    const newState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]);
-                    form.reset(newState);
-                    if (typeof window !== 'undefined') {
-                        localStorage.removeItem('supplier-entry-form-state');
+            {
+                // Always reset form after save OR update — ready for next new entry.
+                // New entry:  next = justSaved srNo + 1  (reliable, no DB query needed)
+                // Update:     next = highest existing srNo + 1  (no new record was added)
+                let nextSrNo: string;
+
+                if (wasEditing) {
+                    // After update: derive from highest known serial in list
+                    const highestSupplier = suppliersForSerial?.[0];
+                    if (highestSupplier) {
+                        const num = parseInt(highestSupplier.srNo.substring(1), 10);
+                        nextSrNo = !isNaN(num) ? formatSrNo(num + 1, 'S') : 'S0001';
+                    } else {
+                        nextSrNo = 'S0001';
                     }
-                }, 0);
+                } else {
+                    // After new save: just-saved srNo + 1 (instant, no race condition)
+                    const justSavedNum = parseInt(values.srNo.substring(1), 10);
+                    nextSrNo = !isNaN(justSavedNum) ? formatSrNo(justSavedNum + 1, 'S') : values.srNo;
+                }
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                form.reset({
+                    srNo: nextSrNo,
+                    date: today,
+                    term: 20,
+                    name: '',
+                    so: '',
+                    address: '',
+                    contact: '',
+                    vehicleNo: '',
+                    variety: lastVariety || '',
+                    grossWeight: 0,
+                    teirWeight: 0,
+                    rate: 0,
+                    kartaPercentage: 1,
+                    labouryRate: 0,
+                    brokerage: 0,
+                    brokerageRate: 0,
+                    brokerageAddSubtract: true,
+                    kanta: 50,
+                    paymentType: lastPaymentType || 'Full',
+                    forceUnique: false,
+                });
+
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('supplier-entry-form-state');
+                }
+
+                // IMPORTANT: Reset currentSupplier ID and identity to prevent overwriting on next entry
+                const resetSupplier: Customer = {
+                    id: "", srNo: nextSrNo, date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
+                    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+                    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                    labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
+                };
+                setCurrentSupplier(resetSupplier);
             }
             
         } catch (error: any) {
@@ -435,6 +493,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 description: error?.message || "Please try again.",
                 variant: "destructive" 
             });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -538,6 +598,123 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
         toast({ title: "Form cleared" });
     }, [form, lastVariety, lastPaymentType, suppliersForSerial, toast]);
 
+    // Calculate unique profiles for easy lookup
+    const uniqueProfiles = useMemo(() => {
+        if (!allSuppliers) return [];
+        const profiles = new Map<string, {name: string, so: string, address: string, contact: string, id: string}>();
+        
+        // Sort by date to get the most recent details for each profile
+        const sorted = [...allSuppliers].sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        sorted.forEach(s => {
+            const normalizedName = (s.name || '').trim().toLowerCase();
+            const normalizedSo = ((s as any).fatherName || s.so || '').trim().toLowerCase();
+            const normalizedAddress = (s.address || '').trim().toLowerCase();
+            
+            const key = `${normalizedName}|${normalizedSo}|${normalizedAddress}`;
+            if (!profiles.has(key) && normalizedName) {
+                profiles.set(key, {
+                    name: s.name,
+                    so: (s as any).fatherName || s.so || '',
+                    address: s.address,
+                    contact: s.contact,
+                    id: s.id
+                });
+            }
+        });
+        return Array.from(profiles.values());
+    }, [allSuppliers]);
+
+    const uniqueAddresses = useMemo(() => {
+        if (!allSuppliers) return [];
+        const seen = new Set<string>();
+        return allSuppliers
+            .map(s => (s.address || '').trim())
+            .filter(a => {
+                if (!a || seen.has(a.toLowerCase())) return false;
+                seen.add(a.toLowerCase());
+                return true;
+            })
+            .slice(0, 100);
+    }, [allSuppliers]);
+
+    const uniqueVehicleNos = useMemo(() => {
+        if (!allSuppliers) return [];
+        const seen = new Set<string>();
+        return allSuppliers
+            .map(s => (s.vehicleNo || '').trim().toUpperCase())
+            .filter(v => {
+                if (!v || seen.has(v.toLowerCase())) return false;
+                seen.add(v.toLowerCase());
+                return true;
+            })
+            .slice(0, 100);
+    }, [allSuppliers]);
+
+    const uniqueNames = useMemo(() => {
+        if (!allSuppliers) return [];
+        const seen = new Set<string>();
+        return allSuppliers
+            .map(s => (s.name || '').trim())
+            .filter(n => {
+                if (!n || seen.has(n.toLowerCase())) return false;
+                seen.add(n.toLowerCase());
+                return true;
+            })
+            .slice(0, 100);
+    }, [allSuppliers]);
+
+    const uniqueSo = useMemo(() => {
+        if (!allSuppliers) return [];
+        const seen = new Set<string>();
+        return allSuppliers
+            .map(s => ((s as any).fatherName || s.so || '').trim())
+            .filter(so => {
+                if (!so || seen.has(so.toLowerCase())) return false;
+                seen.add(so.toLowerCase());
+                return true;
+            })
+            .slice(0, 100);
+    }, [allSuppliers]);
+
+    const uniqueContacts = useMemo(() => {
+        if (!allSuppliers) return [];
+        const seen = new Set<string>();
+        return allSuppliers
+            .map(s => (s.contact || '').trim())
+            .filter(c => {
+                if (!c || seen.has(c)) return false;
+                seen.add(c);
+                return true;
+            })
+            .slice(0, 100);
+    }, [allSuppliers]);
+
+    const handleUseProfile = useCallback((profile: {name: string, so: string, address: string, contact: string}) => {
+        form.setValue('name', profile.name);
+        form.setValue('so', profile.so);
+        form.setValue('address', profile.address);
+        form.setValue('contact', profile.contact);
+        
+        // Switch to "new entry" mode but with these details
+        setIsEditing(false);
+        setCurrentSupplier(prev => ({
+            ...prev,
+            name: profile.name,
+            so: profile.so,
+            address: profile.address,
+            contact: profile.contact,
+            id: '' // Important: clear ID for new entry
+        }));
+        
+        toast({ 
+            title: "Profile Loaded", 
+            description: `Details for ${profile.name} filled. This is a NEW entry.`,
+        });
+    }, [form, toast]);
+
     const handleAddOption = useCallback(async (collectionName: string, optionData: { name: string } | string) => {
         try {
             const name = typeof optionData === 'string' ? optionData : optionData.name;
@@ -620,6 +797,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
         currentSupplier,
         setCurrentSupplier,
         isEditing,
+        isSubmitting,
         setIsEditing,
         varietyOptions,
         paymentTypeOptions,
@@ -646,5 +824,12 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
         handleDeleteOption,
         calculateSummary,
         handleEditSupplier,
+        uniqueProfiles,
+        handleUseProfile,
+        uniqueNames,
+        uniqueSo,
+        uniqueAddresses,
+        uniqueVehicleNos,
+        uniqueContacts
     };
 }

@@ -226,7 +226,9 @@ interface CustomDropdownProps {
                 // Sort Cash In Hand first, then alphabetically
                 if (a.value === 'CashInHand') return -1;
                 if (b.value === 'CashInHand') return 1;
-                return a.label.localeCompare(b.label);
+                const labelA = a.label || '';
+                const labelB = b.label || '';
+                return labelA.localeCompare(labelB);
             });
         }
         
@@ -235,7 +237,9 @@ interface CustomDropdownProps {
             return [...options].sort((a, b) => {
                 if (a.value === 'CashInHand') return -1;
                 if (b.value === 'CashInHand') return 1;
-                return a.label.localeCompare(b.label);
+                const labelA = a.label || '';
+                const labelB = b.label || '';
+                return labelA.localeCompare(labelB);
             });
         }
         
@@ -511,12 +515,13 @@ interface CustomDropdownProps {
 
     const handleAddNew = () => {
         if (onAdd && searchTerm) {
-            const existingOption = options.find(item => item.label.toLowerCase() === searchTerm.toLowerCase());
+            const normalizedTerm = searchTerm.trim().toUpperCase();
+            const existingOption = options.find(item => item.label.toUpperCase() === normalizedTerm);
             if (existingOption) {
                 handleSelect(existingOption);
             } else {
-                onAdd(searchTerm);
-                onChange(searchTerm); 
+                onAdd(normalizedTerm);
+                onChange(normalizedTerm); 
                 setIsOpen(false);
             }
         }
@@ -613,8 +618,8 @@ interface CustomDropdownProps {
                             e.stopPropagation(); // Prevent form submission or other handlers
                             if (highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
                                 handleSelect(filteredItems[highlightedIndex]);
-                            } else if (filteredItems.length === 1) {
-                                // If only one item matches, select it
+                            } else if (filteredItems.length > 0) {
+                                // If any item matches, select the first one (as requested by user)
                                 handleSelect(filteredItems[0]);
                             } else if (showGoButton && onGoClick) {
                                 onGoClick();
@@ -641,6 +646,7 @@ interface CustomDropdownProps {
                 {showGoButton && (
                     <div className="absolute inset-y-0 right-1 flex items-center">
                         <Button
+                            type="button"
                             size="sm"
                             className="h-5 rounded-full px-2.5 text-[10px]"
                             onClick={onGoClick}

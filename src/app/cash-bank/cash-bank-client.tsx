@@ -31,9 +31,9 @@ import { syncLoansAndFundTransactionsToFolder } from "@/lib/local-folder-storage
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalData } from "@/contexts/global-data-context";
+import { useSupplierData } from "@/hooks/use-supplier-data";
 
-
-const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+const StatCard = React.memo(({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm border-white/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-3">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -44,7 +44,8 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
-);
+));
+StatCard.displayName = "StatCard";
 
 const initialLoanFormState: Partial<Loan> = {
     loanName: "",
@@ -292,7 +293,8 @@ export default function CashBankClient() {
             amount: 0, 
             description: "",
             source: "",
-            destination: ""
+            destination: "",
+            date: new Date().toISOString().split('T')[0]
         } 
     });
     
@@ -315,6 +317,8 @@ export default function CashBankClient() {
             return { ...loan, remainingAmount, amountPaid: totalPaid };
         });
     }, [loans, allExpenses]);
+
+    const { customerSummaryMap: supplierSummaryMap } = useSupplierData();
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -367,15 +371,20 @@ export default function CashBankClient() {
         });
         
         const totalLoanLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + Math.max(0, loan.remainingAmount), 0);
-        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
+        
+        let totalSupplierDues = 0;
+        supplierSummaryMap.forEach(summary => {
+            totalSupplierDues += (summary.totalOutstanding || 0);
+        });
+
         const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers]);
+    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, supplierSummaryMap]);
     // ✅ OPTIMIZED: Removed refreshKey from dependencies - it's not needed as the actual data dependencies will trigger recalculation
 
-    const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
+    const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id'> & { date?: string }) => {
         return addFundTransaction(transaction)
             .then(async () => {
                 toast({ title: "Transaction recorded successfully", variant: "success" });
@@ -418,9 +427,10 @@ export default function CashBankClient() {
                 source: values.source, 
                 destination: values.destination, 
                 amount: transactionAmount, 
-                description: values.description 
+                description: values.description,
+                date: values.date || new Date().toISOString().split('T')[0]
             });
-            transferForm.reset({ amount: 0, description: "", source: "", destination: "" });
+            transferForm.reset({ amount: 0, description: "", source: "", destination: "", date: new Date().toISOString().split('T')[0] });
         } catch (error) {
             // Error is already handled in handleAddFundTransaction, just prevent unhandled rejection
         }
@@ -457,15 +467,16 @@ export default function CashBankClient() {
         const isNewLoan = !currentLoan.id;
     
         if (currentLoan.loanType === 'OwnerCapital') {
-            const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
-                type: 'CapitalInflow',
+            const capitalInflowData = {
+                type: 'CapitalInflow' as const,
                 source: 'OwnerCapital',
                 destination: currentLoan.depositTo as any,
                 amount: currentLoan.totalAmount || 0,
-                description: `Owner's capital contribution`
+                description: `Owner's capital contribution`,
+                date: currentLoan.startDate || new Date().toISOString().split('T')[0]
             };
             try {
-                await addFundTransaction(capitalInflowData);
+                await handleAddFundTransaction(capitalInflowData);
                 await syncLoansAndFundTransactionsToFolder();
                 toast({ title: "Capital added successfully", variant: 'success' });
                 setIsLoanDialogOpen(false);
@@ -633,11 +644,26 @@ export default function CashBankClient() {
                                         <Input id="transfer-amount" type="number" {...transferForm.register('amount')} />
                                         {transferForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{transferForm.formState.errors.amount.message}</p>}
                                     </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="transfer-date">Date</Label>
+                                        <Controller
+                                            name="date"
+                                            control={transferForm.control}
+                                            render={({ field }) => (
+                                                <SmartDatePicker
+                                                    id="transfer-date"
+                                                    value={field.value || ''}
+                                                    onChange={(date) => field.onChange(typeof date === 'string' ? date : format(date, 'yyyy-MM-dd'))}
+                                                />
+                                            )}
+                                        />
+                                    </div>
                                </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="transfer-description">Description</Label>
                                     <Textarea id="transfer-description" {...transferForm.register('description')} />
                                 </div>
+                                <TransferFormWatcher control={transferForm.control} />
                                 <Button type="submit">Transfer Funds</Button>
                             </form>
                         </CardContent>
@@ -709,32 +735,14 @@ export default function CashBankClient() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {fundTransactions.map(t => (
-                                    <TableRow key={t.id}>
-                                        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
-                                                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
-                                                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
-                                            </div>
-                                             <p className="text-xs text-muted-foreground">{formSourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {formSourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
-                                        <TableCell>{t.description}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditFundTransaction(t)}><Pen className="h-4 w-4" /></Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Delete Transaction?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the transaction of {formatCurrency(t.amount)}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteFundTransaction(t.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
+                                {fundTransactions.slice(0, 100).map(t => (
+                                    <TransactionRow 
+                                        key={t.id} 
+                                        t={t} 
+                                        sourcesAndDestinations={formSourcesAndDestinations}
+                                        onEdit={handleEditFundTransaction}
+                                        onDelete={handleDeleteFundTransaction}
+                                    />
                                 ))}
                                 {fundTransactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No fund transactions found.</TableCell></TableRow>}
                             </TableBody>
@@ -851,3 +859,48 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+// ✅ Isolated Transaction Row Component
+const TransactionRow = React.memo(({ t, sourcesAndDestinations, onEdit, onDelete }: { 
+    t: FundTransaction, 
+    sourcesAndDestinations: any[], 
+    onEdit: (t: FundTransaction) => void, 
+    onDelete: (id: string) => void 
+}) => (
+    <TableRow>
+        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
+        <TableCell>
+            <div className="flex items-center gap-2">
+                {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
+                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
+                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+                {sourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {sourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}
+            </p>
+        </TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
+        <TableCell>{t.description}</TableCell>
+        <TableCell className="text-right">
+            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => onEdit(t)}><Pen className="h-4 w-4" /></Button>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Delete Transaction?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the transaction of {formatCurrency(t.amount)}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(t.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </TableCell>
+    </TableRow>
+));
+TransactionRow.displayName = "TransactionRow";
+
+// ✅ Watcher to isolate form changes
+const TransferFormWatcher = ({ control }: { control: any }) => {
+    // The useWatch here causes only THIS placeholder component to re-render if needed, 
+    // but actually we don't need real-time feedback for transfer form usually.
+    // This is placeholder for future real-time validation feedback.
+    return null;
+};

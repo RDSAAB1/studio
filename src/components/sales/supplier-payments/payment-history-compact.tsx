@@ -354,9 +354,14 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                             <TableCell className="text-[11px] px-2 py-1 w-[6%] text-left align-middle">
                               <span className="font-mono font-bold truncate block">{payment.paymentId || payment.id}</span>
                             </TableCell>
-                            <TableCell className="text-[10px] px-2 py-1 w-[6%] text-left align-middle">
-                              <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
-                            </TableCell>
+                             <TableCell className="text-[10px] px-2 py-1 w-[6%] text-left align-middle">
+                               <div className="flex flex-col">
+                                 <span className="text-muted-foreground truncate block font-medium">{paymentDate}</span>
+                                 {(payment as any).status === 'Pending' && (
+                                   <span className="text-[8px] font-black text-amber-600 uppercase leading-none mt-0.5">Pending</span>
+                                 )}
+                               </div>
+                             </TableCell>
                             <TableCell className="text-[10px] px-2 py-1 w-[14%] text-left align-middle">
                               <div className="flex flex-col">
                                 <span className="text-muted-foreground truncate block font-medium">{accountHolderName}</span>

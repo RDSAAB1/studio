@@ -227,7 +227,11 @@ function getSqliteDb() {
       sqliteDb.pragma('journal_mode = DELETE');
     }
     
-    sqliteDb.pragma('synchronous = NORMAL');
+    // ✅ Change to FULL synchronous to ensure writes are flushed to disk before returning (safer for network/OneDrive)
+    sqliteDb.pragma('synchronous = FULL');
+    
+    // ✅ Watch for external changes (from other systems)
+    startSqliteWatcher(baseFolder);
     
     const tables = [
       'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
@@ -1203,6 +1207,8 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows) => {
     });
 
     upsert(items);
+    // ✅ Force checkpoint after bulk write so other systems/OneDrive see it immediately
+    forceCheckpoint();
     return { success: true, count: inserted };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -1218,6 +1224,8 @@ ipcMain.handle('sqlite:put', async (_event, tableName, row) => {
     const id = getRowId(row, tableName, 0);
     const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
     stmt.run(id, JSON.stringify(row));
+    // ✅ Force checkpoint so the main .sqlite file is updated (better for OneDrive sync)
+    forceCheckpoint();
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -1243,6 +1251,8 @@ ipcMain.handle('sqlite:delete', async (_event, tableName, id) => {
     const db = getSqliteDb();
     const stmt = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`);
     stmt.run(String(id).slice(0, 500));
+    // ✅ Force checkpoint after delete
+    forceCheckpoint();
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -1254,7 +1264,8 @@ ipcMain.handle('sqlite:all', async (_event, tableName) => {
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return [];
   try {
     const db = getSqliteDb();
-    const rows = db.prepare(`SELECT id, data FROM ${tableName}`).all();
+    // Default to a sane limit for 'all' to prevent UI hanging
+    const rows = db.prepare(`SELECT id, data FROM ${tableName} ORDER BY rowid DESC LIMIT 5000`).all();
     return rows.map((row) => ({
       ...(JSON.parse(row.data || '{}')),
       id: row.id,
@@ -1264,18 +1275,115 @@ ipcMain.handle('sqlite:all', async (_event, tableName) => {
   }
 });
 
-ipcMain.handle('sqlite:get', async (_event, tableName, id) => {
+/**
+ * ✅ OPTIMIZED: Targeted Query Support
+ * Avoids loading entire tables into memory.
+ */
+ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
+  if (sqliteError) return [];
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return [];
+  
+  try {
+    const db = getSqliteDb();
+    let sql = `SELECT id, data FROM ${tableName}`;
+    const params = [];
+
+    // WHERE clause (basic JSON property support)
+    if (options.where && typeof options.where === 'object') {
+      const clauses = [];
+      for (const [key, val] of Object.entries(options.where)) {
+        if (key === 'id') {
+          clauses.push(`id = ?`);
+          params.push(val);
+        } else {
+          clauses.push(`json_extract(data, '$.' || ?) = ?`);
+          params.push(key, val);
+        }
+      }
+      if (clauses.length > 0) sql += ` WHERE ` + clauses.join(' AND ');
+    }
+
+    // ORDER BY
+    if (options.orderBy) {
+      if (options.orderBy === 'id') {
+        sql += ` ORDER BY id`;
+      } else {
+        // Better-sqlite3 doesn't support binding column names or JSON keys in ORDER BY directly,
+        // but it's safe since we're selecting from a predetermined table and controlled schema.
+        sql += ` ORDER BY json_extract(data, '$.' || ?)`;
+        params.push(options.orderBy);
+      }
+      if (options.reverse) sql += ` DESC`;
+    } else {
+      sql += ` ORDER BY rowid DESC`; // Default: newest first
+    }
+
+    // LIMIT & OFFSET
+    if (options.limit != null) {
+      sql += ` LIMIT ?`;
+      params.push(options.limit);
+    }
+    if (options.offset != null) {
+      sql += ` OFFSET ?`;
+      params.push(options.offset);
+    }
+
+    const rows = db.prepare(sql).all(...params);
+    return rows.map((row) => ({
+      ...(JSON.parse(row.data || '{}')),
+      id: row.id,
+    }));
+  } catch (e) {
+    console.error(`[sqlite:query] Error for ${tableName}:`, e);
+    return [];
+  }
+});
+
+ipcMain.handle('sqlite:count', async (_event, tableName) => {
+  if (sqliteError) return 0;
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return 0;
+  try {
+    const db = getSqliteDb();
+    const result = db.prepare(`SELECT count(*) as total FROM ${tableName}`).get();
+    return result?.total || 0;
+  } catch (e) {
+    return 0;
+  }
+});
+
+ipcMain.handle('sqlite:get', async (_event, tableName, value, column = 'id') => {
   if (sqliteError) return null;
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return null;
   try {
     const db = getSqliteDb();
-    const row = db.prepare(`SELECT data FROM ${tableName} WHERE id = ?`).get(id);
+    let row;
+    if (column === 'id') {
+      row = db.prepare(`SELECT data FROM ${tableName} WHERE id = ?`).get(value);
+    } else {
+      // Search within the JSON 'data' column for a specific property
+      // better-sqlite3 supports JSON1 functions like json_extract
+      try {
+        row = db.prepare(`SELECT data, id FROM ${tableName} WHERE json_extract(data, '$.' || ?) = ?`).get(column, value);
+      } catch (jsonErr) {
+        // Fallback for older SQLite versions if json_extract is not available (unlikely)
+        const allRows = db.prepare(`SELECT id, data FROM ${tableName}`).all();
+        row = allRows.find(r => {
+          try {
+            const data = JSON.parse(r.data || '{}');
+            return String(data[column]) === String(value);
+          } catch { return false; }
+        });
+      }
+    }
+    
     if (!row) return null;
+    const finalId = row.id || value;
     return {
       ...(JSON.parse(row.data || '{}')),
-      id: id,
+      id: finalId,
     };
   } catch (e) {
+    console.error(`[sqlite:get] Failed for ${tableName}.${column}=${value}:`, e);
     return null;
   }
 });
@@ -1307,6 +1415,52 @@ ipcMain.handle('sqlite:getFileSize', async () => {
   }
 });
 
+let sqliteWatcher = null;
+function startSqliteWatcher(folderPath) {
+  if (sqliteWatcher) {
+    try { sqliteWatcher.close(); } catch {}
+  }
+
+  const dbPath = path.join(folderPath, 'jrmd.sqlite');
+  console.log(`[SQLite Watcher] Starting on ${dbPath}`);
+
+  let lastSync = 0;
+  // Use watch instead of watchFile for better performance, with a debounce
+  try {
+    sqliteWatcher = fs.watch(folderPath, (eventType, filename) => {
+      if (filename === 'jrmd.sqlite' || filename === 'jrmd.sqlite-wal') {
+        const now = Date.now();
+        if (now - lastSync < 2000) return; // Debounce 2s
+        lastSync = now;
+        
+        console.log(`[SQLite Watcher] External change detected in ${filename}`);
+        // Notify all windows
+        BrowserWindow.getAllWindows().forEach(win => {
+          win.webContents.send('sqlite:backend-change', { table: 'all', source: 'external' });
+        });
+      }
+    });
+  } catch (e) {
+    console.error('[SQLite Watcher] Failed to start:', e);
+  }
+}
+
+// Helper to run a checkpoint (flushes WAL to main DB file)
+function forceCheckpoint() {
+  if (!sqliteDb) return;
+  try {
+    // PASSIVE: doesn't block other connections, but flushes what it can
+    // RESTART: flushes everything and restarts the WAL file (more thorough)
+    sqliteDb.pragma('wal_checkpoint(RESTART)');
+  } catch (e) {
+    console.warn('[SQLite Checkpoint] Failed:', e.message);
+  }
+}
+
+app.on('will-quit', () => {
+  if (sqliteWatcher) sqliteWatcher.close();
+});
+
 ipcMain.handle('sqlite:setFolder', async (_event, folderPath) => {
   if (!folderPath || typeof folderPath !== 'string') {
     return { success: false, error: 'invalid_path' };
@@ -1319,5 +1473,49 @@ ipcMain.handle('sqlite:setFolder', async (_event, folderPath) => {
     return { success: true, folder: sqliteFolderPath };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
+  }
+});
+
+// --- External SQLite Import Helpers ---
+ipcMain.handle('sqlite:selectFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'SQLite Database', extensions: ['sqlite', 'db', 'sqlite3'] }
+    ]
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle('sqlite:readExternalTable', async (_event, filePath, tableName) => {
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
+  if (!filePath || !fs.existsSync(filePath)) return { success: false, error: 'file_not_found' };
+  
+  let tempDb;
+  try {
+    const Database = require('better-sqlite3');
+    tempDb = new Database(filePath, { readonly: true });
+    
+    // Check if table exists
+    const tableExists = tempDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(tableName);
+    if (!tableExists) {
+        return { success: false, error: `Table "${tableName}" not found in source file.` };
+    }
+    
+    const rows = tempDb.prepare(`SELECT data FROM ${tableName}`).all();
+    const data = rows.map(r => {
+        try {
+            return JSON.parse(r.data || '{}');
+        } catch {
+            return null;
+        }
+    }).filter(Boolean);
+    
+    return { success: true, data };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  } finally {
+    if (tempDb) tempDb.close();
   }
 });

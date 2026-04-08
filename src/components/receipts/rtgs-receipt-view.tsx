@@ -16,7 +16,7 @@ interface RtgsReceiptProps {
     onPrint: () => void;
 }
 
-export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onPrint }) => {
+export const RtgsReceiptView: React.FC<RtgsReceiptProps> = ({ payment, settings, onPrint }) => {
 
     if (!payment || !settings) {
         return null; // Return null if essential data is missing

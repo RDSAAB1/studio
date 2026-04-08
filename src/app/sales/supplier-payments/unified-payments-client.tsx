@@ -23,11 +23,11 @@ import { cn } from "@/lib/utils";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
-import { TransactionTable } from '@/components/sales/supplier-payments/transaction-table';
+import { TransactionTable } from '@/components/sales/supplier-payments/supplier-transaction-table';
 import { PaymentFilters } from '@/components/sales/supplier-payments/payment-filters';
 import { SupplierSummaryCards } from '@/components/sales/supplier-payments/supplier-summary-cards';
 import { GeneratePaymentOptions } from '@/components/sales/supplier-payments/generate-payment-options';
-import { PaymentDialogs } from '@/components/sales/supplier-payments/payment-dialogs';
+import { PaymentDialogs } from "../../../components/sales/supplier-payments/payment-dialogs";
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
@@ -42,11 +42,13 @@ import { GovForm } from '@/components/sales/supplier-payments/gov-form';
 import { GovReceiptSelector } from '@/components/sales/supplier-payments/gov-receipt-selector';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
 import { useSupplierSummary } from "../supplier-profile/hooks/use-supplier-summary";
+import { useFilteredSummary } from "../supplier-profile/hooks/use-filtered-summary";
 import { useOutsiderData } from "@/hooks/use-outsider-data";
 import { useOutsiderPayments } from "@/hooks/use-outsider-payments";
 import { GovHistoryTableDirect } from '@/components/sales/supplier-payments/gov-history-table-direct';
 import { usePaymentFilters } from "./hooks/use-payment-filters";
 import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
+import { ProcessingOverlay } from "../../../components/sales/supplier-payments/processing-overlay";
 
 
 // Helper functions for formatting
@@ -297,7 +299,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     sourceSuppliers,
     sourcePayments,
     undefined,
-    undefined
+    undefined,
+    hook.selectedCustomerKey as string | null
   );
   
   // Force summary recalculation when supplier data refresh key changes
@@ -386,6 +389,18 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     // Removed toast from dependencies - it's stable from useToast hook
     // eslint-disable-next-line react-hooks/exhaustive-deps
 
+  const handleEditPayment = useCallback((payment: Payment) => {
+    handleClearSupplierFilters();
+    setSearchType('name');
+    hook.handleEditPayment?.(payment);
+    setHistoryDialogOpen(false); // Close history dialog when editing
+    startTransition(() => {
+      setActiveTab('process');
+    });
+    // Scroll to top to see the processing interface
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [handleClearSupplierFilters, hook.handleEditPayment, setActiveTab]);
+
   const handleEditEntry = useCallback((entry: any) => {
     if (!entry) return;
     setSelectedEntryForEdit(entry);
@@ -418,316 +433,19 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     });
   }, [type, selectedSupplierSummary, filterVariety, isWithinDateRange]);
 
-  // Create filtered summary based on selected receipts
-  const filteredSupplierSummary = useMemo(() => {
-    if (type === 'outsider') return null;
-    if (!selectedSupplierSummary) return null;
-    
-    // Determine base transactions depending on selection
-    const selectedSrNos = new Set(
-      hook.selectedEntries.map((e: Customer) => (e.srNo || "").toLowerCase()).filter(Boolean)
-    );
-    
-    const filteredTransactions = hook.selectedEntries && hook.selectedEntries.length > 0
-      ? transactionsForSelectedSupplier.filter((t: Customer) =>
-          selectedSrNos.has((t.srNo || "").toLowerCase())
-        )
-      : transactionsForSelectedSupplier;
-    
-    const round2 = (value: number) => Math.round(value * 100) / 100;
-
-    let totalGrossWeight = 0;
-    let totalTeirWeight = 0;
-    let totalFinalWeight = 0;
-    let totalKartaWeight = 0;
-    let totalNetWeight = 0;
-
-    let totalKartaAmount = 0;
-    let totalLabouryAmount = 0;
-    let totalKanta = 0;
-    let totalOther = 0;
-    let totalBaseOriginalAmount = 0;
-    let totalAmountBinaDeduction = 0;
-
-    let totalWeightedRate = 0;
-    let minRate = 0;
-    let maxRate = 0;
-    let totalKartaPercentage = 0;
-    let totalLabouryRate = 0;
-
-    const outstandingEntryIds: string[] = [];
-    const filteredSrNosSet = new Set<string>();
-
-    for (const t of filteredTransactions) {
-      totalGrossWeight += Number(t.grossWeight) || 0;
-      totalTeirWeight += Number(t.teirWeight) || 0;
-      totalFinalWeight += Number((t as any).weight) || 0;
-      totalKartaWeight += Number(t.kartaWeight) || 0;
-
-      const netWeight = Number(t.netWeight) || 0;
-      totalNetWeight += netWeight;
-
-      totalKartaAmount += Number(t.kartaAmount) || 0;
-      totalLabouryAmount += Number(t.labouryAmount) || 0;
-      totalKanta += Number(t.kanta) || 0;
-      totalOther += Number(t.otherCharges) || 0;
-
-      const base = Number(t.originalNetAmount) || 0;
-      const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
-      totalBaseOriginalAmount += base + advance;
-
-      const amt = Number(t.amount) || 0;
-      if (amt > 0) {
-        totalAmountBinaDeduction += amt;
-      } else {
-        const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
-          ? Number((t as any).calculatedRate) || 0
-          : Number(t.rate) || 0;
-        totalAmountBinaDeduction += round2(rate * (Number((t as any).weight) || 0));
-      }
-
-      const rateValue = Number(t.rate) || 0;
-      totalWeightedRate += rateValue * netWeight;
-      if (rateValue > 0) {
-        if (minRate === 0 || rateValue < minRate) minRate = rateValue;
-        if (rateValue > maxRate) maxRate = rateValue;
-      }
-
-      totalKartaPercentage += Number(t.kartaPercentage) || 0;
-      totalLabouryRate += Number(t.labouryRate) || 0;
-
-      const srNoLower = (t.srNo || "").toLowerCase();
-      if (srNoLower) filteredSrNosSet.add(srNoLower);
-
-      const outstanding = Number((t as any).outstandingForEntry ?? t.netAmount ?? 0);
-      if (outstanding > 0.01 && t.id) outstandingEntryIds.push(t.id);
-    }
-    const filteredPayments = (hook.paymentHistory || []).filter((p: Payment) => {
-      const paidForMatch = p.paidFor?.some(pf => filteredSrNosSet.has((pf.srNo || "").toLowerCase()));
-      if (paidForMatch) return true;
-      const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
-      const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map(t => t.trim()).filter(Boolean);
-      const parchiMatch = parchiTokens.some(token => filteredSrNosSet.has(token));
-      return parchiMatch;
-    });
-    
-    // Ledger sahi concept: Debit = payment (paida) → Total Paid badhe; Credit = charge (bill badha) → Total Amount badhe
-    const receiptTypeOf = (p: Payment) => ((p as any).receiptType || (p as any).type || "").toString().trim().toLowerCase();
-    const isLedgerCredit = (p: Payment) => {
-      const drCr = String((p as any).drCr || "").trim().toLowerCase();
-      const amountRaw = Number((p as any).amount || 0);
-      return drCr === "credit" || amountRaw < 0;
-    };
-
-    let totalPaid = 0;
-    let totalCd = 0;
-    let totalCashPaid = 0;
-    let totalRtgsPaid = 0;
-    let totalGovExtraAmount = 0;
-    let totalLinkedLedgerCredit = 0;
-    for (const payment of filteredPayments) {
-      const receiptType = receiptTypeOf(payment);
-      const paidForList = Array.isArray(payment.paidFor) ? payment.paidFor : [];
-      const hasAnyPaidForExtra = paidForList.some((pf) => Number((pf as any).extraAmount || 0) > 0);
-
-      const isLedger = receiptType === "ledger";
-      const ledgerCredit = isLedger && isLedgerCredit(payment);
-
-      if (paidForList.length > 0) {
-        const totalPaidForInPayment = paidForList.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0);
-
-        for (const pf of paidForList) {
-          const srNoLower = (pf.srNo || "").toLowerCase();
-          if (!srNoLower || !filteredSrNosSet.has(srNoLower)) continue;
-
-          const pfAmount = Number(pf.amount || 0);
-
-          if (!isLedger || !ledgerCredit) {
-            totalPaid += pfAmount;
-          } else {
-            totalLinkedLedgerCredit += pfAmount;
-          }
-
-          const extraAmount = Number((pf as any).extraAmount || 0);
-          if (extraAmount > 0) totalGovExtraAmount += extraAmount;
-
-          if ('cdAmount' in pf && (pf as any).cdAmount !== undefined && (pf as any).cdAmount !== null) {
-            totalCd += Number((pf as any).cdAmount || 0);
-          } else if (payment.cdAmount && totalPaidForInPayment > 0) {
-            const proportion = pfAmount / totalPaidForInPayment;
-            totalCd += round2(Number(payment.cdAmount) * proportion);
-          }
-
-          if (receiptType === 'cash') {
-            totalCashPaid += pfAmount;
-          } else if (receiptType === 'rtgs') {
-            totalRtgsPaid += pfAmount;
-          }
-        }
-      } else {
-        const parchiNoRaw = String((payment as any).parchiNo || "").trim().toLowerCase();
-        const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
-        if (parchiTokens.length > 0) {
-          const matchingTokenCount = parchiTokens.reduce((count: number, token: string) => {
-            return filteredSrNosSet.has(token) ? count + 1 : count;
-          }, 0);
-
-          if (matchingTokenCount > 0) {
-            const amountAbs = Math.abs(Number((payment as any).amount || 0));
-            const share = parchiTokens.length > 0 ? round2(amountAbs / parchiTokens.length) : amountAbs;
-            if (!isLedger || !ledgerCredit) {
-              totalPaid += share * matchingTokenCount;
-            }
-          }
-        }
-      }
-
-      const rt = String((payment as any).receiptType || '').trim().toLowerCase();
-      const isGov = rt === 'gov.' || rt === 'gov' || rt.startsWith('gov');
-      const govExtra = Number((payment as any).govExtraAmount || 0);
-      if (isGov && govExtra > 0 && !hasAnyPaidForExtra) {
-        totalGovExtraAmount += govExtra;
-      }
-    }
-
-    // Gov Extra: include current form's govExtraAmount when in Gov mode (unsaved payment)
-    if (type === 'supplier' && hook.paymentMethod === 'Gov.' && (hook.govExtraAmount || 0) > 0) {
-      const formExtra = Number(hook.govExtraAmount || 0);
-      const selectedMatch = hook.selectedEntries?.some((e: Customer) =>
-        filteredSrNosSet.has((e.srNo || '').toLowerCase())
-      );
-      if (selectedMatch) {
-        totalGovExtraAmount += formExtra;
-      }
-    }
-    
-    // Calculate adjusted original (base original + Gov extra + linked ledger credit)
-    const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount + totalLinkedLedgerCredit;
-    const totalAdjustedOriginal = totalOriginalAmount;
-    
-    // Outstanding = Adjusted Original - Paid - CD
-    const baseOutstanding = totalAdjustedOriginal - totalPaid - totalCd;
-
-    // Ledger: sirf selected receipt ke sath — paidFor ya parchiNo se link hona chahiye
-    // supplierMatch/supplierDetailsMatch hata diya: doosri receipt ka ledger extra show na ho
-    const ledgerCandidatePayments = (hook.paymentHistory || []).filter((p: Payment) => {
-      const receiptType = ((p as any).receiptType || (p as any).type || "").toString().trim().toLowerCase();
-      if (receiptType !== "ledger") return false;
-
-      const paidForMatch = p.paidFor?.some((pf) => filteredSrNosSet.has((pf.srNo || "").toLowerCase())) || false;
-      const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
-      const parchiTokens = parchiNoRaw
-        .split(/[,\s]+/g)
-        .map((t) => t.trim())
-        .filter(Boolean);
-      const parchiMatch = parchiTokens.some((token) => filteredSrNosSet.has(token));
-
-      return paidForMatch || parchiMatch;
-    });
-
-    const uniqueLedgerPayments = Array.from(
-      new Map(
-        ledgerCandidatePayments.map((p: Payment) => [
-          String(p.paymentId || p.id || (p as any).rtgsSrNo || `${p.date}_${p.amount}`),
-          p,
-        ])
-      ).values()
-    );
-
-    const ledgerAdjustment = uniqueLedgerPayments.reduce(
-      (acc, p: Payment) => {
-        const amountRaw = Number((p as any).amount || 0);
-        const amountAbs = Math.abs(amountRaw);
-        const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
-        const isLedgerCredit = drCrLower === "credit" || amountRaw < 0;
-        const linkedPaid = p.paidFor?.reduce((sum: number, pf: PaidFor) => sum + Number(pf.amount || 0), 0) || 0;
-        const unlinked = Math.max(0, amountAbs - linkedPaid);
-
-        if (unlinked > 0) {
-          if (isLedgerCredit) acc.credit += unlinked;
-          else acc.debit += unlinked;
-        }
-
-        return acc;
-      },
-      { debit: 0, credit: 0 }
-    );
-
-    // Ledger credit = linked (paidFor) + unlinked; Net Bill = base + govExtra + full ledger credit
-    const ledgerCreditAmount = Math.round((totalLinkedLedgerCredit + ledgerAdjustment.credit) * 100) / 100;
-    // Ledger Debit (payment side) = linked debit payments + unlinked debit (for display),
-    // but outstanding formula should only use UNLINKED debit (linked debit already in totalPaid).
-    const linkedLedgerDebitPaid = filteredPayments.reduce((sum: number, p: Payment) => {
-      const receiptType = String((p as any).receiptType || "").toLowerCase().trim();
-      if (receiptType !== "ledger") return sum;
-      const drCrLower = String((p as any).drCr || "").toLowerCase().trim();
-      const amountRaw = Number((p as any).amount || 0);
-      const isLedgerCredit = drCrLower === "credit" || amountRaw < 0;
-      if (isLedgerCredit) return sum;
-      const linkedPaid = p.paidFor?.reduce((inner: number, pf: PaidFor) => inner + Number(pf.amount || 0), 0) || 0;
-      return sum + linkedPaid;
-    }, 0);
-    const unlinkedLedgerDebit = Math.round(ledgerAdjustment.debit * 100) / 100;
-    const ledgerDebitAmount = Math.round((linkedLedgerDebitPaid + unlinkedLedgerDebit) * 100) / 100;
-    // Total Amount = Final Net Bill (original already includes linked ledger credit)
-    const totalAmountIncludingLedger = Math.round((totalOriginalAmount + ledgerAdjustment.credit) * 100) / 100;
-    // Outstanding: baseOutstanding (incl. linked ledger credit) + unlinked ledger Credit − unlinked ledger Debit
-    const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.credit - unlinkedLedgerDebit) * 100) / 100;
-    
-    const safeNetWeight = totalNetWeight || 0;
-    const averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
-    
-    // Calculate average original price (adjusted original / net weight)
-    const totalAdjustedOriginalForAvg = totalAdjustedOriginal || totalOriginalAmount || 0;
-    const averageOriginalPrice = safeNetWeight > 0 ? totalAdjustedOriginalForAvg / safeNetWeight : 0;
-
-    const averageKartaPercentage = filteredTransactions.length > 0 ? totalKartaPercentage / filteredTransactions.length : 0;
-    const averageLabouryRate = filteredTransactions.length > 0 ? totalLabouryRate / filteredTransactions.length : 0;
-
-    const allPaymentsForSummary = Array.from(
-      new Map(
-        [...filteredPayments, ...uniqueLedgerPayments].map((p: Payment) => [
-          String(p.paymentId || p.id || (p as any).rtgsSrNo || `${p.date}_${p.amount}`),
-          p,
-        ])
-      ).values()
-    );
-
-    return {
-      ...selectedSupplierSummary,
-      allTransactions: filteredTransactions,
-      allPayments: allPaymentsForSummary,
-      totalGrossWeight,
-      totalTeirWeight,
-      totalFinalWeight,
-      totalKartaWeight,
-      totalNetWeight,
-      // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount
-      totalAmount: totalAmountBinaDeduction,
-      totalKartaAmount,
-      totalLabouryAmount,
-      totalKanta,
-      totalOther,
-      totalOriginalAmount,
-      totalBaseOriginalAmount,
-      totalGovExtraAmount,
-      totalAdjustedOriginal,
-      totalPaid,
-      totalCdAmount: totalCd,
-      totalCashPaid,
-      totalRtgsPaid,
-      ledgerCreditAmount,
-      ledgerDebitAmount,
-      totalOutstanding,
-      outstandingEntryIds,
-      averageRate,
-      averageOriginalPrice, // Add average original price
-      minRate,
-      maxRate,
-      averageKartaPercentage,
-      averageLabouryRate,
-    };
-  }, [selectedSupplierSummary, hook.selectedEntries, hook.paymentHistory, transactionsForSelectedSupplier]);
+  // Create filtered summary based on selected receipt  
+  const filteredSupplierSummary = useFilteredSummary({
+    type,
+    selectedSupplierSummary,
+    selectedEntries: hook.selectedEntries,
+    paymentHistory: hook.paymentHistory,
+    transactionsForSelectedSupplier,
+    isWithinDateRange,
+    filterVariety,
+    paymentMethod: hook.paymentMethod,
+    govExtraAmount: hook.govExtraAmount,
+    selectedCustomerKey: hook.selectedCustomerKey
+  });
 
   const selectedSupplierSrNos = useMemo(() => {
     if (!selectedSupplierSummary?.allTransactions) return [];
@@ -768,11 +486,17 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       //   ? true // No receipts selected, show all payments for supplier
       //   : paidSrNos.some((sr) => selectedReceiptSrNos.includes(sr)); // Receipts selected, filter by them
       
+      const parchiNoRaw = String((payment as any).parchiNo || (payment as any).checkNo || "").trim().toLowerCase();
+      const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map(t => t.trim()).filter(Boolean);
+
       const matchesSupplier =
         !hook.selectedCustomerKey ||
         (payment.supplierId === hook.selectedCustomerKey) ||
-        (!selectedSupplierSrNos.length ||
-        paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr)));
+        ((payment as any).customerId === hook.selectedCustomerKey) ||
+        (selectedSupplierSrNos.length > 0 && (
+          paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr)) ||
+          parchiTokens.some((token) => selectedSupplierSrNos.includes(token))
+        ));
 
       const matchesDate = isWithinDateRange(payment.date);
 
@@ -961,21 +685,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   
     return (
         <div className="space-y-2 text-[12px]">
-             {showProcessingOverlay && (
-               <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-                 <div className="flex items-center gap-3 rounded-lg bg-background px-6 py-4 shadow-lg">
-                   <Loader2 className="h-5 w-5 animate-spin" />
-                   <div className="flex flex-col">
-                     <span className="text-sm font-medium">
-                       {isDeleteProcessing ? "Deleting payment..." : "Processing payment..."}
-                     </span>
-                     <span className="text-xs text-muted-foreground">
-                       Please wait, background tasks are completing.
-                     </span>
-                   </div>
-                 </div>
-               </div>
-             )}
+             <ProcessingOverlay 
+               show={showProcessingOverlay} 
+               isDeleting={isDeleteProcessing} 
+             />
              {type === 'outsider' ? (
                 // For outsider: No tabs, just show payment content directly
                 <>
@@ -1040,7 +753,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                               <div className="w-full h-[310px] overflow-hidden">
                                 <PaymentHistoryCompact
                                   payments={outsiderPayments}
-                                  onEdit={hook.handleEditPayment}
+                                  onEdit={handleEditPayment}
                                   onDelete={handleDeletePayment}
                                 />
                               </div>
@@ -1143,10 +856,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                       }
                                     />
 
-                                    {hook.selectedCustomerKey &&
-                                      transactionsForSelectedSupplier &&
-                                      Array.isArray(transactionsForSelectedSupplier) &&
-                                      transactionsForSelectedSupplier.length > 0 && (
+                                    {(hook.selectedCustomerKey || hook.editingPayment) &&
+                                       ((transactionsForSelectedSupplier &&
+                                         Array.isArray(transactionsForSelectedSupplier) &&
+                                         transactionsForSelectedSupplier.length > 0) || hook.editingPayment) && (
                                         <div className="hidden lg:block w-full h-[300px] overflow-auto">
                                           <PaymentForm
                                             {...hook}
@@ -1158,7 +871,24 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                             setCenterName={hook.setCenterName}
                                             centerNameOptions={hook.centerNameOptions}
                                             onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
-                                            onProcessPayment={() => void hook.processPayment?.()}
+                                            onProcessPayment={async () => {
+                                                 try {
+                                                     if (hook.processPayment) {
+                                                         await hook.processPayment();
+                                                     } else if ((hook as any).handleProcessPayment) {
+                                                         await (hook as any).handleProcessPayment();
+                                                     }
+                                                 } catch (error: any) {
+                                                     console.error("Payment trigger failed:", error);
+                                                     // Fallback toast in case hook doesn't show one
+                                                     const { toast } = await import('@/hooks/use-toast');
+                                                     toast({ 
+                                                        title: "Critical Error", 
+                                                        description: error.message || "Failed to initiate payment processing.", 
+                                                        variant: "destructive" 
+                                                     });
+                                                 }
+                                             }}
                                             isProcessing={hook.isProcessing ?? false}
                                           />
                                         </div>
@@ -1166,9 +896,9 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                 </div>
 
                                 {hook.selectedCustomerKey &&
-                                  transactionsForSelectedSupplier &&
-                                  Array.isArray(transactionsForSelectedSupplier) &&
-                                  transactionsForSelectedSupplier.length > 0 && (
+                                  ((transactionsForSelectedSupplier &&
+                                    Array.isArray(transactionsForSelectedSupplier) &&
+                                    transactionsForSelectedSupplier.length > 0) || hook.editingPayment) && (
                                     <div className="hidden lg:flex min-w-0 flex-col gap-2">
                                       <div className="min-w-0 h-[220px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)]">
                                         <TransactionTable
@@ -1189,7 +919,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                       <div className="w-full h-[170px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)] mt-1">
                                         <PaymentHistoryCompact
                                           payments={selectedSupplierPayments}
-                                          onEdit={hook.handleEditPayment}
+                                          onEdit={handleEditPayment}
                                           onDelete={handleDeletePayment}
                                         />
                                       </div>
@@ -1202,9 +932,9 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                             {hook.selectedCustomerKey && (
                               <div
                                 className={`w-full overflow-hidden mb-2 rounded-xl border border-border/60 bg-card shadow-sm p-3 ${
-                                  transactionsForSelectedSupplier &&
-                                  Array.isArray(transactionsForSelectedSupplier) &&
-                                  transactionsForSelectedSupplier.length > 0
+                                  ((transactionsForSelectedSupplier &&
+                                     Array.isArray(transactionsForSelectedSupplier) &&
+                                     transactionsForSelectedSupplier.length > 0) || hook.editingPayment)
                                     ? "lg:hidden"
                                     : ""
                                 }`}
@@ -1219,7 +949,23 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                                   setCenterName={hook.setCenterName}
                                   centerNameOptions={hook.centerNameOptions}
                                   onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
-                                  onProcessPayment={() => void hook.processPayment?.()}
+                                  onProcessPayment={async () => {
+                                      try {
+                                          if (hook.processPayment) {
+                                              await hook.processPayment();
+                                          } else if ((hook as any).handleProcessPayment) {
+                                              await (hook as any).handleProcessPayment();
+                                          }
+                                      } catch (error: any) {
+                                          console.error("Payment trigger failed (mobile):", error);
+                                          const { toast } = await import('@/hooks/use-toast');
+                                          toast({ 
+                                             title: "Critical Error", 
+                                             description: error.message || "Failed to initiate payment processing.", 
+                                             variant: "destructive" 
+                                          });
+                                      }
+                                  }}
                                   isProcessing={hook.isProcessing ?? false}
                                 />
                               </div>
@@ -1229,7 +975,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                             {/* DO NOT RENDER TransactionTable for outsider type - it shows outstanding entries which we don't need */}
                             {/* EXPLICITLY CHECK: Never render this entire grid section for outsider type */}
                             {/* CRITICAL: This section is INSIDE the IIFE, so it will NOT execute for outsider type */}
-                            {(!transactionsForSelectedSupplier ||
+                            {!hook.editingPayment && (!transactionsForSelectedSupplier ||
                               !Array.isArray(transactionsForSelectedSupplier) ||
                               transactionsForSelectedSupplier.length === 0) && (
                               <div className="space-y-2 w-full">
@@ -1427,425 +1173,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
               </div>
             )}
 
-            <Dialog open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
-              <DialogContent className="max-w-[min(1400px,98vw)] w-[min(1400px,98vw)] p-0 overflow-hidden">
-                <div className="flex h-[min(88vh,820px)] flex-col">
-                  <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-primary via-primary/95 to-primary/90 text-white shadow-[0_12px_30px_rgba(88,28,135,0.55)]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <DialogTitle className="text-sm sm:text-base md:text-lg font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
-                          Payment Summary
-                        </DialogTitle>
-                        <DialogDescription className="mt-0.5 text-[11px] sm:text-xs text-primary-100/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
-                          Current filters ke hisaab se supplier ka full statement summary.
-                        </DialogDescription>
-                      </div>
-                    </div>
-                  </DialogHeader>
-
-                  <div className="flex-1 min-h-0 bg-gradient-to-b from-primary/15 via-background to-background">
-                    <ScrollArea className="h-full pr-3">
-                      {filteredSupplierSummary ? (
-                        (() => {
-                          const summary: any = filteredSupplierSummary;
-                          const totalOutstanding = summary.totalOutstanding || 0;
-                          const totalNetWeight = summary.totalNetWeight || 0;
-                          const totalGrossWeight = summary.totalGrossWeight || 0;
-                          const totalFinalWeight = summary.totalFinalWeight || 0;
-                          const totalPaid = summary.totalPaid || 0;
-                          const totalCashPaid = summary.totalCashPaid || 0;
-                          const totalRtgsPaid = summary.totalRtgsPaid || 0;
-                          const minRate = summary.minRate || 0;
-                          const maxRate = summary.maxRate || 0;
-                          const avgRate = summary.averageRate || 0;
-                          const totalKartaAmount = summary.totalKartaAmount || 0;
-                          const totalLabouryAmount = summary.totalLabouryAmount || 0;
-                          const totalKanta = summary.totalKanta || 0;
-                          const totalBrokerage = summary.totalBrokerage || 0;
-                          const baseOriginalAmount = summary.totalBaseOriginalAmount ?? summary.totalOriginalAmount ?? 0;
-                          const govExtraAmount = summary.totalGovExtraAmount ?? 0;
-                          const adjustedOriginalAmount = summary.totalOriginalAmount || 0;
-                          const ledgerCreditAmount = summary.ledgerCreditAmount || 0;
-                          const ledgerDebitAmount = summary.ledgerDebitAmount || 0;
-                          const totalCdAmount = summary.totalCdAmount || 0;
-                          const totalDeductions =
-                            totalKartaAmount +
-                            totalLabouryAmount +
-                            totalKanta +
-                            totalBrokerage;
-                          const rateSpread = Math.max(0, maxRate - minRate);
-                          const averageOriginalPrice = summary.averageOriginalPrice || 0;
-                          const averageLabouryRate = summary.averageLabouryRate || 0;
-                          const txCount = (summary.allTransactions?.length as number) || 0;
-                          const outstandingCount = (summary.outstandingEntryIds?.length as number) || 0;
-                          const paidCount = Math.max(0, txCount - outstandingCount);
-
-                          const govPaid = (summary.allPayments || [])
-                            .filter((p: Payment) => {
-                              const receiptType = ((p as any).receiptType || "").trim();
-                              return (
-                                receiptType === "Gov." ||
-                                receiptType.toLowerCase() === "gov" ||
-                                receiptType.toLowerCase().startsWith("gov")
-                              );
-                            })
-                            .reduce((sum: number, p: Payment) => {
-                              const matchingPaidFor =
-                                p.paidFor?.filter((pf: PaidFor) =>
-                                  (summary.allTransactions || []).some(
-                                    (t: Customer) => t.srNo === pf.srNo
-                                  )
-                                ) || [];
-                              const govPaidForThisPayment = matchingPaidFor.reduce(
-                                (paymentSum, pf) => paymentSum + (pf.amount || 0),
-                                0
-                              );
-                              return sum + govPaidForThisPayment;
-                            }, 0);
-
-                          const paidShareDenom = totalPaid > 0 ? totalPaid : 1;
-                          const netLedgerImpact = ledgerDebitAmount - ledgerCreditAmount;
-                          // Net Bill = Base Original + Gov Extra + Ledger Credit (Base Original is already post-deduction)
-                          const netBillAmount = baseOriginalAmount + govExtraAmount + ledgerCreditAmount;
-                          const cashPct = Math.max(
-                            0,
-                            Math.min(100, (totalCashPaid / paidShareDenom) * 100)
-                          );
-                          const rtgsPct = Math.max(
-                            0,
-                            Math.min(100, (totalRtgsPaid / paidShareDenom) * 100)
-                          );
-                          const govPct = Math.max(
-                            0,
-                            Math.min(100, (govPaid / paidShareDenom) * 100)
-                          );
-
-                          return (
-                            <div className="w-full min-w-0 space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 bg-slate-50">
-                              {/* Top overview bar */}
-                              <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 md:grid-cols-4">
-                                <Card className="border-emerald-200 bg-emerald-50/90 shadow-sm">
-                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
-                                    <div className="text-[11px] font-medium text-emerald-900/90">
-                                      Net Bill Amount
-                                    </div>
-                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-emerald-950 tabular-nums">
-                                      {formatCurrency(netBillAmount)}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                <Card className="border-rose-200 bg-rose-50/90 shadow-sm">
-                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
-                                    <div className="text-[11px] font-medium text-rose-900/90">
-                                      Outstanding
-                                    </div>
-                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-rose-950 tabular-nums">
-                                      {formatCurrency(totalOutstanding)}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                <Card className="border-slate-200 bg-slate-50 shadow-sm">
-                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
-                                    <div className="text-[11px] font-medium text-slate-800">
-                                      Net Weight (kg)
-                                    </div>
-                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-slate-950 tabular-nums">
-                                      {Number(totalNetWeight || 0).toFixed(2)}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                <Card className="border-indigo-200 bg-indigo-50/90 shadow-sm">
-                                  <CardContent className="py-3 px-3 sm:py-4 sm:px-4">
-                                    <div className="text-[11px] font-medium text-indigo-900/90">
-                                      Entries (Paid / Total)
-                                    </div>
-                                    <div className="mt-1 text-lg sm:text-xl font-semibold text-indigo-950 tabular-nums">
-                                      {paidCount} / {txCount}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              </div>
-
-                              {/* Sectioned summary layout – clearer categories */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
-                                {/* Weights & Entries */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Weights & Entries
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Gross</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {Number(totalGrossWeight || 0).toFixed(2)} kg
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Teir</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {Number(summary.totalTeirWeight || 0).toFixed(2)} kg
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Final</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {Number(totalFinalWeight || 0).toFixed(2)} kg
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Net</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {Number(totalNetWeight || 0).toFixed(2)} kg
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
-                                      <span>Entries (Paid / Pending)</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {paidCount} / {outstandingCount}
-                                      </span>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                {/* Bill Amounts: Total Amount (primary) → breakdown: Deductions, Base Original, Gov Extra, Ledger Credit */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Bill Amounts (Original vs Final)
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Total Amount</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(summary.totalAmount ?? 0)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Total Deductions</span>
-                                      <span className="font-semibold tabular-nums text-rose-700">
-                                        - {formatCurrency(totalDeductions)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Base Original</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(baseOriginalAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Gov Extra</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(govExtraAmount)}
-                                      </span>
-                                    </div>
-                                    {ledgerCreditAmount > 0 && (
-                                      <div className="flex justify-between">
-                                        <span>Ledger Credit</span>
-                                        <span className="font-semibold tabular-nums">
-                                          {formatCurrency(ledgerCreditAmount)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
-
-                                {/* Payment Status & Ledger — Total Paid/Total Amount mein ledger include nahi; sirf Net Ledger Impact outstanding par */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Payment Status & Ledger
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Total Paid</span>
-                                      <span className="font-semibold tabular-nums text-emerald-700">
-                                        {formatCurrency(totalPaid)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Outstanding</span>
-                                      <span className="font-semibold tabular-nums text-rose-700">
-                                        {formatCurrency(totalOutstanding)}
-                                      </span>
-                                    </div>
-                                    {(ledgerCreditAmount > 0 || ledgerDebitAmount > 0) ? (
-                                      <>
-                                        <div className="flex justify-between text-slate-600">
-                                          <span>Ledger (Income · Expense)</span>
-                                          <span className="tabular-nums text-[10px]">
-                                            Income {formatCurrency(ledgerCreditAmount)} · Expense {formatCurrency(ledgerDebitAmount)}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1.5">
-                                          <span>Net Ledger Impact</span>
-                                          <span className="font-semibold tabular-nums">
-                                            {formatCurrency(netLedgerImpact)}
-                                          </span>
-                                        </div>
-                                      </>
-                                    ) : null}
-                                  </CardContent>
-                                </Card>
-
-                                {/* Rate Summary */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Rate Summary
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Avg Rate</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(avgRate)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Rate Range</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(minRate)} – {formatCurrency(maxRate)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Avg Original Rate</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(averageOriginalPrice)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Avg Laboury Rate</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {Number(averageLabouryRate || 0).toFixed(2)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Rate Spread</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(rateSpread)}
-                                      </span>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                {/* Deductions Breakdown */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Deductions Breakdown
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Karta Amount</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalKartaAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Laboury Amount</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalLabouryAmount)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Kanta + Other</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalKanta)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Brokerage</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalBrokerage)}
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
-                                      <span>Total Deductions</span>
-                                      <span className="font-semibold tabular-nums text-rose-800">
-                                        {formatCurrency(totalDeductions)}
-                                      </span>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-
-                                {/* Payment Modes & CD */}
-                                <Card className="border-slate-200 bg-white shadow-sm">
-                                  <CardHeader className="py-2.5 px-3 sm:px-4 border-b">
-                                    <CardTitle className="text-xs font-semibold text-slate-800">
-                                      Payment Modes & CD
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="py-2.5 px-3 sm:px-4 space-y-1.5 text-[11px] text-slate-800">
-                                    <div className="flex justify-between">
-                                      <span>Cash In Hand</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalCashPaid)}{" "}
-                                        <span className="text-[10px] text-slate-500">
-                                          ({Math.round(cashPct)}%)
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>RTGS</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalRtgsPaid)}{" "}
-                                        <span className="text-[10px] text-slate-500">
-                                          ({Math.round(rtgsPct)}%)
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Gov</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(govPaid)}{" "}
-                                        <span className="text-[10px] text-slate-500">
-                                          ({Math.round(govPct)}%)
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 border-t border-dashed border-slate-200 pt-1.5 flex justify-between">
-                                      <span>CD Granted</span>
-                                      <span className="font-semibold tabular-nums">
-                                        {formatCurrency(totalCdAmount)}
-                                      </span>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              </div>
-
-                              {/* Removed extra main card with full statement breakdown to keep summary focused */}
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="p-4 sm:p-5 md:p-6">
-                          <Card className="rounded-[16px] border border-slate-200/80 bg-white/90 shadow-[0_18px_45px_rgba(15,23,42,0.15)]">
-                            <CardContent className="p-4 sm:p-5">
-                              <div className="text-[12px] sm:text-sm font-semibold text-slate-900">
-                                Summary
-                              </div>
-                              <div className="mt-1.5 text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                                Supplier select karke (aur entries load hone ke baad) yahan detailed
-                                payment summary dikh jayegi – weight, rate, paid, outstanding sab
-                                ek jagah par.
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
  
             <DetailsDialog
               isOpen={!!hook.detailsSupplierEntry}
@@ -1952,13 +1279,15 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
             setIsStatementOpen={setIsStatementOpen}
             selectedSupplierSummary={selectedSupplierSummary}
             filteredSupplierSummary={filteredSupplierSummary}
+            isSummaryOpen={isSummaryOpen}
+            setIsSummaryOpen={setIsSummaryOpen}
             historyDialogOpen={historyDialogOpen}
             setHistoryDialogOpen={setHistoryDialogOpen}
             selectedHistoryType={selectedHistoryType}
             cashHistoryRows={cashHistoryRows}
             rtgsHistoryRows={rtgsHistoryRows}
             govHistoryRows={govHistoryRows}
-            onEditPayment={hook.handleEditPayment}
+            onEditPayment={handleEditPayment}
             onDeletePayment={hook.handleDeletePayment}
           />
         </div>

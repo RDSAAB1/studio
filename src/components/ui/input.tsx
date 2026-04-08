@@ -4,90 +4,100 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, onKeyDown, onChange, ...props }, ref) => {
+  ({ className, type, onKeyDown, onChange, value, ...props }, ref) => {
     const isNumericField = type === "number" || type === "tel";
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // ... (rest of handleKeyDown same as before)
       const input = e.currentTarget;
       const currentValue = input.value;
       
-      // Handle Indian numbering shortcuts for numeric fields
       if (isNumericField && currentValue) {
         const key = e.key.toUpperCase();
-        
-        // Check if user pressed L, T, H, C, K, M, or B
-        if (key === 'L' || key === 'T' || key === 'H' || key === 'C' || key === 'K' || key === 'M' || key === 'B') {
+        if ((key === 'L' || key === 'T' || key === 'H' || key === 'C' || key === 'K' || key === 'M' || key === 'B') && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
-          
-          // Get the numeric value (remove any non-numeric characters except decimal point and minus)
           const numericValue = parseFloat(currentValue.replace(/[^\d.-]/g, ''));
-          
           if (!isNaN(numericValue) && numericValue !== 0) {
             let multiplier = 1;
-            
             switch (key) {
-              case 'H': // Hundred (100)
-                multiplier = 100;
-                break;
-              case 'T': // Thousand (1000)
-                multiplier = 1000;
-                break;
-              case 'L': // Lakh (100000)
-                multiplier = 100000;
-                break;
-              case 'C': // Crore (10000000)
-                multiplier = 10000000;
-                break;
-              case 'K': // 50 Thousand (10000)
-                multiplier = 10000;
-                break;
-              case 'M': // 50 Lakh (1000000)
-                multiplier = 1000000;
-                break;
-              case 'B': // 50 Crore (100000000)
-                multiplier = 100000000;
-                break;
+              case 'H': multiplier = 100; break;
+              case 'T': multiplier = 1000; break;
+              case 'L': multiplier = 100000; break;
+              case 'C': multiplier = 10000000; break;
+              case 'K': multiplier = 10000; break;
+              case 'M': multiplier = 1000000; break;
+              case 'B': multiplier = 100000000; break;
             }
-            
             const result = numericValue * multiplier;
             const resultString = result.toString();
-            
-            // Create a synthetic event to update the value
-            const syntheticEvent = {
-              ...e,
-              target: { ...input, value: resultString },
-              currentTarget: { ...input, value: resultString }
-            } as React.ChangeEvent<HTMLInputElement>;
-            
-            // Update the input value directly first
+            const syntheticEvent = { ...e, target: { ...input, value: resultString }, currentTarget: { ...input, value: resultString } } as React.ChangeEvent<HTMLInputElement>;
             input.value = resultString;
-            
-            // Call onChange if provided (for controlled components)
-            if (onChange) {
-              onChange(syntheticEvent);
-            }
-            
-            // Trigger input event for form libraries like react-hook-form
-            const inputEvent = new Event('input', { bubbles: true });
-            input.dispatchEvent(inputEvent);
-            
-            // Trigger change event as well
-            const changeEvent = new Event('change', { bubbles: true });
-            input.dispatchEvent(changeEvent);
-            
+            if (onChange) onChange(syntheticEvent);
+            const inputEvent = new Event('input', { bubbles: true }); input.dispatchEvent(inputEvent);
+            const changeEvent = new Event('change', { bubbles: true }); input.dispatchEvent(changeEvent);
             return;
           }
         }
       }
-      
-      // Call original onKeyDown if provided
-      if (onKeyDown) {
-        onKeyDown(e);
-      }
+      if (onKeyDown) onKeyDown(e);
     };
+
+    const [isFocused, setIsFocused] = React.useState(false);
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(true);
+      
+      // Force clear if value is 0 on focus
+      if (isNumericField && (e.target.value === "0" || Number(e.target.value) === 0) && e.target.value !== "") {
+        const input = e.currentTarget;
+        input.value = "";
+        
+        // Trigger onChange for both controlled and uncontrolled components (like react-hook-form)
+        if (onChange) {
+          const syntheticEvent = {
+            ...e,
+            target: input,
+            currentTarget: input,
+            type: "change"
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onChange(syntheticEvent);
+        }
+      }
+      
+      if (props.onFocus) props.onFocus(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(false);
+      
+      // Restore 0 if empty on blur
+      if (isNumericField && e.target.value === "") {
+        const input = e.currentTarget;
+        input.value = "0";
+        
+        if (onChange) {
+          const syntheticEvent = {
+            ...e,
+            target: input,
+            currentTarget: input,
+            type: "change"
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onChange(syntheticEvent);
+        }
+      }
+      
+      if (props.onBlur) props.onBlur(e);
+    };
+
+    // Calculate display value for controlled components
+    let valueToDisplay = value;
+    if (isFocused && isNumericField && valueToDisplay !== undefined && valueToDisplay !== null && valueToDisplay !== "" && Number(valueToDisplay) === 0) {
+      valueToDisplay = "";
+    }
 
     return (
       <input
+        {...props}
         type={type}
         className={cn(
           "ui-field flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-0 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
@@ -96,7 +106,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         ref={ref}
         onKeyDown={handleKeyDown}
         onChange={onChange}
-        {...props}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        value={valueToDisplay}
       />
     )
   }

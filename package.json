@@ -25,7 +25,8 @@
     "capacitor:add:android": "npx cap add android",
     "capacitor:sync": "npm run build && npx cap sync",
     "capacitor:open:android": "npx cap open android",
-    "capacitor:build:android": "npm run build && npx cap sync && npx cap open android"
+    "capacitor:build:android": "npm run build && npx cap sync && npx cap open android",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -70,6 +71,7 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.2.1",
     "firebase-admin": "^13.7.0",
+    "framer-motion": "^12.38.0",
     "google-auth-library": "^9.11.0",
     "googleapis": "^140.0.1",
     "lucide-react": "^0.475.0",

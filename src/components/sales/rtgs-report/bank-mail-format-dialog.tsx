@@ -40,8 +40,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
 
         let checkNoStr = '';
         if (payments.length > 0) {
-            const firstCheckNo = payments[0].checkNo;
-            if (firstCheckNo && payments.every((p: any) => p.checkNo === firstCheckNo)) {
+            const firstCheckNo = String(payments[0].checkNo || '').trim();
+            if (firstCheckNo && payments.every((p: any) => String(p.checkNo || '').trim() === firstCheckNo)) {
                 checkNoStr = `_Check_${firstCheckNo}`;
             }
         }

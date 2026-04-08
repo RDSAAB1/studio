@@ -260,10 +260,10 @@ export function ErpCompanySelector({
   };
 
   const companyLabel = hasEffectiveCompanies
-    ? (selectedCompany?.name ?? "Select Company")
+    ? (selectedCompany?.name ?? selection?.companyId ?? "Select Company")
     : (activeTenant?.name ?? "Company");
-  const subCompanyLabel = selectedSubCompany?.name ?? "Sub Company";
-  const seasonLabel = selectedSeason?.name ?? "Season";
+  const subCompanyLabel = selectedSubCompany?.name ?? selection?.subCompanyId ?? "Sub Company";
+  const seasonLabel = selectedSeason?.name ?? selection?.seasonKey ?? "Season";
 
   const dropdownClass = "h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white";
   const disabledClass = "h-9 w-9 text-white/40 cursor-not-allowed";

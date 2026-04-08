@@ -2,7 +2,12 @@
 
 import React, { Suspense, use } from "react";
 import { useSearchParams } from 'next/navigation';
-import UnifiedSalesPage from "./unified-sales-page";
+import dynamic from "next/dynamic";
+
+const UnifiedSalesPage = dynamic(() => import("./unified-sales-page"), {
+  ssr: false,
+  loading: () => null
+});
 
 function SalesPageContent() {
   const searchParams = useSearchParams();

@@ -68,7 +68,13 @@ export const allMenuItems: MenuItem[] = [
     id: "sales-reports",
     name: "Reports",
     icon: PieChart,
-    href: "/sales?menu=reports&tab=daily-payments",
+    subMenus: [
+      { id: "finance/daily-business-report", name: "360° Business Report", icon: PieChart, href: "/finance/daily-business-report" },
+      { id: "daily-payments", name: "Daily Payments", icon: Wallet, href: "/sales?menu=reports&tab=daily-payments" },
+      { id: "daily-supplier-report", name: "Daily Supplier Report", icon: FileText, href: "/sales?menu=reports&tab=daily-supplier-report" },
+      { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=reports&tab=rtgs-report" },
+      { id: "6r-report", name: "6R Report", icon: FileText, href: "/sales?menu=reports&tab=6r-report" },
+    ],
   },
   {
     id: "hr",

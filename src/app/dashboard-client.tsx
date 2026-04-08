@@ -28,6 +28,8 @@ import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 import { useToast } from '@/hooks/use-toast';
 import { retry } from '@/lib/retry-utils';
 import { Button } from '@/components/ui/button';
+import { useSupplierData } from '@/hooks/use-supplier-data';
+import { useCustomerData } from '@/hooks/use-customer-data';
 
 export default function DashboardClient() {
     const router = useRouter();
@@ -193,8 +195,8 @@ export default function DashboardClient() {
         const loanFilterFn = (item: { startDate: string }) => isWithinInterval(new Date(item.startDate), interval);
 
         return {
-            filteredIncomes: incomes.filter(filterFn),
-            filteredExpenses: expenses.filter(filterFn),
+            filteredIncomes: incomes.filter(i => filterFn(i) && !i.isInternal),
+            filteredExpenses: expenses.filter(e => filterFn(e) && !e.isInternal),
             filteredSupplierPayments: supplierPayments.filter(filterFn),
             filteredCustomerPayments: customerPayments.filter(filterFn),
             filteredFundTransactions: fundTransactions.filter(filterFn),
@@ -208,56 +210,24 @@ export default function DashboardClient() {
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
     const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
+    const { customerSummaryMap: supplierSummaryMap } = useSupplierData();
+    const { customerSummaryMap: customerSummaryMap } = useCustomerData();
+
     const totalCustomerReceivables = useMemo(() => {
-        const customerReceivablesMap = new Map<string, number>();
-
-        kantaParchi.forEach(kp => {
-            const originalAmount = Number(kp.originalNetAmount) || Number(kp.netAmount) || 0;
-            customerReceivablesMap.set(kp.srNo, originalAmount);
+        let total = 0;
+        customerSummaryMap.forEach(summary => {
+            total += (summary.totalOutstanding || 0);
         });
-
-        customers.forEach(customer => {
-            if (!customerReceivablesMap.has(customer.srNo)) {
-                const originalAmount = Number(customer.originalNetAmount) || Number(customer.netAmount) || 0;
-                customerReceivablesMap.set(customer.srNo, originalAmount);
-            }
-        });
-
-        customerPayments.forEach(payment => {
-            if (payment.paidFor && payment.paidFor.length > 0) {
-                payment.paidFor.forEach((paidFor: PaidFor) => {
-                    const currentReceivable = customerReceivablesMap.get(paidFor.srNo) || 0;
-                    const paidAmount = (Number(paidFor.amount) || 0) + (Number(paidFor.cdAmount) || 0);
-                    const newReceivable = Math.max(0, currentReceivable - paidAmount);
-                    customerReceivablesMap.set(paidFor.srNo, newReceivable);
-                });
-            }
-        });
-
-        return Array.from(customerReceivablesMap.values()).reduce((sum, amount) => sum + amount, 0);
-    }, [kantaParchi, customers, customerPayments]);
+        return total;
+    }, [customerSummaryMap]);
 
     const totalSupplierDues = useMemo(() => {
-        const supplierDuesMap = new Map<string, number>();
-
-        suppliers.forEach(s => {
-            const originalAmount = Number(s.originalNetAmount) || Number(s.netAmount) || 0;
-            supplierDuesMap.set(s.srNo, originalAmount);
+        let total = 0;
+        supplierSummaryMap.forEach(summary => {
+            total += (summary.totalOutstanding || 0);
         });
-
-        supplierPayments.forEach(payment => {
-            if (payment.paidFor && payment.paidFor.length > 0) {
-                payment.paidFor.forEach((pf: PaidFor) => {
-                    const currentDue = supplierDuesMap.get(pf.srNo) || 0;
-                    const paidAmount = (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
-                    const newDue = Math.max(0, currentDue - paidAmount);
-                    supplierDuesMap.set(pf.srNo, newDue);
-                });
-            }
-        });
-
-        return Array.from(supplierDuesMap.values()).reduce((sum, amt) => sum + amt, 0);
-    }, [suppliers, supplierPayments]);
+        return total;
+    }, [supplierSummaryMap]);
 
     const { totalIncome, totalExpense, netProfit, totalCdReceived, expenseBreakdown, incomeBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);

@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Controller } from "react-hook-form";
-import { format } from "date-fns";
-import { cn, toTitleCase } from "@/lib/utils";
+import React, { useState } from "react";
+import { Controller, useWatch } from "react-hook-form";
+import { cn } from "@/lib/utils";
 import type { OptionItem } from "@/lib/definitions";
 import type { UseFormReturn } from "react-hook-form";
 import type { CompleteSupplierFormValues } from "@/lib/complete-form-schema";
@@ -11,12 +10,13 @@ import type { CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Search, Hash, Hourglass, Banknote, Weight, Truck, Phone, User, UserSquare, Home, Percent, Settings, Landmark, Users } from "lucide-react";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
-import { User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Hourglass, Settings, Hash, Percent, Weight } from "lucide-react";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { OptionsManagerDialog } from "./options-manager-dialog";
+import { ProfilesSearchDialog } from "./profiles-search-dialog";
+import { SuggestionInput } from "@/components/ui/suggestion-input";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -37,7 +37,7 @@ interface CustomInputProps extends Omit<React.ComponentProps<typeof Input>, "onC
     onChange: (value: string) => void;
 }
 
-const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
+const AutoCapitalizeInput = React.memo(({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const capitalizedValue = capitalizeText(e.target.value);
         onChange(capitalizedValue);
@@ -52,10 +52,11 @@ const AutoCapitalizeInput = ({ value, onChange, onBlur, className, ...props }: C
             {...props}
         />
     );
-};
+});
+AutoCapitalizeInput.displayName = "AutoCapitalizeInput";
 
 // Custom input with uppercase for vehicle number
-const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
+const AutoUppercaseInput = React.memo(({ value, onChange, onBlur, className, ...props }: CustomInputProps) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const uppercaseValue = e.target.value.toUpperCase();
         onChange(uppercaseValue);
@@ -70,7 +71,8 @@ const AutoUppercaseInput = ({ value, onChange, onBlur, className, ...props }: Cu
             {...props}
         />
     );
-};
+});
+AutoUppercaseInput.displayName = "AutoUppercaseInput";
 
 interface SimpleSupplierFormAllFieldsProps {
     form: UseFormReturn<CompleteSupplierFormValues>;
@@ -84,9 +86,16 @@ interface SimpleSupplierFormAllFieldsProps {
     handleUpdateOption: (collectionName: string, id: string, name: string) => void;
     handleDeleteOption: (collectionName: string, id: string, name: string) => void;
     firstInputRef?: React.RefObject<HTMLInputElement>;
+    uniqueProfiles: Array<{name: string, so: string, address: string, contact: string}>;
+    handleUseProfile: (profile: {name: string, so: string, address: string, contact: string}) => void;
+    uniqueNames: string[];
+    uniqueSo: string[];
+    uniqueAddresses: string[];
+    uniqueVehicleNos: string[];
+    uniqueContacts: string[];
 }
 
-const SimpleSupplierFormAllFields = ({ 
+const SimpleSupplierFormAllFields = React.memo(({ 
     form, 
     handleSrNoBlur, 
     handleContactBlur,
@@ -97,11 +106,23 @@ const SimpleSupplierFormAllFields = ({
     handleAddOption, 
     handleUpdateOption, 
     handleDeleteOption,
+    handleUseProfile,
+    uniqueProfiles,
+    uniqueNames,
+    uniqueSo,
+    uniqueAddresses,
+    uniqueVehicleNos,
+    uniqueContacts,
     firstInputRef
 }: SimpleSupplierFormAllFieldsProps) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
+
+    // useWatch isolates re-renders to only when these specific fields change
+    const watchedPaymentType = useWatch({ control: form.control, name: 'paymentType' });
+    const watchedVariety = useWatch({ control: form.control, name: 'variety' });
+    const watchedBrokerageAddSubtract = useWatch({ control: form.control, name: 'brokerageAddSubtract' });
 
     const openManagementDialog = (type: 'variety' | 'paymentType') => {
         setManagementType(type);
@@ -156,6 +177,7 @@ const SimpleSupplierFormAllFields = ({
                                 <Input 
                                     id="supplier-rate" 
                                     type="number" 
+                                    step="any"
                                     {...form.register('rate')} 
                                     className="h-8 text-sm pl-10" 
                                 />
@@ -167,6 +189,7 @@ const SimpleSupplierFormAllFields = ({
                                 <Input 
                                     id="simple-supplier-all-fields-gross-weight" 
                                     type="number" 
+                                    step="any"
                                     {...form.register('grossWeight')} 
                                     className="h-8 text-sm pl-10" 
                                 />
@@ -178,6 +201,7 @@ const SimpleSupplierFormAllFields = ({
                                 <Input 
                                     id="teirWeight" 
                                     type="number" 
+                                    step="any"
                                     {...form.register('teirWeight')} 
                                     className="h-8 text-sm pl-10" 
                                 />
@@ -190,9 +214,11 @@ const SimpleSupplierFormAllFields = ({
                                     name="vehicleNo"
                                     control={form.control}
                                     render={({ field }) => (
-                                        <AutoUppercaseInput
+                                        <SuggestionInput
                                             id="vehicleNo"
+                                            suggestions={uniqueVehicleNos}
                                             {...field}
+                                            transformValue={(v) => v.toUpperCase()}
                                             className="h-8 text-sm pl-10"
                                         />
                                     )}
@@ -209,26 +235,50 @@ const SimpleSupplierFormAllFields = ({
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                                       <Input 
-                                           id="contact"
-                                           {...form.register('contact')} 
-                                           type="tel" 
-                                           maxLength={10} 
-                                           onBlur={(e) => handleContactBlur(e.target.value)}
-                                           className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} 
+                                       <Controller
+                                           name="contact"
+                                           control={form.control}
+                                           render={({ field }) => (
+                                               <SuggestionInput
+                                                   id="contact"
+                                                   suggestions={uniqueContacts}
+                                                   {...field}
+                                                   type="tel"
+                                                   maxLength={10}
+                                                   onBlur={(e) => {
+                                                       field.onBlur();
+                                                       handleContactBlur(e.target.value);
+                                                   }}
+                                                   className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} 
+                                               />
+                                           )}
                                        />
                                     </InputWithIcon>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="name" className="text-xs">Name</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="name" className="text-xs">Name</Label>
+                                        <ProfilesSearchDialog 
+                                            profiles={uniqueProfiles} 
+                                            onSelect={handleUseProfile} 
+                                            trigger={
+                                                <button type="button" className="text-[10px] text-primary hover:underline flex items-center gap-1 transition-all">
+                                                    <Users className="h-2.5 w-2.5" />
+                                                    Advance
+                                                </button>
+                                            }
+                                        />
+                                    </div>
                                     <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                                         <Controller
                                             name="name"
                                             control={form.control}
                                             render={({ field }) => (
-                                                <AutoCapitalizeInput
+                                                <SuggestionInput
                                                     id="name"
+                                                    suggestions={uniqueNames}
                                                     {...field}
+                                                    transformValue={capitalizeText}
                                                     className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")}
                                                 />
                                             )}
@@ -243,9 +293,11 @@ const SimpleSupplierFormAllFields = ({
                                         name="so"
                                         control={form.control}
                                         render={({ field }) => (
-                                            <AutoCapitalizeInput
+                                            <SuggestionInput
                                                 id="so"
+                                                suggestions={uniqueSo}
                                                 {...field}
+                                                transformValue={capitalizeText}
                                                 className="h-8 text-sm pl-10"
                                             />
                                         )}
@@ -259,9 +311,11 @@ const SimpleSupplierFormAllFields = ({
                                         name="address"
                                         control={form.control}
                                         render={({ field }) => (
-                                            <AutoCapitalizeInput
+                                            <SuggestionInput
                                                 id="address"
+                                                suggestions={uniqueAddresses}
                                                 {...field}
+                                                transformValue={capitalizeText}
                                                 className="h-8 text-sm pl-10"
                                             />
                                         )}
@@ -289,9 +343,9 @@ const SimpleSupplierFormAllFields = ({
                                 </Label>
                                 <CustomDropdown 
                                     options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
-                                    value={form.watch('paymentType')} 
+                                    value={watchedPaymentType || ''} 
                                     onChange={(val) => {
-                                        form.setValue("paymentType", val || '');
+                                        form.setValue("paymentType", val || '', { shouldDirty: true, shouldValidate: true });
                                         setLastPaymentType(val || '');
                                     }} 
                                     onAdd={(newItem) => {
@@ -318,9 +372,9 @@ const SimpleSupplierFormAllFields = ({
                                 </Label>
                                 <CustomDropdown 
                                     options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
-                                    value={form.watch('variety')} 
+                                    value={watchedVariety || ''} 
                                     onChange={(val) => {
-                                        form.setValue("variety", val || '');
+                                        form.setValue("variety", val || '', { shouldDirty: true, shouldValidate: true });
                                         setLastVariety(val || '');
                                     }} 
                                     onAdd={(newItem) => {
@@ -357,6 +411,7 @@ const SimpleSupplierFormAllFields = ({
                                             <Input 
                                                 id="kartaPercentage" 
                                                 type="number" 
+                                                step="any"
                                                 {...form.register('kartaPercentage')} 
                                                 className="h-8 text-sm pl-10" 
                                             />
@@ -368,6 +423,7 @@ const SimpleSupplierFormAllFields = ({
                                             <Input 
                                                 id="labouryRate" 
                                                 type="number" 
+                                                step="any"
                                                 {...form.register('labouryRate')} 
                                                 className="h-8 text-sm pl-10" 
                                             />
@@ -380,8 +436,8 @@ const SimpleSupplierFormAllFields = ({
                                     <Label htmlFor="brokerageRate" className="text-xs whitespace-nowrap">Brokerage Rate</Label>
                                     <SegmentedSwitch
                                         id="brokerage-toggle"
-                                        checked={form.watch('brokerageAddSubtract') ?? true}
-                                        onCheckedChange={(checked) => form.setValue('brokerageAddSubtract', checked)}
+                                        checked={watchedBrokerageAddSubtract ?? true}
+                                        onCheckedChange={(checked) => form.setValue('brokerageAddSubtract', checked, { shouldDirty: true })}
                                         leftLabel="EXCLUDE"
                                         rightLabel="INCLUDE"
                                         className="w-36 h-6"
@@ -427,6 +483,8 @@ const SimpleSupplierFormAllFields = ({
         />
         </>
     );
-};
+});
+
+SimpleSupplierFormAllFields.displayName = "SimpleSupplierFormAllFields";
 
 export default SimpleSupplierFormAllFields;

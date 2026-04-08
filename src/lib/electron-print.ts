@@ -9,24 +9,52 @@
 export async function printHtmlContent(htmlContent: string, styles: string = ''): Promise<void> {
   const electron = typeof window !== 'undefined' ? (window as any).electron : undefined;
 
+  // Check if htmlContent is already a full HTML document
+  const isFullDocument = htmlContent.trim().toLowerCase().startsWith('<!doctype') || 
+                         htmlContent.trim().toLowerCase().startsWith('<html');
+
+  let fullHtml = htmlContent;
+  if (!isFullDocument) {
+    fullHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            html, body { margin: 0; padding: 0; background: white !important; color: black !important; font-family: Arial, sans-serif; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            ${styles}
+          </style>
+          <script>
+            window.onload = () => {
+              // Any special print-time hydration can go here
+            };
+          </script>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+      </html>
+    `;
+  }
+
   if (electron?.printHtml) {
     // ✅ Electron: use native webContents.print() via IPC
-    const fullHtml = `
-      <style>
-        html, body { margin: 0; padding: 0; background: white !important; color: black !important; font-family: Arial, sans-serif; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        ${styles}
-      </style>
-      ${htmlContent}
-    `;
     const result = await electron.printHtml(fullHtml);
     if (!result?.success && result?.error) {
       console.error('[ElectronPrint] Print failed:', result.error);
+      throw new Error(result.error);
     }
   } else {
     // 🌐 Browser fallback: use iframe trick
-    printViaIframe(htmlContent, styles);
+    printViaIframe(fullHtml);
   }
+}
+
+/**
+ * Convenience wrapper for printing a full HTML string directly.
+ */
+export async function printFullHtml(fullHtml: string): Promise<void> {
+  return printHtmlContent(fullHtml);
 }
 
 function printViaIframe(htmlContent: string, styles: string = '') {

@@ -11,8 +11,9 @@ import { Download, Printer } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from "@/lib/date-utils";
 import { SupplierSummaryCards } from "@/components/sales/supplier-payments/supplier-summary-cards";
+import { printHtmlContent } from "@/lib/electron-print";
 
-export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+export const StatementPrintTemplate = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
     const statementRef = React.useRef<HTMLDivElement>(null);
 
@@ -74,61 +75,24 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             return;
         }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ title: 'Print Error', description: 'Could not open print window.', variant: 'destructive'});
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Statement</title>');
-
-        Array.from(window.document.styleSheets).forEach(styleSheet => {
-            try {
-                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const styleElement = iframeDoc.createElement('style');
-                styleElement.appendChild(iframeDoc.createTextNode(css));
-                iframeDoc.head.appendChild(styleElement);
-            } catch (e) {
-
-            }
-        });
-        
-        iframeDoc.write(`
-            <style>
-                @media print {
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .printable-area { background-color: #fff !important; color: #000 !important; }
-                    .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                    .summary-grid-container { display: flex !important; flex-wrap: nowrap !important; }
-                    .summary-grid-container > div { flex: 1; }
-                    .print-table tbody tr { background-color: transparent !important; }
-                    .print-bg-gray-800 {
-                        background-color: #f2f2f2 !important; /* Light gray for print */
-                        color: #000 !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
+        const customStyles = `
+            @media print {
+                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .printable-area { background-color: #fff !important; color: #000 !important; }
+                .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                .summary-grid-container { display: flex !important; flex-wrap: nowrap !important; }
+                .summary-grid-container > div { flex: 1; }
+                .print-table tbody tr { background-color: transparent !important; }
+                .print-bg-gray-800 {
+                    background-color: #f2f2f2 !important; /* Light gray for print */
+                    color: #000 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
                 }
-            </style>
-        </head><body></body></html>`);
+            }
+        `;
 
-        iframeDoc.body.innerHTML = node.innerHTML;
-        iframeDoc.close();
-        
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
+        printHtmlContent(node.outerHTML, customStyles);
     };
     
     return (

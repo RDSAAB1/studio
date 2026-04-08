@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { confirm } from "@/lib/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
@@ -26,7 +27,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CategoryManagerDialog } from "./category-manager-dialog";
 import { SummaryMetricsCard } from "./components/summary-metrics-card";
 import { TransactionForm } from "./components/transaction-form";
-import { TransactionTable } from "./components/transaction-table";
+import { TransactionTable } from "./components/expense-transaction-table";
 import { useCategoryManager } from "./hooks/use-category-manager";
 
 export type DisplayTransaction = (Income | Expense) & { id: string };
@@ -38,6 +39,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase";
 import { ErrorBoundary } from "@/components/error-boundary"; 
+import { printHtmlContent } from "@/lib/electron-print";
 
 
 import { Loader2, Pen, Save, Trash, FileText, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X, User, Calculator, ChevronLeft, ChevronRight, MoreVertical, History as HistoryIcon, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
@@ -210,64 +212,57 @@ export default function IncomeExpenseClient() {
       return sorted;
   }, [income, expenses]);
 
-  const uniquePayees = useMemo(() => {
-      if (!allTransactions || allTransactions.length === 0) {
-
-          return [];
-      }
+  const { uniquePayees, lastIncomeIdNumber, lastExpenseIdNumber } = useMemo(() => {
+      const payees = new Set<string>();
+      let maxIn = 0;
+      let maxEx = 0;
       
-      // Extract all payees from transactions
-      const allPayees = allTransactions
-          .map(t => t.payee)
-          .filter(p => p && typeof p === 'string' && p.trim() !== '');
+      const inRegex = /^IN(\d+)$/;
+      const exRegex = /^EX(\d+)$/;
 
-      const payees = new Set(allPayees.map(p => toTitleCase(p.trim())));
-      const uniqueList = Array.from(payees).sort();
-
-      return uniqueList;
-  }, [allTransactions]);
-
-  // Memoize the last ID numbers to avoid re-scanning the entire array on every render
-  const lastIncomeIdNumber = useMemo(() => {
-      const prefix = 'IN';
-      const relevantTransactions = allTransactions.filter(t => t.transactionId?.startsWith(prefix));
-      return relevantTransactions.reduce((max, t) => {
-          const numMatch = t.transactionId?.match(/^IN(\d+)$/);
-          if (numMatch && numMatch[1]) {
-              const num = parseInt(numMatch[1], 10);
-              return num > max ? num : max;
+      allTransactions.forEach(t => {
+          // Payee extraction
+          if (t.payee && typeof t.payee === 'string') {
+              const trimmed = t.payee.trim();
+              if (trimmed) payees.add(toTitleCase(trimmed));
           }
-          return max;
-      }, 0);
-  }, [allTransactions]);
 
-  const lastExpenseIdNumber = useMemo(() => {
-      const prefix = 'EX';
-      const relevantTransactions = allTransactions.filter(t => t.transactionId?.startsWith(prefix));
-      let lastNum = relevantTransactions.reduce((max, t) => {
-          const numMatch = t.transactionId?.match(/^EX(\d+)$/);
-          if (numMatch && numMatch[1]) {
-              const num = parseInt(numMatch[1], 10);
-              return num > max ? num : max;
+          // ID tracking
+          const txId = t.transactionId || '';
+          if (txId.startsWith('IN')) {
+              const match = txId.match(inRegex);
+              if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (num > maxIn) maxIn = num;
+              }
+          } else if (txId.startsWith('EX')) {
+              const match = txId.match(exRegex);
+              if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (num > maxEx) maxEx = num;
+              }
           }
-          return max;
-      }, 0);
+      });
 
-      // Check payments
+      // Also check payments for EX IDs
       if (payments && payments.length > 0) {
-          const paymentLastNum = payments.reduce((max, p) => {
-              if (p.paymentId?.startsWith('EX')) {
-                  const numMatch = p.paymentId?.match(/^EX(\d+)$/);
-                  if (numMatch && numMatch[1]) {
-                      const num = parseInt(numMatch[1], 10);
-                      return num > max ? num : max;
+          payments.forEach(p => {
+              const pid = p.paymentId || '';
+              if (pid.startsWith('EX')) {
+                  const match = pid.match(exRegex);
+                  if (match) {
+                      const num = parseInt(match[1], 10);
+                      if (num > maxEx) maxEx = num;
                   }
               }
-              return max;
-          }, 0);
-          lastNum = Math.max(lastNum, paymentLastNum);
+          });
       }
-      return lastNum;
+
+      return {
+          uniquePayees: Array.from(payees).sort(),
+          lastIncomeIdNumber: maxIn,
+          lastExpenseIdNumber: maxEx
+      };
   }, [allTransactions, payments]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
@@ -526,9 +521,14 @@ export default function IncomeExpenseClient() {
   }, []);
 
   const handleDeleteTransaction = useCallback(async (transaction: DisplayTransaction) => {
-    if (!window.confirm(`Are you sure you want to delete this ${transaction.transactionType}?`)) {
-      return;
-    }
+    const isConfirmed = await confirm(`Are you sure you want to delete this ${transaction.transactionType}?`, {
+      title: "Confirm Deletion",
+      variant: "destructive",
+      confirmText: "Delete",
+      cancelText: "Cancel"
+    });
+    
+    if (!isConfirmed) return;
     
     try {
       if (transaction.transactionType === 'Income') {
@@ -538,10 +538,9 @@ export default function IncomeExpenseClient() {
       }
       toast({ title: "Transaction deleted", variant: "success" });
       
-      // If we deleted the editing transaction, clear the form
-      if (editingTransaction?.id === transaction.id) {
-          handleNew();
-      }
+      // Always call handleNew() after deletion to reset focus and clear state
+      // even if we weren't explicitly editing that exact row, it's safer for UX
+      handleNew();
     } catch (error) {
       logError(error, "expense-tracker-client: deleteTransaction", "medium");
       toast({
@@ -550,7 +549,7 @@ export default function IncomeExpenseClient() {
         variant: "destructive",
       });
     }
-  }, [editingTransaction, handleNew, toast]);
+  }, [handleNew, toast]);
 
 
   useEffect(() => {
@@ -781,10 +780,26 @@ export default function IncomeExpenseClient() {
         const paymentIdExists = activeType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
         
         if (idExists) {
+            const existing = allTransactions.find(t => t.transactionId === values.transactionId);
+            const accountSuffix = existing ? ` for ${existing.payee}` : "";
             toast({
                 title: "ID Already Exists",
-                description: `Transaction ID ${values.transactionId} already exists. Cannot save.`,
-                variant: "destructive"
+                description: `Transaction ID ${values.transactionId} already exists${accountSuffix}. It might be hidden by your current filters.`,
+                variant: 'destructive',
+                action: existing ? (
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                            setSelectedAccount(null);
+                            // Setting search would be good but requires state
+                            // For now, at least clear the account filter
+                            toast({ title: "Account filter cleared", description: "Search for the ID in the table below." });
+                        }}
+                    >
+                        Find It
+                    </Button>
+                ) : undefined
             });
             return;
         }
@@ -1072,28 +1087,7 @@ export default function IncomeExpenseClient() {
 </body>
 </html>`;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-      doc.open();
-      doc.write(html);
-      doc.close();
-      
-      // Wait for content to render, then print and cleanup
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 500);
-    }
+    printHtmlContent(html);
   }, [toast]);
   
   const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
@@ -1235,6 +1229,7 @@ export default function IncomeExpenseClient() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
                     <DropdownMenuItem onClick={handleAddAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">NEW ACCOUNT</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">MANAGE CATEGORIES</DropdownMenuItem>
                     {selectedAccount && (
                       <>
                         <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>

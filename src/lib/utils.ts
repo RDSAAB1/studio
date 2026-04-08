@@ -428,7 +428,18 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     let totalPaid = 0;
     let totalCd = 0;
     paymentsForThisEntry.forEach((p: SupplierPayment | CustomerPayment) => {
-        const pf = p.paidFor?.find((f: PaidFor) => f.srNo === values.srNo);
+        let safePaidFor: any[] = [];
+        if (Array.isArray(p.paidFor)) safePaidFor = p.paidFor;
+        else if (typeof (p as any).paidFor === 'string' && (p as any).paidFor.trim().startsWith('[')) {
+            try { safePaidFor = JSON.parse((p as any).paidFor); } catch { safePaidFor = []; }
+        }
+        const pf = safePaidFor.find((f: any) => {
+            const pfSrNo = String(f.srNo || "").trim().toLowerCase();
+            const pfId = String(f.supplierId || "").trim().toLowerCase();
+            const targetSrNo = String(values.srNo || "").trim().toLowerCase();
+            const targetId = String((values as any).id || "").trim().toLowerCase();
+            return (targetSrNo !== "" && pfSrNo === targetSrNo) || (targetId !== "" && pfId === targetId);
+        });
         if (pf) {
             totalPaid += Number(pf.amount || 0);
             totalCd += Number((pf as any).cdAmount ?? 0);

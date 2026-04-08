@@ -22,6 +22,8 @@ interface Attachment {
     contentType: string;
 }
 
+import { printHtmlContent } from '@/lib/electron-print';
+
 export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const erp = useErpSelection();
     const { toast } = useToast();
@@ -150,210 +152,58 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         toast({ title: "Excel file downloading...", variant: "success" });
     };
     
-     const handlePrint = () => {
-         if (!settings || !payments || payments.length === 0) {
+     const handlePrint = async () => {
+         const node = printRef.current;
+         if (!node) {
              toast({ variant: 'destructive', title: 'Error', description: 'No data to print.' });
              return;
          }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
+        const printHtml = `
+            <div class="printable-area">
+                ${node.innerHTML}
+            </div>
+        `;
 
-        const today = format(new Date(), 'dd-MM-yyyy');
-        const bankToUse = settings.defaultBank || { bankName: settings.bankName, branchName: settings.branchName, accountNumber: settings.accountNo };
-        const companyName = settings.companyName || "GURU KRIPA AGRO FOODS";
-        const companyAddress = `${settings.companyAddress1 || ""}${settings.companyAddress2 ? `, ${settings.companyAddress2}` : ""}`;
-
-        const rowsHtml = payments.map((p: any, index: number) => {
-            const place = toTitleCase(p.supplierAddress || p.branch || '');
-            return `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${toTitleCase(p.supplierName || '')}</td>
-                    <td class="mono">${p.acNo || ''}</td>
-                    <td class="mono">${p.ifscCode || ''}</td>
-                    <td class="right">${(p.amount || 0).toFixed(2)}</td>
-                    <td>${place}</td>
-                    <td>${p.bank || ''}</td>
-                </tr>
-            `;
-        }).join('');
-
-        const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-        const html = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Bank Mail Format 2</title>
-    <style>
-      @page {
-        size: A4 landscape;
-        margin: 10mm;
-      }
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      body {
-        margin: 0;
-        padding: 12px;
-        font-family: Arial, sans-serif;
-        color: #000 !important;
-        background: #fff;
-        font-size: 13px;
-      }
-      * {
-        color: #000 !important;
-      }
-      h1, h2, h3, p {
-        margin: 0;
-        padding: 0;
-        color: #000 !important;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 12px;
-      }
-      .company-block {
-        max-width: 70%;
-      }
-      .company-name {
-        font-weight: 700;
-        font-size: 18px;
-        margin-bottom: 2px;
-        color: #000 !important;
-      }
-      .company-address {
-        font-size: 11px;
-        margin-bottom: 2px;
-        color: #000 !important;
-      }
-      .date-block {
-        text-align: right;
-        font-size: 12px;
-        color: #000 !important;
-      }
-      .date-block p, .date-block strong {
-        color: #000 !important;
-      }
-      .company-block p {
-        color: #000 !important;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 8px;
-        font-size: 13px;
-      }
-      th, td {
-        border: 1px solid #000;
-        padding: 4px 6px;
-        color: #000 !important;
-      }
-      th {
-        font-weight: 700;
-        color: #000 !important;
-      }
-      .right {
-        text-align: right;
-      }
-      .mono {
-        font-family: monospace;
-      }
-      tfoot td {
-        font-weight: 700;
-        color: #000 !important;
-      }
-      @media print {
-        * {
-          color: #000 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        body {
-          color: #000 !important;
-          background: #fff !important;
-        }
-        table, th, td, p, div, span {
-          color: #000 !important;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <div class="company-block">
-        <div class="company-name">${companyName}</div>
-        <div class="company-address">${companyAddress}</div>
-        <p>BoB - ${bankToUse?.bankName || ''}</p>
-        <p>${bankToUse?.branchName || ''}</p>
-        <p>A/C.NO. ${bankToUse?.accountNumber || ''}</p>
-      </div>
-      <div class="date-block">
-        <p><strong>DATE: </strong>${today}</p>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>S.N</th>
-          <th>Name</th>
-          <th>Account no</th>
-          <th>IFCS Code</th>
-          <th>Amount</th>
-          <th>Place</th>
-          <th>BANK</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="4" class="right">PL SEND RTGS & NEFT AS PER CHART VIDE CH NO -</td>
-          <td class="right">${formatCurrency(totalAmount)}</td>
-          <td colspan="2"></td>
-        </tr>
-      </tfoot>
-    </table>
-  </body>
-</html>`;
-
-        iframeDoc.open();
-        iframeDoc.write(html);
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            const printWindow = iframe.contentWindow;
-            if (printWindow) {
-                printWindow.focus();
-                printWindow.print();
+        const printStyles = `
+            @page {
+                size: A4 landscape;
+                margin: 10mm;
             }
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+            body {
+                margin: 0;
+                padding: 12px;
+                font-family: Arial, sans-serif;
+                color: #000 !important;
+                background: #fff;
+            }
+            .printable-area {
+                color: #000 !important;
+            }
+            .printable-area * {
+                color: #000 !important;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 8px;
+            }
+            th, td {
+                border: 1px solid #000;
+                padding: 4px 6px;
+            }
+            th { font-weight: 700; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 700; }
+        `;
+
+        try {
+            await printHtmlContent(printHtml, printStyles);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Print Failed', description: error.message });
+        }
      };
+
 
     const handleSendMail = async () => {
         const auth = getFirebaseAuth();

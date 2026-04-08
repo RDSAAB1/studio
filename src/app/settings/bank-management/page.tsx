@@ -57,7 +57,7 @@ export default function BankManagementPage() {
 
     const bankOptions = useMemo(() => [
         { value: 'all', label: 'All Banks' },
-        ...Array.from(new Set(banks.map(bank => bank.name))).map(name => ({ value: name, label: name }))
+        ...Array.from(new Set(banks.map(bank => bank.name || ''))).filter(Boolean).map(name => ({ value: name, label: name }))
     ], [banks]);
 
     const filteredBranches = useMemo(() => {
@@ -72,14 +72,16 @@ export default function BankManagementPage() {
 
     const handleAddBank = async () => {
         if (!newBankName.trim()) return;
-        if (banks.some(b => b.name.toLowerCase() === newBankName.trim().toLowerCase())) {
+        const normalized = newBankName.trim().toUpperCase();
+        if (banks.some(b => (b.name || '').toUpperCase() === normalized)) {
             toast({ title: "Duplicate Bank", description: "This bank name already exists.", variant: "destructive" });
             return;
         }
-        await addBank(newBankName.trim());
+        await addBank(normalized);
         toast({ title: "Bank Added", variant: "success" });
         setNewBankName('');
-        setIsBankDialogOpen(false);
+        // Keep open to allow adding more? User said "window close kyu ho jati hai"
+        // setIsBankDialogOpen(false); 
     };
     
     const handleDeleteBank = async (id: string, name: string) => {
@@ -98,24 +100,30 @@ export default function BankManagementPage() {
         }
 
         try {
-            if (currentBranch.id) {
-                await updateBankBranch(currentBranch.id, currentBranch);
-                toast({ title: "Branch Updated", variant: "success" });
-            } else {
-                // The duplication check is now in the `addBankBranch` function itself.
-                await addBankBranch(currentBranch as Omit<BankBranch, 'id'>);
-                toast({ title: "Branch Added", variant: "success" });
-            }
-            setCurrentBranch({});
-            setIsBranchDialogOpen(false);
-        } catch (error: any) {
+            const normalizedBranch = {
+                ...currentBranch,
+                bankName: currentBranch.bankName.trim().toUpperCase(),
+                branchName: currentBranch.branchName.trim().toUpperCase(),
+                ifscCode: currentBranch.ifscCode.trim().toUpperCase(),
+            };
 
+            if (currentBranch.id) {
+                await updateBankBranch(currentBranch.id, normalizedBranch);
+                toast({ title: "Branch Updated", variant: "success" });
+                setIsBranchDialogOpen(false);
+            } else {
+                await addBankBranch(normalizedBranch as Omit<BankBranch, 'id'>);
+                toast({ title: "Branch Added", variant: "success" });
+                // Keep open for new entry? 
+                setCurrentBranch(prev => ({ bankName: prev.bankName })); // Keep bank selected
+            }
+        } catch (error: any) {
             toast({ title: "Save Failed", description: error.message, variant: "destructive" });
         }
     };
 
     const handleBranchNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setCurrentBranch(prev => ({...prev, branchName: toTitleCase(e.target.value)}));
+        setCurrentBranch(prev => ({...prev, branchName: e.target.value.toUpperCase()}));
     };
     
     const handleDeleteBranch = async (id: string) => {
@@ -157,7 +165,7 @@ export default function BankManagementPage() {
                     const branchName = item.BranchName?.trim();
                     const ifscCode = item.IFSCCode?.trim().toUpperCase();
 
-                    if(bankName && !banks.some(b => b.name.toLowerCase() === bankName.toLowerCase())) {
+                    if(bankName && !banks.some(b => (b.name || '').toLowerCase() === bankName.toLowerCase())) {
                        await addBank(bankName);
                        addedBanks++;
                     }
@@ -222,6 +230,7 @@ export default function BankManagementPage() {
                                         Export All
                                     </Button>
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={() => setIsBankDialogOpen(true)}
                                         className="h-8 px-3 text-xs"
@@ -230,6 +239,7 @@ export default function BankManagementPage() {
                                         Add Bank
                                     </Button>
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={() => {
                                             setCurrentBranch({});
@@ -309,9 +319,18 @@ export default function BankManagementPage() {
                     <DialogHeader><DialogTitle>Add New Bank</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-2">
                         <Label>Bank Name</Label>
-                        <Input value={newBankName} onChange={(e) => setNewBankName(e.target.value)} placeholder="Enter full bank name" autoFocus />
+                        <Input 
+                            value={newBankName} 
+                            onChange={(e) => setNewBankName(e.target.value.toUpperCase())} 
+                            placeholder="ENTER FULL BANK NAME" 
+                            className="uppercase"
+                            autoFocus 
+                        />
                     </div>
-                    <DialogFooter><Button variant="outline" onClick={() => setIsBankDialogOpen(false)}>Cancel</Button><Button onClick={handleAddBank}>Save Bank</Button></DialogFooter>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsBankDialogOpen(false)}>Cancel</Button>
+                        <Button type="button" onClick={handleAddBank}>Save Bank</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -350,7 +369,10 @@ export default function BankManagementPage() {
                             <Input value={currentBranch.ifscCode || ''} onChange={(e) => setCurrentBranch(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} placeholder="Enter IFSC code" className="uppercase" />
                         </div>
                     </div>
-                    <DialogFooter><Button variant="outline" onClick={() => setIsBranchDialogOpen(false)}>Cancel</Button><Button onClick={handleSaveBranch}>Save Branch</Button></DialogFooter>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsBranchDialogOpen(false)}>Cancel</Button>
+                        <Button type="button" onClick={handleSaveBranch}>Save Branch</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

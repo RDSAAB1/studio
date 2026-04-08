@@ -80,6 +80,8 @@ export type ProcessPaymentContext = {
     paymentHistory?: Payment[]; // Full payment history for CD calculation
     selectedEntries?: Customer[]; // Selected entries for CD calculation
     suppliers?: Customer[]; // All suppliers for context
+    allExpenses?: any[]; // For cross-referencing
+    allIncomes?: any[]; // For cross-referencing
 };
 
 export type ProcessPaymentResult = {
@@ -133,7 +135,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         incomingSelectedEntries,
         govQuantity, govRate, govAmount, govExtraAmount,
         centerName,
-        cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = []
+        cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = [],
+        suppliers = []
     } = context;
     const cdPercentNumber = Number(cdPercentRaw);
     const cdPercent = (cdPercentRaw !== undefined && cdPercentRaw !== null && String(cdPercentRaw).trim() !== '' && Number.isFinite(cdPercentNumber))
@@ -164,17 +167,18 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
 
     // Fallback: If entryOutstandings is not provided, derive it from selectedEntries
     if (entryOutstandings.length === 0 && Array.isArray(selectedEntries) && selectedEntries.length > 0) {
-        entryOutstandings = selectedEntries.map(entry => {
-            const netAmount = Number(entry.netAmount) || 0;
-            const totalPaid = Number(entry.totalPaid) || 0;
-            const totalCd = Number(entry.totalCd) || 0;
-            // Use property if available (from summary map), otherwise calculate
+        entryOutstandings = selectedEntries.map(e => {
+            // Safety Check: handle both objects and raw IDs (strings)
+            const entry = (typeof e === 'string' ? (suppliers || []).find(s => s.srNo === e || s.id === e) : e) || e;
+            const netAmount = Number((entry as any)?.netAmount) || 0;
+            const totalPaid = Number((entry as any)?.totalPaid) || 0;
+            const totalCd = Number((entry as any)?.totalCd) || 0;
             const currentOutstanding = (entry as any).outstandingForEntry !== undefined 
                 ? Number((entry as any).outstandingForEntry)
                 : netAmount - totalPaid - totalCd;
                 
             return {
-                entry,
+                entry: entry as Customer,
                 outstanding: currentOutstanding,
                 originalOutstanding: currentOutstanding,
                 originalAmount: netAmount
@@ -187,29 +191,42 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
     
     // Validation
     // For Gov. payments, allow amount to be 0 if only updating status/CD
-    if (paymentMethod !== 'Gov.' && finalAmountToPay <= 0 && effectiveCdAmount <= 0) {
-        throw new Error("Transaction Failed: Payment and CD amount cannot both be zero");
+    // Validation
+    const effectiveToBePaid = (paymentMethod === 'RTGS' && (!finalAmountToPay || finalAmountToPay === 0)) ? (rtgsAmount || 0) : (finalAmountToPay || 0);
+
+    if (paymentMethod !== 'Gov.' && effectiveToBePaid <= 0 && effectiveCdAmount <= 0) {
+        throw new Error("Transaction Failed: Payment amount cannot be zero. Please enter amount or select entries.");
     }
 
     // LOCAL-FIRST PATH (always): Build payment + paidFor from entryOutstandings first.
     // Firestore transaction path is skipped to keep supplier payments fast and avoid network lag.
     let usedLocalPath = false;
+    let localIsActive = false;
     try {
         const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
-        // isLocalFolderMode() still used elsewhere (catch path), but for performance we always
-        // use the local computation path when we have entryOutstandings; Firestore is skipped.
-        if (entryOutstandings.length > 0) {
+        localIsActive = isLocalFolderMode();
+    } catch (_) { /* ignore */ }
+
+    // Use sanitized finalAmountToPay or fallback to rtgsAmount
+    const finalizedAmount = Number(effectiveToBePaid) || 0;
+
+    if (localIsActive) {
+        try {
             const now = new Date().toISOString();
-            const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
-            const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? 0), 0);
+            // Prioritize rtgsSrNo as the primary paymentId if it exists for RTGS method
+            const newPaymentId = (editingPayment?.paymentId || editingPayment?.id || paymentId) || (paymentMethod === 'RTGS' ? rtgsSrNo : '') || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
+            const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? (Number(i.entry.netAmount) || 0)), 0);
+            const totalNetAmount = entryOutstandings.reduce((s, i) => s + (Number(i.entry.netAmount) || 0), 0);
+
             // Gov. extra: distribute proportionally by outstanding (same as Firestore path) so paidFor gets extraAmount
             const govExtraSharePerEntry: number[] = entryOutstandings.map(() => 0);
-            if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0) {
+            if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0 && entryOutstandings.length > 0) {
                 const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
                 if (totalOutstanding > 0) {
                     let extraAssigned = 0;
                     for (let i = 0; i < entryOutstandings.length; i++) {
-                        const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? 0);
+                        const entry = entryOutstandings[i].entry;
+                        const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? (Number(entry.netAmount) || 0));
                         const isLast = i === entryOutstandings.length - 1;
                         const share = isLast
                             ? Math.round((extraTotal - extraAssigned) * 100) / 100
@@ -227,52 +244,62 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 }
             }
             const paidForDetailsLocal: PaidFor[] = [];
-            let remainingCash = Math.round(finalAmountToPay * 100) / 100;
+            let remainingCash = Math.round(finalizedAmount * 100) / 100;
             let remainingCd = Math.round(effectiveCdAmount * 100) / 100;
-            for (let i = 0; i < entryOutstandings.length; i++) {
-                const item = entryOutstandings[i];
-                const entry = item.entry;
-                const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
-                const share = totalOutstanding > 0 ? (outstanding / totalOutstanding) : 1 / entryOutstandings.length;
-                const amount = i === entryOutstandings.length - 1
-                    ? Math.round(remainingCash * 100) / 100
-                    : Math.min(remainingCash, Math.round(finalAmountToPay * share * 100) / 100);
-                const cdAmount = i === entryOutstandings.length - 1
-                    ? Math.round(remainingCd * 100) / 100
-                    : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
-                remainingCash = Math.round((remainingCash - amount) * 100) / 100;
-                remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
-                const extraAmount = govExtraSharePerEntry[i] ?? 0;
-                if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
-                    const netAmount = Number(entry.netAmount) || 0;
-                    const entryAny = entry as any;
-                    paidForDetailsLocal.push({
-                        srNo: entry.srNo || '',
-                        amount: Math.round(amount * 100) / 100,
-                        cdAmount: Math.round(cdAmount * 100) / 100,
-                        supplierId: entry.id,
-                        parchiNo: entry.parchiNo || entry.srNo || '',
-                        paymentId: newPaymentId,
-                        receiptType: paymentMethod,
-                        sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
-                        supplierName: supplierDetails?.name || entryAny?.name || '',
-                        supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
-                        supplierAddress: supplierDetails?.address || entryAny?.address || '',
-                        type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
-                        updatedAt: now,
-                        utrNo: utrNo || '',
-                        adjustedOriginal: netAmount,
-                        adjustedOutstanding: outstanding,
-                        receiptOutstanding: outstanding,
-                        extraAmount: Math.round((extraAmount || 0) * 100) / 100,
-                    });
+            
+            // Only loop if entries exist
+            if (entryOutstandings.length > 0) {
+                for (let i = 0; i < entryOutstandings.length; i++) {
+                    const item = entryOutstandings[i];
+                    const entry = item.entry;
+                    const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
+                    
+                    // Share: Priority 1: Current Outstanding weights. Priority 2: Net Amount weights. Fallback: Equal split.
+                    const share = (totalOutstanding > 1) 
+                        ? (outstanding / totalOutstanding) 
+                        : (totalNetAmount > 1 ? (Number(entry.netAmount) / totalNetAmount) : 1 / entryOutstandings.length);
+
+                    const amount = i === entryOutstandings.length - 1
+                        ? Math.round(remainingCash * 100) / 100
+                        : Math.min(remainingCash, Math.round(finalizedAmount * share * 100) / 100);
+                    const cdAmount = i === entryOutstandings.length - 1
+                        ? Math.round(remainingCd * 100) / 100
+                        : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                    remainingCash = Math.round((remainingCash - amount) * 100) / 100;
+                    remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
+                    const extraAmount = govExtraSharePerEntry[i] ?? 0;
+                    if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
+                        const netAmount = Number(entry.netAmount) || 0;
+                        const entryAny = entry as any;
+                        paidForDetailsLocal.push({
+                            srNo: entry.srNo || '',
+                            supplierId: entry.id || '',
+                            amount: Math.round(amount * 100) / 100,
+                            cdAmount: Math.round(cdAmount * 100) / 100,
+                            parchiNo: entry.parchiNo || entry.srNo || '',
+                            paymentId: newPaymentId,
+                            receiptType: paymentMethod,
+                            sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
+                            supplierName: supplierDetails?.name || entryAny?.name || '',
+                            supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
+                            supplierAddress: supplierDetails?.address || entryAny?.address || '',
+                            type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
+                            updatedAt: now,
+                            utrNo: utrNo || '',
+                            adjustedOriginal: netAmount,
+                            adjustedOutstanding: outstanding,
+                            receiptOutstanding: outstanding,
+                            extraAmount: Math.round((extraAmount || 0) * 100) / 100,
+                        });
+                    }
                 }
             }
+            
             finalPaymentData = omitUndefinedDeep({
                 id: newPaymentId,
                 paymentId: newPaymentId,
-                date: paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-                amount: isLedger ? (drCr === 'Credit' ? -Math.abs(finalAmountToPay) : Math.abs(finalAmountToPay)) : finalAmountToPay,
+                date: paymentDate ? (typeof paymentDate === 'string' ? paymentDate : format(paymentDate, 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd'),
+                amount: isLedger ? (drCr === 'Credit' ? -Math.abs(finalizedAmount) : Math.abs(finalizedAmount)) : finalizedAmount,
                 drCr: isLedger ? drCr : undefined,
                 paidFor: paidForDetailsLocal,
                 paymentMethod,
@@ -306,10 +333,15 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 rtgsAmount: rtgsAmount || 0,
             } as Payment);
             usedLocalPath = true;
+        } catch (e: any) { 
+            console.error("Local context build failed:", e);
         }
-    } catch (_) { /* ignore */ }
+    }
 
     if (!usedLocalPath) {
+        if (localIsActive) {
+            return { success: false, message: "Local processing failed. Check console for details." };
+        }
         try {
         await runTransaction(firestoreDB, async (transaction) => {
             const now = Timestamp.now();
@@ -318,7 +350,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             // In a real scenario, we would match exact logic, but here we ensure correctness of totals.
             
             // Generate ID first so we can use it in PaidFor details
-            const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
+            // Prioritize rtgsSrNo as the primary paymentId if it exists for RTGS method
+            const newPaymentId = (editingPayment?.paymentId || editingPayment?.id || paymentId) || (paymentMethod === 'RTGS' ? rtgsSrNo : '') || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
 
             let remainingPayment = distributableAmount;
             let remainingCd = effectiveCdAmount;
@@ -457,7 +490,19 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 let total = 0;
                 for (const p of history) {
                     if (p.id === editingId) continue;
-                    const pf = p.paidFor?.find((f: PaidFor) => f.srNo === srNo);
+                    let safePaidFor: any[] = [];
+                    if (Array.isArray(p.paidFor)) safePaidFor = p.paidFor;
+                    else if (typeof (p as any).paidFor === 'string' && (p as any).paidFor.trim().startsWith('[')) {
+                        try { safePaidFor = JSON.parse((p as any).paidFor); } catch { safePaidFor = []; }
+                    }
+                    const entryId = plan[i].entryData.id || '';
+                    const pf = safePaidFor.find((f: any) => {
+                        const pfSrNo = String(f.srNo || "").trim().toLowerCase();
+                        const pfId = String(f.supplierId || "").trim().toLowerCase();
+                        const targetSrNo = String(srNo || "").trim().toLowerCase();
+                        const targetId = String(entryId || "").trim().toLowerCase();
+                        return (targetSrNo !== "" && pfSrNo === targetSrNo) || (targetId !== "" && pfId === targetId);
+                    });
                     if (!pf) continue;
                     if ('cdAmount' in pf && pf.cdAmount != null) total += Number(pf.cdAmount) || 0;
                     else if (p.cdAmount && p.paidFor?.length) {
@@ -777,10 +822,32 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             const remainingAdvance = Math.max(0, Math.round(remainingPayment * 100) / 100);
             const advanceAmount = undefined;
             
+            const isRTGS = paymentMethod === 'RTGS';
+            const isCompletedRTGS = isRTGS && !!checkNo;
+            const currentStatus = isRTGS ? (isCompletedRTGS ? 'Paid' : 'Pending') : 'Paid';
+
+            // Robust date handling to prevent "Invalid time value" RangeError
+            let dateToUse: string;
+            const maybeNewDate = paymentDate ? new Date(paymentDate) : null;
+            const isNewDateValid = maybeNewDate && !isNaN(maybeNewDate.getTime());
+
+            if (editingPayment && (editingPayment as any).status === 'Pending' && currentStatus === 'Paid') {
+                // If completing a pending RTGS, prioritize the selected paymentDate if valid
+                dateToUse = isNewDateValid 
+                    ? format(maybeNewDate!, 'yyyy-MM-dd') 
+                    : format(new Date(), 'yyyy-MM-dd');
+            } else {
+                // Normal case: use selected date if valid, else fallback to original payment date or today
+                dateToUse = isNewDateValid 
+                    ? format(maybeNewDate!, 'yyyy-MM-dd') 
+                    : (editingPayment?.date || format(new Date(), 'yyyy-MM-dd'));
+            }
+
             finalPaymentData = {
                 id: newPaymentId, // Use provided ID if editing
                 paymentId: newPaymentId,
-                date: paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                date: dateToUse,
+                status: currentStatus,
                 amount: isLedger ? signedPaymentAmount : finalAmountToPay,
                 drCr: isLedger ? drCr : undefined,
                 advanceAmount: advanceAmount,
@@ -839,17 +906,18 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         // Local folder mode: Firestore may be unavailable — build payment + paidFor from entryOutstandings and save to Dexie
         try {
             const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
-            if (isLocalFolderMode() && entryOutstandings.length > 0) {
+            if (isLocalFolderMode() && entryOutstandings.length >= 0) {
                 const now = new Date().toISOString();
                 const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
-                const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? 0), 0);
+                const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? (Number(i.entry.netAmount) || 0)), 0);
+                const totalNetAmount = entryOutstandings.reduce((s, i) => s + (Number(i.entry.netAmount) || 0), 0);
                 const govExtraSharePerEntryCatch: number[] = entryOutstandings.map(() => 0);
                 if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0) {
                     const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
                     if (totalOutstanding > 0) {
                         let extraAssigned = 0;
                         for (let i = 0; i < entryOutstandings.length; i++) {
-                            const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? 0);
+                            const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? (Number(entryOutstandings[i].entry.netAmount) || 0));
                             const isLast = i === entryOutstandings.length - 1;
                             const share = isLast ? Math.round((extraTotal - extraAssigned) * 100) / 100 : Math.round((extraTotal * outstanding / totalOutstanding) * 100) / 100;
                             govExtraSharePerEntryCatch[i] = Math.max(0, share);
@@ -869,7 +937,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     const item = entryOutstandings[i];
                     const entry = item.entry;
                     const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
-                    const share = totalOutstanding > 0 ? (outstanding / totalOutstanding) : 1 / entryOutstandings.length;
+                    
+                    // Share: Priority 1: Current Outstanding weights. Priority 2: Net Amount weights. Fallback: Equal split.
+                    const share = (totalOutstanding > 1) 
+                        ? (outstanding / totalOutstanding) 
+                        : (totalNetAmount > 1 ? (Number(entry.netAmount) / totalNetAmount) : 1 / entryOutstandings.length);
+
                     const amount = i === entryOutstandings.length - 1
                         ? Math.round(remainingCash * 100) / 100
                         : Math.min(remainingCash, Math.round(finalAmountToPay * share * 100) / 100);
@@ -914,10 +987,20 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                         });
                     }
                 }
+                const isRTGS = paymentMethod === 'RTGS';
+                const isCompletedRTGS = isRTGS && (!!checkNo || !!utrNo);
+                const currentStatus = isRTGS ? (isCompletedRTGS ? 'Paid' : 'Pending') : 'Paid';
+
+                // Explicitly sync date to the selected date if completing a pending RTGS as per user request.
+                const dateToUse = (editingPayment && (editingPayment as any).status === 'Pending' && currentStatus === 'Paid')
+                    ? (paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+                    : (paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : (editingPayment?.date || format(new Date(), 'yyyy-MM-dd')));
+
                 finalPaymentData = omitUndefinedDeep({
                     id: newPaymentId,
                     paymentId: newPaymentId,
-                    date: paymentDate ? format(new Date(paymentDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                    date: dateToUse,
+                    status: currentStatus,
                     amount: isLedger ? (drCr === 'Credit' ? -Math.abs(finalAmountToPay) : Math.abs(finalAmountToPay)) : finalAmountToPay,
                     drCr: isLedger ? drCr : undefined,
                     paidFor: paidForDetails,
@@ -925,6 +1008,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     receiptType: paymentMethod,
                     supplierId: selectedCustomerKey || '',
                     customerId: selectedCustomerKey || '',
+                    bankAccountId: accountIdForPayment || '',
                     supplierName: supplierDetails?.name || '',
                     supplierFatherName: supplierDetails?.fatherName || '',
                     notes: notes || undefined,
@@ -942,10 +1026,18 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     sixRDate: sixRDate ? format(new Date(sixRDate), 'yyyy-MM-dd') : undefined,
                     type: paymentType,
                 } as Payment);
+                
+                // IMPORTANT: Ensure ID is preserved
+                if (finalPaymentData) {
+                    finalPaymentData.id = newPaymentId;
+                    finalPaymentData.paymentId = newPaymentId;
+                }
             }
-        } catch (_) { /* ignore */ }
+        } catch (e: any) { 
+            console.error("Local context build failed:", e);
+        }
         if (!finalPaymentData) {
-            return { success: false, message: error.message };
+            return { success: false, message: "Local processing build failed. Please check if all required fields are filled." };
         }
     }
     }
@@ -959,7 +1051,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
     const dataToSave = { ...finalPaymentData, paidFor: paidForArray };
 
     const collectionName = isCustomer ? 'customerPayments' : 'payments';
-    await savePaymentOffline(dataToSave, collectionName);
+    try {
+        await savePaymentOffline(dataToSave, collectionName);
+    } catch (err: any) {
+        console.error("Local save failed:", err);
+        return { success: false, message: "Failed to persist payment to local database: " + err.message };
+    }
 
     if (!editingPayment && typeof window !== 'undefined' && db) {
         try {

@@ -73,13 +73,18 @@ let eventListenersAttached = false;
  */
 async function attachEventListeners() {
     if (eventListenersAttached || typeof window === 'undefined') return;
-    const { isLocalFolderMode } = await import('./local-folder-storage');
-    if (isLocalFolderMode()) return; // Local folder: do not attach Firestore sync
+    try {
+        const { isLocalFolderMode } = await import('./local-folder-storage');
+        if (isLocalFolderMode()) return; // Local folder: do not attach Firestore sync
+    } catch (e) {
+        // Ignore Next.js HMR orphaned module disposal errors
+        return;
+    }
     eventListenersAttached = true;
 
     const events = ['click', 'input', 'change', 'blur', 'focus', 'submit', 'keydown'];
     const syncHandler = () => {
-        scheduleSyncFromFirestore();
+        scheduleSyncFromFirestore().catch(() => {});
     };
 
     events.forEach(event => {
@@ -407,12 +412,24 @@ export async function syncToFirestore() {
     pendingChanges.clear();
 
     // ✅ Local folder mode: sync to folder instead of Firestore
-    const { isLocalFolderMode, syncCollectionToFolder } = await import('./local-folder-storage');
-    if (isLocalFolderMode()) {
+    let isLocalFolderModeValue = false;
+    let syncCollectionToFolderFn: any = null;
+    try {
+        const { isLocalFolderMode, syncCollectionToFolder } = await import('./local-folder-storage');
+        isLocalFolderModeValue = isLocalFolderMode();
+        syncCollectionToFolderFn = syncCollectionToFolder;
+    } catch (importErr) {
+        // Handle Next.js HMR "unexpected require" from disposed module silently
+        return;
+    }
+
+    if (isLocalFolderModeValue) {
         const collections = [...new Set(changes.map((c) => c.collection))];
         for (const col of collections) {
             try {
-                await syncCollectionToFolder(col);
+                if (syncCollectionToFolderFn) {
+                    await syncCollectionToFolderFn(col);
+                }
             } catch (e) {
                 handleSilentError(e, `syncToFolder - ${col}`);
             }
@@ -586,8 +603,13 @@ const SYNC_COOLDOWN = 60_000; // Minimum 60 seconds between syncs to reduce read
 async function scheduleSyncFromFirestore() {
     if (syncFromFirestoreScheduled) return;
     if (Date.now() - lastSyncTime < SYNC_COOLDOWN) return;
-    const { isLocalFolderMode } = await import('./local-folder-storage');
-    if (isLocalFolderMode()) return; // Local folder: no Firestore sync
+    try {
+        const { isLocalFolderMode } = await import('./local-folder-storage');
+        if (isLocalFolderMode()) return; // Local folder: no Firestore sync
+    } catch (e) {
+        // Ignore Next.js HMR orphaned listener module disposal errors
+        return;
+    }
 
     syncFromFirestoreScheduled = true;
 
@@ -631,8 +653,12 @@ async function syncFromFirestore() {
     if (!db || typeof window === 'undefined') return;
 
     // ✅ Local folder mode: do not sync from Firestore (would overwrite local data)
-    const { isLocalFolderMode } = await import('./local-folder-storage');
-    if (isLocalFolderMode()) return;
+    try {
+        const { isLocalFolderMode } = await import('./local-folder-storage');
+        if (isLocalFolderMode()) return;
+    } catch (importErr) {
+        return;
+    }
 
     try {
         // ✅ OPTIMIZED: Sync collections in parallel (non-blocking)

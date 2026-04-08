@@ -54,7 +54,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
             .filter(bank => bank && (bank.name || bank.id)) // Filter out invalid banks
             .map((bank: Bank) => ({
                 value: bank.name || bank.id || '',
-                label: toTitleCase(bank.name || bank.id || '')
+                label: (bank.name || bank.id || '').toUpperCase()
             }))
             .filter(opt => opt.value && opt.label); // Filter out invalid options
 
@@ -78,7 +78,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
             if (branchName && !uniqueBranches.has(branchName)) {
                 uniqueBranches.set(branchName, { 
                     value: branchName, 
-                    label: toTitleCase(branchName) 
+                    label: branchName.toUpperCase() 
                 });
             }
         });
@@ -200,7 +200,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
         <div className="space-y-2 text-[10px]">
             <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-muted-foreground">Bank Details</p>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen?.(true)}>
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsBankSettingsOpen?.(true)}>
                     <Settings className="h-3.5 w-3.5" />
                 </Button>
             </div>

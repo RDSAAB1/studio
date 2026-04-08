@@ -288,6 +288,7 @@ export type FundTransaction = {
 
 export type PaidFor = {
     srNo: string;
+    id?: string;
     amount: number;
     cdAmount?: number; // CD amount allocated to this specific entry
     parchiNo?: string; // Parchi No (SR#) of the payment (for tracking extra amount reference)
@@ -357,6 +358,7 @@ export type SupplierPayment = {
     centerName?: string;
     expenseTransactionId?: string;
     bankAccountId?: string; 
+    status?: 'Paid' | 'Pending' | 'Cancelled';
     isDeleted?: boolean;
 }
 
@@ -443,6 +445,8 @@ export type CustomerSummary = {
     totalDeductions: number;
     paymentHistory: (SupplierPayment | CustomerPayment)[];
     outstandingEntryIds: string[];
+    supplierIds?: string[];
+    supplierNames?: string[];
     // New fields for Mill Overview
     totalGrossWeight: number;
     totalTeirWeight: number;
@@ -471,6 +475,7 @@ export type CustomerSummary = {
     totalBaseOriginalAmount?: number; // Base Original Amount (without Extra)
     ledgerCreditAmount?: number;
     ledgerDebitAmount?: number;
+    isStub?: boolean; // NEW: Flag for lazy calculation results
 }
 
 export type OptionItem = {
@@ -760,10 +765,12 @@ declare global {
   interface Window {
     electron: {
       sqliteAll: (tableName: string) => Promise<any[]>;
-      sqliteGet: (tableName: string, id: string) => Promise<any>;
+      sqliteGet: (tableName: string, id: string, column?: string) => Promise<any>;
       sqlitePut: (tableName: string, row: any) => Promise<{ success: boolean; error?: string }>;
       sqliteBulkPut: (tableName: string, rows: any[]) => Promise<{ success: boolean; error?: string }>;
       sqliteDelete: (tableName: string, id: string) => Promise<{ success: boolean; error?: string }>;
+      sqliteQuery: (tableName: string, options: any) => Promise<any[]>;
+      sqliteCount: (tableName: string) => Promise<number>;
       sqliteGetFolder: () => Promise<{ folder: string | null; error?: string }>;
       sqliteSetFolder: (folderPath: string) => Promise<{ success: boolean; folder?: string; error?: string }>;
     };

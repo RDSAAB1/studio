@@ -10,6 +10,10 @@ ipcRenderer.on('folder:file-changed', (_, data) => {
   window.dispatchEvent(new CustomEvent('folder:file-changed', { detail: data }));
 });
 
+ipcRenderer.on('sqlite:backend-change', (_, data) => {
+  window.dispatchEvent(new CustomEvent('sqlite-change', { detail: data?.table || 'all' }));
+});
+
 // Extra guard: ensure renderer is always recognized as Electron, even if URL param sync fails.
 try { window.__ELECTRON__ = true; } catch {}
 
@@ -44,10 +48,14 @@ contextBridge.exposeInMainWorld('electron', {
   sqliteGet: (tableName, id) => ipcRenderer.invoke('sqlite:get', tableName, id),
   sqlitePut: (tableName, row) => ipcRenderer.invoke('sqlite:put', tableName, row),
   sqliteDelete: (tableName, id) => ipcRenderer.invoke('sqlite:delete', tableName, id),
+  sqliteQuery: (tableName, options) => ipcRenderer.invoke('sqlite:query', tableName, options),
+  sqliteCount: (tableName) => ipcRenderer.invoke('sqlite:count', tableName),
   sqliteGetFolder: () => ipcRenderer.invoke('sqlite:getFolder'),
   sqliteSetFolder: (folderPath) => ipcRenderer.invoke('sqlite:setFolder', folderPath),
   sqliteVacuum: () => ipcRenderer.invoke('sqlite:vacuum'),
   sqliteGetFileSize: () => ipcRenderer.invoke('sqlite:getFileSize'),
+  sqliteSelectFile: () => ipcRenderer.invoke('sqlite:selectFile'),
+  sqliteReadExternalTable: (filePath, tableName) => ipcRenderer.invoke('sqlite:readExternalTable', filePath, tableName),
   // Window controls (for frameless window)
   minimize: () => ipcRenderer.send('window:minimize'),
   maximize: () => ipcRenderer.send('window:maximize'),

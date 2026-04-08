@@ -223,8 +223,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const num = parseInt(numericPartStr, 10);
         const formattedId = 'R' + String(num).padStart(5, '0'); // Changed from RT to R
         setRtgsSrNo(formattedId);
+        setPaymentId(formattedId); // Keep primary ID in sync for RTGS
 
-        const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
+        const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId || p.paymentId === formattedId);
         if (existingPayment) {
             onEditCallback(existingPayment);
         }
@@ -271,16 +272,23 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
     useEffect(() => {
         if (!editingPayment) {
-             setRtgsSrNo(getNextPaymentId('RTGS'));
-             if (paymentMethod === 'Online') {
-                 setPaymentId(getNextPaymentId('Online'));
-             } else if (paymentMethod === 'Ledger') {
-                 setPaymentId(getNextPaymentId('Ledger'));
-             } else if (paymentMethod === 'Gov.') {
-                 setPaymentId(getNextPaymentId('Gov.'));
-             } else {
-                 setPaymentId(getNextPaymentId('Cash'));
-             }
+            if (paymentMethod === 'RTGS') {
+                const nextRtgs = getNextPaymentId('RTGS');
+                setRtgsSrNo(nextRtgs);
+                setPaymentId(nextRtgs); // Set primary ID to the same as RTGS ID
+            } else {
+                setRtgsSrNo(''); // Clear RTGS ID for non-RTGS methods
+                
+                if (paymentMethod === 'Online') {
+                    setPaymentId(getNextPaymentId('Online'));
+                } else if (paymentMethod === 'Ledger') {
+                    setPaymentId(getNextPaymentId('Ledger'));
+                } else if (paymentMethod === 'Gov.') {
+                    setPaymentId(getNextPaymentId('Gov.'));
+                } else {
+                    setPaymentId(getNextPaymentId('Cash'));
+                }
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentHistory, expenses, editingPayment, paymentMethod]);
@@ -295,6 +303,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                     ? getNextPaymentId('Ledger')
                 : paymentMethod === 'Gov.'
                     ? getNextPaymentId('Gov.')
+                : paymentMethod === 'RTGS'
+                    ? nextRtgsSrNo
                     : getNextPaymentId('Cash');
 
         setPaymentId(nextPaymentId);
@@ -310,7 +320,10 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         // Do NOT reset selectedCustomerKey - keep the selected customer
         // setSelectedCustomerKey(null);
         setIsPayeeEditing(false);
-        setRtgsSrNo(nextRtgsSrNo);
+        
+        // For RTGS, use the same ID as paymentId. For others, clear it.
+        setRtgsSrNo(paymentMethod === 'RTGS' ? nextPaymentId : '');
+        
         setSixRNo('');
         setSixRDate(new Date());
         setParchiNo('');

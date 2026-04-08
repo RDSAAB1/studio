@@ -16,7 +16,7 @@ import { SupplierSummaryCards } from '@/components/sales/supplier-payments/suppl
 
 
 
-export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     const { toast } = useToast();
     const deferredData = useDeferredValue(data);

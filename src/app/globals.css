@@ -8,12 +8,13 @@
   padding-top: 32px !important; /* Fixed height of WindowControls */
 }
 
-/* Ensure sticky elements start below the Electron title bar */
-.electron-content .sticky {
+/* Ensure only top-level sticky headers (like the main app header) respect the Electron title bar.
+   Nested sticky elements (like table headers) should stick to their immediate container's top (0px). */
+.electron-content .sticky:not(th):not(thead):not(.sticky-nested) {
   top: 32px !important;
 }
 
-.electron-content .sticky.top-0 {
+.electron-content .sticky.top-0:not(th):not(thead):not(.sticky-nested) {
   top: 32px !important;
 }
 

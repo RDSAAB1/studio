@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { Loader2, Printer, Download, Edit2, Save, X } from 'lucide-react';
+import { printHtmlContent } from '@/lib/electron-print';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -159,20 +160,8 @@ export default function SixRReportPage() {
         });
     }, [reportRows, search6RNo, searchName, startDate, endDate, sortOrder]);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!settings) return;
-        
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) return;
         
         // Create custom print table with combined columns
         const printTableHTML = `
@@ -242,42 +231,25 @@ export default function SixRReportPage() {
             </table>
         `;
         
-        iframeDoc.open();
-        iframeDoc.write(`
-            <html><head><title>6R Report</title>
-                <style>
-                    html, body { background: white !important; color: black !important; margin: 0; padding: 0; font-family: sans-serif; }
-                    body * { color: #000 !important; }
-                    @media print {
-                        @page { size: portrait; margin: 10mm; }
-                        html, body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                        .print-header { text-align: center; margin-bottom: 1rem; }
-                        table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                        th, td { border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; background: #fff !important; }
-                        thead, th { background-color: #f2f2f2 !important; color: #000 !important; }
-                        td { vertical-align: top; }
-                    }
-                </style>
-            </head><body>
-                <div class="print-header">
-                    <h2>${toTitleCase(settings.companyName)} - 6R Report</h2>
-                    <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-                </div>
-                ${printTableHTML}
-            </body></html>
-        `);
-        iframeDoc.close();
-        
-        let printed = false;
-        const doPrint = () => {
-            if (printed) return;
-            printed = true;
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        };
-        iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-        setTimeout(doPrint, 800);
+        const printHTML = `
+            <div class="print-header" style="text-align: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 20px;">${toTitleCase(settings.companyName)}</h2>
+                <p style="margin: 5px 0; font-size: 14px;">6R Report - ${format(new Date(), 'dd-MMM-yyyy')}</p>
+            </div>
+            ${printTableHTML}
+        `;
+
+        const printStyles = `
+            @page { size: landscape; margin: 10mm; }
+            body { font-family: sans-serif; background-color: #ffffff !important; color: #000000 !important; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; background-color: #ffffff !important; }
+            th, td { border: 1px solid #ccc !important; padding: 4px !important; text-align: left; background-color: #ffffff !important; color: #000000 !important; vertical-align: top; }
+            th { background-color: #f2f2f2 !important; font-weight: bold !important; }
+            .text-right { text-align: right; }
+            .whitespace-nowrap { white-space: nowrap; }
+        `;
+
+        await printHtmlContent(printHTML, printStyles);
     };
 
     const handleDownloadExcel = () => {

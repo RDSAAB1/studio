@@ -12,8 +12,11 @@ import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 
+import { printHtmlContent } from '@/lib/electron-print';
+
 interface RtgsReportRow {
     paymentId: string;
+    id?: string; // Add id as optional for compatibility
     date: string;
     checkNo: string;
     type: string;
@@ -59,150 +62,104 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
     const { toast } = useToast();
     
     if (!settings) {
-        return <div>Loading settings...</div>;
+        return <div className="p-8 text-center text-muted-foreground">Loading settings...</div>;
+    }
+
+    if (!payments || payments.length === 0) {
+        return (
+            <div className="p-12 text-center flex flex-col items-center justify-center space-y-4">
+                <Printer className="h-12 w-12 text-muted-foreground/50" />
+                <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">No Payments Selected</h3>
+                    <p className="text-sm text-muted-foreground max-w-[250px]">
+                        Please select at least one completed payment to generate the RTGS print format.
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     const paymentChunks = chunkArray(payments, 10);
     const grandTotalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const node = printRef.current;
         if (!node) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
             return;
         }
 
-        // Simple, robust print: open a hidden iframe with minimal CSS and the exact HTML we see in preview
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
         const printHtml = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charSet="utf-8" />
-    <title>RTGS Advice</title>
-    <style>
-      @page {
-        size: A4 landscape;
-        margin: 10mm;
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #000;
-        background: #fff;
-      }
-      .printable-area {
-        color: #000 !important;
-      }
-      .printable-area * {
-        color: #000 !important;
-      }
-      /* Tighten line height and margins so header lines don't look too spaced out */
-      .printable-area h2,
-      .printable-area h3,
-      .printable-area p,
-      .printable-area span {
-        margin-top: 0;
-        margin-bottom: 2px;
-        line-height: 1.1;
-      }
+            <div class="printable-area">
+                ${node.innerHTML}
+            </div>
+        `;
 
-      /* Minimal Tailwind layout utilities used in this component */
-      .flex {
-        display: flex;
-      }
-      .justify-between {
-        justify-content: space-between;
-      }
-      .items-start {
-        align-items: flex-start;
-      }
-      .items-end {
-        align-items: flex-end;
-      }
-      .text-center {
-        text-align: center;
-      }
-      .text-right {
-        text-align: right;
-      }
-      .font-bold {
-        font-weight: 700;
-      }
-      .text-xs {
-        font-size: 0.75rem;
-      }
-      .text-sm {
-        font-size: 0.875rem;
-      }
-      .text-xl {
-        font-size: 1.25rem;
-      }
-      .mb-1 {
-        margin-bottom: 0.25rem;
-      }
-      .mb-2 {
-        margin-bottom: 0.5rem;
-      }
-      .mb-4 {
-        margin-bottom: 1rem;
-      }
-      .mt-12 {
-        margin-top: 3rem;
-      }
-      .information-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .information-table th,
-      .information-table td {
-        border: 1px solid #000;
-        padding: 3px 5px;
-        font-size: 13px;
-      }
-      .print-header-bg {
-        background-color: #fce5d5;
-      }
-      .page-break {
-        page-break-after: always;
-      }
-    </style>
-  </head>
-  <body>
-    ${node.outerHTML}
-  </body>
-</html>`;
-
-        iframeDoc.open();
-        iframeDoc.write(printHtml);
-        iframeDoc.close();
-
-        setTimeout(() => {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
+        const printStyles = `
+            @page {
+                size: A4 landscape;
+                margin: 10mm;
             }
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 500);
-        }, 300);
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                color: #000;
+                background: #fff;
+            }
+            .printable-area {
+                color: #000 !important;
+            }
+            .printable-area * {
+                color: #000 !important;
+            }
+            .printable-area h2,
+            .printable-area h3,
+            .printable-area p,
+            .printable-area span {
+                margin-top: 0;
+                margin-bottom: 2px;
+                line-height: 1.1;
+            }
+            .flex { display: flex; }
+            .justify-between { justify-content: space-between; }
+            .items-start { align-items: flex-start; }
+            .items-end { align-items: flex-end; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 700; }
+            .text-xs { font-size: 0.75rem; }
+            .text-sm { font-size: 0.875rem; }
+            .text-xl { font-size: 1.25rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mt-12 { margin-top: 3rem; }
+            .information-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .information-table th,
+            .information-table td {
+                border: 1px solid #000;
+                padding: 3px 5px;
+                font-size: 13px;
+            }
+            .print-header-bg {
+                background-color: #fce5d5;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+        `;
+
+        try {
+            await printHtmlContent(printHtml, printStyles);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Print Failed', description: error.message });
+        }
     };
+
 
     return (
         <>
@@ -243,10 +200,10 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef}>
                     {paymentChunks.map((chunk, pageIndex) => {
-                        const firstDate = chunk.length > 0 ? chunk[0].date : '';
-                        const isSameDate = chunk.every(p => p.date === firstDate);
-                        const firstCheckNo = chunk.length > 0 ? chunk[0].checkNo : '';
-                        const isSameCheckNo = chunk.every(p => p.checkNo === firstCheckNo);
+                        const firstDate = chunk.length > 0 ? format(new Date(chunk[0].date), 'yyyy-MM-dd') : '';
+                        const isSameDate = chunk.every(p => format(new Date(p.date), 'yyyy-MM-dd') === firstDate);
+                        const firstCheckNo = chunk.length > 0 ? String(chunk[0].checkNo || '').trim() : '';
+                        const isSameCheckNo = chunk.every(p => String(p.checkNo || '').trim() === firstCheckNo);
                         const pageTotalAmount = chunk.reduce((sum, p) => sum + p.amount, 0);
 
                         return (

@@ -9,6 +9,12 @@ const notifyChange = (tableName: string) => {
         window.dispatchEvent(new CustomEvent(`sqlite-change:${tableName}`));
         // Compatibility with GlobalDataProvider (Phase 2 refresh logic)
         window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: tableName } }));
+        
+        // Special case: if transactions change, notify incomes and expenses too
+        if (tableName === 'transactions' || tableName === 'all') {
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'incomes' } }));
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'expenses' } }));
+        }
     }
 };
 
@@ -18,7 +24,13 @@ class SQLiteTable<T> {
 
   async toArray(): Promise<T[]> {
     if (typeof window === 'undefined') return [];
+    // If we have a massive table, sqliteAll (which uses LIMIT 5000 in main.js) is safer
     return window.electron.sqliteAll(this.tableName);
+  }
+
+  async count(): Promise<number> {
+    if (typeof window === 'undefined') return 0;
+    return window.electron.sqliteCount(this.tableName);
   }
 
   async get(id: string | number): Promise<T | undefined> {
@@ -85,20 +97,21 @@ class SQLiteTable<T> {
     console.warn(`Table.clear() called for ${this.tableName} - restricted in SQLite mode`);
   }
 
-  async count(): Promise<number> {
-    const all = await this.toArray();
-    return all.length;
-  }
-
-  private createCollection(dataPromise: Promise<T[]>) {
+  private createCollection(dataPromise: Promise<T[]>, queryOptions: any = {}) {
     const table = this;
     return {
       toArray: () => dataPromise,
       first: async () => (await dataPromise)[0],
-      count: async () => (await dataPromise).length,
-      limit: (n: number) => this.createCollection(dataPromise.then(d => d.slice(0, n))),
-      offset: (n: number) => this.createCollection(dataPromise.then(d => d.slice(n))),
-      filter: (cb: (item: T) => boolean) => this.createCollection(dataPromise.then(d => d.filter(cb))),
+      count: async () => (await dataPromise).length, // Note: this counts the filtered/sliced result
+      limit: (n: number) => {
+          const newOptions = { ...queryOptions, limit: n };
+          return this.createCollection(window.electron.sqliteQuery(this.tableName, newOptions), newOptions);
+      },
+      offset: (n: number) => {
+          const newOptions = { ...queryOptions, offset: n };
+          return this.createCollection(window.electron.sqliteQuery(this.tableName, newOptions), newOptions);
+      },
+      filter: (cb: (item: T) => boolean) => this.createCollection(dataPromise.then(d => d.filter(cb)), queryOptions),
       delete: async () => {
           const all = await dataPromise;
           for (const item of all) {
@@ -110,25 +123,36 @@ class SQLiteTable<T> {
 
   where(field: string) {
     return {
-      equals: (value: any) => this.createCollection(this.toArray().then(all => all.filter((item: any) => item[field] === value))),
-      anyOf: (values: any[]) => {
-          const set = new Set(values);
-          return this.createCollection(this.toArray().then(all => all.filter((item: any) => set.has(item[field]))));
+      equals: (value: any) => {
+          const queryOptions = { where: { [field]: value } };
+          return this.createCollection(window.electron.sqliteQuery(this.tableName, queryOptions), queryOptions);
       },
-      startsWith: (prefix: string) => this.createCollection(this.toArray().then(all => all.filter((item: any) => String(item[field]).startsWith(prefix))))
+      anyOf: (values: any[]) => {
+          // anyOf is harder for SQL without building a complex IN clause, 
+          // keeping as JS-filter for now but optimized for small sets.
+          return this.createCollection(this.toArray().then(all => {
+              const set = new Set(values);
+              return all.filter((item: any) => set.has(item[field]));
+          }));
+      },
+      startsWith: (prefix: string) => {
+          // startsWith can be optimized with LIKE in SQL if needed, keeping simple for now
+          return this.createCollection(this.toArray().then(all => 
+              all.filter((item: any) => String(item[field]).startsWith(prefix))
+          ));
+      }
     };
   }
 
-  filter(cb: (item: T) => boolean) {
-      return this.createCollection(this.toArray().then(all => all.filter(cb)));
-  }
-
   orderBy(field: string) {
-      const data = this.toArray().then(all => all.sort((a: any, b: any) => (String(a[field]) > String(b[field]) ? 1 : -1)));
-      return {
-          ...this.createCollection(data),
-          reverse: () => this.createCollection(data.then(all => [...all].reverse()))
-      };
+    const queryOptions = { orderBy: field };
+    return {
+        ...this.createCollection(window.electron.sqliteQuery(this.tableName, queryOptions), queryOptions),
+        reverse: () => {
+            const revOptions = { ...queryOptions, reverse: true };
+            return this.createCollection(window.electron.sqliteQuery(this.tableName, revOptions), revOptions);
+        }
+    };
   }
 }
 
@@ -196,49 +220,57 @@ export async function getReceiptSettingsFromLocal(): Promise<ReceiptSettings | n
   try {
     const d = getDb();
     const data = await d.settings.get('companyDetails') as Partial<ReceiptSettings> | undefined;
-    if (!data) {
-      return {
-        companyName: 'JAGDAMBE RICE MILL',
-        companyAddress1: 'Devkali Road, Banda, Shajahanpur',
-        companyAddress2: 'Near Devkali, Uttar Pradesh',
-        contactNo: '9555130735',
-        gmail: 'JRMDofficial@gmail.com',
-        fields: DEFAULT_RECEIPT_FIELDS,
-      };
-    }
-    let defaultBank: BankAccount | undefined;
-    if (data.defaultBankAccountId) {
-      const acc = await d.bankAccounts.get(data.defaultBankAccountId);
-      if (acc) defaultBank = acc as BankAccount;
-    }
-    return {
-      companyName: data.companyName || 'JAGDAMBE RICE MILL',
-      companyAddress1: data.companyAddress1 || 'Devkali Road, Banda, Shajahanpur',
-      companyAddress2: data.companyAddress2 || 'Near Devkali, Uttar Pradesh',
-      contactNo: data.contactNo || '9555130735',
-      gmail: data.gmail || 'JRMDofficial@gmail.com',
-      fields: { ...DEFAULT_RECEIPT_FIELDS, ...(data.fields || {}) },
-      defaultBankAccountId: data.defaultBankAccountId,
-      defaultBank: data.defaultBank ?? defaultBank,
-      companyGstin: data.companyGstin,
-      companyStateName: data.companyStateName,
-      companyStateCode: data.companyStateCode,
-      panNo: data.panNo,
+    
+    // Base defaults
+    const baseSettings: ReceiptSettings = {
+      companyName: data?.companyName || 'JAGDAMBE RICE MILL',
+      companyAddress1: data?.companyAddress1 || 'Devkali Road, Banda, Shajahanpur',
+      companyAddress2: data?.companyAddress2 || 'Near Devkali, Uttar Pradesh',
+      contactNo: data?.contactNo || '9555130735',
+      gmail: data?.gmail || 'JRMDofficial@gmail.com',
+      fields: { ...DEFAULT_RECEIPT_FIELDS, ...(data?.fields || {}) },
+      companyGstin: data?.companyGstin || '',
+      companyStateName: data?.companyStateName || '',
+      companyStateCode: data?.companyStateCode || '',
+      panNo: data?.panNo || '',
+      defaultBankAccountId: data?.defaultBankAccountId,
+      bankHeaderLine1: data?.bankHeaderLine1 || '',
+      bankHeaderLine2: data?.bankHeaderLine2 || '',
+      bankHeaderLine3: data?.bankHeaderLine3 || '',
     };
-  } catch {
+
+    if (data?.defaultBankAccountId) {
+      const acc = await d.bankAccounts.get(data.defaultBankAccountId);
+      if (acc) {
+        baseSettings.defaultBank = acc as BankAccount;
+      }
+    }
+    
+    return baseSettings;
+  } catch (err) {
+    console.error('[SQLite] Failed to load receipt settings:', err);
     return null;
   }
 }
 
-// Dummy sync functions to avoid breaking imports
-export async function syncAllData() { return Promise.resolve(); }
-export async function hardSyncAllData() { return Promise.resolve(); }
+// Real sync functions for SQLite mode (manually trigger UI-wide refresh)
+export async function syncAllData() { 
+  notifyChange('all');
+  return Promise.resolve(); 
+}
+export async function hardSyncAllData() { 
+  notifyChange('all');
+  return Promise.resolve(); 
+}
 export async function ensureFirstFullSync() { return Promise.resolve(); }
 export function setDbInUseByFolderLoad(inUse: boolean) { /* no-op */ }
 
 export async function getSyncCounts(): Promise<any[]> {
     const rows = [];
-    const tables = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'employees'];
+    const tables = [
+      'suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'employees',
+      'incomeCategories', 'expenseCategories', 'incomes', 'expenses'
+    ];
     for (const t of tables) {
         const count = await (db as any)[t].count().catch(() => 0);
         rows.push({ collection: t, indexeddb: count, firestore: 0 });

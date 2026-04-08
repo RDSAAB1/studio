@@ -7,18 +7,18 @@ import type { Customer, RtgsSettings } from '@/lib/definitions';
 import { getRtgsSettings } from '@/lib/firestore';
 import { useGlobalData } from '@/contexts/global-data-context';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
+import { printHtmlContent } from '@/lib/electron-print';
 import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent, Wheat, Sigma } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { type DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const escapeHtml = (value?: string | null) => {
   if (!value) return "";
@@ -55,7 +55,7 @@ export default function DailySupplierReportClient() {
     const globalData = useGlobalData();
     const suppliers = globalData.suppliers;
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedVariety, setSelectedVariety] = useState<string | null>('all');
     const { toast } = useToast();
@@ -71,32 +71,43 @@ export default function DailySupplierReportClient() {
     }, []);
     
     const varietyOptions = useMemo(() => {
-        if (!suppliers) return [{ value: 'all', label: 'All Varieties' }];
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const varieties = new Set(suppliers.filter(s => format(new Date(s.date), 'yyyy-MM-dd') === dateStr).map(s => toTitleCase(s.variety)));
+        if (!suppliers || !dateRange?.from) return [{ value: 'all', label: 'All Varieties' }];
+        
+        const varieties = new Set(suppliers.filter(s => {
+            const rowDate = new Date(s.date);
+            const start = startOfDay(dateRange.from!);
+            const end = endOfDay(dateRange.to || dateRange.from!);
+            return isWithinInterval(rowDate, { start, end });
+        }).map(s => toTitleCase(s.variety)));
+        
         const sortedVarieties = Array.from(varieties).sort();
         return [{ value: 'all', label: 'All Varieties' }, ...sortedVarieties.map(v => ({ value: v, label: v }))];
-    }, [suppliers, selectedDate]);
+    }, [suppliers, dateRange]);
 
     const filteredSuppliers = useMemo(() => {
-        if (!suppliers) return [];
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        if (!suppliers || !dateRange?.from) return [];
+        
         const filtered = suppliers.filter(s => {
-            const supplierDate = format(new Date(s.date), 'yyyy-MM-dd');
+            const rowDate = new Date(s.date);
+            const start = startOfDay(dateRange.from!);
+            const end = endOfDay(dateRange.to || dateRange.from!);
+            
+            const dateMatch = isWithinInterval(rowDate, { start, end });
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
             const varietyMatch = !selectedVariety || selectedVariety === 'all' || s.variety.toLowerCase() === selectedVariety.toLowerCase();
-            return supplierDate === dateStr && nameMatch && varietyMatch;
+            return dateMatch && nameMatch && varietyMatch;
         });
-        // Sort by srNo in descending order
+        
         return filtered.sort((a, b) => {
-            const numA = parseInt(a.srNo.substring(1), 10);
-            const numB = parseInt(b.srNo.substring(1), 10);
-            return numB - numA;
+            const aNum = parseInt(String(a.srNo).replace(/\D/g, '')) || 0;
+            const bNum = parseInt(String(b.srNo).replace(/\D/g, '')) || 0;
+            if (aNum !== bNum) return bNum - aNum;
+            return String(b.srNo).localeCompare(String(a.srNo));
         });
-    }, [suppliers, selectedDate, searchTerm, selectedVariety]);
+    }, [suppliers, dateRange, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, minRate: 0, maxRate: 0, kartaPercentage: 0, totalEntries: 0 };
+        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, afterKartaAmount: 0, cdAmount: 0, finalNet: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, minRate: 0, maxRate: 0, kartaPercentage: 0, totalEntries: 0 };
         
         if(filteredSuppliers.length === 0) return initialSummary;
         
@@ -108,6 +119,11 @@ export default function DailySupplierReportClient() {
             acc.net += s.netWeight;
             acc.labour += s.labouryAmount;
             acc.kartaAmount += s.kartaAmount;
+            const afterKarta = s.amount - s.kartaAmount;
+            const cd = afterKarta * 0.01;
+            acc.afterKartaAmount += afterKarta;
+            acc.cdAmount += cd;
+            acc.finalNet += (afterKarta - cd - s.labouryAmount - s.kanta);
             acc.kanta += s.kanta;
             acc.amount += s.amount;
             acc.originalNetAmount += s.originalNetAmount;
@@ -156,88 +172,48 @@ export default function DailySupplierReportClient() {
         return Object.entries(summaryByVariety).map(([variety, data]) => ({ variety, ...data }));
     }, [filteredSuppliers]);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const node = printRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
             return;
         }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
-            document.body.removeChild(iframe);
-            return;
-        }
+        const dateTitle = dateRange?.from ? (
+            dateRange.to ? `${format(dateRange.from, "dd-MMM-yyyy")} to ${format(dateRange.to, "dd-MMM-yyyy")}` : format(dateRange.from, "dd-MMM-yyyy")
+        ) : "";
 
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Daily Supplier Report</title>');
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-
-            }
-        });
-        
-         const printStyles = iframeDoc.createElement('style');
-         printStyles.textContent = `
-            @media print {
-                body, body *, .printable-area, .printable-area * {
-                    visibility: visible !important;
-                    opacity: 1 !important;
-                    box-shadow: none !important;
-                    text-shadow: none !important;
-                    backdrop-filter: none !important;
-                    -webkit-backdrop-filter: none !important;
-                }
-                @page { size: landscape; margin: 10mm; }
-                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background-color: #fff !important; }
-                .printable-area, .printable-area * { background-color: #fff !important; color: #000 !important; border-color: #ccc !important; }
-                .print-header { margin-bottom: 0.5rem; text-align: center; display: block !important; }
-                thead { display: table-header-group !important; background-color: #e5e7eb !important; }
-                tbody { display: table-row-group !important; }
-                tr { page-break-inside: avoid !important; }
-                .no-print { display: none !important; }
-                .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
-                .h-\\[60vh\\] { height: auto !important; overflow: visible !important; }
-                .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
-                .scrollbar-hide::-webkit-scrollbar { display: none; }
-            }
-        `;
-        iframeDoc.head.appendChild(printStyles);
-
-        iframeDoc.write('</head><body>');
-        
         const printContent = `
             <div class="printable-area p-4">
-                <div class="hidden print:block print-header">
-                    <h2>${escapeHtml(toTitleCase(settings.companyName))} - Daily Supplier Report</h2>
-                    <p>Date: ${format(selectedDate, "dd-MMM-yyyy")}</p>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; font-size: 20px;">${escapeHtml(toTitleCase(settings.companyName))}</h2>
+                    <p style="margin: 5px 0; font-size: 14px;">Supplier Report - ${dateTitle}</p>
                 </div>
-                ${node.innerHTML}
+                <div class="report-content">
+                    ${node.innerHTML}
+                </div>
             </div>
         `;
-        
-        iframeDoc.body.innerHTML = printContent;
-        iframeDoc.close();
-        
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
+
+        const printStyles = `
+            @page { size: landscape; margin: 10mm; }
+            .no-print { display: none !important; }
+            .print-summary-container { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; margin-bottom: 20px !important; }
+            .print-summary-container > div { flex: 1 !important; min-width: 150px !important; border: 1px solid #ccc !important; padding: 8px !important; border-radius: 4px !important; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #eee; padding: 4px; text-align: left; background: transparent !important; }
+            th { background-color: #f7f7f7 !important; font-weight: bold; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: bold; }
+            .max-h-\\[600px\\] { max-height: none !important; height: auto !important; overflow: visible !important; }
+            .sticky { position: static !important; }
+            .border { border: 1px solid #eee !important; }
+            .rounded-lg { border-radius: 8px !important; }
+            .bg-card\\/60 { background-color: transparent !important; }
+            .shadow-md { box-shadow: none !important; }
+        `;
+
+        await printHtmlContent(printContent, printStyles);
     };
 
 
@@ -245,22 +221,14 @@ export default function DailySupplierReportClient() {
         <div className="space-y-4">
              <div ref={printRef}>
                 <Card className="print-no-border">
-                    <CardContent className="p-4 space-y-4">
-                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center no-print">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full sm:w-[280px] justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
-                            </Popover>
+                    <CardContent className="p-4 flex flex-col gap-0">
+                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center no-print mb-4">
+                            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
                              <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
                              <CustomDropdown options={varietyOptions} value={selectedVariety} onChange={setSelectedVariety} placeholder="Filter by variety..." />
                         </div>
                         
-                         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-2 print:flex print-summary-container">
+                         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-2 print:flex print-summary-container mb-4">
                            <CategorySummaryCard title="Total Entries" icon={<Sigma size={16}/>} data={[
                                 { label: 'Parchi', value: `${summary.totalEntries}` },
                            ]}/>
@@ -287,17 +255,22 @@ export default function DailySupplierReportClient() {
                                 { label: 'Labour Amt', value: formatCurrency(summary.labour) },
                                 { label: 'Kanta Amt', value: formatCurrency(summary.kanta) },
                            ]}/>
-                           <CategorySummaryCard title="Financial Summary" icon={<CircleDollarSign size={16}/>} data={[
+                           <CategorySummaryCard title="Final Settlement" icon={<TrendingUp size={16}/>} data={[
+                                { label: 'After Karta', value: formatCurrency(summary.afterKartaAmount) },
+                                { label: 'Net Payable', value: formatCurrency(summary.netAmount), isHighlighted: true },
+                                { label: 'CD Amt', value: formatCurrency(summary.cdAmount) },
+                                { label: 'Final Net', value: formatCurrency(summary.finalNet), isHighlighted: true },
+                           ]}/>
+                           <CategorySummaryCard title="Payment Status" icon={<CircleDollarSign size={16}/>} data={[
                                 { label: 'Total Original', value: formatCurrency(summary.originalNetAmount) },
                                 { label: 'Total Paid', value: formatCurrency(summary.originalNetAmount - summary.netAmount) },
-                                { label: 'Net Payable', value: formatCurrency(summary.netAmount), isHighlighted: true },
                            ]}/>
                         </div>
                         
                         {varietySummary.length > 1 && (
-                            <>
+                            <div className="mb-4">
                                 <Separator />
-                                <h3 className="text-sm font-semibold no-print">Variety-wise Summary</h3>
+                                <h3 className="text-sm font-semibold no-print my-2">Variety-wise Summary</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 no-print">
                                     {varietySummary.map(({ variety, netWeight, netAmount, rate, count }) => (
                                         <Card key={variety}>
@@ -313,55 +286,65 @@ export default function DailySupplierReportClient() {
                                         </Card>
                                     ))}
                                 </div>
-                            </>
+                            </div>
                         )}
                         
 
-                        <div className="h-[60vh] overflow-auto scrollbar-hide border rounded-lg">
-                            <table className="w-full text-xs border-collapse">
-                                <thead className="bg-muted font-semibold text-[10px] uppercase whitespace-nowrap sticky top-0 z-10">
-                                    <tr className="text-primary">
-                                        <th className="border-b border-r p-1 text-left">SR</th>
-                                        <th className="border-b border-r p-1 text-left">Date</th>
-                                        <th className="border-b border-r p-1 text-left">Term</th>
-                                        <th className="border-b border-r p-1 text-left">Name</th>
-                                        <th className="border-b border-r p-1 text-left">S/O</th>
-                                        <th className="border-b border-r p-1 text-left">Vehicle</th>
-                                        <th className="border-b border-r p-1 text-right">Gross</th>
-                                        <th className="border-b border-r p-1 text-right">Teir</th>
-                                        <th className="border-b border-r p-1 text-right">Final</th>
-                                        <th className="border-b border-r p-1 text-right">Karta</th>
-                                        <th className="border-b border-r p-1 text-right">Net</th>
-                                        <th className="border-b border-r p-1 text-right">Rate</th>
-                                        <th className="border-b border-r p-1 text-right">Amount</th>
-                                        <th className="border-b border-r p-1 text-right">Karta Amt</th>
-                                        <th className="border-b border-r p-1 text-right">Laboury</th>
-                                        <th className="border-b border-r p-1 text-right">Kanta</th>
-                                        <th className="border-b p-1 text-right">Net Payable</th>
+                        <div className="relative border rounded-lg overflow-auto max-h-[600px] w-full">
+                            <table className="w-full text-xs border-collapse border-0 border-spacing-0 m-0 p-0">
+                                <thead className="sticky top-0 z-20 bg-muted m-0 p-0">
+                                    <tr className="text-primary bg-muted">
+                                        <th className="p-2 text-left border-b border-r bg-muted">SR</th>
+                                        <th className="p-2 text-left border-b border-r bg-muted">Date</th>
+                                        <th className="p-2 text-left border-b border-r bg-muted">Term</th>
+                                        <th className="p-2 text-left border-b border-r bg-muted">Name</th>
+                                        <th className="p-2 text-left border-b border-r bg-muted">S/O</th>
+                                        <th className="p-2 text-left border-b border-r bg-muted">Vehicle</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Gross</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Teir</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Final</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Karta</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Net</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Rate</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Amount</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Karta Amt</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">After Karta</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Laboury</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Kanta</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">Net Payable</th>
+                                        <th className="p-2 text-right border-b border-r bg-muted">CD Amt</th>
+                                        <th className="p-2 text-right border-b bg-muted">Final Net</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredSuppliers.map((s) => (
+                                    {filteredSuppliers.map((s) => {
+                                        const afterKartaAmount = s.amount - s.kartaAmount;
+                                        const cdAmount = afterKartaAmount * 0.01;
+                                        const finalNet = s.amount - s.kartaAmount - cdAmount - s.labouryAmount - s.kanta;
+                                        return (
                                         <tr key={s.id} className="hover:bg-muted/50 whitespace-nowrap h-[29px] border-b">
-                                            <td className="border-r p-1 font-bold">{s.srNo}</td>
-                                            <td className="border-r p-1">{format(new Date(s.date), "dd-MMM")}</td>
-                                            <td className="border-r p-1 text-center">{s.term}</td>
-                                            <td className="border-r p-1">{toTitleCase(s.name)}</td>
-                                            <td className="border-r p-1">{toTitleCase(s.so)}</td>
-                                            <td className="border-r p-1">{s.vehicleNo.toUpperCase()}</td>
-                                            <td className="border-r p-1 text-right">{s.grossWeight.toFixed(2)}</td>
-                                            <td className="border-r p-1 text-right">{s.teirWeight.toFixed(2)}</td>
-                                            <td className="border-r p-1 text-right font-semibold">{s.weight.toFixed(2)}</td>
-                                            <td className="border-r p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
-                                            <td className="border-r p-1 text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
-                                            <td className="border-r p-1 text-right">{formatCurrency(s.rate)}</td>
-                                            <td className="border-r p-1 text-right">{formatCurrency(s.amount)}</td>
-                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
-                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
-                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.kanta)}</td>
-                                            <td className="p-1 text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
+                                            <td className="p-2 border-r font-bold">{s.srNo}</td>
+                                            <td className="p-2 border-r">{format(new Date(s.date), "dd-MMM")}</td>
+                                            <td className="p-2 border-r text-center">{s.term}</td>
+                                            <td className="p-2 border-r">{toTitleCase(s.name)}</td>
+                                            <td className="p-2 border-r">{toTitleCase(s.so)}</td>
+                                            <td className="p-2 border-r">{s.vehicleNo.toUpperCase()}</td>
+                                            <td className="p-2 border-r text-right">{s.grossWeight.toFixed(2)}</td>
+                                            <td className="p-2 border-r text-right">{s.teirWeight.toFixed(2)}</td>
+                                            <td className="p-2 border-r text-right font-semibold">{s.weight.toFixed(2)}</td>
+                                            <td className="p-2 border-r text-right">{s.kartaWeight.toFixed(2)}</td>
+                                            <td className="p-2 border-r text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
+                                            <td className="p-2 border-r text-right">{formatCurrency(s.rate)}</td>
+                                            <td className="p-2 border-r text-right">{formatCurrency(s.amount)}</td>
+                                            <td className="p-2 border-r text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
+                                            <td className="p-2 border-r text-right font-semibold text-blue-700">{formatCurrency(afterKartaAmount)}</td>
+                                            <td className="p-2 border-r text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
+                                            <td className="p-2 border-r text-right text-red-600">{formatCurrency(s.kanta)}</td>
+                                            <td className="p-2 border-r text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
+                                            <td className="p-2 border-r text-right text-orange-600">{formatCurrency(cdAmount)}</td>
+                                            <td className="p-2 text-right font-bold text-emerald-600">{formatCurrency(finalNet)}</td>
                                         </tr>
-                                    ))}
+                                    )})}
                                 </tbody>
                             </table>
                         </div>

@@ -90,7 +90,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
     if (!Array.isArray(banks)) return [];
     return banks.map((bank: any) => ({
       value: bank.name,
-      label: toTitleCase(bank.name)
+      label: (bank.name || '').toUpperCase()
     }));
   }, [banks]);
 
@@ -104,7 +104,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
         if (!uniqueBranches.has(branch.branchName)) {
           uniqueBranches.set(branch.branchName, { 
             value: branch.branchName, 
-            label: toTitleCase(branch.branchName),
+            label: (branch.branchName || '').toUpperCase(),
             ifsc: branch.ifscCode || ''
           });
         }
@@ -295,11 +295,11 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
   const onSubmit = async (data: SupplierBankAccountFormData) => {
     try {
       const accountData = {
-        accountHolderName: toTitleCase(data.accountHolderName),
+        accountHolderName: data.accountHolderName.trim().toUpperCase(),
         accountNumber: data.accountNumber.trim(),
-        bankName: toTitleCase(data.bankName),
+        bankName: data.bankName.trim().toUpperCase(),
         ifscCode: data.ifscCode.toUpperCase().trim(),
-        branchName: toTitleCase(data.branchName),
+        branchName: data.branchName.trim().toUpperCase(),
         accountType: 'Other' as const,
       };
 
@@ -461,11 +461,11 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
           
           if (!existing && accountData.accountNumber) {
             await addSupplierBankAccount({
-              accountHolderName: toTitleCase(accountData.accountHolderName || 'Unknown'),
+              accountHolderName: (accountData.accountHolderName || 'UNKNOWN').trim().toUpperCase(),
               accountNumber: accountData.accountNumber,
-              bankName: toTitleCase(accountData.bankName || ''),
-              ifscCode: accountData.ifscCode.toUpperCase() || '',
-              branchName: toTitleCase(accountData.branchName || ''),
+              bankName: (accountData.bankName || '').trim().toUpperCase(),
+              ifscCode: (accountData.ifscCode || '').toUpperCase().trim(),
+              branchName: (accountData.branchName || '').trim().toUpperCase(),
               accountType: 'Other' as const,
             });
             savedCount++;
@@ -718,17 +718,17 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
             {/* Accounts Table */}
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <ScrollArea className="h-[420px]">
-                  <div className="overflow-x-auto">
-                    <Table className="table-fixed w-full min-w-[800px]">
+                <ScrollArea className="h-[420px] w-full">
+                  <div className="overflow-x-auto w-full">
+                    <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                          <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Account Holder Name</TableHead>
-                          <TableHead className="text-[11px] font-semibold px-2 w-[15%]">Account Number</TableHead>
-                          <TableHead className="text-[11px] font-semibold px-2 w-[25%]">Bank Name</TableHead>
-                          <TableHead className="text-[11px] font-semibold px-2 w-[12%]">IFSC Code</TableHead>
-                          <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Branch</TableHead>
-                          <TableHead className="text-right text-[11px] font-semibold px-2 w-[12%]">Actions</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[22%]">Account Holder Name</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[18%]">Account Number</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[20%]">Bank Name</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[15%]">IFSC Code</TableHead>
+                          <TableHead className="text-[11px] font-semibold px-2 w-[15%]">Branch</TableHead>
+                          <TableHead className="text-right text-[11px] font-semibold px-2 w-[10%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -84,7 +84,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         if (!s) return '';
         const id = (s as any).id;
         const srNo = (s as any).srNo;
-        return String(srNo || id || '').trim();
+        // Prioritize ID (the stable primary key) over srNo (which can be edited)
+        return String(id || srNo || '').trim();
     }, []);
 
     const upsertPaymentInList = useCallback(
@@ -189,22 +190,22 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             if (!db) return;
             try {
                 if (collection === 'suppliers') {
-                    const data = await db.suppliers.orderBy('srNo').reverse().toArray();
+                    const data = await db.suppliers.orderBy('srNo').reverse().limit(1000).toArray();
                     updateState(setSuppliers, data);
                     return;
                 }
                 if (collection === 'customers') {
-                    const data = await db.customers.orderBy('srNo').reverse().toArray();
+                    const data = await db.customers.orderBy('srNo').reverse().limit(1000).toArray();
                     updateState(setCustomers, data);
                     return;
                 }
                 if (collection === 'customerPayments') {
-                    const data = await db.customerPayments.orderBy('date').reverse().toArray();
+                    const data = await db.customerPayments.orderBy('date').reverse().limit(1000).toArray();
                     updateState(setCustomerPayments, data);
                     return;
                 }
                 if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
-                    const payments = await db.payments.orderBy('date').reverse().toArray();
+                    const payments = await db.payments.orderBy('date').reverse().limit(1000).toArray();
                     updateState(setSupplierPayments, payments as Payment[]);
                     return;
                 }
@@ -243,6 +244,17 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     const data = await db.transactions.where('type').equals('Expense').toArray();
                     data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setExpenses, data);
+                    return;
+                }
+                if (collection === 'transactions' && db.transactions) {
+                    // Update both incomes and expenses when transactions change
+                    const incomesData = await db.transactions.where('type').equals('Income').toArray();
+                    incomesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setIncomes, incomesData);
+                    
+                    const expensesData = await db.transactions.where('type').equals('Expense').toArray();
+                    expensesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setExpenses, expensesData);
                     return;
                 }
             } catch (e) {
@@ -329,7 +341,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const onLocalDataReady = () => {
             if (!isSqliteMode()) return;
-            ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses'].forEach((c) => void refresh(c));
+            ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions'].forEach((c) => void refresh(c));
         };
 
         window.addEventListener('indexeddb:collection:changed', onCollectionChanged);
@@ -377,10 +389,10 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses'];
                 for (const c of collections) {
                     try {
-                        if (c === 'suppliers') { const d = await db.suppliers.orderBy('srNo').reverse().toArray(); updateState(setSuppliers, d); }
-                        else if (c === 'customers') { const d = await db.customers.orderBy('srNo').reverse().toArray(); updateState(setCustomers, d); }
-                        else if (c === 'customerPayments') { const d = await db.customerPayments.orderBy('date').reverse().toArray(); updateState(setCustomerPayments, d); }
-                        else if (c === 'payments') { const d = await db.payments.orderBy('date').reverse().toArray(); updateState(setSupplierPayments, d); }
+                        if (c === 'suppliers') { const d = await db.suppliers.orderBy('srNo').reverse().limit(1000).toArray(); updateState(setSuppliers, d); }
+                        else if (c === 'customers') { const d = await db.customers.orderBy('srNo').reverse().limit(1000).toArray(); updateState(setCustomers, d); }
+                        else if (c === 'customerPayments') { const d = await db.customerPayments.orderBy('date').reverse().limit(1000).toArray(); updateState(setCustomerPayments, d); }
+                        else if (c === 'payments') { const d = await db.payments.orderBy('date').reverse().limit(1000).toArray(); updateState(setSupplierPayments, d); }
                         else if (c === 'banks') { const d = await db.banks.toArray(); updateState(setBanks, d); }
                         else if (c === 'bankBranches') { const d = await db.bankBranches.toArray(); updateState(setBankBranches, d); }
                         else if (c === 'bankAccounts') { const d = await db.bankAccounts.toArray(); updateState(setBankAccounts, d); }

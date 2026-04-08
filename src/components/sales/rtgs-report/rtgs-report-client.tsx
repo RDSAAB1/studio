@@ -56,6 +56,8 @@ interface RtgsReportRow {
     utrNo: string;
 }
 
+import { printHtmlContent } from '@/lib/electron-print';
+
 export default function RtgsReportClient() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,6 +67,19 @@ export default function RtgsReportClient() {
     const [isTablePrintPreviewOpen, setIsTablePrintPreviewOpen] = useState(false);
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
+
+    // State for multi-select
+    const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
+
+    const handleSelectRow = (id: string) => {
+        const newSelected = new Set(selectedPaymentIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedPaymentIds(newSelected);
+    };
 
 
     // State for search filters
@@ -160,139 +175,72 @@ export default function RtgsReportClient() {
         }
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
+
+    const selectedPayments = useMemo(() => {
+        if (selectedPaymentIds.size === 0) return filteredReportRows;
+        return filteredReportRows.filter(row => selectedPaymentIds.has(row.paymentId));
+    }, [selectedPaymentIds, filteredReportRows]);
     
-    const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
+    const handlePrint = async (printRef: React.RefObject<HTMLDivElement>) => {
         const node = printRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
             return;
         }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>RTGS Payment Report</title>');
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode(`
-                    @page { size: landscape; margin: 10mm; }
-                    * { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                        color-adjust: exact !important;
-                    }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                    }
-                    .print-header { 
-                        margin-bottom: 1rem; 
-                        text-align: center; 
-                        color: #000000 !important;
-                    }
-                    h2, p { 
-                        color: #000000 !important; 
-                    }
-                    table { 
-                        background-color: #ffffff !important;
-                        border-collapse: collapse !important;
-                        width: 100% !important;
-                    }
-                    th, td { 
-                        border: 1px solid #000000 !important; 
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                        padding: 6px !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    thead { 
-                        background-color: #f2f2f2 !important; 
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    thead tr {
-                        background-color: #f2f2f2 !important;
-                    }
-                    th { 
-                        background-color: #f2f2f2 !important; 
-                        color: #000000 !important;
-                        font-weight: bold !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    tbody tr { 
-                        background-color: #ffffff !important;
-                    }
-                    tbody td {
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                    }
-                `));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-
-            }
-        });
-
-        const printOverride = iframeDoc.createElement('style');
-        printOverride.textContent = `@media print {
-          body, body *, .print-header, .print-header * {
-            visibility: visible !important;
-            opacity: 1 !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-          }
-        }`;
-        iframeDoc.head.appendChild(printOverride);
-        
-        iframeDoc.write('</head><body></body></html>');
-        
-        const printContent = `
+        const printHtml = `
             <div class="print-header">
-                <h2>${escapeHtml(toTitleCase(settings.companyName))} - RTGS Payment Report</h2>
+                <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
                 <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
             </div>
             ${node.outerHTML}
         `;
-        
-        iframeDoc.body.innerHTML = printContent;
-        iframeDoc.close();
-        
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
+
+        const printStyles = `
+            @page { size: landscape; margin: 10mm; }
+            body { 
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                font-family: sans-serif;
+                margin: 0;
+                padding: 15px;
+            }
+            .print-header { 
+                margin-bottom: 2rem; 
+                text-align: center; 
+            }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                font-size: 10px;
+            }
+            th, td { 
+                border: 1px solid #000000 !important; 
+                padding: 6px !important; 
+                text-align: left; 
+                vertical-align: top;
+            }
+            th { 
+                background-color: #f2f2f2 !important; 
+                font-weight: bold !important; 
+            }
+        `;
+
+        try {
+            await printHtmlContent(printHtml, printStyles);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Print Failed', description: error.message });
+        }
     };
+
     
     const handleDownloadExcel = () => {
-        if (filteredReportRows.length === 0) {
+        if (selectedPayments.length === 0) {
             toast({ title: "No data to export", variant: "destructive" });
             return;
         }
 
-        const dataToExport = filteredReportRows.map(p => ({
+        const dataToExport = selectedPayments.map(p => ({
             'Date': format(new Date(p.date), 'dd-MMM-yy'),
             'SR No.': p.srNo,
             'Name': p.supplierName,
@@ -427,6 +375,14 @@ export default function RtgsReportClient() {
                                     filteredReportRows.map((row, index) => (
                                         <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
                                             <TableCell>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedPaymentIds.has(row.paymentId)}
+                                                    onChange={() => handleSelectRow(row.paymentId)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </TableCell>
+                                            <TableCell>
                                                 <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
                                                 <div className="text-xs text-muted-foreground">{row.srNo}</div>
                                             </TableCell>
@@ -475,7 +431,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    {settings && <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />}
+                    {settings && <ConsolidatedRtgsPrintFormat payments={selectedPayments} settings={settings} />}
                 </DialogContent>
             </Dialog>
 
@@ -561,7 +517,7 @@ export default function RtgsReportClient() {
             <BankMailFormatDialog 
                 isOpen={isBankMailFormatOpen}
                 onOpenChange={setIsBankMailFormatOpen}
-                payments={filteredReportRows}
+                payments={selectedPayments}
                 settings={settings}
             />
 

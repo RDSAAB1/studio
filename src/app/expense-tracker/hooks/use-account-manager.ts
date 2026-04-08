@@ -7,6 +7,7 @@ import {
   getAccountsRealtime,
   addAccount,
   updateAccount,
+  updateAccountTransactionsCascade,
   deleteAccount,
   updateExpensePayee,
   updateIncomePayee,
@@ -252,11 +253,16 @@ export function useAccountManager({
 
     try {
       setIsSubmitting(true);
-      const accountData: Omit<Account, 'id'> = {
+      
+      const account = accounts.get(selectedAccount);
+      if (!account?.id) throw new Error("Account ID not found");
+
+      const accountData: Partial<Account> & { id: string } = {
+        id: account.id,
         name: newName,
         contact: editAccount.contact.trim() || undefined,
         address: editAccount.address.trim() || undefined,
-        nature: editAccount.nature || undefined,
+        nature: (editAccount.nature as any) || undefined,
         category: editAccount.category.trim() || undefined,
         subCategory: editAccount.subCategory.trim() || undefined,
       };
@@ -264,15 +270,21 @@ export function useAccountManager({
       // Update account in accounts collection
       await updateAccount(accountData, oldName);
 
-      // If name changed, update all transactions
+      // Perform cascading updates for all fields (Name, Category, Sub-category, Nature)
+      await updateAccountTransactionsCascade(oldName, {
+        name: oldName !== newName ? newName : undefined,
+        category: accountData.category,
+        subCategory: accountData.subCategory,
+        nature: accountData.nature
+      });
+
       if (oldName !== newName) {
-        await Promise.all([updateExpensePayee(oldName, newName), updateIncomePayee(oldName, newName)]);
         setSelectedAccount(newName);
         setValue("payee", newName, { shouldValidate: true });
       }
 
       setIsEditAccountOpen(false);
-      toast({ title: "Success", description: `Account "${oldName}" updated successfully.` });
+      toast({ title: "Success", description: `Account "${newName}" updated successfully.` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update account", variant: "destructive" });
     } finally {

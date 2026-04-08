@@ -1,11 +1,14 @@
 "use client";
 
+import * as React from "react";
 import type { Customer } from "@/lib/definitions";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Scale, FileText, Banknote } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date-utils";
+import { useFormContext, useWatch } from "react-hook-form";
+import { format } from "date-fns";
 
 interface SimpleCalculatedSummaryProps {
     customer: Customer;
@@ -17,28 +20,50 @@ interface SimpleCalculatedSummaryProps {
     isSubmitting?: boolean;
 }
 
-export const SimpleCalculatedSummary = ({ 
-    customer, 
+export const SimpleCalculatedSummary = React.memo(({ 
     onSave, 
     onClearForm,
     onToggleTable,
     showTable = false,
     isEditing, 
     isSubmitting = false
-}: SimpleCalculatedSummaryProps) => {
-
-    const isLoading = !customer || !customer.srNo;
+}: Omit<SimpleCalculatedSummaryProps, 'customer'>) => {
+    const { control } = useFormContext();
     
-    // Always calculate from current form data (whether manual input or auto-filled)
-    const grossWeight = Number(customer.grossWeight) || 0;
-    const teirWeight = Number(customer.teirWeight) || 0;
-    const kartaPercentage = Number(customer.kartaPercentage) || 0;
-    const rate = Number(customer.rate) || 0;
-    const labouryRate = Number(customer.labouryRate) || 0;
-    const brokerageRate = Number(customer.brokerageRate) || 0;
-    const brokerage = Number(customer.brokerage) || 0;
-    const brokerageAddSubtract = customer.brokerageAddSubtract ?? true; // Default to add
-    const kanta = Number(customer.kanta) || 0;
+    // Watch fields for real-time calculation
+    const watchedFields = useWatch({
+        control,
+        name: [
+            "srNo", "grossWeight", "teirWeight", "kartaPercentage", 
+            "rate", "labouryRate", "brokerageRate", "brokerageAddSubtract", 
+            "kanta", "date", "term"
+        ]
+    });
+
+    const [
+        srNo, grossWeightRaw, teirWeightRaw, kartaPercentageRaw,
+        rateRaw, labouryRateRaw, brokerageRateRaw, brokerageAddSubtract,
+        kantaRaw, date, term
+    ] = watchedFields;
+
+    const isLoading = !srNo;
+    
+    // Always calculate from current form data
+    const grossWeight = Number(grossWeightRaw) || 0;
+    const teirWeight = Number(teirWeightRaw) || 0;
+    const kartaPercentage = Number(kartaPercentageRaw) || 0;
+    const rate = Number(rateRaw) || 0;
+    const labouryRate = Number(labouryRateRaw) || 0;
+    const brokerageRate = Number(brokerageRateRaw) || 0;
+    const kanta = Number(kantaRaw) || 0;
+
+    const dueDate = (() => {
+        if (!date) return "-";
+        const d = new Date(date);
+        const t = Number(term) || 20;
+        d.setDate(d.getDate() + t);
+        return format(d, 'yyyy-MM-dd');
+    })();
     
     // Calculate values based on current form data
     const finalWt = grossWeight - teirWeight;
@@ -108,9 +133,9 @@ export const SimpleCalculatedSummary = ({
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Due Date:</span>
                             <span className="font-medium">
-                                {isLoading
+                                {isLoading || dueDate === "-"
                                     ? "-"
-                                    : formatDate(customer.dueDate, "dd-MMM-yy")}
+                                    : formatDate(dueDate, "dd-MMM-yy")}
                             </span>
                         </div>
                     </div>
@@ -186,4 +211,6 @@ export const SimpleCalculatedSummary = ({
             </Card>
         </div>
     );
-};
+});
+
+SimpleCalculatedSummary.displayName = "SimpleCalculatedSummary";
