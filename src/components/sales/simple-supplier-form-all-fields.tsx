@@ -249,6 +249,12 @@ const SimpleSupplierFormAllFields = React.memo(({
                                                        field.onBlur();
                                                        handleContactBlur(e.target.value);
                                                    }}
+                                                   onKeyDown={(e) => {
+                                                       if (e.key === 'Enter') {
+                                                           e.preventDefault();
+                                                           form.setFocus('name');
+                                                       }
+                                                   }}
                                                    className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} 
                                                />
                                            )}
@@ -262,7 +268,11 @@ const SimpleSupplierFormAllFields = React.memo(({
                                             profiles={uniqueProfiles} 
                                             onSelect={handleUseProfile} 
                                             trigger={
-                                                <button type="button" className="text-[10px] text-primary hover:underline flex items-center gap-1 transition-all">
+                                                <button 
+                                                    type="button" 
+                                                    tabIndex={-1} 
+                                                    className="text-[10px] text-primary hover:underline flex items-center gap-1 transition-all"
+                                                >
                                                     <Users className="h-2.5 w-2.5" />
                                                     Advance
                                                 </button>

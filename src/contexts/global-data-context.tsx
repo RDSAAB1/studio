@@ -178,10 +178,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        // SQLite mode: trigger load
-        if (isSqliteMode()) {
-            void syncAllData();
-        }
+        // Trigger initial data load and sync (Local-First architecture)
+        void syncAllData();
 
         const isDbClosedError = (e: unknown) =>
             (e && typeof e === 'object' && ((e as Error).name === 'DatabaseClosedError' || String((e as Error).message || '').includes('Database has been closed')));
@@ -189,24 +187,34 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         const refresh = async (collection: string, retry = false) => {
             if (!db) return;
             try {
+                if (collection === 'all') {
+                    const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions'];
+                    await Promise.all(allCollections.map(c => refresh(c)));
+                    return;
+                }
                 if (collection === 'suppliers') {
-                    const data = await db.suppliers.orderBy('srNo').reverse().limit(1000).toArray();
-                    updateState(setSuppliers, data);
+                    // Use toArray() followed by in-memory sort to bypass Dexie index missing errors
+                    const all = await db.suppliers.toArray();
+                    const sorted = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                    updateState(setSuppliers, sorted);
                     return;
                 }
                 if (collection === 'customers') {
-                    const data = await db.customers.orderBy('srNo').reverse().limit(1000).toArray();
-                    updateState(setCustomers, data);
+                    const all = await db.customers.toArray();
+                    const sorted = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                    updateState(setCustomers, sorted);
                     return;
                 }
                 if (collection === 'customerPayments') {
-                    const data = await db.customerPayments.orderBy('date').reverse().limit(1000).toArray();
-                    updateState(setCustomerPayments, data);
+                    const all = await db.customerPayments.toArray();
+                    const sorted = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    updateState(setCustomerPayments, sorted);
                     return;
                 }
                 if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
-                    const payments = await db.payments.orderBy('date').reverse().limit(1000).toArray();
-                    updateState(setSupplierPayments, payments as Payment[]);
+                    const all = await db.payments.toArray();
+                    const sorted = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    updateState(setSupplierPayments, sorted as Payment[]);
                     return;
                 }
                 if (collection === 'banks') {
@@ -281,10 +289,13 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const onCollectionChanged = (event: Event) => {
-            const detail = (event as CustomEvent).detail as { collection?: string } | undefined;
-            const collection = detail?.collection;
+            const detail = (event as CustomEvent).detail;
+            const collection = typeof detail === 'string' ? detail : detail?.collection;
             if (!collection) return;
 
+            // If it's a background sync, we can afford a slightly longer debounce
+            // to avoid UI stutter while indexDB is busy writing.
+            const isSync = typeof detail === 'object' && detail?.source === 'sync';
             scheduleRefresh(collection);
         };
 
@@ -340,7 +351,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const onLocalDataReady = () => {
-            if (!isSqliteMode()) return;
             ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions'].forEach((c) => void refresh(c));
         };
 
@@ -382,31 +392,53 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const runSetup = () => {
             if (!isSubscribed) return;
-            if (!isSqliteMode()) return;
-            // Fallback: refresh all from IndexedDB after sync (events may have been missed)
+            // Always refresh all from local database (IndexedDB/SQLite)
             const fallbackTimer = window.setTimeout(async () => {
                 if (!isSubscribed || !db) return;
+                console.log('[GlobalData] Running hard fallback refresh (initial boot)...');
                 const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses'];
                 for (const c of collections) {
                     try {
-                        if (c === 'suppliers') { const d = await db.suppliers.orderBy('srNo').reverse().limit(1000).toArray(); updateState(setSuppliers, d); }
-                        else if (c === 'customers') { const d = await db.customers.orderBy('srNo').reverse().limit(1000).toArray(); updateState(setCustomers, d); }
-                        else if (c === 'customerPayments') { const d = await db.customerPayments.orderBy('date').reverse().limit(1000).toArray(); updateState(setCustomerPayments, d); }
-                        else if (c === 'payments') { const d = await db.payments.orderBy('date').reverse().limit(1000).toArray(); updateState(setSupplierPayments, d); }
+                        if (c === 'suppliers') { 
+                            const all = await db.suppliers.toArray(); 
+                            const d = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                            updateState(setSuppliers, d); 
+                        }
+                        else if (c === 'customers') { 
+                            const all = await db.customers.toArray(); 
+                            const d = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                            updateState(setCustomers, d); 
+                        }
+                        else if (c === 'customerPayments') { 
+                            const all = await db.customerPayments.toArray(); 
+                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                            updateState(setCustomerPayments, d); 
+                        }
+                        else if (c === 'payments') { 
+                            const all = await db.payments.toArray(); 
+                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                            updateState(setSupplierPayments, d); 
+                        }
                         else if (c === 'banks') { const d = await db.banks.toArray(); updateState(setBanks, d); }
                         else if (c === 'bankBranches') { const d = await db.bankBranches.toArray(); updateState(setBankBranches, d); }
                         else if (c === 'bankAccounts') { const d = await db.bankAccounts.toArray(); updateState(setBankAccounts, d); }
                         else if (c === 'supplierBankAccounts') { const d = await db.supplierBankAccounts.toArray(); updateState(setSupplierBankAccounts, d); }
-                        else if (c === 'fundTransactions') { const d = await db.fundTransactions.orderBy('date').reverse().toArray(); updateState(setFundTransactions, d); }
+                        else if (c === 'fundTransactions') { 
+                            const all = await db.fundTransactions.toArray(); 
+                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                            updateState(setFundTransactions, d); 
+                        }
                         else if (c === 'incomes' && db.transactions) { const d = await db.transactions.where('type').equals('Income').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setIncomes, d); }
                         else if (c === 'expenses' && db.transactions) { const d = await db.transactions.where('type').equals('Expense').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setExpenses, d); }
-                    } catch {}
+                    } catch (e) {
+                        console.warn(`[GlobalData] Fallback refresh failed for ${c}:`, e);
+                    }
                 }
                 // Load receipt settings from local IndexedDB
                 getReceiptSettingsFromLocal().then((settings) => {
                     if (isSubscribed && settings) setReceiptSettings(settings);
                 });
-            }, 2500);
+            }, 5000);
             staggerTimers.push(fallbackTimer);
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -420,7 +452,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             if (isSqliteMode()) void syncAllData();
         };
         const onRefreshRequested = () => {
-            if (isSubscribed && isSqliteMode()) void syncAllData();
+            if (isSubscribed) void syncAllData();
         };
         if (typeof window !== 'undefined') {
             window.addEventListener('erp:selection-changed', onCompanyChanged);

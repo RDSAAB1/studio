@@ -81,6 +81,10 @@ export async function notifySyncRegistry(
         transaction?: any;
     }
 ): Promise<void> {
+    const { isSqliteMode } = await import('./sqlite-storage');
+    // ✅ PERMANENTLY DISABLED for SQLite mode
+    if (isSqliteMode()) return;
+
     const registryDocId = COLLECTION_MAP[collectionName] || collectionName;
     const registryRef = doc(collection(firestoreDB, ...getTenantCollectionPath("sync_registry")), registryDocId);
     

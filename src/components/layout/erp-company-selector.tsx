@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 import type { TenantSummary } from "@/lib/tenancy";
 import { getCompanyMemberRole } from "@/lib/tenancy";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { clearAllLocalData } from "@/lib/database";
+import { pushLocalChanges, performFullSync } from "@/lib/d1-sync";
 
 type ErpCompany = {
   id: string;
@@ -151,20 +153,10 @@ export function ErpCompanySelector({
     // no-op (kept to preserve hook order in file history)
   }, []);
 
-  // After folder dialog closed, show confirmation for sub company + season
+  // Removed auto-confirmation dialog logic for a smoother experience
   useEffect(() => {
-    if (
-      !folderDialogOpen &&
-      !confirmShownRef.current &&
-      hasEffectiveCompanies &&
-      selectedCompany &&
-      selectedSubCompany &&
-      selectedSeason
-    ) {
-      confirmShownRef.current = true;
-      setConfirmOpen(true);
-    }
-  }, [folderDialogOpen, hasEffectiveCompanies, selectedCompany, selectedSubCompany, selectedSeason]);
+    // Popup logic disabled
+  }, []);
 
   const handleCompanySelect = async (c: ErpCompany) => {
     const subWithSeason = c.subCompanies.find((s) => s.seasons.length > 0);
@@ -172,7 +164,20 @@ export function ErpCompanySelector({
     const season = sub?.seasons[0];
     if (sub && season) {
       const sel = { companyId: c.id, subCompanyId: sub.id, seasonKey: season.key };
-      void setSelection(sel, { skipReload: true });
+      // Perform clean context switch
+      setLoading(true);
+      try {
+        await pushLocalChanges();
+        await clearAllLocalData('UNIT');
+        await setSelection(sel, { skipReload: true });
+        await performFullSync('FORCE_ALL');
+        toast({ title: `Switched to ${c.name}`, description: "Data synced for new context." });
+      } catch (e) {
+        toast({ title: "Sync failed", description: String(e), variant: "destructive" });
+        await setSelection(sel, { skipReload: true });
+      } finally {
+        setLoading(false);
+      }
     } else {
       setUiCompanyId(c.id);
       setUiSubCompanyId(sub?.id ?? null);
@@ -184,7 +189,20 @@ export function ErpCompanySelector({
     const season = s.seasons[0];
     if (season) {
       const sel = { companyId, subCompanyId: s.id, seasonKey: season.key };
-      void setSelection(sel, { skipReload: true });
+      // Perform clean context switch
+      setLoading(true);
+      try {
+        await pushLocalChanges();
+        await clearAllLocalData('UNIT');
+        await setSelection(sel, { skipReload: true });
+        await performFullSync('FORCE_ALL');
+        toast({ title: `Switched to ${s.name}`, description: "Data synced for new unit." });
+      } catch (e) {
+        toast({ title: "Sync failed", description: String(e), variant: "destructive" });
+        await setSelection(sel, { skipReload: true });
+      } finally {
+        setLoading(false);
+      }
     } else {
       setUiCompanyId(companyId);
       setUiSubCompanyId(s.id);
@@ -194,7 +212,20 @@ export function ErpCompanySelector({
 
   const handleSeasonSelect = async (s: { key: string; name: string }, companyId: string, subCompanyId: string) => {
     const sel = { companyId, subCompanyId, seasonKey: s.key };
-    void setSelection(sel, { skipReload: true });
+    // Perform clean context switch
+    setLoading(true);
+    try {
+      await pushLocalChanges();
+      await clearAllLocalData('SEASON');
+      await setSelection(sel, { skipReload: true });
+      await performFullSync('FORCE_ALL');
+      toast({ title: `Switched to ${s.name}`, description: "Data synced for new season." });
+    } catch (e) {
+      toast({ title: "Sync failed", description: String(e), variant: "destructive" });
+      await setSelection(sel, { skipReload: true });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUseFolderAsDataSource = async () => {
@@ -219,6 +250,8 @@ export function ErpCompanySelector({
       await refreshCompanies();
       setUiCompanyId(selectedCompany.id);
       setUiSubCompanyId(subId);
+      // Even if we don't have a season yet, we might want to clear old data
+      await clearAllLocalData('UNIT');
       setSelection(null, { skipReload: true }); // Show overlay for Add Season
     } catch (e) {
       toast({ title: "Failed to add", description: String(e), variant: "destructive" });
@@ -242,10 +275,10 @@ export function ErpCompanySelector({
       setNewSeasonName("");
       setAddSeasonOpen(false);
       refreshCompanies();
-      setSelection(
-        { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey },
-        { skipReload: true }
-      );
+      const sel = { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey };
+      await clearAllLocalData('SEASON');
+      await setSelection(sel, { skipReload: true });
+      await performFullSync('FORCE_ALL');
     } catch (e) {
       toast({ title: "Failed to add", description: String(e), variant: "destructive" });
     } finally {
@@ -365,9 +398,11 @@ export function ErpCompanySelector({
       {/* Sub company & Season & Folder: header on left, icons on right */}
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-col leading-tight">
-          <span className="text-[11px] font-semibold text-white/95 truncate max-w-[140px] sm:max-w-[180px]" title={subCompanyLabel}>
-            {subCompanyLabel}
-          </span>
+          {subCompanyLabel && !['MAIN', 'main', 'default'].includes(subCompanyLabel) && (
+            <span className="text-[11px] font-semibold text-white/95 truncate max-w-[140px] sm:max-w-[180px]" title={subCompanyLabel}>
+              {subCompanyLabel}
+            </span>
+          )}
           <span className="text-[10px] font-medium text-white/75 truncate max-w-[140px] sm:max-w-[180px]" title={seasonLabel}>
             {seasonLabel}
           </span>
@@ -474,30 +509,6 @@ export function ErpCompanySelector({
               ) : (
                 <DropdownMenuItem disabled>Select sub company first</DropdownMenuItem>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-            className={dropdownClass}
-                  >
-                    <HardDrive className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                SQLite only
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="min-w-64 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
-              <DropdownMenuLabel>SQLite</DropdownMenuLabel>
-              <DropdownMenuItem disabled className="text-[11px] text-white/80">
-                Select SQLite folder in Settings → Data Settings
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -619,147 +630,7 @@ export function ErpCompanySelector({
         </DialogContent>
       </Dialog>
 
-      {/* Per-refresh confirmation window: confirm / change active sub company + season */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible">
-          <div
-            className="rounded-xl text-slate-900 shadow-[0_16px_48px_rgba(15,23,42,0.14),0_32px_80px_rgba(15,23,42,0.12)] overflow-hidden"
-            style={{ backgroundColor: '#f1f5f9' }}
-          >
-            {/* Header strip - space for close (X) button */}
-            <div className="px-5 pt-10 pr-12 pb-1">
-              <DialogHeader className="p-0">
-                <DialogTitle className="text-[13px] font-semibold tracking-tight text-slate-800">
-                  Confirm Sub Company & Season
-                </DialogTitle>
-              </DialogHeader>
-            </div>
-
-            <div className="px-5 pb-5 space-y-5 text-[11px]">
-              {/* Current selection - card with primary accent */}
-              <div className="space-y-2.5">
-                <p className="text-slate-600 font-medium text-[11px]">
-                  Aap iss sub company aur season par kaam kar rahe hain:
-                </p>
-                <div className="rounded-lg border-l-4 border-l-primary/80 bg-white border border-slate-200/80 px-3.5 py-3 shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
-                  <div className="flex items-center justify-between gap-3 py-0.5">
-                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Sub Company</span>
-                    <span className="text-[11px] font-semibold truncate max-w-[180px] text-slate-800" title={subCompanyLabel}>
-                      {subCompanyLabel}
-                    </span>
-                  </div>
-                  <div className="h-px bg-slate-100 my-1.5" />
-                  <div className="flex items-center justify-between gap-3 py-0.5">
-                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Season</span>
-                    <span className="text-[11px] font-semibold truncate max-w-[180px] text-primary" title={seasonLabel}>
-                      {seasonLabel}
-                    </span>
-                  </div>
-                  <div className="h-px bg-slate-100 my-1.5" />
-                  <div className="flex items-center justify-between gap-3 py-0.5">
-                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Data Folder</span>
-                    {localFolderPath ? (
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-[11px] font-semibold truncate max-w-[140px] text-emerald-700" title={localFolderPath}>
-                          {localFolderPath}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] shrink-0" onClick={handleSwitchToFirestore}>
-                          <Database className="h-3 w-3 mr-1" />
-                          Firestore
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px]"
-                        onClick={() => {}}
-                      >
-                        SQLite only
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Please confirm before entries karein, taki galti se dusri season ya sub company mein data na chale jaye.
-                </p>
-              </div>
-
-              {/* Change selection - grouped controls */}
-              {hasEffectiveCompanies && selectedCompany && (
-                <div className="space-y-3 pt-1">
-                  <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-                    Change selection
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-medium text-slate-600 block">Sub Company</label>
-                      <Select
-                        value={selectedSubCompany?.id ?? undefined}
-                        onValueChange={(value) => {
-                          const next = selectedCompany.subCompanies.find((s) => s.id === value);
-                          if (next) handleSubCompanySelect(next, selectedCompany.id);
-                        }}
-                      >
-                        <SelectTrigger className="h-9 text-[11px] rounded-md bg-white border-slate-200 text-slate-800 hover:bg-slate-50/80 focus:ring-2 focus:ring-primary/25 focus:border-primary/30">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent className="text-[11px]">
-                          {selectedCompany.subCompanies.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-medium text-slate-600 block">Season</label>
-                      <Select
-                        value={selection?.seasonKey ?? undefined}
-                        onValueChange={(value) => {
-                          if (!selectedSubCompany) return;
-                          const next = selectedSubCompany.seasons.find((s) => s.key === value);
-                          if (next) handleSeasonSelect(next, selectedCompany.id, selectedSubCompany.id);
-                        }}
-                        disabled={!selectedSubCompany}
-                      >
-                        <SelectTrigger className="h-9 text-[11px] rounded-md bg-white border-slate-200 text-slate-800 hover:bg-slate-50/80 disabled:opacity-60 focus:ring-2 focus:ring-primary/25 focus:border-primary/30">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent className="text-[11px]">
-                          {selectedSubCompany?.seasons.map((s) => (
-                            <SelectItem key={s.key} value={s.key}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer - clear separation, balanced buttons */}
-            <div className="px-5 pb-5 pt-1 border-t border-slate-200/80 bg-slate-50/50">
-              <div className="flex items-center justify-end gap-2.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-[2px] border-slate-200 text-slate-700 bg-white hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300"
-                  onClick={() => setConfirmOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                  onClick={() => setConfirmOpen(false)}
-                >
-                  Continue with this
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Confirmation window removed */}
 
       {!hideCompanySelector && hasEffectiveCompanies && (selection || companyId) && (
         <Tooltip>
@@ -828,10 +699,10 @@ export function ErpCompanySelector({
             <Building2 className="h-12 w-12 text-violet-400 mx-auto" />
             <h2 className="text-xl font-semibold">Setup Required</h2>
             <p className="text-white/80 text-sm">
-              {selectedCompany.name} has no sub-company or season yet. Add them to start fresh.
+                {selectedCompany.name} needs at least one unit and one season to start.
             </p>
             <div className="flex flex-col gap-2 pt-2">
-              {!selectedSubCompany ? (
+              {(!selectedCompany.subCompanies || selectedCompany.subCompanies.length === 0) ? (
                 <Button
                   type="button"
                   onClick={(e) => {
@@ -842,22 +713,49 @@ export function ErpCompanySelector({
                   className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Sub Company
+                  Add Unit (First)
                 </Button>
               ) : (
-                <Button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setAddSeasonOpen(true);
-                  }}
-                  disabled={adding}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Season
-                </Button>
+                <>
+                   <div className="space-y-1 text-left mb-2">
+                      <Label className="text-xs text-white/60">Select Unit</Label>
+                      <Select 
+                        value={selectedSubCompany?.id} 
+                        onValueChange={(id) => {
+                            const s = selectedCompany.subCompanies.find(x => x.id === id);
+                            if (s) setUiSubCompanyId(s.id);
+                        }}
+                      >
+                         <SelectTrigger className="bg-white/10 border-white/20 h-10">
+                            <SelectValue placeholder="Select Unit" />
+                         </SelectTrigger>
+                         <SelectContent>
+                            {selectedCompany.subCompanies.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                         </SelectContent>
+                      </Select>
+                   </div>
+                   <Button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setAddSeasonOpen(true);
+                      }}
+                      disabled={adding || !selectedSubCompany}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Season to {selectedSubCompany?.name || 'Unit'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setAddSubOpen(true)} className="text-white/40 hover:text-white">
+                        + Add Another Unit
+                    </Button>
+                </>
               )}
+              <Button variant="ghost" size="sm" onClick={handleClear} className="mt-4">
+                 Switch Company
+              </Button>
             </div>
           </div>
         </div>

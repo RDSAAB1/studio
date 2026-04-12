@@ -31,16 +31,18 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   } as Record<string, unknown>);
   const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ft-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const saved = { id, transactionId: '', ...dataWithDate, date: finalDate } as FundTransaction;
-  try {
-    const batch = writeBatch(firestoreDB);
-    const docRef = doc(fundTransactionsCollection, id);
-    batch.set(docRef, dataWithDate);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('fundTransactions', { batch });
-    await batch.commit();
-    logActivity({ type: "create", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
-  } catch {
-    // Firestore failed (e.g. local folder mode)
+  if (!isSqliteMode()) {
+    try {
+      const batch = writeBatch(firestoreDB);
+      const docRef = doc(fundTransactionsCollection, id);
+      batch.set(docRef, dataWithDate);
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('fundTransactions', { batch });
+      await batch.commit();
+      logActivity({ type: "create", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
+    } catch {
+      // Firestore failed (e.g. local folder mode)
+    }
   }
   if (typeof window !== 'undefined' && db) {
     try {
@@ -55,15 +57,17 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
     const updateData = withEditMetadata({ ...data, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    try {
-      const batch = writeBatch(firestoreDB);
-      const docRef = doc(fundTransactionsCollection, id);
-      batch.update(docRef, updateData as any);
-      const { notifySyncRegistry } = await import('../sync-registry');
-      await notifySyncRegistry('fundTransactions', { batch });
-      await batch.commit();
-      logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData as Record<string, unknown> }).catch(() => {});
-    } catch { /* ignore */ }
+    if (!isSqliteMode()) {
+        try {
+          const batch = writeBatch(firestoreDB);
+          const docRef = doc(fundTransactionsCollection, id);
+          batch.update(docRef, updateData as any);
+          const { notifySyncRegistry } = await import('../sync-registry');
+          await notifySyncRegistry('fundTransactions', { batch });
+          await batch.commit();
+          logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData as Record<string, unknown> }).catch(() => {});
+        } catch { /* ignore */ }
+    }
     if (typeof window !== 'undefined' && db) {
       try {
         const existing = await db.fundTransactions.get(id);
@@ -79,18 +83,20 @@ export async function updateFundTransaction(id: string, data: Partial<FundTransa
 }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
-    try {
-      const docRef = doc(fundTransactionsCollection, id);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
-      }
-      const batch = writeBatch(firestoreDB);
-      batch.delete(docRef);
-      const { notifySyncRegistry } = await import('../sync-registry');
-      await notifySyncRegistry('fundTransactions', { batch });
-      await batch.commit();
-    } catch { /* ignore */ }
+    if (!isSqliteMode()) {
+        try {
+          const docRef = doc(fundTransactionsCollection, id);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
+          }
+          const batch = writeBatch(firestoreDB);
+          batch.delete(docRef);
+          const { notifySyncRegistry } = await import('../sync-registry');
+          await notifySyncRegistry('fundTransactions', { batch });
+          await batch.commit();
+        } catch { /* ignore */ }
+    }
     if (typeof window !== 'undefined' && db) {
       try {
         const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
@@ -139,12 +145,15 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
         }
         
         const newIncome = withCreateMetadata(stripUndefined({ ...incomeData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
-        const batch = writeBatch(firestoreDB);
-        batch.set(docRef, newIncome);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('incomes', { batch });
-        await retryFirestoreOperation(() => batch.commit(), 'addIncome - commit batch');
-        logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => {});
+        
+        if (!isSqliteMode()) {
+            const batch = writeBatch(firestoreDB);
+            batch.set(docRef, newIncome);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('incomes', { batch });
+            await retryFirestoreOperation(() => batch.commit(), 'addIncome - commit batch');
+            logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => {});
+        }
         const saved = newIncome as Income;
         if (typeof window !== 'undefined' && db?.transactions) {
             try {
@@ -190,12 +199,15 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
     if (idExists) throw new Error(`Transaction ID ${newTransactionId} already exists!`);
     
     const newExpense = withCreateMetadata(stripUndefined({ ...expenseData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
-    const batch = writeBatch(firestoreDB);
-    batch.set(docRef, newExpense);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('expenses', { batch });
-    await batch.commit();
-    logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => {});
+    
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.set(docRef, newExpense);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('expenses', { batch });
+        await batch.commit();
+        logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => {});
+    }
     const saved = newExpense as Expense;
     if (typeof window !== 'undefined' && db?.transactions) {
         try {
@@ -209,15 +221,17 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
     const data = withEditMetadata(stripUndefined({ ...incomeData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
-    try {
-        const batch = writeBatch(firestoreDB);
-        batch.set(doc(incomesCollection, id), data, { merge: true });
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('incomes', { batch });
-        await batch.commit();
-        logActivity({ type: "edit", collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Updated income ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
-    } catch (error) {
-        handleSilentError(error, `updateIncome Firestore sync - id: ${id}`);
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(doc(incomesCollection, id), data, { merge: true });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('incomes', { batch });
+            await batch.commit();
+            logActivity({ type: "edit", collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Updated income ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
+        } catch (error) {
+            handleSilentError(error, `updateIncome Firestore sync - id: ${id}`);
+        }
     }
 
     if (db && db.transactions) {
@@ -232,15 +246,17 @@ export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
     const data = withEditMetadata(stripUndefined({ ...expenseData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
-    try {
-        const batch = writeBatch(firestoreDB);
-        batch.set(doc(expensesCollection, id), data, { merge: true });
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('expenses', { batch });
-        await batch.commit();
-        logActivity({ type: "edit", collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Updated expense ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
-    } catch (error) {
-        handleSilentError(error, `updateExpense Firestore sync - id: ${id}`);
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(doc(expensesCollection, id), data, { merge: true });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('expenses', { batch });
+            await batch.commit();
+            logActivity({ type: "edit", collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Updated expense ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
+        } catch (error) {
+            handleSilentError(error, `updateExpense Firestore sync - id: ${id}`);
+        }
     }
     
     if (db && db.transactions) {
@@ -254,18 +270,20 @@ export async function updateExpense(id: string, expenseData: Partial<Omit<Expens
 }
 
 export async function deleteIncome(id: string): Promise<void> {
-    try {
-        const docRef = doc(incomesCollection, id);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          await moveToRecycleBin({ collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted income ${id}` });
-        }
-        const batch = writeBatch(firestoreDB);
-        batch.delete(docRef);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('incomes', { batch });
-        await batch.commit();
-    } catch { /* ignore */ }
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(incomesCollection, id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+              await moveToRecycleBin({ collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted income ${id}` });
+            }
+            const batch = writeBatch(firestoreDB);
+            batch.delete(docRef);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('incomes', { batch });
+            await batch.commit();
+        } catch { /* ignore */ }
+    }
 
     if (typeof window !== 'undefined' && db?.transactions) {
         try {
@@ -276,18 +294,20 @@ export async function deleteIncome(id: string): Promise<void> {
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-    try {
-        const docRef = doc(expensesCollection, id);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          await moveToRecycleBin({ collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense ${id}` });
-        }
-        const batch = writeBatch(firestoreDB);
-        batch.delete(docRef);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('expenses', { batch });
-        await batch.commit();
-    } catch { /* ignore */ }
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(expensesCollection, id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+              await moveToRecycleBin({ collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense ${id}` });
+            }
+            const batch = writeBatch(firestoreDB);
+            batch.delete(docRef);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('expenses', { batch });
+            await batch.commit();
+        } catch { /* ignore */ }
+    }
 
     if (typeof window !== 'undefined' && db?.transactions) {
         try {
@@ -348,11 +368,32 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
 }
 
 export async function deleteAllPayments(): Promise<void> {
-    const snapshot = await getDocs(supplierPaymentsCollection);
-    const batch = writeBatch(firestoreDB);
-    snapshot.forEach(docSnap => batch.delete(docSnap.ref));
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const snapshot = await getDocs(supplierPaymentsCollection);
+        const batch = writeBatch(firestoreDB);
+        snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+        await batch.commit();
+    }
     if (db) await db.payments.clear();
+}
+
+export async function bulkUpsertPayments(payments: Payment[], chunkSize = 400) {
+    if (!payments.length) return;
+    const { chunkArray } = await import('./suppliers');
+    const chunks = chunkArray(payments, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((payment) => {
+            if (!payment.id) throw new Error("Payment missing id");
+            const ref = doc(supplierPaymentsCollection, payment.id);
+            batch.set(ref, payment, { merge: true });
+        });
+        const { notifySyncRegistry } = await import('../sync-registry');
+        if (!isSqliteMode()) {
+            await notifySyncRegistry('payments', { batch });
+            await batch.commit();
+        }
+    }
 }
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
@@ -398,9 +439,11 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
     if (snap.exists()) {
       await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
     }
-    await deleteDoc(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('customerPayments');
+    if (!isSqliteMode()) {
+      await deleteDoc(docRef);
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('customerPayments');
+    }
     if (typeof window !== 'undefined' && db) {
       const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
       if (isLocalFolderMode()) await removePaymentsFromFolderFile('customerPayments', [id]).catch(() => {});
@@ -460,4 +503,84 @@ export function getCustomerPaymentsRealtime(
     onError: (error: Error) => void
 ): () => void {
     return createLocalSubscription<CustomerPayment>("customerPayments", callback);
+}
+
+export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
+    const electron = (window as any).electron;
+    if (electron?.sqliteQuery) return electron.sqliteQuery('customerPayments');
+    const snapshot = await getDocs(customerPaymentsCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CustomerPayment));
+}
+
+export async function bulkUpsertCustomerPayments(payments: CustomerPayment[], chunkSize = 400) {
+    if (!payments.length) return;
+    const { chunkArray } = await import('./suppliers');
+    const chunks = chunkArray(payments, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((payment) => {
+            if (!payment.id) throw new Error("Customer Payment missing id");
+            const ref = doc(customerPaymentsCollection, payment.id);
+            batch.set(ref, payment, { merge: true });
+        });
+        const { notifySyncRegistry } = await import('../sync-registry');
+        if (!isSqliteMode()) {
+            await notifySyncRegistry('customerPayments', { batch });
+            await batch.commit();
+        }
+    }
+}
+
+// --- Migration Functions ---
+
+export type MigrateGovFinalizedToPaymentsResult = {
+    success: boolean;
+    migrated: number;
+    skipped: number;
+    error?: string;
+};
+
+/**
+ * Migrates payments from the governmentFinalizedPayments collection to the main payments collection.
+ * This is used for legacy data reconciliation.
+ */
+export async function migrateGovFinalizedPaymentsToPayments(options: { deleteFromSource?: boolean }): Promise<MigrateGovFinalizedToPaymentsResult> {
+    try {
+        const { governmentFinalizedPaymentsCollection } = await import('./core');
+        const snapshot = await getDocs(governmentFinalizedPaymentsCollection);
+        
+        if (snapshot.empty) {
+            return { success: true, migrated: 0, skipped: 0 };
+        }
+
+        const payments = snapshot.docs.map(docSnap => ({
+            ...docSnap.data(),
+            id: docSnap.id,
+            // Ensure type is set correctly if missing
+            type: (docSnap.data() as any).type || 'Government Finalized'
+        } as Payment));
+
+        // Use bulkUpsertPayments which already handles isSqliteMode and notifications
+        await bulkUpsertPayments(payments);
+
+        if (options.deleteFromSource && !isSqliteMode()) {
+            const batch = writeBatch(firestoreDB);
+            snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+            await batch.commit();
+        }
+
+        return {
+            success: true,
+            migrated: payments.length,
+            skipped: 0
+        };
+    } catch (error) {
+        console.error('migrateGovFinalizedPaymentsToPayments error:', error);
+        return {
+            success: false,
+            migrated: 0,
+            skipped: 0,
+            error: error instanceof Error ? error.message : String(error)
+        };
+    }
 }

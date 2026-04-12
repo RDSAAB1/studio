@@ -9,7 +9,7 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerData } from './use-customer-data';
-import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
+import { calculateOutstandingForEntry, calculateGlobalSimulation } from "@/lib/outstanding-calculator";
 import type { Customer } from "@/lib/definitions";
 
 export const useCustomerPayments = () => {
@@ -85,16 +85,28 @@ export const useCustomerPayments = () => {
     }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
     
     const totalOutstandingForSelected = useMemo(() => {
+        if (!selectedEntries || selectedEntries.length === 0) return 0;
         const paymentHistory = data.paymentHistory || [];
         const historyToUse = form.editingPayment
             ? paymentHistory.filter(p => p.id !== form.editingPayment!.id)
             : paymentHistory;
 
+        // Use group-wide simulation for accuracy
+        const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
+        if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
+            const resMap = calculateGlobalSimulation(profile.allTransactions, historyToUse);
+            return selectedEntries.reduce((sum, entry) => {
+                const sr = String(entry.srNo || "").toLowerCase();
+                const res = resMap.get(sr);
+                return sum + (res?.outstanding ?? 0);
+            }, 0);
+        }
+
         return selectedEntries.reduce((sum, entry) => {
             const { outstanding } = calculateOutstandingForEntry(entry, historyToUse);
             return sum + outstanding;
         }, 0);
-    }, [selectedEntries, form.editingPayment, data.paymentHistory]);
+    }, [selectedEntries, form.editingPayment, data.paymentHistory, form.selectedCustomerKey, data.customerSummaryMap]);
 
     // Use useMemo to derive values instead of useState to avoid infinite loops
     const settleAmountDerived = useMemo(() => {
@@ -275,12 +287,46 @@ export const useCustomerPayments = () => {
 
         setIsProcessing(true);
         try {
+            // Build SR No to Net Amount map for accurate proportional legacy splitting
+            const netAmountMap = new Map<string, number>();
+            (data.suppliers || []).forEach(s => {
+                const srNo = String(s.srNo || '').trim().toLowerCase();
+                if (srNo) {
+                    netAmountMap.set(srNo, Number(s.originalNetAmount || s.netAmount || 0));
+                }
+            });
+
+            const historyToUse = form.editingPayment
+                ? (data.paymentHistory || []).filter(p => p.id !== form.editingPayment!.id)
+                : (data.paymentHistory || []);
+
+            // Build entry outstandings for breakdown calculation
+            const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
+            let groupResMap = new Map();
+            if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
+                groupResMap = calculateGlobalSimulation(profile.allTransactions, historyToUse, netAmountMap);
+            }
+
+            const entryOutstandings = selectedEntries.map(entry => {
+                const sr = String(entry.srNo || "").toLowerCase();
+                const res = groupResMap.get(sr);
+                const outstanding = res ? res.outstanding : calculateOutstandingForEntry(entry, historyToUse, netAmountMap).outstanding;
+                
+                return {
+                    entry,
+                    outstanding: outstanding,
+                    originalOutstanding: outstanding,
+                    originalAmount: (res ? res.adjustedOriginal : null) || Number(entry.netAmount) || 0
+                };
+            });
+
             const result = await processPaymentLogic({ 
                 ...data, 
                 ...form, 
                 ...cdProps, 
                 calculatedCdAmount: effectiveCdAmount, 
                 selectedEntries, 
+                entryOutstandings,
                 finalAmountToPay: toBePaidAmount, 
                 settleAmount, 
                 totalOutstandingForSelected,

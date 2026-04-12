@@ -75,7 +75,8 @@ async function attachEventListeners() {
     if (eventListenersAttached || typeof window === 'undefined') return;
     try {
         const { isLocalFolderMode } = await import('./local-folder-storage');
-        if (isLocalFolderMode()) return; // Local folder: do not attach Firestore sync
+        // ✅ Disable Firestore sync entirely in SQLite or Local Folder mode
+        if (isLocalFolderMode() || true) return; 
     } catch (e) {
         // Ignore Next.js HMR orphaned module disposal errors
         return;
@@ -404,9 +405,10 @@ function getSyncTaskType(collectionName: CollectionName, operation: ChangeType):
 }
 
 export async function syncToFirestore() {
+    // ✅ PERMANENTLY DISABLED: Only use Local SQLite + D1
+    return;
     const { isSqliteMode } = await import('./sqlite-storage');
     if (isSqliteMode()) return;
-    if (!pendingChanges.size || typeof window === 'undefined') return;
 
     const changes = Array.from(pendingChanges.values());
     pendingChanges.clear();
@@ -650,6 +652,8 @@ function saveLastSyncTime(collectionName: string, timestamp: number): void {
  * ✅ OPTIMIZED: Non-blocking with chunked processing
  */
 async function syncFromFirestore() {
+    // ✅ PERMANENTLY DISABLED: Only use Local SQLite + D1
+    return;
     if (!db || typeof window === 'undefined') return;
 
     // ✅ Local folder mode: do not sync from Firestore (would overwrite local data)

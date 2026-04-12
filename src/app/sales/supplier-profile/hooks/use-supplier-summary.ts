@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Customer as Supplier, CustomerSummary, CustomerPayment, Payment, SupplierPayment } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
-import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
+import { calculateOutstandingForEntry, calculateGlobalSimulation } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "../utils/fuzzy-matching";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
@@ -94,14 +94,21 @@ export const useSupplierSummary = (
       srNoToRemainingMap.set(srNo, toNumber(s.originalNetAmount || s.netAmount || 0));
     });
 
-    // Pass 1: Quick grouping
-    const quickGroups = new Map<string, { profile: FuzzySupplierProfile, suppliers: Supplier[] }>();
-    suppliers.forEach(s => {
+    // Pass 1: Quick grouping with fuzzy matching
+    const groups: Array<{ profile: FuzzySupplierProfile, suppliers: Supplier[], key: string }> = [];
+    suppliers.forEach((s, idx) => {
       const profile = toFuzzyProfile(s);
-      const key = buildProfileKey(profile, 0);
-      const existing = quickGroups.get(key);
-      if (existing) existing.suppliers.push(s);
-      else quickGroups.set(key, { profile, suppliers: [s] });
+      
+      let matchedGroup = groups.find(g => 
+        fuzzyMatchProfiles(g.profile, profile).isMatch
+      );
+
+      if (matchedGroup) {
+        matchedGroup.suppliers.push(s);
+      } else {
+        const key = buildProfileKey(profile, idx);
+        groups.push({ profile, suppliers: [s], key });
+      }
     });
 
     const finalMap = new Map<string, CustomerSummary>();
@@ -117,9 +124,22 @@ export const useSupplierSummary = (
     } as any;
 
     const millTransactions: Supplier[] = [];
-    quickGroups.forEach((groupData, groupKey) => {
+    const millPaymentsMap = new Map<string, AnyPayment>();
+
+    groups.forEach((groupData) => {
+      const groupKey = groupData.key;
       const isSelected = selectedKey === groupKey || !selectedKey || selectedKey === MILL_OVERVIEW_KEY;
       let summary: CustomerSummary;
+
+      // Group-level totals (common for both stub and deep calc)
+      const groupTotalGrossWeight = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.grossWeight || 0), 0);
+      const groupTotalNetWeight = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.netWeight || 0), 0);
+      const groupTotalWeight = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.weight || 0), 0);
+      const groupTotalKartaWeight = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.kartaWeight || 0), 0);
+      const groupTotalKartaAmount = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.kartaAmount || 0), 0);
+      const groupTotalLabouryAmount = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.labouryAmount || 0), 0);
+      const groupTotalKanta = groupData.suppliers.reduce((sum, s) => sum + toNumber(s.kanta || 0), 0);
+      const groupTotalOtherCharges = groupData.suppliers.reduce((sum, s) => sum + toNumber((s as any).otherCharges || 0), 0);
 
       if (!isSelected) {
         // FAST STUB
@@ -129,32 +149,68 @@ export const useSupplierSummary = (
           name: groupData.profile.name || firstS.name || `Supplier ${groupIndex + 1}`,
           so: groupData.profile.fatherName || firstS.so || firstS.fatherName || '',
           address: groupData.profile.address || firstS.address || '',
+          totalAmount: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.amount || 0), 0),
+          totalOriginalAmount: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.originalNetAmount || s.netAmount || 0), 0),
           totalOutstanding: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.netAmount || 0), 0),
+          totalPaid: groupData.suppliers.reduce((sum, s) => sum + (toNumber(s.amount || 0) - toNumber(s.netAmount || 0)), 0),
+          totalGrossWeight: groupTotalGrossWeight,
+          totalNetWeight: groupTotalNetWeight,
+          totalFinalWeight: groupTotalWeight,
+          totalKartaWeight: groupTotalKartaWeight,
+          totalKartaAmount: groupTotalKartaAmount,
+          totalLabouryAmount: groupTotalLabouryAmount,
+          totalKanta: groupTotalKanta,
+          totalOtherCharges: groupTotalOtherCharges,
           allTransactions: groupData.suppliers,
           paymentHistory: [],
           isStub: true
         } as any;
         
-        // Still add raw suppliers to mill list to ensure we have them all if needed, 
-        // but mill overview accuracy prefers processed ones.
         millTransactions.push(...groupData.suppliers);
       } else {
-        // DEEP CALC
+        // Filter payment history to only include payments that belong to this group
+        const groupSrNos = new Set(groupData.suppliers.map(s => String(s.srNo || "").toLowerCase()));
+        const groupIds = new Set(groupData.suppliers.map(s => s.id));
+        const groupCustomerIds = new Set(groupData.suppliers.map(s => s.customerId).filter(Boolean));
+        
+        const filteredGroupPayments = paymentHistory.filter(p => {
+          const parchiRaw = String((p as any).parchiNo || "").toLowerCase();
+          const parchiMatch = parchiRaw.split(/[,\s]+/g).some(t => groupSrNos.has(t.trim()));
+          if (parchiMatch) return true;
+
+          const pAny = p as any;
+          const paidFor = Array.isArray(pAny.paidFor) ? pAny.paidFor : [];
+          const paidForMatch = paidFor.some((pf: any) => groupSrNos.has(String(pf.srNo || "").toLowerCase()));
+          if (paidForMatch) return true;
+
+          if (groupIds.has(p.id) || groupIds.has(pAny.supplierId) || groupIds.has(pAny.customerId)) return true;
+          if (pAny.customerId && groupCustomerIds.has(pAny.customerId)) return true;
+          if (pAny.supplierId && groupCustomerIds.has(pAny.supplierId)) return true;
+
+          const paymentProfile = toFuzzyProfile(pAny.supplierDetails || p);
+          if (fuzzyMatchProfiles(groupData.profile, paymentProfile).isMatch) return true;
+
+          return false;
+        });
+
+        const globalRes = calculateGlobalSimulation(groupData.suppliers, filteredGroupPayments, srNoToRemainingMap);
+        
         const processed = groupData.suppliers.map(s => {
-          const res = calculateOutstandingForEntry(s, paymentHistory, srNoToRemainingMap);
+          const sr = String(s.srNo || "").toLowerCase();
+          const res = globalRes.get(sr);
           return { 
             ...s, 
-            outstandingForEntry: res.outstanding, 
-            totalPaidForEntry: res.totalPaid, 
-            totalCdForEntry: res.totalCd,
-            totalExtraForEntry: res.totalExtra,
-            adjustedOriginal: res.adjustedOriginal,
-            paymentsForEntry: res.paymentsForEntry 
+            outstandingForEntry: res?.outstanding ?? 0, 
+            totalPaidForEntry: res?.totalPaid ?? 0, 
+            totalCdForEntry: res?.totalCd ?? 0,
+            totalExtraForEntry: res?.totalExtra ?? 0,
+            adjustedOriginal: res?.adjustedOriginal ?? 0,
+            paymentsForEntry: res?.paymentsForEntry ?? []
           };
         });
 
         const firstS = processed[0];
-        const allGroupPayments = Array.from(new Map(processed.flatMap(s => s.paymentsForEntry).map(p => [p.id, p])).values()).sort(sortPaymentByIdDescending);
+        const allGroupPayments = filteredGroupPayments.sort(sortPaymentByIdDescending);
 
         summary = {
           ...firstS,
@@ -162,8 +218,19 @@ export const useSupplierSummary = (
           so: groupData.profile.fatherName || firstS.so || firstS.fatherName || '',
           address: groupData.profile.address || firstS.address || '',
           totalAmount: processed.reduce((sum, s) => sum + toNumber(s.amount), 0),
+          totalOriginalAmount: processed.reduce((sum, s) => sum + (s.adjustedOriginal || toNumber(s.originalNetAmount)), 0),
           totalOutstanding: processed.reduce((sum, s) => sum + s.outstandingForEntry, 0),
-          totalPaid: processed.reduce((sum, s) => sum + s.totalPaidForEntry, 0),
+          // Total Paid should include all payments received for this group
+          totalPaid: filteredGroupPayments.reduce((sum, p) => sum + Math.abs(toNumber(p.amount)), 0),
+          totalCdAmount: processed.reduce((sum, s) => sum + s.totalCdForEntry, 0),
+          totalGrossWeight: groupTotalGrossWeight,
+          totalNetWeight: groupTotalNetWeight,
+          totalFinalWeight: groupTotalWeight,
+          totalKartaWeight: groupTotalKartaWeight,
+          totalKartaAmount: groupTotalKartaAmount,
+          totalLabouryAmount: groupTotalLabouryAmount,
+          totalKanta: groupTotalKanta,
+          totalOtherCharges: groupTotalOtherCharges,
           allTransactions: processed,
           allPayments: allGroupPayments,
           paymentHistory: allGroupPayments,
@@ -171,21 +238,36 @@ export const useSupplierSummary = (
         } as any;
         
         millTransactions.push(...processed);
+        allGroupPayments.forEach(p => millPaymentsMap.set(p.id || (p as any).paymentId, p));
       }
 
       finalMap.set(groupKey, summary);
       
-      // Update Mill (always sum up for mill overview accuracy)
-      mill.totalOutstanding += summary.totalOutstanding;
-      if (!summary.isStub) {
-          mill.totalAmount += summary.totalAmount || 0;
-          mill.totalPaid += summary.totalPaid || 0;
+      // Update Mill
+      mill.totalOutstanding += summary.totalOutstanding || 0;
+      mill.totalAmount += summary.totalAmount || 0;
+      mill.totalPaid += summary.totalPaid || 0;
+      mill.totalOriginalAmount += (summary as any).totalOriginalAmount || 0;
+      mill.totalCdAmount += (summary as any).totalCdAmount || 0;
+      mill.totalGrossWeight += (summary as any).totalGrossWeight || 0;
+      mill.totalNetWeight += (summary as any).totalNetWeight || 0;
+      mill.totalFinalWeight += (summary as any).totalFinalWeight || 0;
+      mill.totalKartaWeight += (summary as any).totalKartaWeight || 0;
+      mill.totalKartaAmount += (summary as any).totalKartaAmount || 0;
+      mill.totalLabouryAmount += (summary as any).totalLabouryAmount || 0;
+      mill.totalKanta += (summary as any).totalKanta || 0;
+      mill.totalOtherCharges += (summary as any).totalOtherCharges || 0;
+      mill.totalTransactions += (summary.allTransactions || []).length;
+      if (summary.outstandingEntryIds && summary.outstandingEntryIds.length > 0) {
+        mill.totalOutstandingTransactions += summary.outstandingEntryIds.length;
       }
       
       groupIndex++;
     });
 
     mill.allTransactions = millTransactions;
+    mill.allPayments = Array.from(millPaymentsMap.values()).sort(sortPaymentByIdDescending);
+    mill.paymentHistory = mill.allPayments;
     finalMap.set(MILL_OVERVIEW_KEY, mill);
     return finalMap;
   }, [suppliers, paymentHistory, startDate, endDate, selectedKey]);

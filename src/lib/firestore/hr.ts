@@ -9,7 +9,9 @@ import {
   projectsCollection, 
   employeesCollection, 
   payrollCollection,
-  createLocalSubscription
+  createLocalSubscription,
+  handleSilentError,
+  stripUndefined
 } from "./core";
 import { AttendanceEntry, Project, Employee, PayrollEntry } from "@/lib/definitions";
 import { createMetadataBasedListener } from "../sync-registry-listener";
@@ -27,13 +29,19 @@ export async function getAttendanceForPeriod(employeeId: string, startDate: stri
 }
 
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(attendanceCollection, entry.id);
-    const data = withEditMetadata({ ...entry, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.set(docRef, data, { merge: true });
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('attendance', { batch });
-    await batch.commit();
+    const data = withEditMetadata(stripUndefined({ ...entry, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(docRef, data, { merge: true });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('attendance', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, `updateAttendance Firestore sync - id: ${entry.id}`);
+        }
+    }
     logActivity({ type: "edit", collection: "attendance", docId: entry.id, docPath: getTenantCollectionPath("attendance").join("/"), summary: `Updated attendance ${entry.id}`, afterData: data }).catch(() => {});
 }
 
@@ -146,25 +154,38 @@ export function getPayrollRealtime(callback: (data: PayrollEntry[]) => void, onE
 }
 
 export async function addEmployee(employeeData: Omit<Employee, 'id'>): Promise<Employee> {
-    const batch = writeBatch(firestoreDB);
     const newDocRef = doc(employeesCollection);
-    const data = withCreateMetadata({ ...employeeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.set(newDocRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('employees', { batch });
-    await batch.commit();
+    const docWithId = { id: newDocRef.id, ...employeeData };
+    const data = withCreateMetadata(docWithId as Record<string, unknown>);
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(newDocRef, data);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('employees', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, 'addEmployee Firestore sync');
+        }
+    }
     logActivity({ type: "create", collection: "employees", docId: newDocRef.id, docPath: getTenantCollectionPath("employees").join("/"), summary: `Created employee ${employeeData.name}`, afterData: data }).catch(() => {});
-    return { id: newDocRef.id, ...data } as Employee;
+    return data as Employee;
 }
 
 export async function updateEmployee(id: string, employeeData: Partial<Employee>): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(employeesCollection, id);
-    const data = withEditMetadata({ ...employeeData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('employees', { batch });
-    await batch.commit();
+    const data = withEditMetadata(stripUndefined({ ...employeeData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.update(docRef, data);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('employees', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, `updateEmployee Firestore sync - id: ${id}`);
+        }
+    }
     logActivity({ type: "edit", collection: "employees", docId: id, docPath: getTenantCollectionPath("employees").join("/"), summary: `Updated employee ${id}`, afterData: data }).catch(() => {});
 }
 
@@ -195,13 +216,19 @@ export async function addPayrollEntry(payrollData: Omit<PayrollEntry, 'id'>): Pr
 }
 
 export async function updatePayrollEntry(id: string, payrollData: Partial<PayrollEntry>): Promise<void> {
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(payrollCollection, id);
-    const data = withEditMetadata({ ...payrollData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('payroll', { batch });
-    await batch.commit();
+    const data = withEditMetadata(stripUndefined({ ...payrollData, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.update(docRef, data);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('payroll', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, `updatePayroll Firestore sync - id: ${id}`);
+        }
+    }
     logActivity({ type: "edit", collection: "payroll", docId: id, docPath: getTenantCollectionPath("payroll").join("/"), summary: `Updated payroll entry ${id}`, afterData: data }).catch(() => {});
 }
 

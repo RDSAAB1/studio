@@ -90,23 +90,23 @@ export function fuzzyMatchProfiles(profileA: SupplierProfile, profileB: Supplier
     };
   }
   
-  // Rule 1: Maximum 2 character difference per field
-  if (nameDiff > 2 || fatherNameDiff > 2 || addressDiff > 2) {
+  // Rule 1: Maximum 3 character difference for Name/Address, 2 for Father Name
+  if (nameDiff > 3 || fatherNameDiff > 2 || addressDiff > 3) {
     return {
       isMatch: false,
       totalDifference,
       fieldDifferences: { name: nameDiff, fatherName: fatherNameDiff, address: addressDiff },
-      reason: `Field difference exceeds 2 characters: Name(${nameDiff}), Father(${fatherNameDiff}), Address(${addressDiff})`
+      reason: `Field difference exceeds limit: Name(${nameDiff}/3), Father(${fatherNameDiff}/2), Address(${addressDiff}/3)`
     };
   }
   
-  // Rule 2: Maximum 4 total cumulative character difference
-  if (totalDifference > 4) {
+  // Rule 2: Maximum 6 total cumulative character difference
+  if (totalDifference > 6) {
     return {
       isMatch: false,
       totalDifference,
       fieldDifferences: { name: nameDiff, fatherName: fatherNameDiff, address: addressDiff },
-      reason: `Total difference exceeds 4 characters: ${totalDifference}`
+      reason: `Total difference exceeds 6 characters: ${totalDifference}`
     };
   }
   

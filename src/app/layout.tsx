@@ -22,6 +22,7 @@ import { getRtgsSettings, refreshTenantFirestoreBindings } from "@/lib/firestore
 import { ensureTenantForUser, getActiveTenant } from "@/lib/tenancy";
 import { electronNavigate } from "@/lib/electron-navigate";
 import { syncAllData } from '@/lib/database';
+import { startAutoSync } from '@/lib/d1-sync';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ElectronBaseTag } from '@/components/electron-base-tag';
@@ -421,6 +422,16 @@ export default function RootLayout({ children, params }: LayoutProps) {
     }, []);
 
     useSyncQueue();
+
+    // Initialize Cloudflare D1 Auto-Sync
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const cleanup = startAutoSync();
+            return () => {
+                if (typeof cleanup === 'function') cleanup();
+            };
+        }
+    }, []);
 
     // Electron: if we're on app://, force redirect to http (works even when preload didn't run)
     useEffect(() => {

@@ -62,7 +62,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         gatePassNo: '',
         grNo: '',
         grDate: '',
+        lrNo: '',
+        lrDate: '',
         transport: '',
+        vehicleNo: '',
         advanceFreight: 0,
         advancePaymentMethod: 'CashInHand',
     });
@@ -98,7 +101,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 gatePassNo: customer.gatePassNo || '',
                 grNo: customer.grNo || '',
                 grDate: customer.grDate || '',
+                lrNo: customer.lrNo || '',
+                lrDate: customer.lrDate || '',
                 transport: customer.transport || '',
+                vehicleNo: customer.vehicleNo || '',
                 companyGstin: receiptSettings?.companyGstin || prev.companyGstin,
                 companyStateName: receiptSettings?.companyStateName || prev.companyStateName,
                 companyStateCode: receiptSettings?.companyStateCode || prev.companyStateCode,
@@ -243,7 +249,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     gatePassNo: invoiceDetails.gatePassNo,
                     grNo: invoiceDetails.grNo,
                     grDate: invoiceDetails.grDate,
+                    lrNo: invoiceDetails.lrNo || '',
+                    lrDate: invoiceDetails.lrDate || '',
                     transport: invoiceDetails.transport,
+                    vehicleNo: invoiceDetails.vehicleNo || '',
                  };
 
                 if (isSameAsBilling) {
@@ -278,6 +287,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                         ...customer,
                         ...editableInvoiceDetails,
                         ...recalculated,
+                        lrNo: invoiceDetails.lrNo,
+                        lrDate: invoiceDetails.lrDate,
+                        transport: invoiceDetails.transport,
+                        vehicleNo: invoiceDetails.vehicleNo,
                         id: customer.id,
                         updatedAt: new Date().toISOString(),
                     } as Customer;
@@ -475,7 +488,19 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                             buttonClassName="h-8 w-8"
                                         />
                                     </div>
-                                    <div className="space-y-1 col-span-2"><Label className="text-xs">Transport</Label><Input value={invoiceDetails.transport} onChange={(e) => setInvoiceDetails({...invoiceDetails, transport: e.target.value})} className="h-8 text-xs" /></div>
+                                     <div className="space-y-1 col-span-2"><Label className="text-xs">Transport Name</Label><Input value={invoiceDetails.transport} onChange={(e) => setInvoiceDetails({...invoiceDetails, transport: e.target.value})} className="h-8 text-xs" /></div>
+                                     <div className="space-y-1"><Label className="text-xs">Vehicle No.</Label><Input value={invoiceDetails.vehicleNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, vehicleNo: e.target.value})} className="h-8 text-xs" /></div>
+                                     <div className="space-y-1"><Label className="text-xs">LR/LLR No.</Label><Input value={invoiceDetails.lrNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, lrNo: e.target.value})} className="h-8 text-xs" /></div>
+                                     <div className="space-y-1">
+                                         <Label className="text-xs">LR/LLR Date</Label>
+                                         <SmartDatePicker
+                                             id="lrDate"
+                                             value={invoiceDetails.lrDate || ""}
+                                             onChange={(next) => setInvoiceDetails({...invoiceDetails, lrDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd') })}
+                                             inputClassName="h-8 text-xs"
+                                             buttonClassName="h-8 w-8"
+                                         />
+                                     </div>
                                     <div className="space-y-1"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.advanceFreight} onChange={(e) => setInvoiceDetails({...invoiceDetails, advanceFreight: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Advance Paid Via</Label>

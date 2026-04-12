@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Customer, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
+import { calculateGlobalSimulation } from "@/lib/outstanding-calculator";
 
 // Helper functions for formatting and math
 const toNumber = (value: unknown): number => {
@@ -81,8 +82,14 @@ export function useFilteredSummary({
 
     const outstandingEntryIds: string[] = [];
     const filteredSrNosSet = new Set<string>();
+    const srNoToNetAmount = new Map<string, number>();
 
     for (const t of filteredTransactions) {
+      const srNoVal = String(t.srNo || "").trim().toLowerCase();
+      if (srNoVal) {
+        filteredSrNosSet.add(srNoVal);
+        srNoToNetAmount.set(srNoVal, toNumber(t.originalNetAmount || t.netAmount || 0));
+      }
       totalGrossWeight += Number(t.grossWeight) || 0;
       totalTeirWeight += Number(t.teirWeight) || 0;
       totalFinalWeight += Number((t as any).weight) || 0;
@@ -98,7 +105,7 @@ export function useFilteredSummary({
 
       const base = Number(t.originalNetAmount) || 0;
       const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
-      totalBaseOriginalAmount += base + advance;
+      // Removed duplicate summation of totalBaseOriginalAmount here (handled by Global Simulation Pass below)
 
       const amt = Number(t.amount) || 0;
       if (amt > 0) {
@@ -119,9 +126,6 @@ export function useFilteredSummary({
 
       totalKartaPercentage += Number(t.kartaPercentage) || 0;
       totalLabouryRate += Number(t.labouryRate) || 0;
-
-      const srNoLower = (t.srNo || "").toLowerCase();
-      if (srNoLower) filteredSrNosSet.add(srNoLower);
 
       const outstanding = Number((t as any).outstandingForEntry ?? t.netAmount ?? 0);
       if (outstanding > 0.01 && t.id) outstandingEntryIds.push(t.id);
@@ -158,89 +162,40 @@ export function useFilteredSummary({
     let totalGovExtraAmount = 0;
     let totalLinkedLedgerCredit = 0;
 
-    for (const payment of filteredPayments) {
-      const receiptType = receiptTypeOf(payment);
+    // Use Global Simulation for consistency regardless of filters
+    const allSupplierTransactions = (selectedSupplierSummary?.allTransactions || []) as Customer[];
+    const allSupplierPayments = (selectedSupplierSummary?.allPayments || []) as Payment[];
+    
+    // Map to feed simulation
+    const netAmountMap = new Map<string, number>();
+    allSupplierTransactions.forEach(s => {
+      const srNo = String(s.srNo || '').trim().toLowerCase();
+      if (srNo) netAmountMap.set(srNo, Number(s.originalNetAmount || s.netAmount || 0));
+    });
+
+    const globalSimRes = calculateGlobalSimulation(allSupplierTransactions, allSupplierPayments, netAmountMap);
+
+    // Sum results only for entries currently checked (filteredSrNosSet)
+    for (const entry of allSupplierTransactions) {
+      const sr = String(entry.srNo || "").toLowerCase();
+      if (!filteredSrNosSet.has(sr)) continue;
+
+      const res = globalSimRes.get(sr);
+      if (!res) {
+          totalBaseOriginalAmount += Number(entry.originalNetAmount || entry.netAmount || 0) + (Number((entry as any).advanceFreight) || 0);
+          continue;
+      }
+
+      totalPaid += res.totalPaid;
+      totalCd += res.totalCd;
+      totalGovExtraAmount += res.totalExtra;
+      totalBaseOriginalAmount += res.adjustedOriginal;
       
-      const pfRaw = payment.paidFor as any;
-      let paidForList: any[] = [];
-      if (Array.isArray(pfRaw)) paidForList = pfRaw;
-      else if (typeof pfRaw === 'string' && pfRaw.trim().startsWith('[')) {
-          try { paidForList = JSON.parse(pfRaw); } catch { paidForList = []; }
-      }
-
-      const hasAnyPaidForExtra = paidForList.some((pf) => Number((pf as any).extraAmount || 0) > 0);
-      const isLedger = receiptType === "ledger";
-      const ledgerCredit = isLedger && isLedgerCredit(payment);
-
-      if (paidForList.length > 0) {
-        const totalPaidForInPayment = paidForList.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-
-        for (const pf of paidForList) {
-          const srNoLower = (pf.srNo || "").toLowerCase();
-          if (!srNoLower || !filteredSrNosSet.has(srNoLower)) continue;
-
-          const pfAmount = Number(pf.amount || 0);
-
-          if (!isLedger || !ledgerCredit) {
-            totalPaid += pfAmount;
-          } else {
-            totalLinkedLedgerCredit += pfAmount;
-          }
-
-          const extraAmount = Number((pf as any).extraAmount || 0);
-          if (extraAmount > 0) totalGovExtraAmount += extraAmount;
-
-          if ('cdAmount' in pf && (pf as any).cdAmount !== undefined && (pf as any).cdAmount !== null) {
-            totalCd += Number((pf as any).cdAmount || 0);
-          } else if (payment.cdAmount && totalPaidForInPayment > 0) {
-            const proportion = pfAmount / totalPaidForInPayment;
-            totalCd += round2(Number(payment.cdAmount) * proportion);
-          }
-
-          if (receiptType === 'cash') {
-            totalCashPaid += pfAmount;
-          } else if (receiptType === 'rtgs') {
-            totalRtgsPaid += pfAmount;
-          }
-        }
-      } else {
-        const parchiNoRaw = String((payment as any).parchiNo || (payment as any).checkNo || "").trim().toLowerCase();
-        const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t: string) => t.trim()).filter(Boolean);
-        if (parchiTokens.length > 0) {
-          const matchingTokenCount = parchiTokens.reduce((count: number, token: string) => {
-            return filteredSrNosSet.has(token) ? count + 1 : count;
-          }, 0);
-
-          if (matchingTokenCount > 0) {
-            const amountAbs = Math.abs(Number((payment as any).amount || 0));
-            const share = parchiTokens.length > 0 ? round2(amountAbs / parchiTokens.length) : amountAbs;
-            
-            const cdTotal = Number(payment.cdAmount || 0);
-            const cdShare = (cdTotal > 0 && parchiTokens.length > 0) ? round2(cdTotal / parchiTokens.length) : cdTotal;
-
-            if (!isLedger || !ledgerCredit) {
-              totalPaid += share * matchingTokenCount;
-            }
-            
-            if (cdTotal > 0) {
-              totalCd += cdShare * matchingTokenCount;
-            }
-
-            if (receiptType === 'cash') {
-              totalCashPaid += share * matchingTokenCount;
-            } else if (receiptType === 'rtgs') {
-              totalRtgsPaid += share * matchingTokenCount;
-            }
-          }
-        }
-      }
-
-      const rt = String((payment as any).receiptType || '').trim().toLowerCase();
-      const isGov = rt === 'gov.' || rt === 'gov' || rt.startsWith('gov');
-      const govExtra = Number((payment as any).govExtraAmount || 0);
-      if (isGov && govExtra > 0 && !hasAnyPaidForExtra) {
-        totalGovExtraAmount += govExtra;
-      }
+      res.paymentsForEntry.forEach((p: any) => {
+          const rt = String(p.receiptType || '').trim().toLowerCase();
+          if (rt === 'cash') totalCashPaid += p.shareAmount;
+          else if (rt === 'rtgs') totalRtgsPaid += p.shareAmount;
+      });
     }
 
     // Include current form's govExtraAmount when in Gov mode
@@ -354,18 +309,13 @@ export function useFilteredSummary({
         );
       })
       .reduce((sum: number, p: Payment) => {
-          let safePaidFor: any[] = [];
           const pfRaw = p.paidFor as any;
+          let safePaidFor: any[] = [];
           if (Array.isArray(pfRaw)) safePaidFor = pfRaw;
           else if (typeof pfRaw === 'string' && pfRaw.trim().startsWith('[')) {
               try { safePaidFor = JSON.parse(pfRaw); } catch { safePaidFor = []; }
           }
-
-          const srNoToNetAmount = new Map<string, number>();
-          (filteredTransactions || []).forEach((t: Customer) => {
-              srNoToNetAmount.set(String(t.srNo || "").trim().toLowerCase(), Number(t.originalNetAmount || t.netAmount || 0));
-          });
-
+          
           const matchingPaidFor = safePaidFor.filter((pf: any) => {
               const pfSrNo = String(pf.srNo || "").trim().toLowerCase();
               const pfId = String(pf.supplierId || "").trim().toLowerCase();
@@ -377,22 +327,24 @@ export function useFilteredSummary({
           });
 
           if (matchingPaidFor.length > 0) {
-              return sum + matchingPaidFor.reduce((paymentSum, pf) => paymentSum + (pf.amount || 0), 0);
+              return sum + matchingPaidFor.reduce((paymentSum: number, pf: any) => paymentSum + (pf.amount || 0), 0);
           } else {
               const parchiNoRaw = String((p as any).parchiNo || (p as any).checkNo || "").trim().toLowerCase();
               const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map(t => t.trim()).filter(Boolean);
-              const matchingTokens = parchiTokens.filter(token => (filteredTransactions || []).some((t: Customer) => String(t.srNo || "").trim().toLowerCase() === token.toLowerCase()));
-
-              if (matchingTokens.length > 0) {
-                  const amountAbs = Math.abs(Number((p as any).amount || 0));
-                  const totalBillAmountInParchi = parchiTokens.reduce((s, token) => s + (srNoToNetAmount.get(token.toLowerCase()) || 0), 0);
-                  const totalMatchingShare = matchingTokens.reduce((s, token) => {
-                      const weight = totalBillAmountInParchi > 0 ? ((srNoToNetAmount.get(token.toLowerCase()) || 0) / totalBillAmountInParchi) : (1 / parchiTokens.length);
-                      return s + (amountAbs * weight);
-                  }, 0);
-                  return sum + Math.round(totalMatchingShare * 100) / 100;
+              
+              const amountAbs = Math.abs(Number((p as any).amount || 0));
+              let remaining = amountAbs;
+              let shareForSelection = 0;
+              for (const token of parchiTokens) {
+                  const billNet = srNoToNetAmount.get(token.toLowerCase()) || 0;
+                  const consumption = Math.min(remaining, billNet);
+                  if ((filteredTransactions || []).some(t => String(t.srNo || "").trim().toLowerCase() === token.toLowerCase())) {
+                      shareForSelection += consumption;
+                  }
+                  remaining -= consumption;
+                  if (remaining <= 0) break;
               }
-              return sum;
+              return sum + Math.round(shareForSelection * 100) / 100;
           }
       }, 0);
 

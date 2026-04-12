@@ -14,6 +14,7 @@ import {
     getAdditionalUserInfo,
     type Auth 
 } from 'firebase/auth';
+import { getDatabase, ref, onValue, set, push, serverTimestamp, type Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU",
@@ -21,7 +22,8 @@ const firebaseConfig = {
   projectId: "bizsuite-dataflow",
   storageBucket: "bizsuite-dataflow.appspot.com",
   messagingSenderId: "1083654429292",
-  appId: "1:1083654429292:web:735c2b52865c1f394a5e0f"
+  appId: "1:1083654429292:web:735c2b52865c1f394a5e0f",
+  databaseURL: "https://bizsuite-dataflow-default-rtdb.firebaseio.com"
 };
 
 // Initialize Firebase app (singleton)
@@ -39,6 +41,9 @@ const storage = getStorage(app);
 if (typeof window !== 'undefined') {
     setLogLevel('silent');
 }
+
+// RTDB Instance
+const rtdb: Database = getDatabase(app);
 
 // Auth singleton.
 // NOTE: Electron network issues (auth/network-request-failed) are handled at the
@@ -71,5 +76,11 @@ export {
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
     signInWithRedirect,
-    getAdditionalUserInfo
+    getAdditionalUserInfo,
+    rtdb,
+    ref,
+    onValue,
+    set,
+    push,
+    serverTimestamp
 };

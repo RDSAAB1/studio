@@ -493,74 +493,82 @@ export async function migrateTenantDataToSeason(
   return migrateDataToSeason(options);
 }
 
-/** List companies the current user has access to (created or joined via invite) */
+/**
+ * List companies the current user has access to from Cloud (D1)
+ */
 export async function listErpCompanies(): Promise<
   { id: string; name: string; subCompanies: { id: string; name: string; seasons: { key: string; name: string }[] }[] }[]
 > {
-  const auth = getFirebaseAuth();
-  const userId = auth?.currentUser?.uid;
-  if (!userId) return [];
-
-  const companyIds = new Set<string>();
-
-  // Companies user created (createdBy = userId)
-  const companiesCol = collection(firestoreDB, "companies");
-  const companiesSnap = await getDocs(companiesCol);
-  for (const d of companiesSnap.docs) {
-    if (d.id.startsWith("_")) continue;
-    const data = d.data() as { createdBy?: string };
-    if (data.createdBy === userId) companyIds.add(d.id);
-  }
-
-  // Companies user joined (companyMembers)
-  const membersRef = collection(firestoreDB, "companyMembers");
-  const membersSnap = await getDocs(
-    query(membersRef, where("userId", "==", userId))
-  );
-  for (const m of membersSnap.docs) {
-    const data = m.data() as { companyId?: string };
-    if (data.companyId) companyIds.add(data.companyId);
-  }
-
-  if (companyIds.size === 0) return [];
-
-  const result: { id: string; name: string; subCompanies: { id: string; name: string; seasons: { key: string; name: string }[] }[] }[] = [];
-  for (const companyId of companyIds) {
-    const companyRef = doc(firestoreDB, "companies", companyId);
-    const companySnap = await getDoc(companyRef);
-    if (!companySnap.exists()) continue;
-    const data = companySnap.data() as { name?: string; subCompanies?: Record<string, { name?: string; seasons?: Record<string, string> }> };
-    const subCompanies = data.subCompanies || {};
-    result.push({
-      id: companyId,
-      name: data.name || companyId,
-      subCompanies: Object.entries(subCompanies).map(([id, s]) => ({
-        id,
-        name: s.name || id,
-        seasons: Object.entries(s.seasons || {}).map(([key, name]) => ({ key, name })),
-      })),
+  try {
+    const auth = getFirebaseAuth();
+    const userId = auth?.currentUser?.uid || "test-user-123";
+    
+    const res = await fetch('/api/d1-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/list',
+            method: 'GET',
+            headers: { 
+                'Authorization': 'Bearer jrmd2026',
+                'X-User-Id': userId
+            }
+        })
     });
+    
+    if (!res.ok) return [];
+    const data = await res.json();
+    
+    // Transform Cloud D1 structure to match the UI expectation
+    // D1 structure: { businesses: [ { id, name, subCompanies: [ { id, name, seasons: [] } ] } ] }
+    return (data.businesses || []).map((b: any) => ({
+      id: b.id,
+      name: b.name,
+      subCompanies: (b.subCompanies || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        seasons: (s.seasons || []).map((yr: any) => ({ key: yr.id, name: yr.name }))
+      }))
+    }));
+  } catch (e) {
+    console.error("Cloud List Error:", e);
+    return [];
   }
-  return result;
 }
 
-/** Add new sub company under selected company (updates index only; subcollection created when first season added) */
+/**
+ * Add new sub company under selected company (Redirects to D1)
+ */
 export async function addErpSubCompany(
   companyId: string,
   companyName: string,
   subCompanyName: string,
 ): Promise<string> {
-  const subCompanyId = nameToId(subCompanyName, "default");
-  const companyRef = doc(firestoreDB, "companies", companyId);
-  const snap = await getDoc(companyRef);
-  const existing = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
-  const subCompanies = (existing.subCompanies as Record<string, { name: string; seasons: Record<string, string> }>) || {};
-  subCompanies[subCompanyId] = { name: subCompanyName?.trim() || "MAIN", seasons: {} };
-  await setDoc(companyRef, { name: companyName, subCompanies, updatedAt: serverTimestamp() }, { merge: true });
-  return subCompanyId;
+  const auth = getFirebaseAuth();
+  const userId = auth?.currentUser?.uid || "test-user-123";
+
+  const res = await fetch('/api/d1-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/sub-company',
+          method: 'POST',
+          headers: { 
+              'Authorization': 'Bearer jrmd2026',
+              'X-User-Id': userId
+          },
+          body: { companyId, name: subCompanyName }
+      })
+  });
+
+  if (!res.ok) throw new Error("Failed to create unit on cloud");
+  const data = await res.json();
+  return data.subId;
 }
 
-/** Add new season under selected sub company */
+/**
+ * Add new season under selected company/sub-company in D1
+ */
 export async function addErpSeason(
   companyId: string,
   subCompanyId: string,
@@ -568,13 +576,24 @@ export async function addErpSeason(
   subCompanyName: string,
   seasonName: string,
 ): Promise<string> {
-  const seasonKey = nameToId(seasonName, "default_season");
-  const ref = doc(firestoreDB, ...seasonPath(companyId, subCompanyId, seasonKey));
-  await setDoc(ref, { seasonKey, seasonName: seasonName?.trim() || seasonKey, updatedAt: serverTimestamp() }, { merge: true });
-  await registerCompanyInIndex(companyId, subCompanyId, seasonKey, {
-    companyName,
-    subCompanyName,
-    seasonName: seasonName?.trim() || seasonKey,
+  const auth = getFirebaseAuth();
+  const userId = auth?.currentUser?.uid || "test-user-123";
+
+  const res = await fetch('/api/d1-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/season',
+          method: 'POST',
+          headers: { 
+              'Authorization': 'Bearer jrmd2026',
+              'X-User-Id': userId
+          },
+          body: { companyId, subCompanyId, name: seasonName }
+      })
   });
-  return seasonKey;
+
+  if (!res.ok) throw new Error("Failed to create season on cloud");
+  const data = await res.json();
+  return data.seasonId;
 }

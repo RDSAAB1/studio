@@ -215,12 +215,12 @@ export const PaymentBreakdownRow = React.memo(({
       </TableCell>
       <TableCell className="text-right py-0 px-1.5 align-middle">
         <div className={`${amountMainClass} font-semibold leading-tight text-slate-900`}>
-          {formatCurrency(payment.amount || 0)}
+          {formatCurrency(payment.shareAmount !== undefined ? payment.shareAmount : (payment.amount || 0))}
         </div>
       </TableCell>
       <TableCell className="text-right py-0 px-1.5 align-middle">
         <div className={`${amountSubClass} font-semibold leading-tight text-slate-600`}>
-          {formatCurrency(payment.cdAmount || 0)}
+          {formatCurrency(payment.shareCd !== undefined ? payment.shareCd : (payment.cdAmount || 0))}
         </div>
       </TableCell>
       <TableCell className="text-right py-0 px-2 align-middle">

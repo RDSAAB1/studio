@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export const LedgerHeader: React.FC<LedgerHeaderProps> = ({
           placeholder="Search account by name, address or contact"
           noItemsPlaceholder={accountsLength === 0 ? "No accounts available. Create one to begin." : "No matching account found."}
           inputClassName="h-10"
+          searchType="all"
         />
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">

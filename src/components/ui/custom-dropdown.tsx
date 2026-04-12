@@ -17,7 +17,7 @@ export interface CustomDropdownOption {
     data?: any; // Additional data for enhanced display
 }
 
-type SearchType = 'name' | 'fatherName' | 'address' | 'contact';
+type SearchType = 'all' | 'name' | 'fatherName' | 'address' | 'contact';
 
 interface CustomDropdownProps {
     options: CustomDropdownOption[];
@@ -58,7 +58,7 @@ interface CustomDropdownProps {
     onGoClick,
     maxRows,
     showScrollbar = false,
-    searchType = 'name',
+    searchType = 'all',
     onSearchTypeChange,
     id,
     className,
@@ -73,7 +73,7 @@ interface CustomDropdownProps {
     const prevSelectedItemRef = useRef<CustomDropdownOption | undefined>(undefined);
     const isUpdatingSearchTermRef = useRef(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const [currentSearchType, setCurrentSearchType] = useState<SearchType>(searchType);
+    const [currentSearchType, setCurrentSearchType] = useState<SearchType>(searchType || 'all');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
@@ -257,6 +257,14 @@ interface CustomDropdownProps {
             let searchText = '';
             
             switch (currentSearchType) {
+                case 'all':
+                    // Concatenate all search fields for a comprehensive search
+                    const name = data.name || item.label || '';
+                    const so = data.fatherName || data.so || '';
+                    const addr = data.address || '';
+                    const ph = data.contact || '';
+                    searchText = normalizeText(`${name} ${so} ${addr} ${ph}`);
+                    break;
                 case 'name':
                     // If data.name exists and is not empty, use it; otherwise fall back to label
                     const nameValue = data.name?.trim();
@@ -352,9 +360,18 @@ interface CustomDropdownProps {
                 const fullDistance = levenshteinDistance(lowercasedSearchTerm, searchText);
                 minDistance = Math.min(minDistance, fullDistance);
                 
-                // Allow fuzzy matching only for small differences (up to 3 characters for spelling mistakes)
-                // Only add if it's a reasonable match (not too different)
-                if (minDistance <= 3 && minDistance < Math.max(lowercasedSearchTerm.length * 0.3, 3)) {
+                // Allow fuzzy matching based on search term length
+                // Threshold logic:
+                // - Term length <= 3: No fuzzy matching (too noisy)
+                // - Term length 4-5: Max 1 character difference
+                // - Term length 6-9: Max 2 character differences
+                // - Term length 10+: Max 3 character differences
+                let threshold = 0;
+                if (lowercasedSearchTerm.length > 9) threshold = 3;
+                else if (lowercasedSearchTerm.length > 5) threshold = 2;
+                else if (lowercasedSearchTerm.length > 3) threshold = 1;
+
+                if (minDistance > 0 && minDistance <= threshold) {
                     fuzzyMatches.push({ item, distance: minDistance });
                 }
             }
@@ -545,6 +562,7 @@ interface CustomDropdownProps {
                             <SelectValue placeholder="Search by..." />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value="all">All Fields</SelectItem>
                             <SelectItem value="name">Name</SelectItem>
                             <SelectItem value="fatherName">Father Name</SelectItem>
                             <SelectItem value="address">Address</SelectItem>

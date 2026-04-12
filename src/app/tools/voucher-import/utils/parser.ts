@@ -3,7 +3,7 @@ import { bankBranches } from "@/lib/data";
 import type { VoucherBlock, PaymentBlock, CombinedEntry, ParseResult } from "../types";
 import { toTitleCase, sanitize, normalizeDate, normalizeNumber, displayDate } from "@/lib/formatters";
 
-export { sanitize };
+export { sanitize, displayDate };
 
 const bankLookup = new Map(
   bankBranches.map((branch) => [branch.ifscCode.toUpperCase(), branch])

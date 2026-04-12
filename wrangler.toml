@@ -1,0 +1,8 @@
+name = "jrmd-sync-worker"
+main = "worker.ts"
+compatibility_date = "2024-04-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bizsuite"
+database_id = "9d1e0202-6028-4e97-8eec-5da8b69cf0be"

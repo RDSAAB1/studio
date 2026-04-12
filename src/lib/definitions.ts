@@ -92,6 +92,8 @@ export type Customer = {
   grNo?: string;
   grDate?: string;
   transport?: string;
+  lrNo?: string;
+  lrDate?: string;
   isDeleted?: boolean; // For soft delete
   
   // RICE BRAN specific fields

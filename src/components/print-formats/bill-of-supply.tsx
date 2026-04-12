@@ -7,6 +7,8 @@ import { Customer, ReceiptSettings, BankAccount } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
+import { MapPin, Phone, Mail, Building2, Hash, Calendar, FileText, Wheat, Globe, Truck } from 'lucide-react';
+
 interface BillOfSupplyProps {
     customer: Customer;
     settings: ReceiptSettings & { defaultBank?: BankAccount };
@@ -21,11 +23,23 @@ interface BillOfSupplyProps {
         gatePassNo: string;
         grNo: string;
         grDate: string;
+        lrNo?: string;
+        lrDate?: string;
         transport: string;
+        vehicleNo?: string;
         totalAdvance: number;
         showBagWeightColumns?: boolean;
     };
 }
+
+const getFinancialYear = (date: Date) => {
+    const d = new Date(date);
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const startYear = month <= 3 ? year - 1 : year;
+    const endYear = startYear + 1;
+    return `${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`;
+};
 
 const numberToWords = (num: number): string => {
     const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
@@ -113,156 +127,379 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
         companyName: toTitleCase(customer.shippingCompanyName || ''),
         address: toTitleCase(customer.shippingAddress || customer.address),
         contact: customer.shippingContact || customer.contact,
-        gstin: customer.shippingGstin || customer.gstin || 'N/A',
+        gstin: (customer.shippingGstin || customer.gstin || 'N/A').toUpperCase(),
         stateName: toTitleCase(customer.shippingStateName || customer.stateName || ''),
         stateCode: customer.shippingStateCode || customer.stateCode || ''
     };
 
-    return (
-        <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
-            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800 {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}.print-bg-black, .print-bg-black * {background-color: #000000 !important; color: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
-            
-            <div className="flex-grow-0">
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="w-1/2">
-                         <h2 className="font-bold text-3xl mb-1">{settings.companyName}</h2>
-                         <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
-                         <p className="text-gray-600 text-sm">State: {settings.companyStateName} (Code: {settings.companyStateCode})</p>
-                         <p className="text-gray-600 text-sm">GSTIN: {settings.companyGstin}</p>
-                         <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
-                    </div>
-                     <div className="text-right">
-                        <h1 className="text-4xl font-bold text-gray-800 uppercase mb-1">BILL OF SUPPLY</h1>
-                        <div className="text-base text-gray-700">
-                            <div className="grid grid-cols-2 text-left">
-                                <span className="font-bold pr-2">Invoice #:</span><span>{customer.srNo}</span>
-                                <span className="font-bold pr-2">Date:</span><span>{format(new Date(customer.date), "dd MMM, yyyy")}</span>
-                                <span className="font-bold pr-2">Vehicle No:</span><span>{customer.vehicleNo.toUpperCase()}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mt-8 mb-6">
-                    <div className="border border-gray-200 p-4 rounded-lg">
-                        <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
-                        <p className="font-bold text-lg">{billToDetails.companyName || billToDetails.name}</p>
-                        <p className="text-base">{billToDetails.address}</p>
-                        <p className="text-base">State: {billToDetails.stateName} (Code: {billToDetails.stateCode})</p>
-                        <p className="text-base">Phone: {billToDetails.contact}</p>
-                        <p className="text-base">GSTIN: {billToDetails.gstin}</p>
-                    </div>
-                     <div className="border border-gray-200 p-4 rounded-lg">
-                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Ship To</h3>
-                        <p className="font-bold text-lg">{shipToDetails.companyName || shipToDetails.name}</p>
-                        
-                        <p className="text-base">{shipToDetails.address}</p>
-                        <p className="text-base">State: {shipToDetails.stateName} (Code: {shipToDetails.stateCode})</p>
-                        <p className="text-base">Phone: {shipToDetails.contact}</p>
-                        <p className="text-base">GSTIN: {shipToDetails.gstin}</p>
-                    </div>
-                </div>
-                
-                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-left print-table text-base">
-                       <thead className="print-bg-gray-800">
-                             <tr className="uppercase text-xs text-gray-600">
-                                <th className="p-3 font-semibold text-center w-[4%]">#</th>
-                                <th className="p-3 font-semibold w-[25%]">Item & Description</th>
-                                <th className="p-3 font-semibold text-center w-[7%]">HSN/SAC</th>
-                                <th className="p-3 font-semibold text-center w-[7%]">UOM</th>
-                                <th className="p-3 font-semibold text-center w-[9%]">WT (Qtl)</th>
-                                {showBagWeightColumns && <th className="p-3 font-semibold text-center w-[9%]">Bag Wt (Qtl)</th>}
-                                {showBagWeightColumns && <th className="p-3 font-semibold text-center w-[9%]">Final Wt (Qtl)</th>}
-                                <th className="p-3 font-semibold text-right w-[9%]">Rate</th>
-                                <th className="p-3 font-semibold text-right w-[11%]">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="border-t border-gray-200">
-                                <td className="p-3 text-center">1</td>
-                                <td className="p-3">
-                                    <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
-                                </td>
-                                <td className="p-3 text-center">{hsnCode}</td>
-                                <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
-                                <td className="p-3 text-center">{weight.toFixed(2)}</td>
-                                {showBagWeightColumns && <td className="p-3 text-center">{bagWeightQtl.toFixed(2)}</td>}
-                                {showBagWeightColumns && <td className="p-3 text-center">{netWeight.toFixed(2)}</td>}
-                                <td className="p-3 text-right">{formatCurrency(rate)}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(tableTotalAmount))}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                 </div>
-                 
-                 <div className="border border-gray-200 p-3 rounded-lg mt-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">9R No:</span><span>{invoiceDetails.nineRNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. No:</span><span>{invoiceDetails.grNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. Date:</span><span>{invoiceDetails.grDate}</span></div>
-                    <div className="flex gap-2 col-span-2"><span className="font-semibold text-gray-600">Transport:</span><span>{invoiceDetails.transport}</span></div>
-                 </div>
+    const formatCleanCurrency = (amount: number) => {
+        const value = Math.round(amount);
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            maximumFractionDigits: 0
+        }).format(value);
+    };
 
+    const totalBagWeight = (bags * bagWeightKg) / 100;
+
+    return (
+        <div className="p-6 pt-2 bg-white text-black font-sans text-xs leading-tight flex flex-col min-h-[29.7cm] printable-area border-[1px] border-gray-300 relative" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <style>{`
+                @media print {
+                    body { background-color: #fff !important; }
+                    .printable-area { border: none !important; padding: 0 !important; margin: 0 !important; }
+                    .print-bg-black { background-color: #000000 !important; color: #ffffff !important; -webkit-print-color-adjust: exact; }
+                    .print-bg-gray { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; }
+                }
+            `}</style>
+            
+            {/* Compact Slate Document Title */}
+            <div className="w-full flex justify-center mb-4">
+                <div className="bg-slate-100 border-2 border-slate-900 px-8 py-1 rounded-full flex items-center justify-center shadow-sm">
+                    <span className="text-base font-black uppercase tracking-[0.3em] text-slate-900 leading-none">
+                        BILL OF SUPPLY
+                    </span>
+                </div>
             </div>
 
-            <div className="flex-grow-0 mt-6">
-                <div className="flex justify-between mb-6">
-                    <div className="w-3/5 pr-4 space-y-2">
-                         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <p className="font-bold mb-1 uppercase text-gray-500 text-xs">Amount in Words:</p>
-                            <p className="font-semibold text-gray-800 text-base">{numberToWords(totalInvoiceValue)}</p>
+            {/* Optimized Visual Header */}
+            <div className="flex justify-between items-end mb-10 pt-2">
+                {/* Left: Branding & Identity */}
+                <div className="flex flex-col">
+                    <h1 className="font-black text-4xl tracking-widest uppercase text-slate-900 leading-none mb-4">
+                        {settings.companyName || "JAGDAMBE RICE MILL"}
+                    </h1>
+
+                    <div className="flex flex-col gap-2.5">
+                        <div className="flex items-center gap-3">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                            <span className="text-[12px] font-black text-slate-900 uppercase tracking-widest leading-none">
+                                {settings.companyAddress1 || "DEVKALI ROAD, BANDA, SHAJAHANPUR"}
+                            </span>
                         </div>
-                        <div className="border border-gray-200 rounded-lg p-3">
-                            <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            {settings.defaultBank?.bankName ? (
-                                <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
-                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
-                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || ''}</p>
-                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
-                                </div>
-                            ) : (
-                               <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span> {settings.bankName}</p>
-                                    <p><span className="font-semibold">A/C No:</span> {settings.accountNo}</p>
-                                    <p><span className="font-semibold">Branch:</span> {settings.branchName}</p>
-                                    <p><span className="font-semibold">IFSC:</span> {settings.ifscCode}</p>
-                                </div>
-                            )}
+                        
+                        <div className="flex items-center gap-3">
+                            <Building2 className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                            <span className="text-[12px] font-black text-slate-950 uppercase leading-none tracking-tight">
+                                {String(settings.companyStateName || "UTTAR PRADESH").toUpperCase()} (09)
+                            </span>
                         </div>
-                    </div>
-                    <div className="w-2/5 text-base">
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(Math.round(taxableAmount))}</span></div>
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(cgstAmount))}</span></div>
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(sgstAmount))}</span></div>
-                         {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
-                        <div className="flex justify-between p-3 mt-1 bg-black text-white font-bold rounded-lg text-xl print-bg-black">
-                            <span className="text-white" style={{ color: '#ffffff' }}>Total Amount:</span><span className="text-white" style={{ color: '#ffffff' }}>{formatCurrency(Math.round(totalInvoiceValue))}</span>
+
+                        <div className="flex items-center gap-3">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                            <span className="text-[14px] font-black text-slate-950 leading-none tracking-tight">
+                                +91-{settings.contactNo || "7880555498"}
+                            </span>
                         </div>
-                    </div>
-                </div>
-                <div className="border-t border-gray-300 pt-6 mt-6">
-                    <div className="flex justify-between items-end">
-                        <div className="w-3/5">
-                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms & Conditions</h4>
-                            <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
-                                <li>Goods once sold will not be taken back or exchanged.</li>
-                                <li>Interest @18% p.a. will be charged on all overdue payments.</li>
-                                <li>All disputes are subject to Shahjahanpur jurisdiction only.</li>
-                                <li>Please check the goods on delivery. No claims will be entertained later.</li>
-                            </ul>
+
+                        <div className="flex items-center gap-3">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                            <span className="text-[14px] font-black text-slate-950 leading-none">
+                                {settings.gmail || "JRMDofficial@gmail.com"}
+                            </span>
                         </div>
-                        <div className="w-2/5 text-center">
-                            <div className="h-20"></div>
-                            <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
-                                <p className="font-bold text-base">Authorised Signatory</p>
-                                <p className="text-gray-600">For {settings.companyName}</p>
+
+                        <div className="flex items-center gap-4 mt-1">
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-4 py-2 rounded-full print-bg-gray shadow-sm">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">GSTIN/UIN:</span>
+                                <span className="text-[13px] font-black text-slate-950 tabular-nums leading-none uppercase">
+                                    {settings.companyGstin || "09AAUFJ1162A1ZG"}
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                {/* Right: Modern Metadata Stack */}
+                <div className="flex flex-col gap-3 items-end pb-1">
+                    <div className="flex items-center gap-3">
+                        <FileText className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                        <span className="text-[15px] font-black text-slate-950 tabular-nums tracking-widest uppercase leading-none">
+                            JRM/{getFinancialYear(new Date(customer.date))}/{String(customer.srNo).padStart(4, '0')}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                        <span className="text-[15px] font-black text-slate-950 tabular-nums leading-none tracking-tight">{format(new Date(customer.date), "dd-MM-yyyy")}</span>
+                    </div>
+                </div>
+            </div>
+
+
+
+            {/* Elite Logistics Matrix */}
+            <div className="border-y-2 border-slate-900 py-3 mb-4">
+                <div className="grid grid-cols-3 gap-x-12 gap-y-1.5">
+                    {/* Column 1: Primary Document Identifiers */}
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">9R NUMBER:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.nineRNo || 'N/A').toUpperCase()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">GATE PASS NO:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.gatePassNo || 'N/A').toUpperCase()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">VEHICLE NO:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{(invoiceDetails.vehicleNo || customer.vehicleNo || 'N/A').toUpperCase()}</span>
+                        </div>
+                    </div>
+
+                    {/* Column 2: Logistics & Transportation */}
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">LR NO:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.lrNo || 'N/A').toUpperCase()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">LR DATE:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{invoiceDetails.lrDate ? format(new Date(invoiceDetails.lrDate), "dd-MM-yyyy") : 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">TRANSPORT:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.transport || 'N/A').toUpperCase()}</span>
+                        </div>
+                    </div>
+
+                    {/* Column 3: Regulatory Tracking */}
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">GR NO:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.grNo || 'N/A').toUpperCase()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-900 uppercase">GR DATE:</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{invoiceDetails.grDate ? format(new Date(invoiceDetails.grDate), "dd-MM-yyyy") : 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            {/* Symmetrical Billing Cards */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Billed To Card */}
+                <div className="relative border border-slate-200 rounded-lg bg-white overflow-hidden shadow-sm flex flex-col print:shadow-none print:border-slate-300">
+                    <div className="bg-slate-50 border-b border-slate-100 px-3 py-1.5 flex items-center gap-2 print-bg-gray">
+                        <FileText className="w-4 h-4 text-slate-900" />
+                        <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Billed To (Receiver)</span>
+                    </div>
+                    
+                    <div className="px-3 py-4 flex-1 text-left">
+                        <h2 className="text-xl font-black uppercase text-black leading-none mb-1.5 tracking-tighter">
+                            {billToDetails.companyName || billToDetails.name}
+                        </h2>
+                        <div className="flex items-start gap-1.5 text-[9.5px] font-bold text-slate-500 uppercase leading-snug mb-5 min-h-[2.5rem]">
+                            <MapPin className="w-3 h-3 mt-0.5 text-slate-400 shrink-0" />
+                            <span className="max-w-[280px]">{billToDetails.address}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 border-t border-slate-50 pt-3">
+                            <div className="flex flex-col">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">GSTIN/UIN</span>
+                                <span className="text-[10px] font-black text-slate-950 tabular-nums leading-none tracking-tight underline decoration-slate-100">{billToDetails.gstin.toUpperCase()}</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-100 pl-3">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">STATE & CODE</span>
+                                <span className="text-[8.5px] font-black text-slate-900 leading-tight uppercase italic">{billToDetails.stateName} ({billToDetails.stateCode || "09"})</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-100 pl-3">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">CONTACT</span>
+                                <span className="text-[8.5px] font-black text-slate-900 leading-tight tabular-nums italic">{billToDetails.contact || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Shipped To Card */}
+                <div className="relative border border-slate-200 rounded-lg bg-white overflow-hidden shadow-sm flex flex-col print:shadow-none print:border-slate-300">
+                    <div className="bg-slate-50 border-b border-slate-100 px-3 py-1.5 flex items-center gap-2 print-bg-gray">
+                        <Truck className="w-4 h-4 text-slate-900" />
+                        <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Shipped To (Consignee)</span>
+                    </div>
+                    
+                    <div className="px-3 py-4 flex-1 text-left">
+                        <h2 className="text-xl font-black uppercase text-black leading-none mb-1.5 tracking-tighter">
+                            {shipToDetails.companyName || shipToDetails.name}
+                        </h2>
+                        <div className="flex items-start gap-1.5 text-[9.5px] font-bold text-slate-500 uppercase leading-snug mb-5 min-h-[2.5rem]">
+                            <MapPin className="w-3 h-3 mt-0.5 text-slate-400 shrink-0" />
+                            <span className="max-w-[280px]">{shipToDetails.address}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 border-t border-slate-50 pt-3">
+                            <div className="flex flex-col">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">GSTIN/UIN</span>
+                                <span className="text-[10px] font-black text-slate-950 tabular-nums leading-none tracking-tight underline decoration-slate-100">{shipToDetails.gstin.toUpperCase()}</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-100 pl-3">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">STATE & CODE</span>
+                                <span className="text-[8.5px] font-black text-slate-900 leading-tight uppercase italic">{shipToDetails.stateName} ({shipToDetails.stateCode || "09"})</span>
+                            </div>
+                            <div className="flex flex-col border-l border-slate-100 pl-3">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase leading-none mb-1.5 tracking-tighter">CONTACT</span>
+                                <span className="text-[8.5px] font-black text-slate-900 leading-tight tabular-nums italic">{shipToDetails.contact || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Optimized Supply Table - ELITE Corporate Styling */}
+            <div className="flex flex-col mb-6 border-t-4 border-b-2 border-slate-900 overflow-hidden print:border-black">
+                <table className="w-full text-center border-collapse">
+                    <thead className="bg-slate-50 text-slate-900 print:!bg-slate-50 print:!text-black border-b-2 border-slate-900">
+                        <tr className="text-[9px] font-black uppercase tracking-widest italic">
+                            <th className="py-2.5 px-2 border-r border-slate-200">SN</th>
+                            <th className="py-2.5 px-4 border-r border-slate-200 text-left">Description of Goods</th>
+                            <th className="py-2.5 px-2 border-r border-slate-200">Packaging</th>
+                            <th className="py-2.5 px-2 border-r border-slate-200">HSN</th>
+                            <th className="py-2.5 px-2 border-r border-slate-200">Weight (QTL)</th>
+                            <th className="py-2.5 px-2">Net Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 print:divide-black/10">
+                         <tr className="text-[11px] font-medium text-slate-900 group">
+                            <td className="py-2.5 px-4 font-black border-r border-slate-50 italic">01.</td>
+                            <td className="py-2.5 px-4 text-left border-r border-slate-50">
+                                <div className="font-black text-[13px] text-slate-950 leading-none uppercase tracking-tight">{customer.variety}</div>
+                                <div className="text-[7.5px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Exempted Supply - Quality Processed</div>
+                            </td>
+                            <td className="py-2.5 px-4 border-r border-slate-50">
+                                <div className="font-black text-2xl">{customer.bags || '0'}</div>
+                                <div className="text-[7px] font-bold text-slate-400 uppercase">Large Bags PKG</div>
+                            </td>
+                            <td className="p-4 border-r border-slate-50 font-black italic">{hsnCode}</td>
+                            <td className="py-2.5 px-4 border-r border-slate-50">
+                                 <div className="font-black text-lg tabular-nums">{netWeight.toFixed(2)} QTL</div>
+                            </td>
+                            <td className="py-2.5 px-4 font-black tabular-nums bg-slate-50/50 print:bg-transparent text-right pr-6">{formatCleanCurrency(tableTotalAmount)}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr className="bg-slate-50 text-slate-900 font-black uppercase text-[10px] tracking-widest print:!bg-slate-50 print:!text-black border-t-2 border-slate-900">
+                            <td colSpan={5} className="p-2.5 text-right border-r border-slate-200 uppercase tracking-widest opacity-60">Subtotal Assignment</td>
+                            <td className="p-2.5 text-right bg-slate-100 text-slate-950 font-black tabular-nums pr-6 border-l-2 border-slate-900">{formatCleanCurrency(tableTotalAmount)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            {/* PHASE 1: FULL-WIDTH SETTLEMENT LAYER */}
+            <div className="mb-6">
+                <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 grid grid-cols-4 gap-8 print:border-slate-200 shadow-sm print-bg-gray">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Beneficiary Bank</span>
+                        <span className="text-[11px] font-black text-slate-900 uppercase truncate underline decoration-slate-100 decoration-2 underline-offset-4">{settings.defaultBank?.bankName || settings.bankName}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 border-l border-slate-100 pl-6">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Account Number</span>
+                        <span className="text-[13px] font-black text-slate-950 tabular-nums leading-none">{settings.defaultBank?.accountNumber || settings.accountNo}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-slate-100 pl-6">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">IFSC Designation</span>
+                        <span className="text-[11px] font-black text-slate-900 tabular-nums tracking-tighter">{settings.defaultBank?.ifscCode || settings.ifscCode}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-slate-100 pl-6">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Account Nature</span>
+                        <span className="text-[10px] font-black text-slate-900 uppercase italic">Business Current</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* PHASE 2: SPLIT ARCHITECTURE (TERMS & TOTALS) */}
+            <div className="grid grid-cols-12 gap-8 items-start mb-8">
+                 {/* Left: Words & Terms */}
+                 <div className="col-span-8 flex flex-col gap-4">
+                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-inner">
+                        <div className="flex items-center gap-4 mb-3 opacity-60">
+                             <Wheat className="w-5 h-5 text-slate-400" />
+                             <div className="h-px flex-1 bg-slate-200"></div>
+                        </div>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Amount In Words</span>
+                        <p className="text-[12px] font-black uppercase text-slate-950 italic tracking-tight leading-tight">
+                            {numberToWords(totalInvoiceValue).replace(/only/gi, '').trim()} ONLY
+                        </p>
+                        
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">GST In Words</span>
+                             <p className="text-[9px] font-black text-slate-900 uppercase italic leading-none truncate">
+                                No Tax Applicable (Exempted Supply)
+                             </p>
+                        </div>
+                     </div>
+
+                     <div className="text-[10px] font-bold text-slate-500 uppercase space-y-1.5 italic border-l-4 border-slate-900 pl-5 py-2">
+                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 1. Certified that the actual price of the goods is described above.</p>
+                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 2. Subject to Shajahanpur (UP) Jurisdiction only.</p>
+                     </div>
+                 </div>
+
+                 {/* Right: Monumental Totals & Signatory */}
+                 <div className="col-span-4 flex flex-col pt-1">
+                     <div className="flex flex-col gap-2 mb-6">
+                         <div className="flex justify-between items-center px-4 py-1.5 border-b border-slate-100">
+                             <span className="text-[9px] font-black text-slate-400 uppercase">Gross Supply Total</span>
+                             <span className="text-[13px] font-black text-slate-900 tabular-nums">{formatCleanCurrency(taxableAmount)}</span>
+                         </div>
+                         <div className="flex justify-between items-center px-4 py-1.5 border-b border-slate-100">
+                             <span className="text-[9px] font-black text-slate-500 uppercase italic">Add: Adjustments</span>
+                             <span className="text-[11px] font-black text-slate-950 tabular-nums">{formatCleanCurrency(0)}</span>
+                         </div>
+                         {advanceFreight > 0 && <div className="flex justify-between items-center px-4 py-1.5 bg-red-50 text-red-700">
+                             <span className="text-[9px] font-black uppercase">Less: Advance Value</span>
+                             <span className="text-[12px] font-black">-{formatCleanCurrency(advanceFreight)}</span>
+                         </div>}
+                         <div className="mt-2 p-5 bg-white border-y-4 border-slate-900 flex flex-col items-end shadow-md">
+                             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 leading-none italic">Total Net Value</span>
+                             <div className="text-3xl font-black text-slate-950 italic tracking-tighter tabular-nums leading-none">
+                                {formatCleanCurrency(totalInvoiceValue)}
+                             </div>
+                         </div>
+                     </div>
+
+                     <div className="mt-auto pt-8 border-t-2 border-slate-900 text-center relative self-end w-full max-w-[240px]">
+                         <p className="font-black text-[9px] text-slate-400 uppercase tracking-widest mb-2 leading-none">FOR {String(settings.companyName || "JAGDAMBE RICE MILL").toUpperCase()}</p>
+                         <p className="font-black text-[16px] uppercase tracking-tighter text-slate-950 italic">Authorised Signatory</p>
+                     </div>
+                 </div>
+            </div>
+
+
+
+            <div className="grid grid-cols-2 gap-12 items-end text-left mb-10">
+                <div className="p-4 bg-slate-50 border-l-4 border-slate-900 rounded-r-lg">
+                    <div className="space-y-2">
+                        <p className="text-[9.5px] font-black text-slate-950 uppercase italic leading-tight">
+                            WE DECLARED THAT THIS INVOICE SHOWS THE ACTUAL PRICE OF THE GOODS DESCRIBED AND THAT PARTICULARS ARE TRUE AND CORRECT.
+                        </p>
+                        <p className="text-[8.5px] font-black text-slate-500 uppercase italic">
+                            SUBJECT TO SHAHJAHANPUR JURISDICTION.
+                        </p>
+                    </div>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                    <div className="w-full max-w-[260px] relative">
+                        {/* Seal Accent */}
+                        <div className="absolute -top-12 -right-6 w-24 h-24 border-4 border-slate-100 rounded-full opacity-20 flex items-center justify-center rotate-12">
+                             <div className="text-[8px] font-black text-slate-200 uppercase text-center tracking-tighter">Official Seal<br/>Not Required</div>
+                        </div>
+                        <div className="border-t-4 border-slate-900 pt-5 text-center relative">
+                            <p className="font-black text-[11px] text-slate-400 uppercase tracking-[0.3em] mb-3">FOR {String(settings.companyName || "JAGDAMBE RICE MILL").toUpperCase()}</p>
+                            <p className="font-black text-lg uppercase tracking-tighter text-slate-950 leading-none italic">Authorised Signatory</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-slate-100 print:border-black/5 text-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight italic leading-none">
+                    This is a computer generated invoice.
+                </p>
             </div>
         </div>
     );
-}
+};

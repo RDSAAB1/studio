@@ -212,53 +212,147 @@ function getSqliteDb() {
   } catch {
     // ignore
   }
-  const dbPath = path.join(baseFolder, 'jrmd.sqlite');
-  try {
-    const Database = require('better-sqlite3');
-    sqliteDb = new Database(dbPath);
+    const dbPath = path.join(baseFolder, 'jrmd.sqlite');
     
-    // ✅ Add busy_timeout to handle temporary file locks (prevent instant I/O error)
-    sqliteDb.pragma('busy_timeout = 5000');
-    
+    const initDatabase = (retryCount = 0) => {
+      try {
+        const Database = require('better-sqlite3');
+        const db = new Database(dbPath);
+        console.log(`[SQLite] Database opened at: ${dbPath} (Attempt ${retryCount + 1})`);
+        
+        // ✅ CRITICAL: Integrity Check
+        // If this is malformed, better to start fresh than to keep failing.
+        try {
+          const check = db.prepare('PRAGMA integrity_check').get();
+          if (check.integrity_check !== 'ok') {
+            throw new Error(`Integrity check failed: ${check.integrity_check}`);
+          }
+        } catch (e) {
+          console.error('[SQLite] CORRUPTION DETECTED:', e.message);
+          db.close();
+          if (retryCount < 1) {
+            const corruptPath = `${dbPath}.corrupt.${Date.now()}`;
+            console.warn(`[SQLite] Quarantining malformed database to: ${corruptPath}`);
+            fs.renameSync(dbPath, corruptPath);
+            // Also try to move WAL/SHM files if they exist
+            try { fs.renameSync(`${dbPath}-wal`, `${corruptPath}-wal`); } catch {}
+            try { fs.renameSync(`${dbPath}-shm`, `${corruptPath}-shm`); } catch {}
+            return initDatabase(retryCount + 1);
+          }
+          throw e;
+        }
+
+        return db;
+      } catch (e) {
+        if (e.message.includes('malformed') && retryCount < 1) {
+           const corruptPath = `${dbPath}.corrupt.${Date.now()}`;
+           fs.renameSync(dbPath, corruptPath);
+           return initDatabase(retryCount + 1);
+        }
+        throw e;
+      }
+    };
+
     try {
-      // ✅ Try WAL mode but fallback to DELETE if platform/drive doesn't support shared memory
-      sqliteDb.pragma('journal_mode = WAL');
-    } catch {
-      sqliteDb.pragma('journal_mode = DELETE');
-    }
-    
-    // ✅ Change to FULL synchronous to ensure writes are flushed to disk before returning (safer for network/OneDrive)
-    sqliteDb.pragma('synchronous = FULL');
-    
-    // ✅ Watch for external changes (from other systems)
-    startSqliteWatcher(baseFolder);
-    
-    const tables = [
-      'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
-      'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
-      'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
-      'mandiReports', 'employees', 'payroll', 'attendance',
-      'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
-      'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
-      'manufacturingCosting', 'expenseTemplates',
-    ];
-    for (const t of tables) {
-      sqliteDb.exec(
-        `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`
-      );
-    }
-    
-    // ✅ Remove heavy automatic vacuums that cause I/O spikes during large migrations
-    sqliteDb.pragma('auto_vacuum = NONE');
+      sqliteDb = initDatabase();
+      
+      // ✅ Add busy_timeout to handle temporary file locks (prevent instant I/O error)
+      sqliteDb.pragma('busy_timeout = 5000');
+      
+      try {
+        // ✅ Try WAL mode but fallback to DELETE if platform/drive doesn't support shared memory
+        sqliteDb.pragma('journal_mode = WAL');
+      } catch {
+        sqliteDb.pragma('journal_mode = DELETE');
+      }
+      
+      // ✅ Change to FULL synchronous to ensure writes are flushed to disk before returning (safer for network/OneDrive)
+      sqliteDb.pragma('synchronous = FULL');
+      
+      // ✅ Watch for external changes (from other systems)
+      startSqliteWatcher(baseFolder);
+      
+      const tables = [
+        'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+        'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
+        'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
+        'mandiReports', 'employees', 'payroll', 'attendance',
+        'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
+        'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
+        'manufacturingCosting', 'expenseTemplates'
+      ];
+      for (const t of tables) {
+        sqliteDb.exec(
+          `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`
+        );
+      }
+      
+      // ✅ FORCE SCHEMA RESET: Ensure _sync_log has the correct multi-column schema
+      try {
+        const info = sqliteDb.prepare("PRAGMA table_info(_sync_log)").all();
+        if (info.length > 0) {
+          const hasCollection = info.some(col => col.name === 'collection');
+          if (!hasCollection) {
+            console.log('[SQLite] _sync_log schema is old (no collection column). Force dropping...');
+            sqliteDb.exec('DROP TABLE _sync_log');
+          }
+        }
+      } catch (e) {
+        console.warn('[SQLite] Schema check failed for _sync_log, trying to drop anyway:', e.message);
+        try { sqliteDb.exec('DROP TABLE IF EXISTS _sync_log'); } catch(e2) {}
+      }
 
-    // ✅ CREATE BACKUP ON INIT (100-file rotation)
-    createRotatingBackup(dbPath, baseFolder).catch(e => console.error('[SQLite] Backup failed:', e));
+      // ✅ AUTO-HEALING: Ensure _sync_meta exists and has the correct columns
+      try {
+        // Check current schema
+        const info = sqliteDb.prepare("PRAGMA table_info(_sync_meta)").all();
+        
+        if (info.length > 0) {
+          const hasData = info.some(col => col.name === 'data');
+          const hasTimestamp = info.some(col => col.name === 'last_sync_timestamp');
+          
+          if (hasData) {
+            console.log('[SQLite] _sync_meta has legacy "data" column. Force recreating...');
+            sqliteDb.exec('DROP TABLE _sync_meta');
+          } else if (!hasTimestamp) {
+            console.log('[SQLite] Adding last_sync_timestamp to _sync_meta...');
+            sqliteDb.exec('ALTER TABLE _sync_meta ADD COLUMN last_sync_timestamp INTEGER DEFAULT 0');
+          }
+        }
+        
+        // Ensure it exists with correct schema
+        sqliteDb.exec(`CREATE TABLE IF NOT EXISTS _sync_meta (id TEXT PRIMARY KEY, last_sync_timestamp INTEGER DEFAULT 0)`);
+      } catch (e) {
+        if (e.message.includes('malformed')) throw e; // Let the outer catch handle it
+        console.warn('[SQLite] _sync_meta schema check/repair failed:', e.message);
+      }
 
-    return sqliteDb;
-  } catch (e) {
-    sqliteError = e;
-    throw e;
-  }
+      // Re-create _sync_log with the correct schema
+      sqliteDb.exec(`
+        CREATE TABLE IF NOT EXISTS _sync_log (
+          id TEXT PRIMARY KEY, 
+          collection TEXT NOT NULL, 
+          docId TEXT NOT NULL, 
+          operation TEXT NOT NULL, 
+          data TEXT, 
+          timestamp INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER))
+        )
+      `);
+      
+      // ✅ Remove heavy automatic vacuums that cause I/O spikes during large migrations
+      sqliteDb.pragma('auto_vacuum = NONE');
+
+      // ✅ CREATE BACKUP ON INIT (100-file rotation)
+      createRotatingBackup(dbPath, baseFolder).catch(e => console.error('[SQLite] Backup failed:', e));
+  
+      return sqliteDb;
+    } catch (e) {
+      if (e.message.includes('malformed')) {
+        console.error('[SQLite] Unrecoverable corruption. Manual intervention required.');
+      }
+      sqliteError = e;
+      throw e;
+    }
 }
 
 /** 
@@ -1100,8 +1194,65 @@ const SQLITE_ALLOWED_TABLES = new Set([
   'mandiReports', 'employees', 'payroll', 'attendance',
   'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
   'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
-  'manufacturingCosting', 'expenseTemplates',
+  'manufacturingCosting', 'expenseTemplates', '_sync_log', '_sync_meta'
 ]);
+
+/**
+ * ✅ TABLE CATEGORIES: Define which tables are tied to a specific season
+ * and which are shared across all seasons within a unit.
+ */
+const SEASONAL_TABLES = new Set([
+  'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
+  'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
+  'mandiReports', 'payroll', 'attendance', 'inventoryAddEntries', 'kantaParchi', 
+  'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
+]);
+
+const SHARED_TABLES = new Set(
+  Array.from(SQLITE_ALLOWED_TABLES).filter(t => !SEASONAL_TABLES.has(t) && !t.startsWith('_sync_'))
+);
+
+/**
+ * ✅ HELPER: Map row to a unified object
+ * Merges specialized columns (like docId, operation) with the JSON blob in 'data'.
+ */
+function mapRowToResult(row) {
+  if (!row) return null;
+  const { data, ...rest } = row;
+  let parsed = null;
+  if (data) {
+    try { 
+      parsed = JSON.parse(data); 
+    } catch(e) { /* ignore */ }
+  }
+  
+  // If this is a standard document table (only has 'id' and 'data')
+  // We return the spread JSON data for UI compatibility.
+  // rest should only contain 'id' here.
+  const otherKeys = Object.keys(rest);
+  if (otherKeys.length === 1 && otherKeys[0] === 'id') {
+    return {
+      ...(parsed && typeof parsed === 'object' ? parsed : {}),
+      id: row.id
+    };
+  }
+
+  // For system tables or multi-column tables (_sync_log, _sync_meta, etc.)
+  // We return everything, with the 'data' column parsed into an object.
+  return {
+    ...rest,
+    data: parsed
+  };
+}
+
+function notifyRenderer(tableName, source = 'internal') {
+  // Skip notifications for internal sync metadata tables to prevent infinite loops
+  if (tableName === '_sync_log' || tableName === '_sync_meta') return;
+
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('sqlite:backend-change', { table: tableName, source });
+  });
+}
 
 ipcMain.handle('sqlite:importTable', async (_event, tableName, rows, options = {}) => {
   if (sqliteError) {
@@ -1178,7 +1329,7 @@ function getRowId(row, tableName, idx) {
   return (id || stableFallback()).slice(0, 500);
 }
 
-ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows) => {
+ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows, options = {}) => {
   if (sqliteError) {
     return { success: false, error: sqliteError?.message || 'SQLite not available' };
   }
@@ -1186,48 +1337,138 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows) => {
     return { success: false, error: 'invalid_table' };
   }
   try {
-    const db = getSqliteDb();
+    const skipLog = options.skipLog === true;
     const items = rows || [];
     let idx = 0;
     const seen = new Set();
     let inserted = 0;
+    const now = Date.now();
 
-    const upsert = db.transaction((items) => {
-      const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
-      for (const row of items) {
-        if (!row || typeof row !== 'object') continue;
-        const id = getRowId(row, tableName, idx);
-        idx++;
-        const key = String(id).slice(0, 500);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        stmt.run(key, JSON.stringify(row));
-        inserted++;
-      }
-    });
+    // PROCESS IN CHUNKS OF 500
+    const CHUNK_SIZE = 500;
+    const db = getSqliteDb();
+    const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
+    const metaStmt = db.prepare(`INSERT OR REPLACE INTO _sync_meta (id, last_sync_timestamp) VALUES (?, ?)`);
+    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`);
 
-    upsert(items);
-    // ✅ Force checkpoint after bulk write so other systems/OneDrive see it immediately
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const chunk = items.slice(i, i + CHUNK_SIZE);
+      
+      const upsert = db.transaction((chunkItems) => {
+        for (const row of chunkItems) {
+          if (!row || typeof row !== 'object') continue;
+          const id = getRowId(row, tableName, idx);
+          idx++;
+          const key = String(id).slice(0, 500);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          
+          if (tableName === '_sync_meta') {
+            metaStmt.run(key, row.last_sync_timestamp || 0);
+          } else {
+            stmt.run(key, JSON.stringify(row));
+          }
+          
+          if (!skipLog && !tableName.startsWith('_sync_')) {
+            logStmt.run(`${tableName}:${key}`, tableName, key, 'upsert', JSON.stringify(row), now);
+          }
+          inserted++;
+        }
+      });
+      
+      upsert(chunk);
+    }
+
     forceCheckpoint();
+    notifyRenderer(tableName, skipLog ? 'sync' : 'internal');
     return { success: true, count: inserted };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
   }
 });
 
-ipcMain.handle('sqlite:put', async (_event, tableName, row) => {
+ipcMain.handle('sqlite:put', async (_event, tableName, row, options = {}) => {
   if (sqliteError) return { success: false, error: sqliteError?.message || 'SQLite not available' };
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
   if (!row || typeof row !== 'object') return { success: false, error: 'invalid_row' };
   try {
     const db = getSqliteDb();
     const id = getRowId(row, tableName, 0);
-    const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
-    stmt.run(id, JSON.stringify(row));
-    // ✅ Force checkpoint so the main .sqlite file is updated (better for OneDrive sync)
+    const skipLog = options.skipLog === true;
+    
+    const runUpdate = db.transaction((id, tableName, row) => {
+      if (tableName === '_sync_meta') {
+        db.prepare(`INSERT OR REPLACE INTO _sync_meta (id, last_sync_timestamp) VALUES (?, ?)`).run(id, row.last_sync_timestamp || 0);
+      } else {
+        db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`).run(id, JSON.stringify(row));
+      }
+      
+      if (!skipLog && !tableName.startsWith('_sync_')) {
+        const syncId = `${tableName}:${id}`;
+        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`).run(
+          syncId, 
+          tableName, 
+          id, 
+          'upsert', 
+          JSON.stringify(row), 
+          Date.now()
+        );
+      }
+    });
+
+    runUpdate(id, tableName, row);
     forceCheckpoint();
+    notifyRenderer(tableName, skipLog ? 'sync' : 'internal');
     return { success: true };
   } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
+});
+
+/**
+ * ✅ CLEAR ALL DATA: Wipe all transactional tables for context switching.
+ * Excludes _sync_log (if pending) and global settings if requested.
+ */
+ipcMain.handle('sqlite:clearAllTables', async (_event, options = {}) => {
+  if (sqliteError) return { success: false, error: sqliteError?.message || 'SQLite not available' };
+  try {
+    const db = getSqliteDb();
+    const keep = new Set(options.keep || []);
+    const mode = options.mode || 'UNIT'; // 'UNIT' (all) or 'SEASON' (only transactional)
+    
+    let tablesToClear = [];
+    
+    if (mode === 'SEASON') {
+      // Only clear transactional/seasonal tables
+      tablesToClear = Array.from(SEASONAL_TABLES).filter(t => !keep.has(t));
+      // Also clear sync logs for these tables? 
+      // Actually we keep sync logs to ensure pending stuff pushes eventually.
+    } else {
+      // Clear everything except sync logs and protected tables
+      tablesToClear = Array.from(SQLITE_ALLOWED_TABLES).filter(t => !keep.has(t));
+    }
+    
+    db.transaction(() => {
+      for (const t of tablesToClear) {
+        db.prepare(`DELETE FROM ${t}`).run();
+      }
+      // If we are clearing everything for a unit, also reset sync metadata
+      // Reset sync metadata to force re-sync on switch
+      if (mode === 'UNIT') {
+        db.prepare(`DELETE FROM _sync_meta`).run();
+      } else if (mode === 'SEASON') {
+        // Clear metadata prefixes for the tables we just wiped
+        for (const t of tablesToClear) {
+          db.prepare(`DELETE FROM _sync_meta WHERE id LIKE ?`).run(`${t}:%`);
+        }
+      }
+      db.prepare("VACUUM").run();
+    })();
+
+    console.log(`[SQLite] Tables cleared for ${mode} switch.`);
+    return { success: true };
+  } catch (e) {
+    console.error('[SQLite] Failed to clear tables:', e);
     return { success: false, error: e?.message || String(e) };
   }
 });
@@ -1243,16 +1484,83 @@ ipcMain.handle('sqlite:vacuum', async () => {
   }
 });
 
-ipcMain.handle('sqlite:delete', async (_event, tableName, id) => {
+ipcMain.handle('sqlite:bulkDelete', async (_event, tableName, ids, options = {}) => {
+  if (sqliteError) return { success: false, error: 'SQLite not available' };
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
+  if (!Array.isArray(ids) || ids.length === 0) return { success: true, count: 0 };
+  
+  try {
+    const skipLog = options.skipLog === true;
+    let deleted = 0;
+    
+    // PROCESS IN CHUNKS OF 500
+    const CHUNK_SIZE = 500;
+    const db = getSqliteDb();
+    const now = Date.now();
+    
+    const delStmt = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`);
+    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`);
+
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      
+      const runChunk = db.transaction((idList) => {
+        for (const id of idList) {
+          if (!id) continue;
+          const finalId = String(id).trim().slice(0, 500);
+          if (!finalId) continue;
+
+          const info = delStmt.run(finalId);
+          if (info.changes > 0) {
+            deleted++;
+            if (!skipLog && !tableName.startsWith('_sync_')) {
+              logStmt.run(`${tableName}:${finalId}`, tableName, finalId, 'delete', null, now);
+            }
+          }
+        }
+      });
+      
+      runChunk(chunk);
+    }
+
+    forceCheckpoint();
+    notifyRenderer(tableName, skipLog ? 'sync' : 'internal');
+    return { success: true, count: deleted };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle('sqlite:delete', async (_event, tableName, id, options = {}) => {
   if (sqliteError) return { success: false, error: sqliteError?.message || 'SQLite not available' };
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return { success: false, error: 'invalid_table' };
-  if (!id || typeof id !== 'string') return { success: false, error: 'invalid_id' };
+  if (!id) return { success: false, error: 'invalid_id' };
   try {
     const db = getSqliteDb();
-    const stmt = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`);
-    stmt.run(String(id).slice(0, 500));
-    // ✅ Force checkpoint after delete
+    // Ensure consistent ID trimming (v. critical for matching Put logic)
+    const finalId = String(id).trim().slice(0, 500);
+    if (!finalId) return { success: false, error: 'invalid_id_after_trim' };
+    
+    const skipLog = options.skipLog === true;
+    
+    const runDelete = db.transaction((tableName, finalId) => {
+      const info = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(finalId);
+      
+      if (info.changes > 0 && !skipLog && !tableName.startsWith('_sync_')) {
+        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`).run(
+          `${tableName}:${finalId}`,
+          tableName,
+          finalId,
+          'delete',
+          null,
+          Date.now()
+        );
+      }
+    });
+
+    runDelete(tableName, finalId);
     forceCheckpoint();
+    notifyRenderer(tableName, skipLog ? 'sync' : 'internal');
     return { success: true };
   } catch (e) {
     return { success: false, error: e?.message || String(e) };
@@ -1265,11 +1573,8 @@ ipcMain.handle('sqlite:all', async (_event, tableName) => {
   try {
     const db = getSqliteDb();
     // Default to a sane limit for 'all' to prevent UI hanging
-    const rows = db.prepare(`SELECT id, data FROM ${tableName} ORDER BY rowid DESC LIMIT 5000`).all();
-    return rows.map((row) => ({
-      ...(JSON.parse(row.data || '{}')),
-      id: row.id,
-    }));
+    const rows = db.prepare(`SELECT * FROM ${tableName} ORDER BY rowid DESC LIMIT 5000`).all();
+    return rows.map(mapRowToResult).filter(Boolean);
   } catch (e) {
     return [];
   }
@@ -1285,7 +1590,7 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
   
   try {
     const db = getSqliteDb();
-    let sql = `SELECT id, data FROM ${tableName}`;
+    let sql = `SELECT * FROM ${tableName}`;
     const params = [];
 
     // WHERE clause (basic JSON property support)
@@ -1294,6 +1599,22 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
       for (const [key, val] of Object.entries(options.where)) {
         if (key === 'id') {
           clauses.push(`id = ?`);
+          params.push(val);
+        } else if (Array.isArray(val) && (key === '[collection+docId]' || key.includes('+'))) {
+          // SUPPORT DEXIE COMPOSITE KEY QUERY: [col1+col2]
+          const parts = key.replace(/[\[\]]/g, '').split('+');
+          if (parts.length === val.length) {
+            parts.forEach((p, i) => {
+              clauses.push(`${p} = ?`);
+              params.push(val[i]);
+            });
+          } else {
+             // Fallback if counts mismatch
+             clauses.push(`json_extract(data, '$.' || ?) = ?`);
+             params.push(key, val);
+          }
+        } else if (tableName === '_sync_log' && ['collection', 'operation', 'docId'].includes(key)) {
+          clauses.push(`${key} = ?`);
           params.push(val);
         } else {
           clauses.push(`json_extract(data, '$.' || ?) = ?`);
@@ -1305,8 +1626,8 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
 
     // ORDER BY
     if (options.orderBy) {
-      if (options.orderBy === 'id') {
-        sql += ` ORDER BY id`;
+      if (options.orderBy === 'id' || (tableName === '_sync_log' && ['timestamp', 'collection'].includes(options.orderBy))) {
+        sql += ` ORDER BY ${options.orderBy}`;
       } else {
         // Better-sqlite3 doesn't support binding column names or JSON keys in ORDER BY directly,
         // but it's safe since we're selecting from a predetermined table and controlled schema.
@@ -1328,13 +1649,36 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
       params.push(options.offset);
     }
 
-    const rows = db.prepare(sql).all(...params);
-    return rows.map((row) => ({
-      ...(JSON.parse(row.data || '{}')),
-      id: row.id,
-    }));
-  } catch (e) {
-    console.error(`[sqlite:query] Error for ${tableName}:`, e);
+    // AUTO-TRIM: If sync_log is being queried, check its size and trim if it's massive (> 10,000)
+    if (tableName === '_sync_log' && Math.random() < 0.1) { // 10% chance to check on query
+       try {
+         const count = db.prepare('SELECT count(*) as total FROM _sync_log').get().total;
+         if (count > 10000) {
+            console.warn(`[SQLite] _sync_log is too large (${count}). Trimming oldest records...`);
+            db.prepare('DELETE FROM _sync_log WHERE id IN (SELECT id FROM _sync_log ORDER BY timestamp ASC LIMIT ?)')
+              .run(count - 5000);
+         }
+       } catch (trimErr) {
+         console.warn('[SQLite] Failed to trim _sync_log:', trimErr);
+       }
+    }
+
+    // SAFETY: SQLite has a hard limit of 999 parameters. 
+    // If we exceed this, the query will crash.
+    if (params.length > 990) {
+      console.error(`[SQLite:Query] ABORTED: Too many parameters (${params.length}) for table ${tableName}. This exceeds SQLite limits.`);
+      return { error: 'too_many_parameters', count: params.length };
+    }
+
+    try {
+      const rows = db.prepare(sql).all(...params);
+      return rows.map(mapRowToResult).filter(Boolean);
+    } catch (e) {
+      console.error(`[sqlite:query] Error for ${tableName}. Params(${params.length}): ${JSON.stringify(params)}. SQL: ${sql}`, e);
+      return [];
+    }
+  } catch (error) {
+    console.error(`[sqlite:query] Outer Error for ${tableName}:`, error);
     return [];
   }
 });
@@ -1358,15 +1702,13 @@ ipcMain.handle('sqlite:get', async (_event, tableName, value, column = 'id') => 
     const db = getSqliteDb();
     let row;
     if (column === 'id') {
-      row = db.prepare(`SELECT data FROM ${tableName} WHERE id = ?`).get(value);
+      row = db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(value);
     } else {
       // Search within the JSON 'data' column for a specific property
-      // better-sqlite3 supports JSON1 functions like json_extract
       try {
-        row = db.prepare(`SELECT data, id FROM ${tableName} WHERE json_extract(data, '$.' || ?) = ?`).get(column, value);
+        row = db.prepare(`SELECT *, id FROM ${tableName} WHERE json_extract(data, '$.' || ?) = ?`).get(column, value);
       } catch (jsonErr) {
-        // Fallback for older SQLite versions if json_extract is not available (unlikely)
-        const allRows = db.prepare(`SELECT id, data FROM ${tableName}`).all();
+        const allRows = db.prepare(`SELECT * FROM ${tableName}`).all();
         row = allRows.find(r => {
           try {
             const data = JSON.parse(r.data || '{}');
@@ -1376,12 +1718,7 @@ ipcMain.handle('sqlite:get', async (_event, tableName, value, column = 'id') => 
       }
     }
     
-    if (!row) return null;
-    const finalId = row.id || value;
-    return {
-      ...(JSON.parse(row.data || '{}')),
-      id: finalId,
-    };
+    return mapRowToResult(row);
   } catch (e) {
     console.error(`[sqlite:get] Failed for ${tableName}.${column}=${value}:`, e);
     return null;
@@ -1449,9 +1786,9 @@ function startSqliteWatcher(folderPath) {
 function forceCheckpoint() {
   if (!sqliteDb) return;
   try {
-    // PASSIVE: doesn't block other connections, but flushes what it can
-    // RESTART: flushes everything and restarts the WAL file (more thorough)
-    sqliteDb.pragma('wal_checkpoint(RESTART)');
+    // PASSIVE: doesn't block other connections, flushes what it can.
+    // This is safer for high-concurrency UI updates than RESTART.
+    sqliteDb.pragma('wal_checkpoint(PASSIVE)');
   } catch (e) {
     console.warn('[SQLite Checkpoint] Failed:', e.message);
   }

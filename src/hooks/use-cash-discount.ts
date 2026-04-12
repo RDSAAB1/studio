@@ -351,8 +351,9 @@ export const useCashDiscount = ({
 
     const calculatedCdAmount = useMemo(() => {
         const amount = manualCdAmount !== null ? manualCdAmount : cdContext.amount;
-        return roundToRupee(clampNumber(amount, 0, cdContext.maxAvailable));
-    }, [manualCdAmount, cdContext]);
+        // CRITICAL: Ensure CD never exceeds total outstanding to prevent negative balances
+        return roundToRupee(clampNumber(amount, 0, Math.min(cdContext.maxAvailable, totalOutstanding)));
+    }, [manualCdAmount, cdContext, totalOutstanding]);
 
     return {
         cdEnabled,

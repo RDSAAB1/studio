@@ -316,21 +316,25 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     .first();
                 
                 if (existingSupplier) {
-                    form.setValue('name', existingSupplier.name || '');
-                    form.setValue('so', existingSupplier.so || '');
-                    form.setValue('address', existingSupplier.address || '');
-                    setCurrentSupplier(existingSupplier);
+                    // Update form values with existing details
+                    if (existingSupplier.name) form.setValue('name', existingSupplier.name, { shouldValidate: true });
+                    if (existingSupplier.so) form.setValue('so', existingSupplier.so, { shouldValidate: true });
+                    if (existingSupplier.address) form.setValue('address', existingSupplier.address, { shouldValidate: true });
+                    
+                    // Trigger calculation and UI update
+                    setCurrentSupplier(prev => ({
+                        ...prev,
+                        ...existingSupplier
+                    }));
                     
                     setTimeout(() => {
                         calculateSummary();
-                    }, 100);
+                    }, 50);
                     
-/* 
                     toast({
-                        title: "Existing Contact Found",
-                        description: `Details for ${existingSupplier.name}${existingSupplier.so ? ` S/O ${existingSupplier.so}` : ''}, ${existingSupplier.address || 'No Address'} (Contact: ${trimmedContact}) have been auto-filled.`,
+                        title: "Entry Auto-filled",
+                        description: `Found existing record for ${existingSupplier.name}. Details have been loaded.`,
                     });
-*/
                 }
             } catch (error) {
                 // Error checking existing contact

@@ -215,66 +215,107 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             const now = new Date().toISOString();
             // Prioritize rtgsSrNo as the primary paymentId if it exists for RTGS method
             const newPaymentId = (editingPayment?.paymentId || editingPayment?.id || paymentId) || (paymentMethod === 'RTGS' ? rtgsSrNo : '') || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
-            const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? (Number(i.entry.netAmount) || 0)), 0);
-            const totalNetAmount = entryOutstandings.reduce((s, i) => s + (Number(i.entry.netAmount) || 0), 0);
+            // Sort entryOutstandings by srNo to ensure consistent sequential distribution
+            entryOutstandings = [...entryOutstandings].sort((a, b) => {
+                const srA = String(a.entry.srNo || "").toLowerCase();
+                const srB = String(b.entry.srNo || "").toLowerCase();
+                return srA.localeCompare(srB, undefined, { numeric: true, sensitivity: 'base' });
+            });
 
-            // Gov. extra: distribute proportionally by outstanding (same as Firestore path) so paidFor gets extraAmount
+            const totalOutstanding = entryOutstandings.reduce((s, i) => {
+                const item = i as any;
+                const netAmount = Number(i.entry.originalNetAmount || i.entry.netAmount || 0);
+                const currentOutstanding = item.outstanding ?? (netAmount - Number(i.entry.totalPaid || 0) - Number(i.entry.totalCd || 0));
+                return s + Math.max(0, currentOutstanding);
+            }, 0);
+
+            // Gov. extra: distribute sequentially (Pure Sequential Fill-up)
             const govExtraSharePerEntry: number[] = entryOutstandings.map(() => 0);
             if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0 && entryOutstandings.length > 0) {
-                const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
-                if (totalOutstanding > 0) {
-                    let extraAssigned = 0;
-                    for (let i = 0; i < entryOutstandings.length; i++) {
-                        const entry = entryOutstandings[i].entry;
-                        const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? (Number(entry.netAmount) || 0));
-                        const isLast = i === entryOutstandings.length - 1;
-                        const share = isLast
-                            ? Math.round((extraTotal - extraAssigned) * 100) / 100
-                            : Math.round((extraTotal * outstanding / totalOutstanding) * 100) / 100;
-                        govExtraSharePerEntry[i] = Math.max(0, share);
-                        extraAssigned += govExtraSharePerEntry[i];
+                let remainingExtra = Math.round((govExtraAmount || 0) * 100) / 100;
+                for (let i = 0; i < entryOutstandings.length; i++) {
+                    const item = entryOutstandings[i] as any;
+                    const entry = item.entry;
+                    const isLast = i === entryOutstandings.length - 1;
+                    
+                    const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                    const prevPaid = Number(entry.totalPaid || 0);
+                    const prevCd = Number(entry.totalCd || 0);
+                    const currentOutstanding = item.outstanding ?? (netAmount - prevPaid - prevCd);
+                    const outstanding = Math.max(0, currentOutstanding);
+                    
+                    let extra = 0;
+                    if (isLast) {
+                        extra = remainingExtra;
+                    } else {
+                        extra = Math.min(remainingExtra, outstanding);
                     }
-                } else {
-                    const perEntry = Math.round((extraTotal / entryOutstandings.length) * 100) / 100;
-                    for (let i = 0; i < entryOutstandings.length; i++) {
-                        govExtraSharePerEntry[i] = i === entryOutstandings.length - 1
-                            ? Math.round((extraTotal - perEntry * (entryOutstandings.length - 1)) * 100) / 100
-                            : perEntry;
-                    }
+                    extra = Math.round(extra * 100) / 100;
+                    govExtraSharePerEntry[i] = extra;
+                    remainingExtra = Math.round((remainingExtra - extra) * 100) / 100;
                 }
             }
             const paidForDetailsLocal: PaidFor[] = [];
             let remainingCash = Math.round(finalizedAmount * 100) / 100;
             let remainingCd = Math.round(effectiveCdAmount * 100) / 100;
-            
-            // Only loop if entries exist
+
+            // 1. Proportional CD Distribution
+            const cdAllocationsLocal: number[] = entryOutstandings.map(() => 0);
+            if (remainingCd > 0) {
+                if (totalOutstanding > 0) {
+                    let cdAssigned = 0;
+                    for (let i = 0; i < entryOutstandings.length; i++) {
+                        const isLast = i === entryOutstandings.length - 1;
+                        const item = entryOutstandings[i] as any;
+                        const entry = item.entry;
+                        const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                        const outstanding = Math.max(0, item.outstanding ?? (netAmount - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0)));
+                        
+                        const share = isLast ? (remainingCd - cdAssigned) : (remainingCd * outstanding / totalOutstanding);
+                        const give = Math.round(Math.max(0, share) * 100) / 100;
+                        cdAllocationsLocal[i] = give;
+                        cdAssigned += give;
+                    }
+                } else {
+                    const perEntry = Math.round((remainingCd / entryOutstandings.length) * 100) / 100;
+                    for (let i = 0; i < entryOutstandings.length; i++) {
+                        cdAllocationsLocal[i] = i === entryOutstandings.length - 1 ? (remainingCd - perEntry * (entryOutstandings.length - 1)) : perEntry;
+                    }
+                }
+            }
+
+            // 2. Sequential Cash Fill-up: Fill bills one by one with remaining cash
             if (entryOutstandings.length > 0) {
                 for (let i = 0; i < entryOutstandings.length; i++) {
-                    const item = entryOutstandings[i];
+                    const item = entryOutstandings[i] as any;
                     const entry = item.entry;
-                    const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
-                    
-                    // Share: Priority 1: Current Outstanding weights. Priority 2: Net Amount weights. Fallback: Equal split.
-                    const share = (totalOutstanding > 1) 
-                        ? (outstanding / totalOutstanding) 
-                        : (totalNetAmount > 1 ? (Number(entry.netAmount) / totalNetAmount) : 1 / entryOutstandings.length);
+                    const isLast = i === entryOutstandings.length - 1;
 
-                    const amount = i === entryOutstandings.length - 1
-                        ? Math.round(remainingCash * 100) / 100
-                        : Math.min(remainingCash, Math.round(finalizedAmount * share * 100) / 100);
-                    const cdAmount = i === entryOutstandings.length - 1
-                        ? Math.round(remainingCd * 100) / 100
-                        : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                    const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                    const outstanding = Math.max(0, item.outstanding ?? (netAmount - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0)));
+                    
+                    if (outstanding <= 0 && !isLast) continue;
+
+                    // Use pre-allocated proportional CD
+                    const cdAmount = Math.round((cdAllocationsLocal[i] || 0) * 100) / 100;
+
+                    // Remaining room for cash after CD
+                    const roomForCash = Math.max(0, Math.round((outstanding - cdAmount) * 100) / 100);
+                    const amount = Math.min(remainingCash, roomForCash || remainingCash);
                     remainingCash = Math.round((remainingCash - amount) * 100) / 100;
-                    remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
+                    
+                    // If this is the last one and there is still cash left, add it here (overpayment)
+                    const finalAmount = isLast ? Math.round((amount + remainingCash) * 100) / 100 : amount;
+                    if (isLast) remainingCash = 0;
+
                     const extraAmount = govExtraSharePerEntry[i] ?? 0;
-                    if (amount > 0 || cdAmount > 0 || extraAmount > 0) {
+                    if (finalAmount > 0 || cdAmount > 0 || extraAmount > 0) {
                         const netAmount = Number(entry.netAmount) || 0;
                         const entryAny = entry as any;
                         paidForDetailsLocal.push({
                             srNo: entry.srNo || '',
                             supplierId: entry.id || '',
-                            amount: Math.round(amount * 100) / 100,
+                            amount: Math.round(finalAmount * 100) / 100,
                             cdAmount: Math.round(cdAmount * 100) / 100,
                             parchiNo: entry.parchiNo || entry.srNo || '',
                             paymentId: newPaymentId,
@@ -356,11 +397,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             let remainingPayment = distributableAmount;
             let remainingCd = effectiveCdAmount;
             
-            // Ledger Debit overpayment: sort so entries with positive outstanding get payment first
-            // (otherwise 0-outstanding entry gets full amount and 4K-outstanding entry gets 0)
-            if (isLedger && drCr === 'Debit' && entryOutstandings.length > 1) {
-                entryOutstandings = [...entryOutstandings].sort((a, b) => (b.outstanding ?? 0) - (a.outstanding ?? 0));
-            }
+            // Sort entries sequentially by srNo
+            entryOutstandings = [...entryOutstandings].sort((a, b) => {
+                const srA = String(a.entry.srNo || "").toLowerCase();
+                const srB = String(b.entry.srNo || "").toLowerCase();
+                return srA.localeCompare(srB, undefined, { numeric: true, sensitivity: 'base' });
+            });
             
             const processedEntries: PaidFor[] = [];
             // Ledger: Debit = payment (entries ko distribute/update karo). Credit = charge (entries ko update nahi, summary me extra side se treat hota hai).
@@ -397,34 +439,26 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 plan.push({ entryRef, item, entryData, currentPaid, currentCd, netAmount, outstanding, amountToPay: 0, roomForCd });
             }
 
-            // Gov: Extra amount pehle entries ki capacity mein add karo, PHIR To Be Paid distribute. Isse full amount distribute ho jata hai.
-            // Pehle extra add karo → capacity badh jati hai → phir cash distribute karo.
+            // Gov: Extra amount sequels (Pure Sequential Fill-up)
             const govExtraSharePerEntry: number[] = plan.map(() => 0);
             if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0 && plan.length > 0) {
-                const totalBaseOutstanding = plan.reduce((s, p) => s + p.outstanding, 0);
-                const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
-                if (totalBaseOutstanding > 0) {
-                    let extraAssigned = 0;
-                    for (let i = 0; i < plan.length; i++) {
-                        const p = plan[i];
-                        const isLast = i === plan.length - 1;
-                        const share = isLast
-                            ? Math.round((extraTotal - extraAssigned) * 100) / 100
-                            : Math.round((extraTotal * p.outstanding / totalBaseOutstanding) * 100) / 100;
-                        const extraShare = Math.max(0, share);
-                        govExtraSharePerEntry[i] = extraShare;
-                        p.outstanding = Math.round((p.outstanding + extraShare) * 100) / 100;
-                        p.roomForCd = Math.round(Math.max(0, p.outstanding) * 100) / 100;
-                        extraAssigned += extraShare;
+                let remainingExtra = Math.round((govExtraAmount || 0) * 100) / 100;
+                for (let i = 0; i < plan.length; i++) {
+                    const p = plan[i];
+                    const isLast = i === plan.length - 1;
+                    const room = Math.max(0, p.outstanding);
+                    
+                    let extra = 0;
+                    if (isLast) {
+                        extra = remainingExtra;
+                    } else {
+                        extra = Math.min(remainingExtra, room);
                     }
-                } else {
-                    // Equal split when no outstanding
-                    const perEntry = Math.round((extraTotal / plan.length) * 100) / 100;
-                    for (let i = 0; i < plan.length; i++) {
-                        govExtraSharePerEntry[i] = perEntry;
-                        plan[i].outstanding = Math.round((plan[i].outstanding + perEntry) * 100) / 100;
-                        plan[i].roomForCd = Math.round(Math.max(0, plan[i].outstanding) * 100) / 100;
-                    }
+                    extra = Math.round(extra * 100) / 100;
+                    govExtraSharePerEntry[i] = extra;
+                    p.outstanding = Math.round((p.outstanding + extra) * 100) / 100;
+                    p.roomForCd = Math.round(Math.max(0, p.outstanding) * 100) / 100;
+                    remainingExtra = Math.round((remainingExtra - extra) * 100) / 100;
                 }
             }
 
@@ -513,216 +547,26 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 return total;
             });
 
+            // UPDATED: Proportional CD Distribution (restored as per user request)
             if (remainingCd > 0) {
-                if (isOnPreviouslyPaidNoCd && history.length > 0) {
-                    // "CD on Paid Amount (No CD)": CD ONLY on previously paid amount that had no CD — no CD on current payment.
-                    // 20-day rule: sirf 20 din ke andar wali payments count — 20 din se pehley payment to CD include, 20 din ke baad wali to include nahi. Isse yahaan CD sahi calculate hoti hai.
-                    const { previouslyPaidNoCd } = buildPreviouslyPaidNoCd(true);
-                    let cdRemaining = remainingCd;
+                const totalRoomForCd = plan.reduce((s, p) => s + Math.max(0, p.outstanding), 0);
+                if (totalRoomForCd > 0) {
+                    let cdAssigned = 0;
                     for (let i = 0; i < plan.length; i++) {
-                        const prevNoCd = previouslyPaidNoCd[i] ?? 0;
-                        if (prevNoCd <= 0) continue;
+                        const isLast = i === plan.length - 1;
                         const p = plan[i];
-                        const cdEligible = Math.round((prevNoCd * cdPercent) / 100 * 100) / 100;
-                        const room = Math.max(0, p.roomForCd - cdAllocations[i]);
-                        const give = Math.min(cdRemaining, cdEligible, room);
-                        if (give > 0) {
-                            cdAllocations[i] = Math.round((cdAllocations[i] + give) * 100) / 100;
-                            cdRemaining = Math.round((cdRemaining - give) * 100) / 100;
-                        }
+                        const room = Math.max(0, p.outstanding);
+                        
+                        const share = isLast ? (remainingCd - cdAssigned) : (remainingCd * room / totalRoomForCd);
+                        const give = Math.round(Math.max(0, share) * 100) / 100;
+                        cdAllocations[i] = give;
+                        cdAssigned += give;
                     }
-                } else if (isCdOnPaidAmount && (totalPayment > 0 || history.length > 0)) {
-                    // "Partial CD on Paid Amount": First CD on previously paid without CD (by date), then remaining by current amountToPay. 20-day rule yahan nahi (sirf No CD mode par).
-                    const { previouslyPaidNoCd, earliestDateNoCd } = buildPreviouslyPaidNoCd(false);
-
-                    let cdRemaining = remainingCd;
-                    const sortedByEarliestFirst = plan.map((_, i) => i).sort((a, b) => {
-                        const ea = earliestDateNoCd[a] ?? Infinity;
-                        const eb = earliestDateNoCd[b] ?? Infinity;
-                        if (ea !== eb) return ea - eb;
-                        return (previouslyPaidNoCd[b] ?? 0) - (previouslyPaidNoCd[a] ?? 0);
-                    });
-                    for (const i of sortedByEarliestFirst) {
-                        if (cdRemaining <= 0) break;
-                        const prevNoCd = previouslyPaidNoCd[i] ?? 0;
-                        if (prevNoCd <= 0) continue;
-                        const p = plan[i];
-                        const cdEligibleOnPrev = Math.round((prevNoCd * cdPercent) / 100 * 100) / 100;
-                        const room = p.roomForCd - cdAllocations[i];
-                        const give = Math.min(cdRemaining, cdEligibleOnPrev, Math.max(0, room));
-                        if (give > 0) {
-                            cdAllocations[i] = Math.round((cdAllocations[i] + give) * 100) / 100;
-                            cdRemaining = Math.round((cdRemaining - give) * 100) / 100;
-                        }
+                } else {
+                    const perEntry = Math.round((remainingCd / plan.length) * 100) / 100;
+                    for (let i = 0; i < plan.length; i++) {
+                        cdAllocations[i] = i === plan.length - 1 ? (remainingCd - perEntry * (plan.length - 1)) : perEntry;
                     }
-
-                    if (cdRemaining > 0 && (totalPayment > 0 || totalOutstandingForCd > 0)) {
-                        const totalBase = totalPayment > 0 ? totalPayment : totalOutstandingForCd;
-                        let cdAssigned = 0;
-                        for (let i = 0; i < plan.length; i++) {
-                            const p = plan[i];
-                            const roomLeft = p.roomForCd - cdAllocations[i];
-                            if (roomLeft <= 0) continue;
-                            const isLast = i === plan.length - 1;
-                            let extra: number;
-                            if (isLast) {
-                                extra = Math.max(0, Math.min(roomLeft, Math.round((cdRemaining - cdAssigned) * 100) / 100));
-                            } else {
-                                const base = totalPayment > 0 ? p.amountToPay : p.outstanding;
-                                const share = totalBase > 0 ? (cdRemaining * base) / totalBase : 0;
-                                extra = Math.min(roomLeft, Math.round(share * 100) / 100);
-                                extra = Math.max(0, extra);
-                            }
-                            cdAllocations[i] = Math.round((cdAllocations[i] + extra) * 100) / 100;
-                            cdAssigned += extra;
-                        }
-                        let remainder = Math.round((cdRemaining - cdAssigned) * 100) / 100;
-                        if (remainder > 0) {
-                            for (let i = 0; i < plan.length && remainder > 0; i++) {
-                                const roomLeft = plan[i].roomForCd - cdAllocations[i];
-                                if (roomLeft > 0) {
-                                    const ex = Math.min(remainder, roomLeft);
-                                    cdAllocations[i] = Math.round((cdAllocations[i] + ex) * 100) / 100;
-                                    remainder = Math.round((remainder - ex) * 100) / 100;
-                                }
-                            }
-                        }
-                    }
-                } else if (totalRoomForCd > 0 && !isCdOnPaidAmount && !isOnPreviouslyPaidNoCd) {
-                    const isOnFullAmount = cdAt === 'on_full_amount' || cdAt === 'proportional_cd';
-                    const isOnUnpaidAmount = cdAt === 'on_unpaid_amount';
-                    const eligibleIndices = plan
-                        .map((_, i) => i)
-                        .filter(i => (totalCdReceivedByEntry[i] ?? 0) <= 0.01 && plan[i].outstanding > 0.01);
-                    const useEligibleOnly = isOnFullAmount && eligibleIndices.length > 0;
-                    const indicesToUse = useEligibleOnly
-                        ? eligibleIndices
-                        : plan.map((_, i) => i).filter(i => plan[i].roomForCd > 0.01);
-
-                    if (isOnFullAmount && indicesToUse.length > 0) {
-                        // on_full_amount / proportional_cd: CD by original amount (proportional), cap by room, redistribute excess
-                        const totalOriginal = indicesToUse.reduce((s, i) => s + plan[i].netAmount, 0);
-                        if (totalOriginal > 0) {
-                            let totalAlloc = 0;
-                            for (const i of indicesToUse) {
-                                const p = plan[i];
-                                const share = (remainingCd * p.netAmount) / totalOriginal;
-                                const raw = Math.round(share * 100) / 100;
-                                const capped = Math.min(p.roomForCd, Math.max(0, raw));
-                                cdAllocations[i] = capped;
-                                totalAlloc += capped;
-                            }
-                            let excess = Math.round((remainingCd - totalAlloc) * 100) / 100;
-                            if (excess > 0.01) {
-                                const byCapacity = [...indicesToUse].sort((a, b) => (plan[b].roomForCd - cdAllocations[b]) - (plan[a].roomForCd - cdAllocations[a]));
-                                for (const i of byCapacity) {
-                                    if (excess <= 0.01) break;
-                                    const roomLeft = plan[i].roomForCd - cdAllocations[i];
-                                    if (roomLeft > 0.01) {
-                                        const add = Math.min(excess, roomLeft);
-                                        cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
-                                        excess = Math.round((excess - add) * 100) / 100;
-                                    }
-                                }
-                            }
-                        }
-                    } else if (isOnUnpaidAmount && indicesToUse.length > 0) {
-                        // on_unpaid_amount: CD by outstanding (proportional), cap by room
-                        const totalOut = indicesToUse.reduce((s, i) => s + plan[i].outstanding, 0);
-                        if (totalOut > 0) {
-                            let totalAlloc = 0;
-                            for (const i of indicesToUse) {
-                                const p = plan[i];
-                                const share = (remainingCd * p.outstanding) / totalOut;
-                                const raw = Math.round(share * 100) / 100;
-                                const capped = Math.min(p.roomForCd, Math.max(0, raw));
-                                cdAllocations[i] = capped;
-                                totalAlloc += capped;
-                            }
-                            let remainder = Math.round((remainingCd - totalAlloc) * 100) / 100;
-                            if (remainder > 0.01) {
-                                for (const i of indicesToUse) {
-                                    if (remainder <= 0.01) break;
-                                    const roomLeft = plan[i].roomForCd - cdAllocations[i];
-                                    if (roomLeft > 0.01) {
-                                        const add = Math.min(remainder, roomLeft);
-                                        cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
-                                        remainder = Math.round((remainder - add) * 100) / 100;
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Default: distribute by room (outstanding - amountToPay)
-                        let cdAssigned = 0;
-                        for (let i = 0; i < plan.length; i++) {
-                            const p = plan[i];
-                            const isLast = i === plan.length - 1;
-                            let cdToPay: number;
-                            if (isLast) {
-                                cdToPay = Math.max(0, Math.min(p.roomForCd, Math.round((remainingCd - cdAssigned) * 100) / 100));
-                            } else {
-                                cdToPay = Math.min(p.roomForCd, Math.round((remainingCd * p.roomForCd / totalRoomForCd) * 100) / 100);
-                                cdToPay = Math.max(0, cdToPay);
-                            }
-                            cdAllocations[i] = cdToPay;
-                            cdAssigned += cdToPay;
-                        }
-                        let remainder = Math.round((remainingCd - cdAllocations.reduce((a, b) => a + b, 0)) * 100) / 100;
-                        if (remainder > 0) {
-                            for (let i = 0; i < plan.length && remainder > 0; i++) {
-                                const roomLeft = plan[i].roomForCd - cdAllocations[i];
-                                if (roomLeft > 0) {
-                                    const extra = Math.min(remainder, roomLeft);
-                                    cdAllocations[i] = Math.round((cdAllocations[i] + extra) * 100) / 100;
-                                    remainder = Math.round((remainder - extra) * 100) / 100;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Final verification: no entry gets CD > room (outstanding - amountToPay); cap and redistribute excess
-            for (let i = 0; i < plan.length; i++) {
-                const maxCd = plan[i].roomForCd;
-                if (cdAllocations[i] > maxCd + 0.01) {
-                    let excess = Math.round((cdAllocations[i] - maxCd) * 100) / 100;
-                    cdAllocations[i] = Math.round(maxCd * 100) / 100;
-                    for (let j = 0; j < plan.length && excess > 0.01; j++) {
-                        if (i === j) continue;
-                        const roomLeft = plan[j].roomForCd - cdAllocations[j];
-                        if (roomLeft > 0.01) {
-                            const add = Math.min(excess, roomLeft);
-                            cdAllocations[j] = Math.round((cdAllocations[j] + add) * 100) / 100;
-                            excess = Math.round((excess - add) * 100) / 100;
-                        }
-                    }
-                }
-            }
-
-            // Ensure full CD is allocated to paidFor (breakdown) even when room was 0 (full payment)
-            // Skip for "CD on Paid Amount (No CD)". Jab amountToPay abhi 0 hai to proportion ke liye outstanding use karo.
-            const totalAllocated = cdAllocations.reduce((a, b) => a + b, 0);
-            if (
-                !isOnPreviouslyPaidNoCd &&
-                remainingCd > 0 &&
-                totalAllocated < remainingCd - 0.01 &&
-                (totalPayment > 0 || totalOutstandingForCd > 0)
-            ) {
-                const toDistribute = Math.round((remainingCd - totalAllocated) * 100) / 100;
-                const totalBase = totalPayment > 0 ? totalPayment : totalOutstandingForCd;
-                let assigned = 0;
-                for (let i = 0; i < plan.length; i++) {
-                    const p = plan[i];
-                    const isLast = i === plan.length - 1;
-                    const base = totalPayment > 0 ? p.amountToPay : p.outstanding;
-                    const share = isLast
-                        ? Math.round((toDistribute - assigned) * 100) / 100
-                        : Math.round((toDistribute * base / totalBase) * 100) / 100;
-                    const add = Math.max(0, share);
-                    cdAllocations[i] = Math.round((cdAllocations[i] + add) * 100) / 100;
-                    assigned += add;
                 }
             }
 
@@ -749,17 +593,20 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
 
             // Pehle CD distribute ho chuki; ab jo bache vo To Be Paid (cash). Har entry ko capacity = outstanding - cdAllocations[i] tak cash mil sakti hai.
             // Ledger Debit: allow overpayment (full amount), so outstanding can go negative
+            // PHASE 2c: distribute To Be Paid (cash) sequentially
             let remainingCash = Math.round(toBePaidTotal * 100) / 100;
             const allowOverpayment = isLedger && drCr === 'Debit';
             for (let i = 0; i < plan.length; i++) {
                 const p = plan[i];
+                const isLast = i === plan.length - 1;
                 const baseCap = Math.round((p.outstanding - (cdAllocations[i] ?? 0)) * 100) / 100;
-                const cap = allowOverpayment ? Math.max(remainingCash, baseCap) : Math.max(0, baseCap);
+                
                 let pay = 0;
-                if (remainingCash > 0 && (cap > 0 || allowOverpayment)) {
-                    pay = Math.min(remainingCash, allowOverpayment ? remainingCash : cap);
-                    pay = Math.round(pay * 100) / 100;
-                    remainingCash = Math.round((remainingCash - pay) * 100) / 100;
+                if (remainingCash > 0) {
+                    const cap = allowOverpayment ? remainingCash : Math.max(0, baseCap);
+                    const amount = Math.min(remainingCash, cap || remainingCash);
+                    pay = isLast ? Math.round((amount + (remainingCash - amount)) * 100) / 100 : amount;
+                    remainingCash = isLast ? 0 : Math.round((remainingCash - pay) * 100) / 100;
                 }
                 p.amountToPay = pay;
                 p.roomForCd = Math.max(0, Math.round((p.outstanding - pay - (cdAllocations[i] ?? 0)) * 100) / 100);
@@ -909,46 +756,91 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             if (isLocalFolderMode() && entryOutstandings.length >= 0) {
                 const now = new Date().toISOString();
                 const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
-                const totalOutstanding = entryOutstandings.reduce((s, i) => s + Math.max(0, (i as any).outstanding ?? (Number(i.entry.netAmount) || 0)), 0);
-                const totalNetAmount = entryOutstandings.reduce((s, i) => s + (Number(i.entry.netAmount) || 0), 0);
+                // Sort entryOutstandings by srNo
+                entryOutstandings = [...entryOutstandings].sort((a, b) => {
+                    const srA = String(a.entry.srNo || "").toLowerCase();
+                    const srB = String(b.entry.srNo || "").toLowerCase();
+                    return srA.localeCompare(srB, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                const totalOutstanding = entryOutstandings.reduce((s, i) => {
+                    const entry = i.entry;
+                    const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                    const prevPaid = Number(entry.totalPaid || 0);
+                    const prevCd = Number(entry.totalCd || 0);
+                    const currentOutstanding = (i as any).outstanding ?? (netAmount - prevPaid - prevCd);
+                    return s + Math.max(0, currentOutstanding);
+                }, 0);
+                
                 const govExtraSharePerEntryCatch: number[] = entryOutstandings.map(() => 0);
                 if (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0) {
-                    const extraTotal = Math.round((govExtraAmount || 0) * 100) / 100;
-                    if (totalOutstanding > 0) {
-                        let extraAssigned = 0;
-                        for (let i = 0; i < entryOutstandings.length; i++) {
-                            const outstanding = Math.max(0, (entryOutstandings[i] as any).outstanding ?? (Number(entryOutstandings[i].entry.netAmount) || 0));
-                            const isLast = i === entryOutstandings.length - 1;
-                            const share = isLast ? Math.round((extraTotal - extraAssigned) * 100) / 100 : Math.round((extraTotal * outstanding / totalOutstanding) * 100) / 100;
-                            govExtraSharePerEntryCatch[i] = Math.max(0, share);
-                            extraAssigned += govExtraSharePerEntryCatch[i];
+                    let remainingExtra = Math.round((govExtraAmount || 0) * 100) / 100;
+                    for (let i = 0; i < entryOutstandings.length; i++) {
+                        const item = entryOutstandings[i] as any;
+                        const entry = item.entry;
+                        const isLast = i === entryOutstandings.length - 1;
+                        
+                        const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                        const prevPaid = Number(entry.totalPaid || 0);
+                        const prevCd = Number(entry.totalCd || 0);
+                        const currentOutstanding = item.outstanding ?? (netAmount - prevPaid - prevCd);
+                        const outstanding = Math.max(0, currentOutstanding);
+                        
+                        let extra = 0;
+                        if (isLast) {
+                            extra = remainingExtra;
+                        } else {
+                            extra = Math.min(remainingExtra, outstanding);
                         }
-                    } else {
-                        const perEntry = Math.round((extraTotal / entryOutstandings.length) * 100) / 100;
-                        for (let i = 0; i < entryOutstandings.length; i++) {
-                            govExtraSharePerEntryCatch[i] = i === entryOutstandings.length - 1 ? Math.round((extraTotal - perEntry * (entryOutstandings.length - 1)) * 100) / 100 : perEntry;
-                        }
+                        extra = Math.round(extra * 100) / 100;
+                        govExtraSharePerEntryCatch[i] = extra;
+                        remainingExtra = Math.round((remainingExtra - extra) * 100) / 100;
                     }
                 }
                 const paidForDetails: PaidFor[] = [];
                 let remainingCash = Math.round(finalAmountToPay * 100) / 100;
                 let remainingCd = Math.round(effectiveCdAmount * 100) / 100;
-                for (let i = 0; i < entryOutstandings.length; i++) {
-                    const item = entryOutstandings[i];
-                    const entry = item.entry;
-                    const outstanding = Math.max(0, (item as any).outstanding ?? (Number(entry.netAmount) || 0) - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0));
-                    
-                    // Share: Priority 1: Current Outstanding weights. Priority 2: Net Amount weights. Fallback: Equal split.
-                    const share = (totalOutstanding > 1) 
-                        ? (outstanding / totalOutstanding) 
-                        : (totalNetAmount > 1 ? (Number(entry.netAmount) / totalNetAmount) : 1 / entryOutstandings.length);
+                // 1. Proportional CD Distribution
+                const cdAllocationsCatch: number[] = entryOutstandings.map(() => 0);
+                if (remainingCd > 0) {
+                    if (totalOutstanding > 0) {
+                        let cdAssigned = 0;
+                        for (let i = 0; i < entryOutstandings.length; i++) {
+                            const isLast = i === entryOutstandings.length - 1;
+                            const item = entryOutstandings[i] as any;
+                            const entry = item.entry;
+                            const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                            const outstanding = Math.max(0, item.outstanding ?? (netAmount - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0)));
+                            
+                            const share = isLast ? (remainingCd - cdAssigned) : (remainingCd * outstanding / totalOutstanding);
+                            const give = Math.round(Math.max(0, share) * 100) / 100;
+                            cdAllocationsCatch[i] = give;
+                            cdAssigned += give;
+                        }
+                    } else {
+                        const perEntry = Math.round((remainingCd / entryOutstandings.length) * 100) / 100;
+                        for (let i = 0; i < entryOutstandings.length; i++) {
+                            cdAllocationsCatch[i] = i === entryOutstandings.length - 1 ? (remainingCd - perEntry * (entryOutstandings.length - 1)) : perEntry;
+                        }
+                    }
+                }
 
-                    const amount = i === entryOutstandings.length - 1
-                        ? Math.round(remainingCash * 100) / 100
-                        : Math.min(remainingCash, Math.round(finalAmountToPay * share * 100) / 100);
-                    const cdAmount = i === entryOutstandings.length - 1
-                        ? Math.round(remainingCd * 100) / 100
-                        : Math.min(remainingCd, Math.round(effectiveCdAmount * share * 100) / 100);
+                for (let i = 0; i < entryOutstandings.length; i++) {
+                    const item = entryOutstandings[i] as any;
+                    const entry = item.entry;
+                    const isLast = i === entryOutstandings.length - 1;
+                    const netAmount = Number(entry.originalNetAmount || entry.netAmount || 0);
+                    const outstanding = Math.max(0, item.outstanding ?? (netAmount - Number(entry.totalPaid || 0) - Number(entry.totalCd || 0)));
+                    
+                    if (outstanding <= 0 && !isLast) continue;
+
+                    // Use pre-allocated proportional CD
+                    const cdAmount = Math.round((cdAllocationsCatch[i] || 0) * 100) / 100;
+
+                    // 2. Give Cash next
+                    const roomForCash = Math.max(0, Math.round((outstanding - cdAmount) * 100) / 100);
+                    const amount = isLast ? remainingCash : Math.min(remainingCash, roomForCash);
+                    remainingCash = Math.round((remainingCash - amount) * 100) / 100;
                     
                     let extraAmount = govExtraSharePerEntryCatch[i] ?? 0;
                     let entryAmount = amount;
@@ -959,9 +851,6 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                         entryAmount = 0;
                     }
 
-                    remainingCash = Math.round((remainingCash - amount) * 100) / 100;
-                    remainingCd = Math.round((remainingCd - cdAmount) * 100) / 100;
-                    
                     if (entryAmount > 0 || cdAmount > 0 || extraAmount !== 0) {
                         const netAmount = Number(entry.netAmount) || 0;
                         const entryAny = entry as any;

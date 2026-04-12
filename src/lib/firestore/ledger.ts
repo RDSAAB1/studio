@@ -78,24 +78,45 @@ export async function createLedgerAccount(account: LedgerAccountInput): Promise<
     const docRef = doc(ledgerAccountsCollection);
     const base = { name: account.name, address: account.address || '', contact: account.contact || '', createdAt: timestamp, updatedAt: timestamp };
     const newAccount = withCreateMetadata(base as Record<string, unknown>);
-    const batch = writeBatch(firestoreDB);
-    batch.set(docRef, newAccount);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('ledgerAccounts', { batch });
-    await batch.commit();
-    logActivity({ type: "create", collection: "ledgerAccounts", docId: docRef.id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Created ledger account ${account.name}`, afterData: newAccount }).catch(() => {});
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.set(docRef, newAccount);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerAccounts', { batch });
+        await batch.commit();
+        logActivity({ type: "create", collection: "ledgerAccounts", docId: docRef.id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Created ledger account ${account.name}`, afterData: newAccount }).catch(() => {});
+    }
     return { id: docRef.id, ...newAccount } as LedgerAccount;
 }
 
 export async function updateLedgerAccount(id: string, updates: Partial<LedgerAccountInput>): Promise<void> {
     const docRef = doc(ledgerAccountsCollection, id);
     const data = withEditMetadata({ ...updates, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    const batch = writeBatch(firestoreDB);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('ledgerAccounts', { batch });
-    await batch.commit();
-    logActivity({ type: "edit", collection: "ledgerAccounts", docId: id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Updated ledger account ${id}`, afterData: data }).catch(() => {});
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.update(docRef, data);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerAccounts', { batch });
+        await batch.commit();
+        logActivity({ type: "edit", collection: "ledgerAccounts", docId: id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), summary: `Updated ledger account ${id}`, afterData: data }).catch(() => {});
+    }
+}
+
+export async function bulkUpsertLedgerAccounts(accounts: LedgerAccount[], chunkSize = 400) {
+    if (!accounts.length) return;
+    const { chunkArray } = await import('./suppliers');
+    const chunks = chunkArray(accounts, chunkSize);
+    for (const chunk of chunks) {
+        const batch = writeBatch(firestoreDB);
+        chunk.forEach((account) => {
+            if (!account.id) throw new Error("Ledger Account missing id");
+            const ref = doc(ledgerAccountsCollection, account.id);
+            batch.set(ref, account, { merge: true });
+        });
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerAccounts', { batch });
+        await batch.commit();
+    }
 }
 
 export function getLedgerAccountsRealtime(callback: (data: LedgerAccount[]) => void, onError: (error: Error) => void): () => void {
@@ -108,14 +129,16 @@ export async function deleteLedgerAccount(id: string): Promise<void> {
     if (snap.exists()) {
       await moveToRecycleBin({ collection: "ledgerAccounts", docId: id, docPath: getTenantCollectionPath("ledgerAccounts").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted ledger account ${id}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const entriesSnapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', id)));
-    entriesSnapshot.forEach((entryDoc) => batch.delete(entryDoc.ref));
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('ledgerAccounts', { batch });
-    if (entriesSnapshot.size > 0) await notifySyncRegistry('ledgerEntries', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const entriesSnapshot = await getDocs(query(ledgerEntriesCollection, where('accountId', '==', id)));
+        entriesSnapshot.forEach((entryDoc) => batch.delete(entryDoc.ref));
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerAccounts', { batch });
+        if (entriesSnapshot.size > 0) await notifySyncRegistry('ledgerEntries', { batch });
+        await batch.commit();
+    }
 }
 
 export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
@@ -198,13 +221,15 @@ export async function createLedgerCashAccount(account: LedgerCashAccountInput): 
     const timestamp = new Date().toISOString();
     const payload = { name: account.name, noteGroups: account.noteGroups, createdAt: timestamp, updatedAt: timestamp };
     const docRef = doc(ledgerCashAccountsCollection);
-    try {
-        const batch = writeBatch(firestoreDB);
-        batch.set(docRef, payload);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('ledgerCashAccounts', { batch });
-        await batch.commit();
-    } catch {}
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(docRef, payload);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('ledgerCashAccounts', { batch });
+            await batch.commit();
+        } catch {}
+    }
     const saved = { id: docRef.id, ...payload };
     if (typeof window !== 'undefined' && db?.ledgerCashAccounts) {
         try { await db.ledgerCashAccounts.put(saved); } catch {}
@@ -215,13 +240,15 @@ export async function createLedgerCashAccount(account: LedgerCashAccountInput): 
 export async function updateLedgerCashAccount(id: string, updates: Partial<LedgerCashAccountInput>): Promise<void> {
     const docRef = doc(ledgerCashAccountsCollection, id);
     const payload = stripUndefined({ ...updates, updatedAt: new Date().toISOString() });
-    try {
-        const batch = writeBatch(firestoreDB);
-        batch.update(docRef, payload);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('ledgerCashAccounts', { batch });
-        await batch.commit();
-    } catch {}
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.update(docRef, payload);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('ledgerCashAccounts', { batch });
+            await batch.commit();
+        } catch {}
+    }
     if (typeof window !== 'undefined' && db?.ledgerCashAccounts) {
         try {
             const existing = await db.ledgerCashAccounts.get(id);
@@ -232,17 +259,20 @@ export async function updateLedgerCashAccount(id: string, updates: Partial<Ledge
 
 export async function bulkUpsertLedgerCashAccounts(accounts: LedgerCashAccount[]): Promise<void> {
     if (!accounts.length) return;
-    const batch = writeBatch(firestoreDB);
     const timestamp = new Date().toISOString();
-    
-    accounts.forEach(acc => {
-        const docRef = doc(ledgerCashAccountsCollection, acc.id);
-        batch.set(docRef, { ...acc, updatedAt: timestamp }, { merge: true });
-    });
 
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('ledgerCashAccounts', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        
+        accounts.forEach(acc => {
+            const docRef = doc(ledgerCashAccountsCollection, acc.id);
+            batch.set(docRef, { ...acc, updatedAt: timestamp }, { merge: true });
+        });
+
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerCashAccounts', { batch });
+        await batch.commit();
+    }
 
     if (db && db.ledgerCashAccounts) {
         await db.ledgerCashAccounts.bulkPut(accounts.map(acc => ({ ...acc, updatedAt: timestamp })));
@@ -250,14 +280,16 @@ export async function bulkUpsertLedgerCashAccounts(accounts: LedgerCashAccount[]
 }
 
 export async function deleteLedgerCashAccount(id: string): Promise<void> {
-    try {
-        const docRef = doc(ledgerCashAccountsCollection, id);
-        const batch = writeBatch(firestoreDB);
-        batch.delete(docRef);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('ledgerCashAccounts', { batch });
-        await batch.commit();
-    } catch {}
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(ledgerCashAccountsCollection, id);
+            const batch = writeBatch(firestoreDB);
+            batch.delete(docRef);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('ledgerCashAccounts', { batch });
+            await batch.commit();
+        } catch {}
+    }
     if (typeof window !== 'undefined' && db?.ledgerCashAccounts) {
         try { await db.ledgerCashAccounts.delete(id); } catch {}
     }
@@ -284,26 +316,51 @@ export function getLedgerEntriesRealtime(callback: (data: LedgerEntry[]) => void
 export async function createLedgerEntry(entry: LedgerEntryInput & { accountId: string; balance: number }): Promise<LedgerEntry> {
     const timestamp = new Date().toISOString();
     const normalizedRemarks = typeof entry.remarks === 'string' ? entry.remarks : '';
-    const docRef = await addDoc(ledgerEntriesCollection, { accountId: entry.accountId, date: entry.date, particulars: entry.particulars, debit: entry.debit, credit: entry.credit, balance: entry.balance, remarks: normalizedRemarks, linkGroupId: entry.linkGroupId || null, linkStrategy: entry.linkStrategy || null, createdAt: timestamp, updatedAt: timestamp });
-    return { id: docRef.id, accountId: entry.accountId, date: entry.date, particulars: entry.particulars, debit: entry.debit, credit: entry.credit, balance: entry.balance, remarks: normalizedRemarks || undefined, createdAt: timestamp, updatedAt: timestamp, linkGroupId: entry.linkGroupId, linkStrategy: entry.linkStrategy || undefined };
+    let docId = "";
+    if (!isSqliteMode()) {
+        const docRef = await addDoc(ledgerEntriesCollection, { accountId: entry.accountId, date: entry.date, particulars: entry.particulars, debit: entry.debit, credit: entry.credit, balance: entry.balance, remarks: normalizedRemarks, linkGroupId: entry.linkGroupId || null, linkStrategy: entry.linkStrategy || null, createdAt: timestamp, updatedAt: timestamp });
+        docId = docRef.id;
+    }
+    return { id: docId || `le-${Date.now()}`, accountId: entry.accountId, date: entry.date, particulars: entry.particulars, debit: entry.debit, credit: entry.credit, balance: entry.balance, remarks: normalizedRemarks || undefined, createdAt: timestamp, updatedAt: timestamp, linkGroupId: entry.linkGroupId, linkStrategy: entry.linkStrategy || undefined };
 }
 
 export async function updateLedgerEntriesBatch(entries: LedgerEntry[]): Promise<void> {
-    if (!entries.length) return;
-    const batch = writeBatch(firestoreDB);
-    const timestamp = new Date().toISOString();
-    entries.forEach((entry) => {
-        const entryRef = doc(ledgerEntriesCollection, entry.id);
-        batch.set(entryRef, { ...entry, updatedAt: timestamp, linkGroupId: entry.linkGroupId || null, linkStrategy: entry.linkStrategy || null, remarks: typeof entry.remarks === 'string' ? entry.remarks : '' }, { merge: true });
-    });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        const timestamp = new Date().toISOString();
+        entries.forEach((entry) => {
+            const entryRef = doc(ledgerEntriesCollection, entry.id);
+            batch.set(entryRef, { ...entry, updatedAt: timestamp, linkGroupId: entry.linkGroupId || null, linkStrategy: entry.linkStrategy || null, remarks: typeof entry.remarks === 'string' ? entry.remarks : '' }, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+export async function bulkUpsertLedgerEntries(entries: LedgerEntry[], chunkSize = 400) {
+    if (!isSqliteMode()) {
+        const { chunkArray } = await import('./suppliers');
+        const chunks = chunkArray(entries, chunkSize);
+        for (const chunk of chunks) {
+            const batch = writeBatch(firestoreDB);
+            chunk.forEach((entry) => {
+                if (!entry.id) throw new Error("Ledger Entry missing id");
+                const ref = doc(ledgerEntriesCollection, entry.id);
+                batch.set(ref, entry, { merge: true });
+            });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('ledgerEntries', { batch });
+            await batch.commit();
+        }
+    }
 }
 
 export async function deleteLedgerEntry(id: string): Promise<void> {
-    const entryRef = doc(ledgerEntriesCollection, id);
-    const batch = writeBatch(firestoreDB);
-    batch.delete(entryRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('ledgerEntries', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const entryRef = doc(ledgerEntriesCollection, id);
+        const batch = writeBatch(firestoreDB);
+        batch.delete(entryRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('ledgerEntries', { batch });
+        await batch.commit();
+    }
 }

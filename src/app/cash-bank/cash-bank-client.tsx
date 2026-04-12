@@ -868,15 +868,15 @@ const TransactionRow = React.memo(({ t, sourcesAndDestinations, onEdit, onDelete
     onDelete: (id: string) => void 
 }) => (
     <TableRow>
-        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
+        <TableCell>{t.date && !isNaN(new Date(t.date).getTime()) ? format(new Date(t.date), "dd-MMM-yy") : "---"}</TableCell>
         <TableCell>
             <div className="flex items-center gap-2">
                 {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
                 {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
-                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
+                <span className="font-medium">{toTitleCase((t.type || 'Unknown').replace(/([A-Z])/g, ' $1').trim())}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-                {sourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {sourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}
+                {sourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase((t.source || 'Unknown').replace(/([A-Z])/g, ' $1').trim())} &rarr; {sourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase((t.destination || 'Unknown').replace(/([A-Z])/g, ' $1').trim())}
             </p>
         </TableCell>
         <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>

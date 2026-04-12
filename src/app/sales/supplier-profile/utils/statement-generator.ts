@@ -215,8 +215,24 @@ const yieldToBrowser = (): Promise<void> => {
 };
 
 /**
+ * Safely get paidFor as an array
+ */
+const getSafePaidFor = (p: any): any[] => {
+    if (!p || !p.paidFor) return [];
+    if (Array.isArray(p.paidFor)) return p.paidFor;
+    if (typeof p.paidFor === 'string') {
+        try {
+            const parsed = JSON.parse(p.paidFor);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+    return [];
+};
+
+/**
  * Pre-calculate previously paid amounts for all entries (optimized O(n) approach)
- * This replaces the O(n²) nested loop
  */
 const buildPreviouslyPaidMap = (
     deduplicatedPayments: any[],
@@ -237,11 +253,11 @@ const buildPreviouslyPaidMap = (
     
     for (const payment of sortedPayments) {
         const paymentId = payment.paymentId || payment.id || '';
-        const paymentDate = parseDateSafely(payment.date);
+        const safePaidFor = getSafePaidFor(payment);
         
-        if (!payment.paidFor) continue;
+        if (safePaidFor.length === 0) continue;
         
-        for (const pf of payment.paidFor) {
+        for (const pf of safePaidFor) {
             const entrySrNo = pf.srNo;
             if (!entrySrNo) continue;
             
@@ -257,17 +273,18 @@ const buildPreviouslyPaidMap = (
             const currentPaid = entryPayments.get(entrySrNo) || 0;
             
             // Calculate CD portion for this entry
-            const totalPaidForPayment = payment.paidFor.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-            const cdPortionForThisEntry = (payment as any).cdAmount && totalPaidForPayment > 0 ? 
-                (pf.amount / totalPaidForPayment) * (payment as any).cdAmount : 0;
-            const actualPaymentForThisEntry = pf.amount - cdPortionForThisEntry;
+            const storedCdAmount = Number(pf.cdAmount || 0);
+            const totalPaidForPayment = safePaidFor.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            const cdPortionForThisEntry = storedCdAmount > 0 ? storedCdAmount : 
+                ((payment as any).cdAmount && totalPaidForPayment > 0 ? 
+                (pf.amount / totalPaidForPayment) * (payment as any).cdAmount : 0);
             
-            // Store previously paid amount for this payment
+            // Store previously paid amount for this payment (includes both cash and CD)
             const entryMap = previouslyPaidMap.get(entrySrNo)!;
             entryMap.set(paymentId, currentPaid);
             
-            // Update cumulative paid
-            entryPayments.set(entrySrNo, currentPaid + actualPaymentForThisEntry);
+            // Update cumulative paid (cash + CD)
+            entryPayments.set(entrySrNo, currentPaid + pf.amount + cdPortionForThisEntry);
         }
     }
     
@@ -384,7 +401,8 @@ export const generateStatementTransactions = async (
         const chunk = deduplicatedPayments.slice(i, i + chunkSize);
         
         for (const p of chunk) {
-            const purchaseDates = p.paidFor
+            const safePaidFor = getSafePaidFor(p);
+            const purchaseDates = safePaidFor
                 ?.map((pf: any) => {
                     const purchase = transactionMap.get(pf.srNo);
                     return purchase?.date;
@@ -409,7 +427,7 @@ export const generateStatementTransactions = async (
             const paymentAmountRaw = Number((p as any).amount || 0);
             const paymentAmountAbs = Math.abs(paymentAmountRaw);
             const paidForExtraAmount =
-                p.paidFor?.reduce((sum: number, pf: any) => sum + (Number(pf.extraAmount) || 0), 0) || 0;
+                safePaidFor?.reduce((sum: number, pf: any) => sum + (Number(pf.extraAmount) || 0), 0) || 0;
             const paymentLevelExtraFromFields =
                 Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
             // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
@@ -417,7 +435,7 @@ export const generateStatementTransactions = async (
                 paidForExtraAmount === 0 && (paidForExtraAmount === 0 || !(paymentTypeLower === 'ledger' || paymentTypeLower === 'online'));
 
             // Calculate total paid amount from paidFor entries
-            const totalPaidForPayment = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
+            const totalPaidForPayment = safePaidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
 
             const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
             // Ledger concept for statement:
@@ -431,7 +449,7 @@ export const generateStatementTransactions = async (
             const creditCdAmount = isLedger ? 0 : Number((p as any).cdAmount || 0);
             const ledgerAmountFallback =
                 isLedger &&
-                (p.paidFor?.length || 0) === 0 &&
+                (safePaidFor?.length || 0) === 0 &&
                 paymentLevelExtraFromFields === 0
                     ? paymentAmountAbs
                     : 0;
@@ -449,43 +467,47 @@ export const generateStatementTransactions = async (
 
             // Create payment details
             const paymentHeaderSrNo = formatColumn('SR No', 6);
-            const paymentHeaderOrig = formatColumn('₹Original', 8);
-            const paymentHeaderPrev = formatColumn('₹Previous', 8);
-            const paymentHeaderNow = formatColumn('₹Current', 8);
-            const paymentHeaderBal = formatColumn('₹Balance', 8);
+            const paymentHeaderOrig = formatColumn('₹Orig', 8);
+            const paymentHeaderPrev = formatColumn('₹Prev', 8);
+            const paymentHeaderPaid = formatColumn('₹Paid', 8);
+            const paymentHeaderCd = formatColumn('₹CD', 6);
+            const paymentHeaderBal = formatColumn('₹Bal', 8);
 
-            const paymentHeaderRow = `${paymentHeaderSrNo}|${paymentHeaderOrig}|${paymentHeaderPrev}|${paymentHeaderNow}|${paymentHeaderBal}`;
-            const paymentSeparatorRow = '------|--------|--------|--------|--------';
+            const paymentHeaderRow = `${paymentHeaderSrNo}|${paymentHeaderOrig}|${paymentHeaderPrev}|${paymentHeaderPaid}|${paymentHeaderCd}|${paymentHeaderBal}`;
+            const paymentSeparatorRow = '------|--------|--------|--------|------|--------';
 
-            const paymentDetails = p.paidFor?.map((pf: any) => {
+            const paymentDetails = safePaidFor?.map((pf: any) => {
                 const purchase = transactionMap.get(pf.srNo);
                 const originalAmount = purchase?.originalNetAmount || 0;
                 const paidAmount = pf.amount;
 
-                // Calculate CD portion for this entry
-                const totalPaidForThisPayment = p.paidFor?.reduce((sum: any, pf: any) => sum + pf.amount, 0) || 0;
-                const cdPortionForThisEntry = (p as any).cdAmount && totalPaidForThisPayment > 0 ? 
-                    (pf.amount / totalPaidForThisPayment) * (p as any).cdAmount : 0;
-                const actualPaymentForThisEntry = paidAmount - cdPortionForThisEntry;
-
-                // Get previously paid from pre-calculated map (O(1) lookup instead of O(n) loop)
+                // Calculate CD portion for this entry - priority to stored cdAmount, fallback to proportional
+                const storedCdAmount = Number(pf.cdAmount || 0);
+                const totalPaidForThisPayment = safePaidFor?.reduce((sum: any, pf: any) => sum + pf.amount, 0) || 0;
+                const cdPortionForThisEntry = storedCdAmount > 0 ? storedCdAmount : 
+                    ((p as any).cdAmount && totalPaidForThisPayment > 0 ? 
+                    (pf.amount / totalPaidForThisPayment) * (p as any).cdAmount : 0);
+                
+                // Get previously paid from pre-calculated map
                 const entryMap = previouslyPaidMap.get(pf.srNo);
                 const previouslyPaid = entryMap?.get(paymentId) || 0;
 
-                const remaining = originalAmount - previouslyPaid - actualPaymentForThisEntry - cdPortionForThisEntry;
+                const remaining = originalAmount - previouslyPaid - paidAmount - cdPortionForThisEntry;
 
                 const srNo = formatColumn(pf.srNo, 6);
-                const origNum = formatColumn(originalAmount.toString(), 8, 'right');
+                const origNum = formatColumn(Math.round(originalAmount).toString(), 8, 'right');
                 const prevNum = formatColumn(Math.round(previouslyPaid).toString(), 8, 'right');
-                const nowNum = formatColumn(Math.round(actualPaymentForThisEntry).toString(), 8, 'right');
+                const nowNum = formatColumn(Math.round(paidAmount).toString(), 8, 'right');
+                const cdNum = formatColumn(Math.round(cdPortionForThisEntry).toString(), 6, 'right');
                 const balNum = formatColumn(Math.round(remaining).toString(), 8, 'right');
 
                 const orig = `₹${origNum}`;
                 const prev = `₹${prevNum}`;
                 const now = `₹${nowNum}`;
+                const cd = `₹${cdNum}`;
                 const bal = `₹${balNum}`;
 
-                return `${srNo}|${orig}|${prev}|${now}|${bal}`;
+                return `${srNo}|${orig}|${prev}|${now}|${cd}|${bal}`;
             }).join('\n') || '';
 
             const headerLines: string[] = [];
@@ -500,7 +522,7 @@ export const generateStatementTransactions = async (
                 headerLines.push(`EXTRA: ${paymentAdvanceAmount < 0 ? '-' : ''}₹${extraAbs}`);
             }
 
-            const particulars = p.paidFor && p.paidFor.length > 0
+            const particulars = safePaidFor && safePaidFor.length > 0
                 ? `${headerLines.join('\n')}\n${paymentHeaderRow}\n${paymentSeparatorRow}\n${paymentDetails}`
                 : `${headerLines.join('\n')}\nAMT: ₹${Math.round(paymentAmountAbs)}`;
 

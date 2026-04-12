@@ -1,4 +1,4 @@
-import { doc, getDoc, writeBatch, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, writeBatch, query, where, getDocs, collection } from "firebase/firestore";
 import { firestoreDB } from "../firebase";
 import { db } from "../database";
 import { isSqliteMode } from "../sqlite-storage";
@@ -38,10 +38,14 @@ export async function deleteBank(id: string): Promise<void> {
     if (snap.exists()) {
       await moveToRecycleBin({ collection: "banks", docId: id, docPath: getTenantCollectionPath("banks").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted bank ${id}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('banks', { batch });
+    
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('banks', { batch });
+        await batch.commit();
+    }
     
     if (typeof window !== 'undefined' && db) {
       try {
@@ -49,8 +53,6 @@ export async function deleteBank(id: string): Promise<void> {
         window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'banks' }));
       } catch { /* ignore */ }
     }
-
-    await batch.commit();
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
@@ -81,21 +83,24 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
         ifscCode: normalizedIfsc,
         updatedAt: new Date().toISOString() 
     } as Record<string, unknown>);
-    batch.set(docRef, dataWithTimestamp);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('bankBranches', { batch });
+    
+    if (!isSqliteMode()) {
+        batch.set(docRef, dataWithTimestamp);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('bankBranches', { batch });
+        await batch.commit();
+    }
     
     const newBranch = { id: docRef.id, ...(dataWithTimestamp as any) } as BankBranch;
     
     if (typeof window !== 'undefined' && db) {
       try {
         await db.bankBranches.put(newBranch);
-        window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankBranches' }));
+        window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankBranches', source: 'sync' } }));
         window.dispatchEvent(new CustomEvent('branch-added', { detail: normalizedBranchName }));
       } catch { /* ignore */ }
     }
 
-    await batch.commit();
     logActivity({ type: "create", collection: "bankBranches", docId: docRef.id, docPath: getTenantCollectionPath("bankBranches").join("/"), summary: `Created branch ${normalizedBranchName}`, afterData: dataWithTimestamp as Record<string, unknown> }).catch(() => {});
     
     return newBranch;
@@ -110,21 +115,24 @@ export async function updateBankBranch(id: string, branchData: Partial<BankBranc
     if (normalizedData.ifscCode) normalizedData.ifscCode = normalizedData.ifscCode.trim().toUpperCase();
 
     const data = withEditMetadata({ ...normalizedData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('bankBranches', { batch });
+    
+    if (!isSqliteMode()) {
+        batch.update(docRef, data);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('bankBranches', { batch });
+        await batch.commit();
+    }
     
     if (typeof window !== 'undefined' && db) {
       try {
         const existing = await db.bankBranches.get(id);
         if (existing) {
           await db.bankBranches.put({ ...existing, ...normalizedData });
-          window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankBranches' }));
+          window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankBranches', source: 'sync' } }));
         }
       } catch { /* ignore */ }
     }
 
-    await batch.commit();
     logActivity({ type: "edit", collection: "bankBranches", docId: id, docPath: getTenantCollectionPath("bankBranches").join("/"), summary: `Updated branch ${id}`, afterData: data }).catch(() => {});
 }
 
@@ -134,23 +142,24 @@ export async function deleteBankBranch(id: string): Promise<void> {
     if (snap.exists()) {
       await moveToRecycleBin({ collection: "bankBranches", docId: id, docPath: getTenantCollectionPath("bankBranches").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted branch ${id}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('bankBranches', { batch });
+    
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('bankBranches', { batch });
+        await batch.commit();
+    }
     
     if (typeof window !== 'undefined' && db) {
       try {
         await db.bankBranches.delete(id);
-        window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankBranches' }));
+        window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankBranches', source: 'sync' } }));
       } catch { /* ignore */ }
     }
-
-    await batch.commit();
 }
 
 export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
-    const { writeLocalFirst } = await import('../local-first-sync');
     const id = accountData.accountNumber || doc(bankAccountsCollection).id;
     const normalizedData = { ...accountData };
     if (normalizedData.bankName) normalizedData.bankName = normalizedData.bankName.trim().toUpperCase();
@@ -160,21 +169,70 @@ export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'
     
     const newAccount = withCreateMetadata({ ...normalizedData, id, updatedAt: new Date().toISOString() } as Record<string, unknown>) as BankAccount;
     
-    if (isSqliteMode()) {
-        const dbInstance = (await import('../database')).db;
-        await dbInstance.bankAccounts.put(newAccount);
+    if (isSqliteMode() && db) {
+        await db.bankAccounts.put(newAccount);
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankAccounts' }));
+            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankAccounts', source: 'sync' } }));
             window.dispatchEvent(new CustomEvent('bank-account-added', { detail: id }));
         }
         return newAccount;
     }
 
+    const { writeLocalFirst } = await import('../local-first-sync');
     const result = await writeLocalFirst('bankAccounts', 'create', id, newAccount) as BankAccount;
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('bank-account-added', { detail: id }));
     }
     return result;
+}
+
+export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
+    if (isSqliteMode() && db) {
+        const existing = await db.bankAccounts.get(id);
+        const data = withEditMetadata({ ...existing, ...accountData, updatedAt: new Date().toISOString() } as Record<string, unknown>) as BankAccount;
+        await db.bankAccounts.put(data);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankAccounts', source: 'sync' } }));
+        }
+        return;
+    }
+
+    const { writeLocalFirst } = await import('../local-first-sync');
+    await writeLocalFirst('bankAccounts', 'update', id, undefined, accountData);
+}
+
+export async function deleteBankAccount(id: string): Promise<void> {
+    if (isSqliteMode() && db) {
+        await db.bankAccounts.delete(id);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: { table: 'bankAccounts', source: 'sync' } }));
+        }
+        return;
+    }
+
+    const { writeLocalFirst } = await import('../local-first-sync');
+    await writeLocalFirst('bankAccounts', 'delete', id);
+}
+
+export async function getAllBanks(): Promise<Bank[]> {
+  const electron = (window as any).electron;
+  if (electron?.sqliteQuery) return electron.sqliteQuery('banks');
+  const snapshot = await getDocs(query(collection(firestoreDB, ...getTenantCollectionPath("banks"))));
+  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Bank));
+}
+
+export async function getAllBankBranches(): Promise<BankBranch[]> {
+  const electron = (window as any).electron;
+  if (electron?.sqliteQuery) return electron.sqliteQuery('bankBranches');
+  const snapshot = await getDocs(bankBranchesCollection);
+  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankBranch));
+}
+
+export async function getAllBankAccounts(): Promise<BankAccount[]> {
+  const electron = (window as any).electron;
+  if (electron?.sqliteQuery) return electron.sqliteQuery('bankAccounts');
+  const snapshot = await getDocs(bankAccountsCollection);
+  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankAccount));
 }
 
 export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (error: Error) => void) {
@@ -222,36 +280,4 @@ export async function updateSupplierBankAccount(id: string, data: any): Promise<
 export async function deleteSupplierBankAccount(id: string): Promise<void> {
     const { writeLocalFirst } = await import('../local-first-sync');
     await writeLocalFirst('supplierBankAccounts', 'delete', id);
-}
-
-export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
-    const { writeLocalFirst } = await import('../local-first-sync');
-    
-    if (isSqliteMode()) {
-        const dbInstance = (await import('../database')).db;
-        const existing = await dbInstance.bankAccounts.get(id);
-        const data = withEditMetadata({ ...existing, ...accountData, updatedAt: new Date().toISOString() } as Record<string, unknown>) as BankAccount;
-        await dbInstance.bankAccounts.put(data);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankAccounts' }));
-        }
-        return;
-    }
-
-    await writeLocalFirst('bankAccounts', 'update', id, undefined, accountData);
-}
-
-export async function deleteBankAccount(id: string): Promise<void> {
-    const { writeLocalFirst } = await import('../local-first-sync');
-
-    if (isSqliteMode()) {
-        const dbInstance = (await import('../database')).db;
-        await dbInstance.bankAccounts.delete(id);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('sqlite-change', { detail: 'bankAccounts' }));
-        }
-        return;
-    }
-
-    await writeLocalFirst('bankAccounts', 'delete', id);
 }

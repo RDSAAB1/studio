@@ -370,21 +370,23 @@ export async function deleteMultipleSuppliers(supplierIds: string[]): Promise<vo
             ...validSupplierIds.map(sid => ({ type: 'delete', ref: doc(suppliersCollection, sid) }))
         ];
 
-        for (let i = 0; i < ops.length; i += 450) {
-            const batch = writeBatch(firestoreDB);
-            const chunk = ops.slice(i, i + 450);
-            
-            chunk.forEach(op => {
-                if (op.type === 'delete') batch.delete(op.ref);
-                else if (op.type === 'update') batch.update(op.ref, (op as any).data);
-            });
+        if (!isSqliteMode()) {
+            for (let i = 0; i < ops.length; i += 450) {
+                const batch = writeBatch(firestoreDB);
+                const chunk = ops.slice(i, i + 450);
+                
+                chunk.forEach(op => {
+                    if (op.type === 'delete') batch.delete(op.ref);
+                    else if (op.type === 'update') batch.update(op.ref, (op as any).data);
+                });
 
-            const { notifySyncRegistry } = await import('../sync-registry');
-            await notifySyncRegistry('suppliers', { batch });
-            if (paymentsToDeleteArr.size > 0 || paymentsToUpdateMap.size > 0) {
-                await notifySyncRegistry('payments', { batch });
+                const { notifySyncRegistry } = await import('../sync-registry');
+                await notifySyncRegistry('suppliers', { batch });
+                if (paymentsToDeleteArr.size > 0 || paymentsToUpdateMap.size > 0) {
+                    await notifySyncRegistry('payments', { batch });
+                }
+                await batch.commit();
             }
-            await batch.commit();
         }
 
         if (db) {
@@ -517,14 +519,16 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 export async function bulkUpsertSuppliers(suppliers: Customer[], chunkSize = 400) {
     if (!suppliers.length) return;
     const chunks = chunkArray(suppliers, chunkSize);
-    for (const chunk of chunks) {
-        const batch = writeBatch(firestoreDB);
-        chunk.forEach((supplier) => {
-            if (!supplier.id) throw new Error("Supplier entry missing id");
-            const ref = doc(suppliersCollection, supplier.id);
-            batch.set(ref, supplier, { merge: true });
-        });
-        await batch.commit();
+    if (!isSqliteMode()) {
+        for (const chunk of chunks) {
+            const batch = writeBatch(firestoreDB);
+            chunk.forEach((supplier) => {
+                if (!supplier.id) throw new Error("Supplier entry missing id");
+                const ref = doc(suppliersCollection, supplier.id);
+                batch.set(ref, supplier, { merge: true });
+            });
+            await batch.commit();
+        }
     }
 }
 

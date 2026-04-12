@@ -43,11 +43,12 @@ contextBridge.exposeInMainWorld('electron', {
   debugExcelPaths: (folderPath) => ipcRenderer.invoke('folder:debugExcelPaths', folderPath),
   // SQLite migration / basic access
   sqliteImportTable: (tableName, rows) => ipcRenderer.invoke('sqlite:importTable', tableName, rows),
-  sqliteBulkPut: (tableName, rows) => ipcRenderer.invoke('sqlite:bulkPut', tableName, rows),
+  sqliteBulkPut: (tableName, rows, options) => ipcRenderer.invoke('sqlite:bulkPut', tableName, rows, options),
   sqliteAll: (tableName) => ipcRenderer.invoke('sqlite:all', tableName),
   sqliteGet: (tableName, id) => ipcRenderer.invoke('sqlite:get', tableName, id),
-  sqlitePut: (tableName, row) => ipcRenderer.invoke('sqlite:put', tableName, row),
-  sqliteDelete: (tableName, id) => ipcRenderer.invoke('sqlite:delete', tableName, id),
+  sqlitePut: (tableName, row, options) => ipcRenderer.invoke('sqlite:put', tableName, row, options),
+  sqliteDelete: (tableName, id, options) => ipcRenderer.invoke('sqlite:delete', tableName, id, options),
+  sqliteBulkDelete: (tableName, ids) => ipcRenderer.invoke('sqlite:bulkDelete', tableName, ids),
   sqliteQuery: (tableName, options) => ipcRenderer.invoke('sqlite:query', tableName, options),
   sqliteCount: (tableName) => ipcRenderer.invoke('sqlite:count', tableName),
   sqliteGetFolder: () => ipcRenderer.invoke('sqlite:getFolder'),
@@ -63,6 +64,8 @@ contextBridge.exposeInMainWorld('electron', {
   isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   // Native print
   printHtml: (htmlContent, options) => ipcRenderer.invoke('print:html', htmlContent, options),
+  // Database utilities
+  sqliteClearAllTables: (options) => ipcRenderer.invoke('sqlite:clearAllTables', options),
 });
 
 

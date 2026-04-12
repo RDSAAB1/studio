@@ -23,21 +23,25 @@ export async function getCompanyEmailSettings(erp?: { companyId: string; subComp
 }
 
 export async function saveCompanyEmailSettings(settings: { email: string; appPassword: string }, erp?: { companyId: string; subCompanyId: string; seasonKey: string }): Promise<void> {
-    let coll = settingsCollection;
-    if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
-        coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+    if (!isSqliteMode()) {
+        let coll = settingsCollection;
+        if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
+            coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+        }
+        const docRef = doc(coll, "emailConfig");
+        await setDoc(docRef, settings, { merge: true });
     }
-    const docRef = doc(coll, "emailConfig");
-    await setDoc(docRef, settings, { merge: true });
 }
 
 export async function deleteCompanyEmailSettings(erp?: { companyId: string; subCompanyId: string; seasonKey: string }): Promise<void> {
-    let coll = settingsCollection;
-    if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
-        coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+    if (!isSqliteMode()) {
+        let coll = settingsCollection;
+        if (erp?.companyId && erp?.subCompanyId && erp?.seasonKey) {
+            coll = collection(firestoreDB, ...getErpCollectionPath("settings", erp));
+        }
+        const docRef = doc(coll, "emailConfig");
+        await deleteDoc(docRef);
     }
-    const docRef = doc(coll, "emailConfig");
-    await deleteDoc(docRef);
 }
 
 export async function getRtgsSettings(): Promise<RtgsSettings> {
@@ -75,12 +79,13 @@ export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promi
         await d.settings.put({ ...existing, ...settings, id: 'companyDetails' } as any);
     }
     
-    try {
-        const docRef = doc(settingsCollection, "companyDetails");
-        await setDoc(docRef, settings, { merge: true });
-    } catch (e) {
-        if (!isSqliteMode()) throw e;
-        console.warn("Firestore sync for RTGS settings failed (skipped in SQLite mode):", e);
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(settingsCollection, "companyDetails");
+            await setDoc(docRef, settings, { merge: true });
+        } catch (e) {
+            console.warn("Firestore sync for RTGS settings failed (skipped in SQLite mode):", e);
+        }
     }
 }
 
@@ -129,8 +134,16 @@ export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
 }
 
 export async function updateReceiptSettings(settings: Partial<ReceiptSettings>): Promise<void> {
-    const docRef = doc(settingsCollection, "companyDetails");
-    await setDoc(docRef, settings, { merge: true });
+    if (isSqliteMode()) {
+        const d = getDb();
+        const existing = await d.settings.get('companyDetails');
+        await d.settings.put({ ...existing, ...settings, id: 'companyDetails' } as any);
+    }
+
+    if (!isSqliteMode()) {
+        const docRef = doc(settingsCollection, "companyDetails");
+        await setDoc(docRef, settings, { merge: true });
+    }
 }
 
 export async function getMandiHeaderSettings(): Promise<MandiHeaderSettings | null> {
@@ -153,7 +166,15 @@ export async function saveMandiHeaderSettings(settings: Partial<MandiHeaderSetti
     if (settings.registerNo !== undefined) payload.registerNo = settings.registerNo;
     if (settings.commodity !== undefined) payload.commodity = settings.commodity;
     if (settings.financialYear !== undefined) payload.financialYear = settings.financialYear;
-    await setDoc(mandiHeaderDocRef, payload, { merge: true });
+    
+    if (isSqliteMode()) {
+        const d = getDb();
+        await d.settings.put({ ...payload, id: 'mandiHeader' } as any);
+    }
+
+    if (!isSqliteMode()) {
+        await setDoc(mandiHeaderDocRef, payload, { merge: true });
+    }
 }
 
 // --- Holiday Functions ---
@@ -194,23 +215,37 @@ export async function getHolidays(): Promise<Holiday[]> {
 }
 
 export async function addHoliday(date: string, name: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
-    const { getTenantDocPath } = await import('../tenancy');
-    const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", date));
-    batch.set(docRef, { date, name, updatedAt: Timestamp.now() });
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('holidays', { batch });
-    await batch.commit();
+    if (isSqliteMode()) {
+        const d = getDb();
+        await d.settings.put({ id: `holiday:${date}`, date, name, updatedAt: new Date().toISOString() } as any);
+    }
+
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        const { getTenantDocPath } = await import('../tenancy');
+        const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", date));
+        batch.set(docRef, { date, name, updatedAt: Timestamp.now() });
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('holidays', { batch });
+        await batch.commit();
+    }
 }
 
 export async function deleteHoliday(id: string): Promise<void> {
-    const batch = writeBatch(firestoreDB);
-    const { getTenantDocPath } = await import('../tenancy');
-    const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", id));
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('holidays', { batch });
-    await batch.commit();
+    if (isSqliteMode()) {
+        const d = getDb();
+        await d.settings.delete(`holiday:${id}`);
+    }
+
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        const { getTenantDocPath } = await import('../tenancy');
+        const docRef = doc(firestoreDB, ...getTenantDocPath("holidays", id));
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('holidays', { batch });
+        await batch.commit();
+    }
 }
 
 // --- Daily Payment Limit ---
@@ -241,6 +276,13 @@ export async function getFormatSettings(): Promise<FormatSettings> {
 }
 
 export async function saveFormatSettings(settings: FormatSettings): Promise<void> {
-    const docRef = doc(settingsCollection, "formats");
-    await setDoc(docRef, settings, { merge: true });
+    if (isSqliteMode()) {
+        const d = getDb();
+        await d.settings.put({ ...settings, id: 'formats' } as any);
+    }
+
+    if (!isSqliteMode()) {
+        const docRef = doc(settingsCollection, "formats");
+        await setDoc(docRef, settings, { merge: true });
+    }
 }

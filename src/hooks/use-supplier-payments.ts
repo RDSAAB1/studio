@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSupplierData } from './use-supplier-data';
 import { addBank, getOptionsRealtime } from '@/lib/firestore';
 import type { Customer, OptionItem } from "@/lib/definitions";
-import { calculateOutstandingForEntry } from "@/lib/outstanding-calculator";
+import { calculateOutstandingForEntry, calculateGlobalSimulation } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "@/app/sales/supplier-profile/utils/fuzzy-matching";
 
 const normalizeProfileField = (value: unknown): string => {
@@ -106,17 +106,36 @@ export const useSupplierPayments = () => {
     
     // Use SAME calculation as outstanding table - so Full payment To Be Paid shows exact outstanding amount
     const totalOutstandingForSelected = useMemo(() => {
+        if (!selectedEntries || selectedEntries.length === 0) return 0;
+
         const paymentHistory = data.paymentHistory || [];
         // Edit mode: exclude the payment being edited so we get correct "max payable" for this payment
         const historyToUse = form.editingPayment
             ? paymentHistory.filter((p: Payment) => p.id !== form.editingPayment!.id)
             : paymentHistory;
 
+        // If we have a selected customer, use THEIR full transaction list for simulation
+        // This is CRITICAL: simulation must see ALL bills of the supplier to correctly 
+        // distribute global/parchi payments chronologically.
+        const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
+        
+        if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
+            // Use group-wide simulation for accuracy
+            const resMap = calculateGlobalSimulation(profile.allTransactions, historyToUse);
+            
+            return selectedEntries.reduce((sum, entry) => {
+                const sr = String(entry.srNo || "").toLowerCase();
+                const res = resMap.get(sr);
+                return sum + (res?.outstanding ?? 0);
+            }, 0);
+        }
+
+        // Fallback for cases where profile isn't available (e.g. multi-supplier mode without a selected profile)
         return selectedEntries.reduce((sum, entry) => {
             const result = calculateOutstandingForEntry(entry, historyToUse);
             return sum + result.outstanding;
         }, 0);
-    }, [selectedEntries, data.paymentHistory, form.editingPayment]);
+    }, [selectedEntries, data.paymentHistory, form.editingPayment, form.selectedCustomerKey, data.customerSummaryMap]);
 
     const supplierIdToProfileKey = useMemo(() => {
         const map = new Map<string, string>();
@@ -753,14 +772,39 @@ export const useSupplierPayments = () => {
             const summary = data.customerSummaryMap?.get(form.selectedCustomerKey || '');
             const selectedEntryObjects = (summary?.allTransactions || []).filter((t: Customer) => form.selectedEntryIds.has(t.srNo || t.id || ''));
             
+            // 1b. Build SR No to Net Amount map for accurate proportional legacy splitting
+            const netAmountMap = new Map<string, number>();
+            (data.suppliers || []).forEach(s => {
+                const srNo = String(s.srNo || '').trim().toLowerCase();
+                if (srNo) {
+                    netAmountMap.set(srNo, Number(s.originalNetAmount || s.netAmount || 0));
+                }
+            });
+
+            const historyToUse = form.editingPayment
+                ? (data.paymentHistory || []).filter(p => p.id !== form.editingPayment!.id)
+                : (data.paymentHistory || []);
+
             // 2. Build entry outstandings for breakdown calculation
+            const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
+            let groupResMap = new Map();
+            if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
+                // Use group-wide simulation for accuracy in breakdown
+                groupResMap = calculateGlobalSimulation(profile.allTransactions, historyToUse, netAmountMap);
+            }
+
             const entryOutstandings = selectedEntryObjects.map(entry => {
-                const res = calculateOutstandingForEntry(entry, data.paymentHistory || []);
+                const sr = String(entry.srNo || "").toLowerCase();
+                const res = groupResMap.get(sr);
+                
+                // If we found a result in the group simulation, use it. Otherwise fallback to individual.
+                const outstanding = res ? res.outstanding : calculateOutstandingForEntry(entry, historyToUse, netAmountMap).outstanding;
+                
                 return {
                     entry,
-                    outstanding: res.outstanding,
-                    originalOutstanding: res.outstanding,
-                    originalAmount: Number(entry.netAmount) || 0
+                    outstanding: outstanding,
+                    originalOutstanding: outstanding,
+                    originalAmount: (res ? res.adjustedOriginal : null) || Number(entry.originalNetAmount || entry.netAmount || 0)
                 };
             });
 

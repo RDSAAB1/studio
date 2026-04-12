@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGlobalData } from "@/contexts/global-data-context";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings, BankBranch, CustomerSummary } from "@/lib/definitions";
 import { toTitleCase, levenshteinDistance } from '@/lib/utils';
+import { fuzzyMatchProfiles } from '@/app/sales/supplier-profile/utils/fuzzy-matching';
 
 
 export const useSupplierData = () => {
@@ -50,12 +51,25 @@ export const useSupplierData = () => {
 
         safeSuppliers.forEach(s => {
             const father = (s as any).fatherName || s.so || '';
-            const key = makeKey(s.name || '', father, s.address || '');
-            const existing = byKey.get(key);
+            const currentProfile = {
+                name: s.name || '',
+                fatherName: father,
+                address: s.address || ''
+            };
+
+            // Fuzzy matched search for existing summary
+            let existing = summaryList.find(summary => 
+                fuzzyMatchProfiles(
+                    { name: summary.name || '', fatherName: summary.so || '', address: summary.address || '' },
+                    currentProfile
+                ).isMatch
+            );
+
             if (existing) {
                 existing.allTransactions!.push({ ...s });
                 return;
             }
+            
             const newSummary: CustomerSummary = {
                 name: s.name, so: father, address: s.address,
                 contact: '', 
@@ -74,11 +88,16 @@ export const useSupplierData = () => {
                 totalBrokerage: 0, totalCd: 0,
                 minRate: 0, maxRate: 0,
             };
+            
+            summaryList.push(newSummary);
+            
+            // For fast lookup by exact key (optional optimization for performance)
+            const key = makeKey(s.name || '', father, s.address || '');
             byKey.set(key, newSummary);
+            
             if (s.id) {
                 internalIdToSummary.set(String(s.id).trim().toLowerCase(), newSummary);
             }
-            summaryList.push(newSummary);
         });
 
         // Collect all supplier IDs and names for each summary profile
@@ -272,47 +291,60 @@ export const useSupplierData = () => {
                         .filter(Boolean);
                     const parchiMatch = parchiTokens.includes(entrySrNo) || parchiNoRaw === entrySrNo;
 
-                    // Legacy/unlinked payments: paidFor empty but parchiNo has SR# list.
-                    if (!paidForThisDetail && parchiMatch && (amountAbs > 0 || Number(p.cdAmount || 0) > 0)) {
-                        // SMART SPLIT: Instead of equal share, use proportional share based on originalNetAmount
-                        const srNoToNetAmount = new Map<string, number>();
-                        data.allTransactions!.forEach(t => {
-                            srNoToNetAmount.set(String(t.srNo || '').trim().toLowerCase(), Number(t.originalNetAmount ?? t.netAmount ?? 0));
-                        });
-
-                        const totalBillAmountInParchi = parchiTokens.reduce((sum, token) => {
-                            return sum + (srNoToNetAmount.get(token.toLowerCase()) || 0);
-                        }, 0);
-
-                        const currentBillAmount = srNoToNetAmount.get(entrySrNoLower) || 0;
-                        const weight = totalBillAmountInParchi > 0 ? (currentBillAmount / totalBillAmountInParchi) : (1 / parchiTokens.length);
-
-                        const share = totalBillAmountInParchi > 0 
-                            ? Math.round((amountAbs * weight) * 100) / 100 
-                            : (parchiTokens.length > 0 ? Math.round((amountAbs / parchiTokens.length) * 100) / 100 : amountAbs);
-
-                        const cdAmountTotal = Number(p.cdAmount || 0);
-                        const cdShare = totalBillAmountInParchi > 0
-                            ? Math.round((cdAmountTotal * weight) * 100) / 100
-                            : (parchiTokens.length > 0 ? Math.round((cdAmountTotal / parchiTokens.length) * 100) / 100 : cdAmountTotal);
-
-                        if (isLedger && isLedgerCredit) {
-                           totalExtraForEntry += share;
-                        } else {
-                           totalPaidForEntry += share;
-                        }
+                    // Legacy/unlinked payments: ONLY if paidFor is completely empty and parchiNo matches.
+                    // If paidFor exists but doesn't include this entry, it means this entry was NOT paid in this payment.
+                    if (!paidForThisDetail && (safePaidFor.length === 0) && parchiMatch && (amountAbs > 0 || Number(p.cdAmount || 0) > 0)) {
+                        // FILL-UP SPLIT: Instead of proportional share, fill entries in order (matches payment-logic.ts)
+                        // This ensures UI reflection matches the intended distribution even for unlinked legacy payments
+                        const parchiTokensSorted = [...parchiTokens].sort(); // Consistent order
+                        const currentTokenIndex = parchiTokensSorted.indexOf(entrySrNoLower);
                         
-                        totalCdForEntry += cdShare;
+                        if (currentTokenIndex !== -1) {
+                            let tempCash = amountAbs;
+                            let tempCd = Number(p.cdAmount || 0);
+                            let share = 0;
+                            let cdShare = 0;
 
-                        paymentBreakdown.push({
-                            paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
-                            amount: share,
-                            cdAmount: cdShare,
-                            receiptType: p.receiptType,
-                            date: p.date,
-                            drCr: (p as any).drCr,
-                        });
-                        return;
+                            for (let i = 0; i < parchiTokensSorted.length; i++) {
+                                const token = parchiTokensSorted[i];
+                                const tEntry = data.allTransactions!.find(t => String(t.srNo || '').trim().toLowerCase() === token);
+                                if (!tEntry) continue;
+
+                                const tOriginal = Number(tEntry.originalNetAmount ?? tEntry.netAmount ?? 0);
+                                // For simplicity in UI hook, we use original amount as capacity for legacy unlinked payments
+                                const tCapacity = Math.max(0, tOriginal);
+                                
+                                const tCdShare = Math.min(tempCd, tCapacity);
+                                const tCashShare = Math.min(tempCash, Math.max(0, tCapacity - tCdShare));
+
+                                if (i === currentTokenIndex) {
+                                    share = tCashShare;
+                                    cdShare = tCdShare;
+                                    break;
+                                }
+
+                                tempCash -= tCashShare;
+                                tempCd -= tCdShare;
+                            }
+
+                            if (isLedger && isLedgerCredit) {
+                                totalExtraForEntry += share;
+                            } else {
+                                totalPaidForEntry += share;
+                            }
+                            
+                            totalCdForEntry += cdShare;
+
+                            paymentBreakdown.push({
+                                paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
+                                amount: share,
+                                cdAmount: cdShare,
+                                receiptType: p.receiptType,
+                                date: p.date,
+                                drCr: (p as any).drCr,
+                            });
+                            return;
+                        }
                     }
 
                     // Online payment-level extra (when not stored per paidFor)

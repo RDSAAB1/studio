@@ -8,7 +8,9 @@ import {
   kantaParchiCollection, 
   customerDocumentsCollection,
   mandiReportsCollection,
-  createLocalSubscription 
+  createLocalSubscription,
+  handleSilentError,
+  stripUndefined
 } from "./core";
 import { KantaParchi, CustomerDocument, MandiReport } from "@/lib/definitions";
 import { createMetadataBasedListener } from "../sync-registry-listener";
@@ -27,15 +29,21 @@ export async function addKantaParchi(kantaParchiData: KantaParchi): Promise<Kant
     return dataWithTimestamp as KantaParchi;
 }
 
-export async function updateKantaParchi(srNo: string, kantaParchiData: Partial<Omit<KantaParchi, 'id' | 'srNo'>>): Promise<boolean> {
+export async function updateKantaParchi(srNo: string, updates: Partial<Omit<KantaParchi, 'id' | 'srNo'>>): Promise<boolean> {
     if (!srNo) return false;
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(kantaParchiCollection, srNo);
-    const data = withEditMetadata({ ...kantaParchiData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('kantaParchi', { batch });
-    await batch.commit();
+    const data = withEditMetadata(stripUndefined({ ...updates, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(docRef, data, { merge: true });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('kantaParchi', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, `updateKantaParchi Firestore sync - id: ${srNo}`);
+        }
+    }
     logActivity({ type: "edit", collection: "kantaParchi", docId: srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), summary: `Updated kanta parchi ${srNo}`, afterData: data }).catch(() => {});
     return true;
 }
@@ -44,14 +52,17 @@ export async function deleteKantaParchi(srNo: string): Promise<void> {
     if (!srNo) return;
     const docRef = doc(kantaParchiCollection, srNo);
     const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      await moveToRecycleBin({ collection: "kantaParchi", docId: srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted kanta parchi ${srNo}` });
+    const fullData = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (fullData) {
+      await moveToRecycleBin({ collection: "kantaParchi", docId: srNo, docPath: getTenantCollectionPath("kantaParchi").join("/"), data: fullData as Record<string, unknown>, summary: `Deleted kanta parchi ${srNo}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('kantaParchi', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('kantaParchi', { batch });
+        await batch.commit();
+    }
 }
 
 export async function getKantaParchiBySrNo(srNo: string): Promise<KantaParchi | null> {
@@ -81,15 +92,21 @@ export async function addCustomerDocument(documentData: CustomerDocument): Promi
     return dataWithTimestamp as CustomerDocument;
 }
 
-export async function updateCustomerDocument(documentSrNo: string, documentData: Partial<Omit<CustomerDocument, 'id' | 'documentSrNo' | 'kantaParchiSrNo'>>): Promise<boolean> {
+export async function updateCustomerDocument(documentSrNo: string, updates: Partial<Omit<CustomerDocument, 'id' | 'documentSrNo' | 'kantaParchiSrNo'>>): Promise<boolean> {
     if (!documentSrNo) return false;
-    const batch = writeBatch(firestoreDB);
     const docRef = doc(customerDocumentsCollection, documentSrNo);
-    const data = withEditMetadata({ ...documentData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('customerDocuments', { batch });
-    await batch.commit();
+    const data = withEditMetadata(stripUndefined({ ...updates, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            batch.set(docRef, data, { merge: true });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('customerDocuments', { batch });
+            await batch.commit();
+        } catch (error) {
+            handleSilentError(error, `updateCustomerDocument Firestore sync - id: ${documentSrNo}`);
+        }
+    }
     logActivity({ type: "edit", collection: "customerDocuments", docId: documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), summary: `Updated customer document ${documentSrNo}`, afterData: data }).catch(() => {});
     return true;
 }
@@ -98,14 +115,17 @@ export async function deleteCustomerDocument(documentSrNo: string): Promise<void
     if (!documentSrNo) return;
     const docRef = doc(customerDocumentsCollection, documentSrNo);
     const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      await moveToRecycleBin({ collection: "customerDocuments", docId: documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer document ${documentSrNo}` });
+    const fullData = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (fullData) {
+      await moveToRecycleBin({ collection: "customerDocuments", docId: documentSrNo, docPath: getTenantCollectionPath("customerDocuments").join("/"), data: fullData as Record<string, unknown>, summary: `Deleted customer document ${documentSrNo}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('customerDocuments', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('customerDocuments', { batch });
+        await batch.commit();
+    }
 }
 
 export async function getCustomerDocumentBySrNo(documentSrNo: string): Promise<CustomerDocument | null> {
@@ -273,15 +293,18 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 }
 
 export async function bulkUpsertMandiReports(reports: MandiReport[], chunkSize = 400) {
-    if (!reports.length) return;
-    const chunks = chunkArray(reports, chunkSize);
-    for (const chunk of chunks) {
-        const batch = writeBatch(firestoreDB);
-        chunk.forEach((report) => {
-            if (!report.id) throw new Error("Mandi report entry missing id");
-            const ref = doc(mandiReportsCollection, report.id);
-            batch.set(ref, report, { merge: true });
-        });
-        await batch.commit();
+    if (!isSqliteMode()) {
+        const chunks = chunkArray(reports, chunkSize);
+        for (const chunk of chunks) {
+            const batch = writeBatch(firestoreDB);
+            chunk.forEach((report) => {
+                if (!report.id) throw new Error("Mandi report entry missing id");
+                const ref = doc(mandiReportsCollection, report.id);
+                batch.set(ref, report, { merge: true });
+            });
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('mandiReports', { batch });
+            await batch.commit();
+        }
     }
 }

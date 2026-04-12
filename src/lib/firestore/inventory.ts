@@ -8,7 +8,9 @@ import {
   inventoryItemsCollection, 
   manufacturingCostingCollection,
   expenseTemplatesCollection,
-  createLocalSubscription 
+  createLocalSubscription,
+  handleSilentError,
+  stripUndefined
 } from "./core";
 import { InventoryItem, ManufacturingCostingData } from "@/lib/definitions";
 
@@ -26,13 +28,23 @@ export async function addInventoryItem(item: Omit<InventoryItem, 'id'>): Promise
 }
 
 export async function updateInventoryItem(id: string, item: Partial<InventoryItem>): Promise<void> {
-  const batch = writeBatch(firestoreDB);
   const docRef = doc(inventoryItemsCollection, id);
-  const data = withEditMetadata({ ...item, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-  batch.update(docRef, data);
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('inventoryItems', { batch });
-  await batch.commit();
+  const data = withEditMetadata(stripUndefined({ ...item, updatedAt: new Date().toISOString() } as Record<string, unknown>));
+  
+  if (db) await db.inventoryItems.update(id, data);
+
+  if (!isSqliteMode()) {
+    try {
+      const batch = writeBatch(firestoreDB);
+      batch.update(docRef, data);
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('inventoryItems', { batch });
+      await batch.commit();
+    } catch (error) {
+      handleSilentError(error, `updateInventoryItem Firestore sync - id: ${id}`);
+    }
+  }
+  
   logActivity({ type: "edit", collection: "inventoryItems", docId: id, docPath: getTenantCollectionPath("inventoryItems").join("/"), summary: `Updated inventory item ${id}`, afterData: data }).catch(() => {});
 }
 
@@ -42,11 +54,20 @@ export async function deleteInventoryItem(id: string) {
   if (snap.exists()) {
     await moveToRecycleBin({ collection: "inventoryItems", docId: id, docPath: getTenantCollectionPath("inventoryItems").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted inventory item ${id}` });
   }
-  const batch = writeBatch(firestoreDB);
-  batch.delete(docRef);
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('inventoryItems', { batch });
-  await batch.commit();
+  
+  if (db) await db.inventoryItems.delete(id);
+
+  if (!isSqliteMode()) {
+    try {
+      const batch = writeBatch(firestoreDB);
+      batch.delete(docRef);
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('inventoryItems', { batch });
+      await batch.commit();
+    } catch (error) {
+      handleSilentError(error, `deleteInventoryItem Firestore sync - id: ${id}`);
+    }
+  }
 }
 
 export async function getAllInventoryItems(): Promise<InventoryItem[]> {
@@ -123,4 +144,13 @@ export async function deleteExpenseTemplate(id: string): Promise<void> {
     await notifySyncRegistry('expenseTemplates', { batch });
     await batch.commit();
     if (db) await db.expenseTemplates.delete(id);
+}
+
+export async function saveManufacturingCosting(id: string | undefined, data: Partial<ManufacturingCostingData>): Promise<void> {
+  if (id) {
+    return updateManufacturingCosting(id, data);
+  } else {
+    // If id is provided as a number or string but we are creating
+    await addManufacturingCosting(data as Omit<ManufacturingCostingData, 'id'>);
+  }
 }

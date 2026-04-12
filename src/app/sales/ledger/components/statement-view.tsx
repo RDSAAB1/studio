@@ -40,11 +40,11 @@ export const StatementView: React.FC<StatementViewProps> = ({
           <div className="flex flex-col md:flex-row items-end gap-4">
             <div className="space-y-1.5 flex-1 min-w-[200px]">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">From Date</span>
-              <SmartDatePicker value={statementStart} onChange={setStatementStart} className="h-10 bg-background/50 border-0 shadow-none ring-1 ring-border/50" />
+              <SmartDatePicker value={statementStart} onChange={(val) => setStatementStart(val instanceof Date ? val.toISOString().split('T')[0] : val)} className="h-10 bg-background/50 border-0 shadow-none ring-1 ring-border/50" />
             </div>
             <div className="space-y-1.5 flex-1 min-w-[200px]">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">To Date</span>
-              <SmartDatePicker value={statementEnd} onChange={setStatementEnd} className="h-10 bg-background/50 border-0 shadow-none ring-1 ring-border/50" />
+              <SmartDatePicker value={statementEnd} onChange={(val) => setStatementEnd(val instanceof Date ? val.toISOString().split('T')[0] : val)} className="h-10 bg-background/50 border-0 shadow-none ring-1 ring-border/50" />
             </div>
             <Button onClick={onGenerate} disabled={loading} className="h-10 px-8 shadow-md hover:shadow-lg transition-all rounded-full font-bold">
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

@@ -6,7 +6,8 @@ import {
   expensesCollection, 
   incomesCollection,
   createLocalSubscription,
-  stripUndefined
+  stripUndefined,
+  isSqliteMode
 } from "./core";
 import { Account } from "@/lib/definitions";
 import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } from "../audit";
@@ -21,11 +22,13 @@ export async function addAccount(accountData: Omit<Account, 'id'>): Promise<Acco
   const docRef = doc(accountsCollection);
   const data = withCreateMetadata({ ...accountData, id: docRef.id, createdAt: timestamp, updatedAt: timestamp } as Record<string, unknown>);
   
-  const batch = writeBatch(firestoreDB);
-  batch.set(docRef, data);
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('accounts', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, data);
+    const { notifySyncRegistry } = await import('../sync-registry');
+    await notifySyncRegistry('accounts', { batch });
+    await batch.commit();
+  }
   
   logActivity({ 
     type: "create", 
@@ -48,11 +51,13 @@ export async function updateAccount(accountData: Partial<Account> & { id: string
   const docRef = doc(accountsCollection, id);
   const data = withEditMetadata({ ...dataToUpdate, updatedAt: new Date().toISOString() } as Record<string, unknown>);
   
-  const batch = writeBatch(firestoreDB);
-  batch.set(docRef, data, { merge: true });
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('accounts', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const batch = writeBatch(firestoreDB);
+    batch.set(docRef, data, { merge: true });
+    const { notifySyncRegistry } = await import('../sync-registry');
+    await notifySyncRegistry('accounts', { batch });
+    await batch.commit();
+  }
 
   logActivity({ 
     type: "edit", 
@@ -87,37 +92,41 @@ export async function updateAccountTransactionsCascade(
 
   // 1. Update Firestore Incomes
   const qIncome = query(incomesCollection, where('payee', '==', oldName));
-  const snapIncome = await getDocs(qIncome);
-  if (!snapIncome.empty) {
-    const batch = writeBatch(firestoreDB);
-    snapIncome.forEach(docSnap => {
-      const updateObj: any = { updatedAt: timestamp };
-      if (newName) updateObj.payee = newName;
-      if (category !== undefined) updateObj.category = category;
-      if (subCategory !== undefined) updateObj.subCategory = subCategory;
-      batch.update(docSnap.ref, updateObj);
-    });
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('incomes', { batch });
-    await batch.commit();
+  if (!isSqliteMode()) {
+    const snapIncome = await getDocs(qIncome);
+    if (!snapIncome.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapIncome.forEach(docSnap => {
+        const updateObj: any = { updatedAt: timestamp };
+        if (newName) updateObj.payee = newName;
+        if (category !== undefined) updateObj.category = category;
+        if (subCategory !== undefined) updateObj.subCategory = subCategory;
+        batch.update(docSnap.ref, updateObj);
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('incomes', { batch });
+      await batch.commit();
+    }
   }
 
   // 2. Update Firestore Expenses
   const qExpense = query(expensesCollection, where('payee', '==', oldName));
-  const snapExpense = await getDocs(qExpense);
-  if (!snapExpense.empty) {
-    const batch = writeBatch(firestoreDB);
-    snapExpense.forEach(docSnap => {
-      const updateObj: any = { updatedAt: timestamp };
-      if (newName) updateObj.payee = newName;
-      if (category !== undefined) updateObj.category = category;
-      if (subCategory !== undefined) updateObj.subCategory = subCategory;
-      if (nature !== undefined) updateObj.expenseNature = nature;
-      batch.update(docSnap.ref, updateObj);
-    });
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('expenses', { batch });
-    await batch.commit();
+  if (!isSqliteMode()) {
+    const snapExpense = await getDocs(qExpense);
+    if (!snapExpense.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapExpense.forEach(docSnap => {
+        const updateObj: any = { updatedAt: timestamp };
+        if (newName) updateObj.payee = newName;
+        if (category !== undefined) updateObj.category = category;
+        if (subCategory !== undefined) updateObj.subCategory = subCategory;
+        if (nature !== undefined) updateObj.expenseNature = nature;
+        batch.update(docSnap.ref, updateObj);
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('expenses', { batch });
+      await batch.commit();
+    }
   }
 
   // 3. Update SQLite Transactions (combined for income/expense)
@@ -171,11 +180,13 @@ export async function deleteAccount(name: string): Promise<void> {
     });
   }
 
-  const batch = writeBatch(firestoreDB);
-  batch.delete(docRef);
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('accounts', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const batch = writeBatch(firestoreDB);
+    batch.delete(docRef);
+    const { notifySyncRegistry } = await import('../sync-registry');
+    await notifySyncRegistry('accounts', { batch });
+    await batch.commit();
+  }
 
   if (db) await db.accounts.delete(name);
 }
@@ -183,19 +194,20 @@ export async function deleteAccount(name: string): Promise<void> {
 // Payee Update Logic (Cascades)
 
 export async function updateExpensePayee(oldName: string, newName: string): Promise<void> {
-  const q = query(expensesCollection, where('payee', '==', oldName));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
-
-  const batch = writeBatch(firestoreDB);
   const timestamp = new Date().toISOString();
-  snapshot.forEach(docSnap => {
-    batch.update(docSnap.ref, { payee: newName, updatedAt: timestamp });
-  });
-  
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('expenses', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const q = query(expensesCollection, where('payee', '==', oldName));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapshot.forEach(docSnap => {
+        batch.update(docSnap.ref, { payee: newName, updatedAt: timestamp });
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('expenses', { batch });
+      await batch.commit();
+    }
+  }
 
   if (db) {
     const local = await db.transactions.where('payee').equals(oldName).toArray();
@@ -206,19 +218,20 @@ export async function updateExpensePayee(oldName: string, newName: string): Prom
 }
 
 export async function updateIncomePayee(oldName: string, newName: string): Promise<void> {
-  const q = query(incomesCollection, where('payee', '==', oldName));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
-
-  const batch = writeBatch(firestoreDB);
   const timestamp = new Date().toISOString();
-  snapshot.forEach(docSnap => {
-    batch.update(docSnap.ref, { payee: newName, updatedAt: timestamp });
-  });
-  
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('incomes', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const q = query(incomesCollection, where('payee', '==', oldName));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapshot.forEach(docSnap => {
+        batch.update(docSnap.ref, { payee: newName, updatedAt: timestamp });
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('incomes', { batch });
+      await batch.commit();
+    }
+  }
 
   if (db) {
     const local = await db.transactions.where('payee').equals(oldName).toArray();
@@ -229,35 +242,37 @@ export async function updateIncomePayee(oldName: string, newName: string): Promi
 }
 
 export async function deleteExpensesForPayee(payee: string): Promise<void> {
-  const q = query(expensesCollection, where('payee', '==', payee));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
-
-  const batch = writeBatch(firestoreDB);
-  snapshot.forEach(docSnap => {
-    batch.delete(docSnap.ref);
-  });
-  
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('expenses', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const q = query(expensesCollection, where('payee', '==', payee));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapshot.forEach(docSnap => {
+        batch.delete(docSnap.ref);
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('expenses', { batch });
+      await batch.commit();
+    }
+  }
 
   if (db) await db.transactions.where('payee').equals(payee).delete();
 }
 
 export async function deleteIncomesForPayee(payee: string): Promise<void> {
-  const q = query(incomesCollection, where('payee', '==', payee));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
-
-  const batch = writeBatch(firestoreDB);
-  snapshot.forEach(docSnap => {
-    batch.delete(docSnap.ref);
-  });
-  
-  const { notifySyncRegistry } = await import('../sync-registry');
-  await notifySyncRegistry('incomes', { batch });
-  await batch.commit();
+  if (!isSqliteMode()) {
+    const q = query(incomesCollection, where('payee', '==', payee));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(firestoreDB);
+      snapshot.forEach(docSnap => {
+        batch.delete(docSnap.ref);
+      });
+      const { notifySyncRegistry } = await import('../sync-registry');
+      await notifySyncRegistry('incomes', { batch });
+      await batch.commit();
+    }
+  }
 
   if (db) await db.transactions.where('payee').equals(payee).delete();
 }

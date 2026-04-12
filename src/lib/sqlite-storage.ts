@@ -1,8 +1,9 @@
 /**
- * Phase 2: SQLite Only Storage Manager.
+ * Phase 2 & 3: Hybrid Storage Manager.
  *
- * - SQLite is the primary and only data store.
- * - Dexie (IndexedDB) has been removed.
+ * - SQLite is the primary store on Desktop (Electron).
+ * - Dexie (IndexedDB) is the fallback/standard store for Web browsers.
+ * - Both sync to Cloudflare D1.
  */
 
 const STORAGE_KEY = 'bizsuite:sqliteMode';
@@ -14,11 +15,11 @@ function getElectron() {
 }
 
 /**
- * In SQLite-only architecture, mode is implicitly always true
- * but we keep this for compatibility with existing UI checks.
+ * Returns true only if running inside Electron with the SQLite bridge.
  */
 export function isSqliteMode(): boolean {
-  return true; 
+  if (typeof window === 'undefined') return false;
+  return (window as any).electron !== undefined;
 }
 
 export function setSqliteMode(enabled: boolean): void {

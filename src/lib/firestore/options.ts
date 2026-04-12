@@ -4,7 +4,7 @@ import { retryFirestoreOperation } from "../retry-utils";
 import { logError } from "../error-logger";
 import { getEditMetadata, logActivity } from "../audit";
 import { getTenantCollectionPath } from "../tenancy";
-import { createLocalSubscription, optionsCollection } from "./core";
+import { createLocalSubscription, optionsCollection, isSqliteMode } from "./core";
 import { OptionItem } from "@/lib/definitions";
 
 export function getOptionsRealtime(
@@ -53,13 +53,15 @@ export async function addOption(collectionName: string, optionData: { name: stri
         }
         
         const meta = getEditMetadata();
-        await retryFirestoreOperation(
-            () => setDoc(docRef, {
-                items: arrayUnion(name),
-                ...meta
-            }, { merge: true }),
-            `addOption - set item for ${collectionName}`
-        );
+        if (!isSqliteMode()) {
+            await retryFirestoreOperation(
+                () => setDoc(docRef, {
+                    items: arrayUnion(name),
+                    ...meta
+                }, { merge: true }),
+                `addOption - set item for ${collectionName}`
+            );
+        }
         logActivity({ type: "create", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Added option ${name} to ${collectionName}`, afterData: { items: [...currentItems, name], ...meta } as Record<string, unknown> }).catch(() => {});
         
         if (db) {
@@ -106,13 +108,15 @@ export async function updateOption(collectionName: string, id: string, optionDat
         
         const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
         const meta = getEditMetadata();
-        await retryFirestoreOperation(
-            () => setDoc(docRef, {
-                items: updatedItems,
-                ...meta
-            }, { merge: true }),
-            `updateOption - set updated items for ${collectionName}`
-        );
+        if (!isSqliteMode()) {
+            await retryFirestoreOperation(
+                () => setDoc(docRef, {
+                    items: updatedItems,
+                    ...meta
+                }, { merge: true }),
+                `updateOption - set updated items for ${collectionName}`
+            );
+        }
         logActivity({ type: "edit", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Updated option ${oldName} to ${newName} in ${collectionName}`, afterData: { items: updatedItems, ...meta } as Record<string, unknown> }).catch(() => {});
         
         if (db) {
@@ -149,13 +153,15 @@ export async function deleteOption(collectionName: string, id: string, name: str
         const docRef = doc(optionsCollection, collectionName);
         const docSnap = await getDoc(docRef);
         const beforeItems = docSnap.exists() ? (docSnap.data().items || []) : [];
-        await retryFirestoreOperation(
-            () => updateDoc(docRef, {
-                items: arrayRemove(name),
-                ...getEditMetadata()
-            }),
-            `deleteOption - remove item from ${collectionName}`
-        );
+        if (!isSqliteMode()) {
+            await retryFirestoreOperation(
+                () => updateDoc(docRef, {
+                    items: arrayRemove(name),
+                    ...getEditMetadata()
+                }),
+                `deleteOption - remove item from ${collectionName}`
+            );
+        }
         logActivity({ type: "delete", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Deleted option ${name} from ${collectionName}`, beforeData: { items: beforeItems } as Record<string, unknown> }).catch(() => {});
     } catch (error) {
         logError(error, `deleteOption(${collectionName}, ${id})`, 'medium');

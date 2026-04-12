@@ -22,13 +22,14 @@ import { DataMigrationCard } from "@/components/settings/data-migration-card";
 import { AddCompanyUserCard } from "@/components/settings/add-company-user-card";
 import { ChangePasswordCard } from "@/components/settings/change-password-card";
 import { CompanyUserList } from "@/components/settings/company-user-list";
+import { CloudSyncCard } from "@/components/settings/cloud-sync-card";
 
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Users2, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Users2, Calendar as CalendarIcon, Cloud } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -146,7 +147,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
   const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
   const searchParams = useSearchParams();
   const tabFromUrl = (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
-  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
+  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account", "cloud-sync"].includes(tabFromUrl)) ? tabFromUrl : "company";
   const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -596,6 +597,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                     <TabsTrigger value="receipts" className="flex items-center gap-1.5 py-2"><FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Receipts</span></TabsTrigger>
                     <TabsTrigger value="formats" className="flex items-center gap-1.5 py-2"><List className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Formats</span></TabsTrigger>
                     <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
+                    <TabsTrigger value="cloud-sync" className="flex items-center gap-1.5 py-2"><Cloud className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cloud Sync</span></TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
                     <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
@@ -740,7 +742,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                                             {account.accountHolderName}
                                             {isDefault && <span className="text-xs font-normal text-primary/80 flex items-center gap-1">(<CheckCheck className="h-3 w-3"/>Default)</span>}
                                         </p>
-                                        <p className="text-sm text-muted-foreground">{account.bankName} - ...{account.accountNumber.slice(-4)}</p>
+                                        <p className="text-sm text-muted-foreground">{account.bankName} - ...{account.accountNumber?.slice(-4) || 'XXXX'}</p>
                                     </div>
                                     <div className="flex gap-1">
                                         {!isDefault && <Button variant="outline" size="sm" className="h-7" onClick={() => handleSetDefaultBankAccount(account.id)}>Set as Default</Button>}
@@ -872,6 +874,9 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                         )}
                     </SettingsCard>
                 </TabsContent>
+                 <TabsContent value="cloud-sync" className="mt-6">
+                    <CloudSyncCard />
+                 </TabsContent>
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>

@@ -24,10 +24,13 @@ export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
     const batch = writeBatch(firestoreDB);
     const newDocRef = doc(loansCollection);
     const data = withCreateMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.set(newDocRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.set(newDocRef, data);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+    }
     logActivity({ type: "create", collection: "loans", docId: newDocRef.id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Created loan ${loanData.loanName}`, afterData: data }).catch(() => {});
     return { id: newDocRef.id, ...data } as Loan;
 }
@@ -36,10 +39,13 @@ export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<v
     const batch = writeBatch(firestoreDB);
     const docRef = doc(loansCollection, id);
     const data = withEditMetadata({ ...loanData, updatedAt: new Date().toISOString() } as Record<string, unknown>);
-    batch.update(docRef, data);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.update(docRef, data);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+    }
     logActivity({ type: "edit", collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), summary: `Updated loan ${id}`, afterData: data }).catch(() => {});
 }
 
@@ -49,9 +55,11 @@ export async function deleteLoan(id: string): Promise<void> {
     if (snap.exists()) {
       await moveToRecycleBin({ collection: "loans", docId: id, docPath: getTenantCollectionPath("loans").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted loan ${id}` });
     }
-    const batch = writeBatch(firestoreDB);
-    batch.delete(docRef);
-    const { notifySyncRegistry } = await import('../sync-registry');
-    await notifySyncRegistry('loans', { batch });
-    await batch.commit();
+    if (!isSqliteMode()) {
+        const batch = writeBatch(firestoreDB);
+        batch.delete(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('loans', { batch });
+        await batch.commit();
+    }
 }

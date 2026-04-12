@@ -19,6 +19,7 @@ import {
   queueLedgerEntryUpsert,
 } from "@/lib/ledger-sync";
 import { CASH_DENOMINATIONS, recalculateBalances, sortEntries, generateLinkGroupId } from "../utils";
+import { fuzzyMatchProfiles } from "../../supplier-profile/utils/fuzzy-matching";
 import { useGlobalData } from "@/contexts/global-data-context";
 
 export function useLedgerPage() {
@@ -88,7 +89,7 @@ export function useLedgerPage() {
             ...account,
             noteGroups: normalizeNoteGroups(account.noteGroups),
           }))
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         setCashAccounts(normalized);
         setActiveCashAccountId((previous) => {
@@ -109,9 +110,34 @@ export function useLedgerPage() {
 
     const unsubscribeAccounts = getLedgerAccountsRealtime(
       (data) => {
-        setAccounts(data);
-        if (!activeAccountId && data.length > 0) {
-          setActiveAccountId(data[0].id);
+        // --- FUZZY GROUPING LOGIC ---
+        const groups: Array<LedgerAccount & { subAccountIds?: string[] }> = [];
+        data.forEach(acc => {
+          const profile = { name: acc.name, fatherName: '', address: acc.address || '' };
+          
+          let matchedGroup = groups.find(g => 
+            fuzzyMatchProfiles(
+              { name: g.name, fatherName: '', address: g.address || '' },
+              profile
+            ).isMatch
+          );
+
+          if (matchedGroup) {
+            if (!matchedGroup.subAccountIds) matchedGroup.subAccountIds = [matchedGroup.id];
+            matchedGroup.subAccountIds.push(acc.id);
+            // Optionally merge details if one is more complete
+            if (!matchedGroup.address && acc.address) matchedGroup.address = acc.address;
+            if (!matchedGroup.contact && acc.contact) matchedGroup.contact = acc.contact;
+          } else {
+            groups.push({ ...acc, subAccountIds: [acc.id] });
+          }
+        });
+
+        const sortedGroups = groups.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setAccounts(sortedGroups);
+        
+        if (!activeAccountId && sortedGroups.length > 0) {
+          setActiveAccountId(sortedGroups[0].id);
         }
       },
       (error) => {
@@ -131,25 +157,26 @@ export function useLedgerPage() {
 
   // Real-time listener for entries
   useEffect(() => {
-    if (!activeAccountId) return;
+    const activeAcc = accounts.find(a => a.id === activeAccountId) as (LedgerAccount & { subAccountIds?: string[] }) | undefined;
+    const accountIdsToFetch = activeAcc?.subAccountIds || (activeAccountId ? [activeAccountId] : []);
 
-    const unsubscribe = getLedgerEntriesRealtime(
-      (data) => {
-        const sortedEntries = sortEntries(recalculateBalances(data));
-        setEntriesMap((prev) => ({ ...prev, [activeAccountId]: sortedEntries }));
-      },
-      (error) => {
-        toast({
-          title: "Unable to load entries",
-          description: "We could not fetch ledger entries. Please try again.",
-          variant: "destructive",
-        });
-      },
-      activeAccountId
+    if (accountIdsToFetch.length === 0) return;
+
+    // Fetch entries for all linked sub-accounts in the fuzzy group
+    const unsubscribes = accountIdsToFetch.map(id => 
+      getLedgerEntriesRealtime(
+        (data) => {
+          setEntriesMap((prev) => ({ ...prev, [id]: data }));
+        },
+        (error) => {
+          console.error(`Error fetching entries for account ${id}:`, error);
+        },
+        id
+      )
     );
 
     return () => {
-      unsubscribe();
+      unsubscribes.forEach(unsub => unsub());
     };
   }, [activeAccountId, toast]);
 
@@ -160,14 +187,23 @@ export function useLedgerPage() {
 
   const activeEntries = useMemo<LedgerEntry[]>(
     () => {
-      const base = activeAccountId ? entriesMap[activeAccountId] || [] : [];
-      if (!activeAccountId || !activeAccount) return base;
+      if (!activeAccountId) return [];
+      
+      const activeAcc = accounts.find(a => a.id === activeAccountId) as (LedgerAccount & { subAccountIds?: string[] }) | undefined;
+      const accountIds = activeAcc?.subAccountIds || [activeAccountId];
+      
+      // Combine entries from all sub-accounts in the group
+      const base = accountIds.flatMap(id => entriesMap[id] || []);
+      
+      if (!activeAcc) return sortEntries(recalculateBalances(base));
 
       const adjustments: LedgerEntry[] = [];
-      const accountName = activeAccount.name.toLowerCase();
+      const accountNames = [(activeAcc.name || '').toLowerCase()]; 
+      // If we want to be thorough, we could include names from all sub-accounts, 
+      // but usually the fuzzy match implies the names are very similar anyway.
 
       globalData.incomes.forEach((inc) => {
-        if (inc.isInternal && inc.payee.toLowerCase() === accountName) {
+        if (inc.isInternal && accountNames.includes((inc.payee || '').toLowerCase())) {
           adjustments.push({
             id: inc.id,
             accountId: activeAccountId,
@@ -184,7 +220,7 @@ export function useLedgerPage() {
       });
 
       globalData.expenses.forEach((exp) => {
-        if (exp.isInternal && exp.payee.toLowerCase() === accountName) {
+        if (exp.isInternal && accountNames.includes((exp.payee || '').toLowerCase())) {
           adjustments.push({
             id: exp.id,
             accountId: activeAccountId,
@@ -276,7 +312,7 @@ export function useLedgerPage() {
 
       const createdAccount = await createLedgerAccount(payload);
       setAccounts((prev) => {
-        const updated = [...prev, createdAccount].sort((a, b) => a.name.localeCompare(b.name));
+        const updated = [...prev, createdAccount].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         return updated;
       });
       setEntriesMap((prev) => ({ ...prev, [createdAccount.id]: [] }));
@@ -612,7 +648,7 @@ export function useLedgerPage() {
         noteGroups: normalizeNoteGroups(createdAccount.noteGroups),
       };
 
-      setCashAccounts((prev) => [...prev, normalized].sort((a, b) => a.name.localeCompare(b.name)));
+      setCashAccounts((prev) => [...prev, normalized].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       setActiveCashAccountId(normalized.id);
       
       toast({ title: "Cash account created" });
