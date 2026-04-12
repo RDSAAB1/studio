@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Cloud, CloudOff, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { getSyncConfig, saveSyncConfig, performFullSync, startAutoSync, exportAllLocalData } from "@/lib/d1-sync";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CloudSyncSettings() {
+    const { toast } = useToast();
     const [config, setConfig] = useState({
         accountId: "",
         databaseId: "",
@@ -40,7 +41,7 @@ export default function CloudSyncSettings() {
 
     const handleSave = () => {
         saveSyncConfig(config as any);
-        toast.success("Sync settings saved successfully");
+        toast({ title: "Sync settings saved successfully", variant: "success" });
         // Trigger initial sync immediately
         if (config.syncToken && config.workerUrl) {
             performFullSync('all').catch(() => {});
@@ -49,7 +50,7 @@ export default function CloudSyncSettings() {
 
     const handleSyncNow = async () => {
         if (!config.syncToken || !config.workerUrl) {
-            toast.error("Please configure sync token and worker URL first");
+            toast({ title: "Please configure sync token and worker URL first", variant: "destructive" });
             return;
         }
 
@@ -60,9 +61,9 @@ export default function CloudSyncSettings() {
             const now = Date.now();
             setLastSync(new Date(now).toLocaleString());
             localStorage.setItem('bizsuite:lastSyncTime', String(now));
-            toast.success("Full data synchronization complete");
+            toast({ title: "Full data synchronization complete", variant: "success" });
         } catch (error: any) {
-            toast.error("Sync failed: " + error.message);
+            toast({ title: "Sync failed", description: error.message, variant: "destructive" });
         } finally {
             setIsSyncing(false);
         }
@@ -70,7 +71,7 @@ export default function CloudSyncSettings() {
 
     const handleExport = async () => {
         if (!config.syncToken || !config.workerUrl) {
-            toast.error("Please configure sync token and worker URL first");
+            toast({ title: "Please configure sync token and worker URL first", variant: "destructive" });
             return;
         }
 
@@ -84,12 +85,12 @@ export default function CloudSyncSettings() {
                 setExportTable(table);
             });
             if (res.success) {
-                toast.success(`Export complete! ${res.total} records pushed.`);
+                toast({ title: "Export complete!", description: `${res.total} records pushed.`, variant: "success" });
             } else {
-                toast.error("Export failed: " + res.error);
+                toast({ title: "Export failed", description: res.error, variant: "destructive" });
             }
         } catch (error: any) {
-            toast.error("Export error: " + error.message);
+            toast({ title: "Export error", description: error.message, variant: "destructive" });
         } finally {
             setIsExporting(false);
         }
@@ -161,7 +162,7 @@ export default function CloudSyncSettings() {
             <Card className="border-orange-500/20 bg-orange-500/5 backdrop-blur-sm shadow-xl">
                 <CardHeader>
                     <CardTitle className="text-orange-400">Migration & Initial Export</CardTitle>
-                    <CardDescription text-orange-200/60>
+                    <CardDescription className="text-orange-200/60">
                         Use this to push your existing records to the cloud for the <b>first time</b>.
                     </CardDescription>
                 </CardHeader>
