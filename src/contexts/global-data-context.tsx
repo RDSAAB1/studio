@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, ReactNo
 import { db, syncAllData, getReceiptSettingsFromLocal } from "@/lib/database";
 import { logError } from "@/lib/error-logger";
 import { isSqliteMode } from "@/lib/sqlite-storage";
+import { getErpSelection } from '@/lib/tenancy';
 import type { 
     Customer, 
     Payment, 
@@ -186,6 +187,10 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const refresh = async (collection: string, retry = false) => {
             if (!db) return;
+            const erp = getErpSelection();
+            const currentSeason = erp?.seasonKey;
+            const currentSub = erp?.subCompanyId;
+
             try {
                 if (collection === 'all') {
                     const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions'];
@@ -193,27 +198,30 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 if (collection === 'suppliers') {
-                    // Use toArray() followed by in-memory sort to bypass Dexie index missing errors
                     const all = await db.suppliers.toArray();
-                    const sorted = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
                     updateState(setSuppliers, sorted);
                     return;
                 }
                 if (collection === 'customers') {
                     const all = await db.customers.toArray();
-                    const sorted = all.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
                     updateState(setCustomers, sorted);
                     return;
                 }
                 if (collection === 'customerPayments') {
                     const all = await db.customerPayments.toArray();
-                    const sorted = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
                     updateState(setCustomerPayments, sorted);
                     return;
                 }
                 if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
                     const all = await db.payments.toArray();
-                    const sorted = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
                     updateState(setSupplierPayments, sorted as Payment[]);
                     return;
                 }
@@ -238,29 +246,36 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 if (collection === 'fundTransactions') {
-                    const data = await db.fundTransactions.orderBy('date').reverse().toArray();
-                    updateState(setFundTransactions, data);
+                    const all = await db.fundTransactions.toArray();
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setFundTransactions, sorted);
                     return;
                 }
                 if (collection === 'incomes' && db.transactions) {
-                    const data = await db.transactions.where('type').equals('Income').toArray();
-                    data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setIncomes, data);
+                    const all = await db.transactions.where('type').equals('Income').toArray();
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setIncomes, filtered);
                     return;
                 }
                 if (collection === 'expenses' && db.transactions) {
-                    const data = await db.transactions.where('type').equals('Expense').toArray();
-                    data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setExpenses, data);
+                    const all = await db.transactions.where('type').equals('Expense').toArray();
+                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                    updateState(setExpenses, filtered);
                     return;
                 }
                 if (collection === 'transactions' && db.transactions) {
                     // Update both incomes and expenses when transactions change
-                    const incomesData = await db.transactions.where('type').equals('Income').toArray();
+                    const all = await db.transactions.toArray();
+                    const seasonal = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    
+                    const incomesData = seasonal.filter((s: any) => s.type === 'Income');
                     incomesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setIncomes, incomesData);
                     
-                    const expensesData = await db.transactions.where('type').equals('Expense').toArray();
+                    const expensesData = seasonal.filter((s: any) => s.type === 'Expense');
                     expensesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setExpenses, expensesData);
                     return;

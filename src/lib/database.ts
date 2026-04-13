@@ -1,5 +1,5 @@
 import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings, Income, Expense, LedgerCashAccount } from './definitions';
-import { loadStoredErpSelection } from '@/contexts/erp-selection-context';
+import { getErpSelection } from '@/lib/tenancy';
 import { logError } from './error-logger';
 import Dexie, { type Table } from 'dexie';
 
@@ -179,6 +179,17 @@ class HybridTable<T> {
     if (!(item as any).id) {
         (item as any).id = String(Date.now());
     }
+
+    // NEW: Auto-Tenancy Injection for internal saves
+    if (source !== 'sync' && !this.tableName.startsWith('_')) {
+        const erp = getErpSelection();
+        if (erp) {
+            if (!(item as any)._company_id) (item as any)._company_id = erp.companyId;
+            if (!(item as any)._sub_company_id) (item as any)._sub_company_id = erp.subCompanyId;
+            if (!(item as any)._year) (item as any)._year = erp.seasonKey;
+        }
+    }
+
     const id = (item as any).id;
     
     try {
@@ -205,16 +216,33 @@ class HybridTable<T> {
     if (typeof window === 'undefined') return [];
     if (items.length === 0) return [];
 
-    // Ensure all items have IDs
+    // Ensure all items have IDs and Tenancy
+    const erp = source !== 'sync' && !this.tableName.startsWith('_') ? getErpSelection() : null;
+    
     items.forEach((item: any) => {
-        if (!item.id) item.id = String(Math.random().toString(36).substr(2, 9));
+        // Special case: _sync_log does NOT have an 'id' column in SQLite schema
+        if (!item.id && this.tableName !== '_sync_log') {
+            item.id = String(Math.random().toString(36).substr(2, 9));
+        }
+        
+        if (erp) {
+            if (!item._company_id) item._company_id = erp.companyId;
+            if (!item._sub_company_id) item._sub_company_id = erp.subCompanyId;
+            if (!item._year) item._year = erp.seasonKey;
+        }
     });
     
     try {
         if (isElectron) {
             const options = { skipLog: source === 'sync' };
+            if (this.tableName === '_sync_log') {
+                console.log(`[Database] Manual Sync Log Push:`, items);
+            }
             const res = await (window as any).electron.sqliteBulkPut(this.tableName, items, options);
-            if (!res?.success) throw new Error(res?.error || 'SQLite bulkPut failed');
+            if (!res?.success) {
+                console.error(`[Database] SQLite bulkPut FAILED for ${this.tableName}:`, res?.error, items[0]);
+                throw new Error(res?.error || 'SQLite bulkPut failed');
+            }
         } else if (this.dexieTable) {
             await this.dexieTable.bulkPut(items);
             // MANUALLY Log changes for D1 Sync (Web only)
@@ -577,7 +605,7 @@ export async function clearAllLocalData(mode: 'UNIT' | 'SEASON' = 'UNIT') {
         } else if (mode === 'SEASON') {
             // For SEASON mode, also clear the sync metadata for the tables we just wiped
             // so that when we switch back to this season (or another), it re-pulls from 0.
-            const erp = loadStoredErpSelection();
+            const erp = getErpSelection();
             if (erp?.seasonKey) {
                 for (const t of tablesToClear) {
                     const scopedMetaId = `${t}:${erp.companyId}:${erp.subCompanyId}:${erp.seasonKey}`;

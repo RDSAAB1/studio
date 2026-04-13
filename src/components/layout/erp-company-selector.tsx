@@ -168,9 +168,8 @@ export function ErpCompanySelector({
       setLoading(true);
       try {
         await pushLocalChanges();
-        await clearAllLocalData('UNIT');
         await setSelection(sel, { skipReload: true });
-        await performFullSync('FORCE_ALL');
+        await performFullSync('all', true);
         toast({ title: `Switched to ${c.name}`, description: "Data synced for new context." });
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -193,9 +192,8 @@ export function ErpCompanySelector({
       setLoading(true);
       try {
         await pushLocalChanges();
-        await clearAllLocalData('UNIT');
         await setSelection(sel, { skipReload: true });
-        await performFullSync('FORCE_ALL');
+        await performFullSync('all', true);
         toast({ title: `Switched to ${s.name}`, description: "Data synced for new unit." });
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -216,9 +214,8 @@ export function ErpCompanySelector({
     setLoading(true);
     try {
       await pushLocalChanges();
-      await clearAllLocalData('SEASON');
       await setSelection(sel, { skipReload: true });
-      await performFullSync('FORCE_ALL');
+      await performFullSync('all', true);
       toast({ title: `Switched to ${s.name}`, description: "Data synced for new season." });
     } catch (e) {
       toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -251,7 +248,7 @@ export function ErpCompanySelector({
       setUiCompanyId(selectedCompany.id);
       setUiSubCompanyId(subId);
       // Even if we don't have a season yet, we might want to clear old data
-      await clearAllLocalData('UNIT');
+      // REMOVED: await clearAllLocalData('UNIT');
       setSelection(null, { skipReload: true }); // Show overlay for Add Season
     } catch (e) {
       toast({ title: "Failed to add", description: String(e), variant: "destructive" });
@@ -276,9 +273,9 @@ export function ErpCompanySelector({
       setAddSeasonOpen(false);
       refreshCompanies();
       const sel = { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey };
-      await clearAllLocalData('SEASON');
+      // REMOVED: await clearAllLocalData('SEASON');
       await setSelection(sel, { skipReload: true });
-      await performFullSync('FORCE_ALL');
+      await performFullSync('all', true);
     } catch (e) {
       toast({ title: "Failed to add", description: String(e), variant: "destructive" });
     } finally {

@@ -129,7 +129,7 @@ export function getErpCollectionPath(collectionName: string, erp: { companyId: s
 export function getStorageKeySuffix(): string {
   const erp = getErpSelection();
   if (erp) {
-    return `${erp.companyId}_${erp.subCompanyId}_${erp.seasonKey}`;
+    return `${erp.companyId}_${erp.subCompanyId}`;
   }
   const active = getActiveTenant();
   if (active?.id) {

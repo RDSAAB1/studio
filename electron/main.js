@@ -292,8 +292,9 @@ function getSqliteDb() {
         const info = sqliteDb.prepare("PRAGMA table_info(_sync_log)").all();
         if (info.length > 0) {
           const hasCollection = info.some(col => col.name === 'collection');
-          if (!hasCollection) {
-            console.log('[SQLite] _sync_log schema is old (no collection column). Force dropping...');
+          const hasTenancy = info.some(col => col.name === '_company_id');
+          if (!hasCollection || !hasTenancy) {
+            console.log('[SQLite] _sync_log schema is old or incomplete. Force dropping...');
             sqliteDb.exec('DROP TABLE _sync_log');
           }
         }
@@ -335,7 +336,10 @@ function getSqliteDb() {
           docId TEXT NOT NULL, 
           operation TEXT NOT NULL, 
           data TEXT, 
-          timestamp INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER))
+          timestamp INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)),
+          _company_id TEXT,
+          _sub_company_id TEXT,
+          _year TEXT
         )
       `);
       
@@ -1349,6 +1353,15 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows, options = {}) =
     const db = getSqliteDb();
     const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`);
     const metaStmt = db.prepare(`INSERT OR REPLACE INTO _sync_meta (id, last_sync_timestamp) VALUES (?, ?)`);
+    
+    // SPECIAL: Complete statement for _sync_log (matching its schema)
+    const fullLogStmt = db.prepare(`
+      INSERT OR REPLACE INTO _sync_log (
+        id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // Shared log statement for implicit changes in other tables
     const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`);
 
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
@@ -1357,20 +1370,37 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows, options = {}) =
       const upsert = db.transaction((chunkItems) => {
         for (const row of chunkItems) {
           if (!row || typeof row !== 'object') continue;
-          const id = getRowId(row, tableName, idx);
-          idx++;
-          const key = String(id).slice(0, 500);
-          if (seen.has(key)) continue;
-          seen.add(key);
           
-          if (tableName === '_sync_meta') {
-            metaStmt.run(key, row.last_sync_timestamp || 0);
+          if (tableName === '_sync_log') {
+            // Special direct path for bulk sync log insertion (e.g. initial export)
+            const id = row.id || `${row.collection}:${row.docId}`;
+            fullLogStmt.run(
+              id,
+              row.collection,
+              row.docId,
+              row.operation || 'upsert',
+              row.data,
+              row.timestamp || row.updated_at || now,
+              row._company_id || null,
+              row._sub_company_id || null,
+              row._year || null
+            );
           } else {
-            stmt.run(key, JSON.stringify(row));
-          }
-          
-          if (!skipLog && !tableName.startsWith('_sync_')) {
-            logStmt.run(`${tableName}:${key}`, tableName, key, 'upsert', JSON.stringify(row), now);
+            const id = getRowId(row, tableName, idx);
+            idx++;
+            const key = String(id).slice(0, 500);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            
+            if (tableName === '_sync_meta') {
+              metaStmt.run(key, row.last_sync_timestamp || 0);
+            } else {
+              stmt.run(key, JSON.stringify(row));
+            }
+            
+            if (!skipLog && !tableName.startsWith('_sync_')) {
+              logStmt.run(`${tableName}:${key}`, tableName, key, 'upsert', JSON.stringify(row), now);
+            }
           }
           inserted++;
         }
@@ -1399,6 +1429,22 @@ ipcMain.handle('sqlite:put', async (_event, tableName, row, options = {}) => {
     const runUpdate = db.transaction((id, tableName, row) => {
       if (tableName === '_sync_meta') {
         db.prepare(`INSERT OR REPLACE INTO _sync_meta (id, last_sync_timestamp) VALUES (?, ?)`).run(id, row.last_sync_timestamp || 0);
+      } else if (tableName === '_sync_log') {
+        db.prepare(`
+          INSERT OR REPLACE INTO _sync_log (
+            id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          id || `${row.collection}:${row.docId}`,
+          row.collection,
+          row.docId,
+          row.operation || 'upsert',
+          row.data,
+          row.timestamp || row.updated_at || Date.now(),
+          row._company_id || null,
+          row._sub_company_id || null,
+          row._year || null
+        );
       } else {
         db.prepare(`INSERT OR REPLACE INTO ${tableName} (id, data) VALUES (?, ?)`).run(id, JSON.stringify(row));
       }

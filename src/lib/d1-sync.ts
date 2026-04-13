@@ -80,6 +80,8 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
         'Content-Type': 'application/json'
     };
 
+    console.log(`[D1 Sync] Request: ${collection || 'global'} | Company: ${headers['X-Company-Id']} | Year: ${headers['X-Year']}`);
+
     try {
         const response = await fetch('/api/d1-proxy', {
             method: 'POST',
@@ -290,7 +292,14 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                     } else {
                         try {
                             const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-                            collectionChangesMap[col].puts.push({ ...parsed, id: docId, updated_at: ts });
+                            collectionChangesMap[col].puts.push({ 
+                                ...parsed, 
+                                id: docId, 
+                                updated_at: ts,
+                                _company_id: r._company_id,
+                                _sub_company_id: r._sub_company_id,
+                                _year: r._year
+                            });
                         } catch (e) {
                             console.warn(`[D1 Sync] JSON Parse error for ${col}:${docId}`);
                         }
@@ -327,28 +336,24 @@ let isSyncingGlobal = false;
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 10000;
 
-export async function performFullSync(targetCollection?: string, options: { isForceAll?: boolean } = {}) {
+export async function performFullSync(target: 'all' | string = 'all', force = false) {
     if (isSyncingGlobal) return;
     
-    const isForceAll = options.isForceAll === true;
     const now = Date.now();
-    
-    // Bypass Cooldown if forced (e.g., remote signal received)
-    if (!isForceAll && (now - lastSyncTime < SYNC_COOLDOWN_MS)) return;
+    // Bypass Cooldown if forced
+    if (!force && (now - lastSyncTime < SYNC_COOLDOWN_MS)) return;
     
     isSyncingGlobal = true;
     lastSyncTime = now;
-
+    
     try {
-        const config = getSyncConfig();
-        if (!config || !config.syncToken || !config.workerUrl) return;
-
-        const isAll = targetCollection === 'FORCE_ALL' || targetCollection === 'all';
-        const effectiveTarget = isAll ? 'all' : targetCollection;
-
-        console.log(`[D1 Sync] Starting Sync Cycle...`);
-        const pushRes = await pushLocalChanges();
+        const effectiveTarget = force ? 'FORCE_ALL' : target;
+        console.log(`[D1 Sync] Starting Sync Cycle (${effectiveTarget})...`);
         
+        // 1. Push local changes first
+        await pushLocalChanges();
+
+        // 2. Pull remote changes
         const pullRes = await pullRemoteChanges(effectiveTarget);
         if (pullRes.pulled && pullRes.pulled > 0) {
             console.log(`[D1 Sync] Pull complete: ${pullRes.pulled} records.`);
@@ -375,7 +380,7 @@ export function startAutoSync() {
     const signalRef = ref(rtdb, path);
     console.log(`[D1 Sync] Event-Driven Signaling Active: ${path}`);
 
-    performFullSync('FORCE_ALL').catch(() => {});
+    performFullSync('all', true).catch(() => {});
 
     syncSignalUnsubscribe = onValue(signalRef, (snapshot) => {
         const val = snapshot.val();
@@ -393,9 +398,55 @@ export function startAutoSync() {
         if (latest.timestamp > lastProcessed) {
             console.log(`[D1 Sync] Remote Change Signal received. Instant pulse...`);
             localStorage.setItem('d1_last_signal_ts', String(latest.timestamp || Date.now()));
-            performFullSync('all', { isForceAll: true }).catch(() => {});
+            performFullSync('all', true).catch(() => {});
         }
     });
+}
+
+/**
+ * EXPORT: Push ALL local data to the cloud (Initial Migration)
+ */
+export async function exportAllLocalData(onProgress?: (percent: number, table: string) => void): Promise<{ success: boolean; total: number; error?: string }> {
+    const config = getSyncConfig();
+    if (!config || !config.syncToken) return { success: false, total: 0, error: 'Sync not configured' };
+    if (!db) return { success: false, total: 0, error: 'Database not available' };
+
+    try {
+        let totalRecords = 0;
+        const tables = SQLITE_TABLES.filter(t => !['_sync_log', '_sync_meta'].includes(t));
+        
+        for (let i = 0; i < tables.length; i++) {
+            const table = tables[i];
+            if (onProgress) onProgress(Math.round((i / tables.length) * 100), table);
+            
+            const records = await (db as any)[table].toArray();
+            if (records.length > 0) {
+                const erp = loadStoredErpSelection();
+                // Queue for sync by adding to _sync_log (Match SQLite Schema Order)
+                const syncLogEntries = records.map((r: any) => ({
+                    docId: String(r.id),
+                    collection: table,
+                    operation: 'upsert',
+                    data: typeof r === 'string' ? r : JSON.stringify(r),
+                    updated_at: Date.now(),
+                    _company_id: erp?.companyId || 'root',
+                    _sub_company_id: erp?.subCompanyId || 'main',
+                    _year: r._year || erp?.seasonKey || 'default'
+                }));
+                
+                await db._sync_log.bulkPut(syncLogEntries);
+                totalRecords += records.length;
+            }
+        }
+        
+        if (onProgress) onProgress(100, 'Pushing to cloud...');
+        await pushLocalChanges();
+        
+        return { success: true, total: totalRecords };
+    } catch (e: any) {
+        console.error('[D1 Sync] Export Error:', e);
+        return { success: false, total: 0, error: e.message };
+    }
 }
 
 /**

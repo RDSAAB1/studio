@@ -131,8 +131,8 @@ export default {
                     } else {
                         // NEW: Optimized Global Pull from Notice Board (_sync_log)
                         const { results } = await env.DB.prepare(
-                            `SELECT docId as id, collection, operation, data, updated_at FROM _sync_log 
-                             WHERE _company_id = ? AND _sub_company_id = ? AND _year = ? AND updated_at >= ? 
+                            `SELECT docId as id, collection, operation, data, updated_at, _company_id, _sub_company_id, _year FROM _sync_log 
+                             WHERE _company_id = ? AND _sub_company_id = ? AND (_year = ? OR _year = 'COMMON') AND updated_at >= ? 
                              ORDER BY updated_at ASC LIMIT 1000`
                         ).bind(companyId, subCompanyId, year, since).all();
                         
@@ -157,7 +157,7 @@ export default {
                             `INSERT OR REPLACE INTO _sync_log 
                              (id, collection, docId, operation, data, updated_at, _company_id, _sub_company_id, _year)
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                        ).bind(`${collection}:${id}`, collection, id, operation || 'upsert', 
+                        ).bind(`${companyId}:${subCompanyId}:${year}:${collection}:${id}`, collection, id, operation || 'upsert', 
                                operation === 'delete' ? null : (typeof data === 'string' ? data : JSON.stringify(data)),
                                finalTime, companyId, subCompanyId, year));
 
