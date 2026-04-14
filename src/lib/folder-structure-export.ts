@@ -18,11 +18,7 @@ import {
   getAllBankBranches,
   getAllBankAccounts,
   getAllSupplierBankAccounts,
-  getAllEmployees,
-  getAllPayroll,
-  getAllAttendance,
   getAllInventoryItems,
-  getAllProjects,
   fetchMandiReports,
   bulkUpsertSuppliers,
   bulkUpsertCustomers,
@@ -247,11 +243,7 @@ export async function fetchAllDataForExport() {
     bankBranches,
     bankAccounts,
     supplierBankAccounts,
-    employees,
-    payroll,
-    attendance,
     inventoryItems,
-    projects,
     mandiReports,
   ] = await Promise.all([
     getAllSuppliers(),
@@ -267,11 +259,7 @@ export async function fetchAllDataForExport() {
     getAllBankBranches(),
     getAllBankAccounts(),
     getAllSupplierBankAccounts(),
-    getAllEmployees(),
-    getAllPayroll(),
-    getAllAttendance(),
     getAllInventoryItems(),
-    getAllProjects(),
     fetchMandiReports(),
   ]);
 
@@ -303,14 +291,6 @@ export async function fetchAllDataForExport() {
     },
     Reports: {
       'mandi-reports': mandiReports as unknown as Record<string, unknown>[],
-    },
-    HR: {
-      employees: employees as unknown as Record<string, unknown>[],
-      payroll: payroll as unknown as Record<string, unknown>[],
-      attendance: attendance as unknown as Record<string, unknown>[],
-    },
-    Projects: {
-      projects: projects as unknown as Record<string, unknown>[],
     },
     Settings: {
       settings: settingsDocs,
@@ -394,18 +374,6 @@ export async function exportToFolder(basePath: string): Promise<{ success: boole
 
   // Reports
   await electron.writeFileToFolder(path('Reports', 'mandi-reports.xlsx'), dataToExcelBase64(data.Reports['mandi-reports']));
-  filesWritten++;
-
-  // HR
-  await electron.writeFileToFolder(path('HR', 'employees.xlsx'), dataToExcelBase64(data.HR.employees));
-  filesWritten++;
-  await electron.writeFileToFolder(path('HR', 'payroll.xlsx'), dataToExcelBase64(data.HR.payroll));
-  filesWritten++;
-  await electron.writeFileToFolder(path('HR', 'attendance.xlsx'), dataToExcelBase64(data.HR.attendance));
-  filesWritten++;
-
-  // Projects
-  await electron.writeFileToFolder(path('Projects', 'projects.xlsx'), dataToExcelBase64(data.Projects.projects));
   filesWritten++;
 
   // Settings

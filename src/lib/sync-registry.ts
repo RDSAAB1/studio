@@ -37,15 +37,10 @@ export const COLLECTION_MAP: Record<string, string> = {
     'expenseCategories': 'expenseCategories',
     'holidays': 'holidays',
     
-    // User and employee management
+    // User management
     'users': 'users',
-    'employees': 'employees',
-    'attendance': 'attendance',
-    'payroll': 'payroll',
     
-    // Project and inventory
-    'projects': 'projects',
-    'tasks': 'tasks',
+    // Inventory
     'inventoryItems': 'inventoryItems',
     'expenseTemplates': 'expenseTemplates',
     

@@ -30,7 +30,7 @@ export async function printHtmlContent(htmlContent: string, styles: string = '')
             };
           </script>
         </head>
-        <body>
+        <body class="is-print-window">
           ${htmlContent}
         </body>
       </html>
@@ -57,35 +57,35 @@ export async function printFullHtml(fullHtml: string): Promise<void> {
   return printHtmlContent(fullHtml);
 }
 
-function printViaIframe(htmlContent: string, styles: string = '') {
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.left = '-9999px';
-  iframe.style.top = '0';
-  iframe.style.width = '210mm';
-  iframe.style.height = '297mm';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const iframeDoc = iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    document.body.removeChild(iframe);
+function printViaIframe(fullHtml: string) {
+  // For Web Browsers, the most robust way to print without layout collapsing or Chrome's iframe throtttling
+  // is to open a temporary popup window, inject the precise HTML and styles, print, and auto-close.
+  const printWindow = window.open('', '_blank', 'width=800,height=600,top=100,left=100');
+  
+  if (!printWindow) {
+    // If popups are blocked, alert the user (very rare when triggered directly by a click event)
+    console.warn("Print popup was blocked by the browser.");
+    alert("Please allow popups for this site to print receipts.");
     return;
   }
 
-  const fullHtml = `<!DOCTYPE html><html><head><style>
-    html, body { margin: 0; padding: 0; background: white !important; color: black !important; }
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    ${styles}
-  </style></head><body>${htmlContent}</body></html>`;
-
+  const iframeDoc = printWindow.document;
   iframeDoc.open();
   iframeDoc.write(fullHtml);
   iframeDoc.close();
 
-  // Copy app styles
+  // Copy app styles (Tailwind/CSS) robustly
+  const headElements = document.querySelectorAll('link[rel="stylesheet"], style');
+  headElements.forEach(el => {
+    try {
+      iframeDoc.head.appendChild(el.cloneNode(true));
+    } catch { /* ignore */ }
+  });
+
+  // Fallback programmatic style copy (critical for dev environments like Next.js/Vite)
   Array.from(document.styleSheets).forEach(styleSheet => {
     try {
+      if (styleSheet.href) return; // Handled by link tag clone
       const style = iframeDoc.createElement('style');
       style.textContent = Array.from(styleSheet.cssRules).map(r => r.cssText).join('');
       iframeDoc.head.appendChild(style);
@@ -96,12 +96,22 @@ function printViaIframe(htmlContent: string, styles: string = '') {
   const doPrint = () => {
     if (printed) return;
     printed = true;
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
+    
+    // Clean up AFTER the print dialog closes
+    printWindow.addEventListener('afterprint', () => {
+      printWindow.close();
+    });
+
+    printWindow.focus();
+    printWindow.print();
+    
+    // Fallback cleanup if afterprint doesn't fire
     setTimeout(() => {
-      try { document.body.removeChild(iframe); } catch {}
-    }, 1000);
+      try { printWindow.close(); } catch {}
+    }, 300000);
   };
-  iframe.contentWindow?.addEventListener('load', doPrint, { once: true });
-  setTimeout(doPrint, 800);
+  
+  // Give it time to apply the cloned styles and fetch images
+  printWindow.addEventListener('load', doPrint, { once: true });
+  setTimeout(doPrint, 1500);
 }

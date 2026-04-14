@@ -273,7 +273,7 @@ function getSqliteDb() {
       startSqliteWatcher(baseFolder);
       
       const tables = [
-        'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+        'companies', 'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
         'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
         'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
         'mandiReports', 'employees', 'payroll', 'attendance',
@@ -673,8 +673,8 @@ function createWindow(loadingOnly = false) {
   const { Menu } = require('electron');
   Menu.setApplicationMenu(null);
   
-  // Maximize the window automatically on start
-  mainWindow.maximize();
+  // Maximize the window automatically on start (True Full Screen)
+  mainWindow.setFullScreen(true);
 
   // IPC Handlers for window controls
   const { ipcMain } = require('electron');
@@ -685,10 +685,12 @@ function createWindow(loadingOnly = false) {
   
   ipcMain.on('window:maximize', () => {
     if (mainWindow) {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
+      if (mainWindow.isFullScreen()) {
+        mainWindow.setFullScreen(false);
+        // Force unmaximize as well just in case they were both true
+        if (mainWindow.isMaximized()) mainWindow.unmaximize();
       } else {
-        mainWindow.maximize();
+        mainWindow.setFullScreen(true);
       }
     }
   });
@@ -698,7 +700,7 @@ function createWindow(loadingOnly = false) {
   });
 
   ipcMain.handle('window:is-maximized', () => {
-    return mainWindow ? mainWindow.isMaximized() : false;
+    return mainWindow ? mainWindow.isFullScreen() || mainWindow.isMaximized() : false;
   });
 
 
@@ -1192,7 +1194,7 @@ ipcMain.handle('folder:stopWatch', async () => {
 
 // --- SQLite IPC: migration + basic queries ---
 const SQLITE_ALLOWED_TABLES = new Set([
-  'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+  'companies', 'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
   'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
   'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
   'mandiReports', 'employees', 'payroll', 'attendance',
@@ -1659,6 +1661,10 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
              clauses.push(`json_extract(data, '$.' || ?) = ?`);
              params.push(key, val);
           }
+        } else if (tableName === '_sync_log' && ['_company_id', '_sub_company_id', '_year'].includes(key)) {
+          // ✅ SUPPORT REAL TENANCY COLUMNS (Only in _sync_log)
+          clauses.push(`${key} = ?`);
+          params.push(val);
         } else if (tableName === '_sync_log' && ['collection', 'operation', 'docId'].includes(key)) {
           clauses.push(`${key} = ?`);
           params.push(val);
@@ -1675,10 +1681,10 @@ ipcMain.handle('sqlite:query', async (_event, tableName, options = {}) => {
       if (options.orderBy === 'id' || (tableName === '_sync_log' && ['timestamp', 'collection'].includes(options.orderBy))) {
         sql += ` ORDER BY ${options.orderBy}`;
       } else {
-        // Better-sqlite3 doesn't support binding column names or JSON keys in ORDER BY directly,
-        // but it's safe since we're selecting from a predetermined table and controlled schema.
-        sql += ` ORDER BY json_extract(data, '$.' || ?)`;
-        params.push(options.orderBy);
+        // Better-sqlite3 doesn't support binding in ORDER BY.
+        // We sanitize the key to prevent SQL injection.
+        const cleanKey = options.orderBy.replace(/[^a-zA-Z0-9_$]/g, '');
+        sql += ` ORDER BY json_extract(data, '$.${cleanKey}')`;
       }
       if (options.reverse) sql += ` DESC`;
     } else {

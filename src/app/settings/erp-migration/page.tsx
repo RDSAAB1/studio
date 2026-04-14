@@ -30,6 +30,7 @@ export default function ErpMigrationPage() {
   const [isImportingExcelToSqlite, setIsImportingExcelToSqlite] = useState(false);
   const [isCreatingNewDb, setIsCreatingNewDb] = useState(false);
   const [selectedCollectionsForNewDb, setSelectedCollectionsForNewDb] = useState<string[]>([
+    'companies',
     'settings',
     'options',
     'banks',
@@ -560,6 +561,7 @@ export default function ErpMigrationPage() {
             <p className="text-sm font-medium">Create new DB from selected collections</p>
             <div className="flex flex-wrap gap-2 text-xs">
               {[
+                'companies',
                 'settings',
                 'options',
                 'banks',
@@ -568,6 +570,7 @@ export default function ErpMigrationPage() {
                 'supplierBankAccounts',
               ].map((name) => {
                 const labelMap: Record<string, string> = {
+                  companies: 'Companies (Tenant Data)',
                   settings: 'Settings',
                   options: 'Options',
                   banks: 'Banks',

@@ -566,8 +566,8 @@ export function SqliteMigrationCard() {
                       suppliers: Truck, customers: Users, payments: CreditCard, customerPayments: HandCoins, governmentFinalizedPayments: Gavel,
                       ledgerAccounts: BookText, ledgerEntries: ListPlus, ledgerCashAccounts: Wallet, incomes: TrendingUp, expenses: TrendingDown,
                       transactions: ArrowRightLeft, banks: Landmark, bankBranches: MapPin, bankAccounts: CreditCard, supplierBankAccounts: Repeat,
-                      loans: Banknote, fundTransactions: Repeat, mandiReports: FileText, employees: UserRound, payroll: Coins, attendance: CalendarCheck,
-                      inventoryItems: Package, inventoryAddEntries: PlusCircle, kantaParchi: FileText, customerDocuments: Files, projects: Briefcase,
+                      loans: Banknote, fundTransactions: Repeat, mandiReports: FileText,
+                      inventoryItems: Package, inventoryAddEntries: PlusCircle, kantaParchi: FileText, customerDocuments: Files,
                       options: Settings2, settings: Settings, incomeCategories: Tags, expenseCategories: Tag, accounts: UserCircle, manufacturingCosting: Factory, expenseTemplates: LayoutTemplate
                     };
                     const IconComp = map[table] || Database;

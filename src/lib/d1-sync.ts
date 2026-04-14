@@ -28,10 +28,13 @@ interface SyncConfig {
     enabled?: boolean;
 }
 
+export const DEFAULT_WORKER_URL = "https://jrmd-sync-worker.traderramanduggal.workers.dev";
+export const DEFAULT_SYNC_TOKEN = "jrmd2026";
+
 const SEASONAL_TABLES = new Set([
     'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
     'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
-    'mandiReports', 'payroll', 'attendance', 'inventoryAddEntries', 'kantaParchi', 
+    'mandiReports', 'inventoryAddEntries', 'kantaParchi', 
     'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
 ]);
 
@@ -41,9 +44,19 @@ function isSeasonalTable(collection: string) {
 
 export function getSyncConfig(): SyncConfig | null {
     if (typeof window === 'undefined') return null;
-    const config = localStorage.getItem('bizsuite:d1SyncConfig');
-    return config ? JSON.parse(config) : null;
+    const raw = localStorage.getItem('bizsuite:d1SyncConfig');
+    const saved = raw ? JSON.parse(raw) : {};
+    
+    return {
+        accountId: saved.accountId || "",
+        databaseId: saved.databaseId || "",
+        apiToken: saved.apiToken || "",
+        syncToken: saved.syncToken || DEFAULT_SYNC_TOKEN,
+        workerUrl: saved.workerUrl || DEFAULT_WORKER_URL,
+        enabled: saved.enabled !== false
+    };
 }
+
 
 export function saveSyncConfig(config: SyncConfig) {
     if (typeof window === 'undefined') return;
@@ -207,6 +220,8 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
             }
             
             if (pendingChanges.length < 100) hasMore = false;
+            // Yield to main thread between batches to prevent UI lag
+            await new Promise(r => setTimeout(r, 0));
         }
 
         if (totalPushedAcrossBatches > 0) {
@@ -320,6 +335,8 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                 }
 
                 if (results.length < 500) hasMore = false;
+                // Yield to main thread between batches to prevent UI lag
+                await new Promise(r => setTimeout(r, 0));
             }
 
             return { success: true, pulled: totalPulled };
@@ -336,12 +353,12 @@ let isSyncingGlobal = false;
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 10000;
 
-export async function performFullSync(target: 'all' | string = 'all', force = false) {
-    if (isSyncingGlobal) return;
+export async function performFullSync(target: 'all' | string = 'all', force = false): Promise<{ pushed: number, pulled: number, total: number } | null> {
+    if (isSyncingGlobal) return null;
     
     const now = Date.now();
     // Bypass Cooldown if forced
-    if (!force && (now - lastSyncTime < SYNC_COOLDOWN_MS)) return;
+    if (!force && (now - lastSyncTime < SYNC_COOLDOWN_MS)) return null;
     
     isSyncingGlobal = true;
     lastSyncTime = now;
@@ -351,15 +368,25 @@ export async function performFullSync(target: 'all' | string = 'all', force = fa
         console.log(`[D1 Sync] Starting Sync Cycle (${effectiveTarget})...`);
         
         // 1. Push local changes first
-        await pushLocalChanges();
+        const pushRes = await pushLocalChanges();
 
         // 2. Pull remote changes
         const pullRes = await pullRemoteChanges(effectiveTarget);
-        if (pullRes.pulled && pullRes.pulled > 0) {
-            console.log(`[D1 Sync] Pull complete: ${pullRes.pulled} records.`);
+
+        const summary = {
+            pushed: pushRes.pushed || 0,
+            pulled: pullRes.pulled || 0,
+            total: (pushRes.pushed || 0) + (pullRes.pulled || 0)
+        };
+
+        if (summary.total > 0) {
+            console.log(`[D1 Sync] Sync complete: ${summary.pushed} push, ${summary.pulled} pull.`);
         }
+
+        return summary;
     } catch (e) {
         console.error('[D1 Sync] Full Sync Cycle Failed:', e);
+        return null;
     } finally {
         isSyncingGlobal = false;
     }

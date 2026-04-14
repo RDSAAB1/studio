@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Building2, Plus, Layers, FileText, ArrowRight } from "lucide-react";
+import { Building, Plus, Layers, CalendarDays, ArrowRight } from "lucide-react";
 
 type ErpCompany = {
   id: string;
@@ -128,7 +128,7 @@ export default function CompanySetupPage() {
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-primary" />
+              <Building className="h-6 w-6 text-primary" />
             </div>
             <div>
               <CardTitle className="text-xl">

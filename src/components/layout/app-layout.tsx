@@ -4,13 +4,17 @@
 import { Fragment, Suspense, createContext, useContext, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
-import { Loader2, Bell, Calculator, ChevronDown, GripVertical, Menu, X } from 'lucide-react';
+import { Loader2, Bell, Calculator, ChevronDown, GripVertical, Menu, X, Zap, ArrowUpCircle, Settings } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import TabBar from '@/components/layout/tab-bar';
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { Truck, Users, Wallet, FilePlus, Banknote } from 'lucide-react';
+import { Truck, Users, Wallet, FilePlus, Banknote, RefreshCw } from 'lucide-react';
 import { logError } from '@/lib/error-logger';
 import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
+import { performFullSync, exportAllLocalData, getSyncConfig } from "@/lib/d1-sync";
+import { ProcessingOverlay } from "@/components/ui/processing-overlay";
+import { showConfirm } from "@/lib/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +130,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     openTabsRef.current = openTabs;
   }, [activeTabId, openTabs]);
 
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [overlayTitle, setOverlayTitle] = useState("");
+  const [overlayDescription, setOverlayDescription] = useState("");
+
   useEffect(() => {
     if (!isBrowser) return;
     listErpCompanies()
@@ -138,6 +148,70 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         setErpMode(false);
       });
   }, [isBrowser]);
+
+  const handleGlobalSync = async () => {
+    const config = getSyncConfig();
+    if (!config?.syncToken) {
+        toast({ title: "Cloud Not Configured", description: "Settings mein jaakar cloud setup karein.", variant: "destructive" });
+        return;
+    }
+
+    setIsProcessing(true);
+    setIsSuccess(false);
+    setOverlayTitle("Syncing Cloud...");
+    setOverlayDescription("Updates pull kiye ja rahe hain...");
+    
+    try {
+        const result = await performFullSync('all');
+        setOverlayTitle("Sync Successful");
+        setOverlayDescription(`Successfully pulled ${result.pulled} changes.`);
+        setIsSuccess(true);
+        setTimeout(() => setIsProcessing(false), 2000);
+    } catch (e: any) {
+        toast({ title: "Sync Failed", description: e.message, variant: "destructive" });
+        setIsProcessing(false);
+    }
+  };
+
+  const handleGlobalUpload = async () => {
+    const config = getSyncConfig();
+    if (!config?.syncToken) {
+        toast({ title: "Cloud Not Configured", description: "Settings mein jaakar cloud setup karein.", variant: "destructive" });
+        return;
+    }
+
+    const confirmed = await showConfirm({
+        title: "Push Local Data to Cloud?",
+        description: "Ye aapka poora local data cloud par upload kar dega aur existing cloud data ko update Karega. Kya aap sure hain?",
+        confirmText: "Yes, Upload",
+        variant: "destructive"
+    });
+
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    setIsSuccess(false);
+    setOverlayTitle("Uploading Data...");
+    setOverlayDescription("Records migrade ho rahe hain...");
+    
+    try {
+        const res = await exportAllLocalData((progress, table) => {
+            setOverlayDescription(`Uploading ${table}... ${progress}%`);
+        });
+        if (res.success) {
+            setOverlayTitle("Upload Complete");
+            setOverlayDescription(`Managed ${res.total} records successfully.`);
+            setIsSuccess(true);
+            setTimeout(() => setIsProcessing(false), 2000);
+        } else {
+            toast({ title: "Upload Failed", description: res.error, variant: "destructive" });
+            setIsProcessing(false);
+        }
+    } catch (e: any) {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+        setIsProcessing(false);
+    }
+  };
 
   // Initialize tabs on mount
   useEffect(() => {
@@ -793,38 +867,19 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                     const active = isTopMenuActive(item);
                     if (item.subMenus && item.subMenus.length > 0) {
                       return (
-                        <DropdownMenu key={item.id}>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
-                                active && "bg-white/25 text-white"
-                              )}
-                              title={item.name}
-                              onClick={() => handleOpenTab(item)}
-                            >
-                              {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="start"
-                            className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/90 text-white shadow-[0_18px_50px_rgba(2,6,23,0.35)] backdrop-blur-[20px]"
-                          >
-                            <DropdownMenuLabel className="font-bold text-sm text-white">{item.name}</DropdownMenuLabel>
-                            {item.subMenus.map((sub) => (
-                              <DropdownMenuItem
-                                key={sub.id}
-                                className="cursor-pointer focus:bg-white/10"
-                                onClick={() => handleOpenTab(sub)}
-                              >
-                                {sub.icon ? <sub.icon className="mr-2 h-4 w-4" /> : null}
-                                <span className="text-sm">{sub.name}</span>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button
+                          key={item.id}
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
+                            active && "bg-white/25 text-white"
+                          )}
+                          title={item.name}
+                          onClick={() => handleOpenTab(item)}
+                        >
+                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                        </Button>
                       );
                     }
 
@@ -855,6 +910,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   hideCompanySelector
                 />
                 <ProfileDropdown />
+                
               </div>
 
               <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
@@ -902,11 +958,34 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                         </button>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground p-2 text-center">No new notifications.</p>
+                      <p className="text-sm text-muted-foreground">No pending EMIs</p>
                     )}
                   </div>
                 </PopoverContent>
               </Popover>
+
+              <div className="flex items-center gap-0.5 border-l border-white/10 ml-1 pl-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleGlobalSync}
+                  disabled={isProcessing}
+                  title="Initiate Delta Sync"
+                  className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <Zap className={cn("h-5 w-5", isProcessing && overlayTitle.includes("Sync") && "animate-pulse")} strokeWidth={2.5} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleGlobalUpload}
+                  disabled={isProcessing}
+                  title="Force Push Records"
+                  className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <ArrowUpCircle className="h-5 w-5" strokeWidth={2.5} />
+                </Button>
+              </div>
 
               <Dialog modal={false}>
                 <DialogTrigger asChild>
@@ -981,6 +1060,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           {children}
         </main>
       </div>
+      <ProcessingOverlay 
+          show={isProcessing}
+          isSuccess={isSuccess}
+          title={overlayTitle}
+          description={overlayDescription}
+      />
       </div>
     </LayoutSubnavContext.Provider>
   );

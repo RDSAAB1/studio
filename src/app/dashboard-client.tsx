@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment, KantaParchi, PaidFor } from '@/lib/definitions';
-import { getLoansRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Payment, CustomerPayment, KantaParchi, PaidFor } from '@/lib/definitions';
+import { getLoansRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { formatCurrency, toTitleCase, getUserFriendlyErrorMessage } from "@/lib/utils";
 import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
@@ -15,7 +15,6 @@ import React from 'react';
 import { AreaChart, Area, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
 import type { DateRange } from 'react-day-picker';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { ensureFirstFullSync, getSyncCounts } from '@/lib/database';
 import { logError } from '@/lib/error-logger';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toStartOfDay, toEndOfDay } from "@/lib/date-utils";
@@ -23,7 +22,6 @@ import { groupSumByKey } from "@/lib/calculation-helpers";
 import { StatCard } from '@/components/dashboard/stat-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { FinancialBreakdown } from '@/components/dashboard/financial-breakdown';
-import { SyncCountsTable, SoftwareCountsTable } from '@/components/dashboard/dashboard-tables';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 import { useToast } from '@/hooks/use-toast';
 import { retry } from '@/lib/retry-utils';
@@ -50,14 +48,9 @@ export default function DashboardClient() {
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
     const [isLoading, setIsLoading] = useState(false);
-    const [syncCounts, setSyncCounts] = useState<{ collection: string; indexeddb: number; firestore: number }[]>([]);
-    const [syncError, setSyncError] = useState<string | null>(null);
-    const [syncRunId, setSyncRunId] = useState(0);
-
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
@@ -116,62 +109,18 @@ export default function DashboardClient() {
         // Only fetch data that's not in global context (run once on mount)
         const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, () => {});
         const unsubLoans = getLoansRealtime(setLoans, () => {});
-        const unsubProjects = getProjectsRealtime(setProjects, () => {});
         const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, () => {});
         const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, () => {});
 
         return () => {
             unsubKantaParchi();
             unsubLoans();
-            unsubProjects();
             unsubExpCats();
             unsubIncCats();
         };
     }, []); // Only run once on mount
     
-    useEffect(() => {
-        let isMounted = true;
-        setIsLoading(true);
-        setSyncError(null);
-
-        (async () => {
-            try {
-                const rows = await retry(
-                    async () => {
-                        await ensureFirstFullSync();
-                        return await getSyncCounts();
-                    },
-                    {
-                        maxAttempts: 3,
-                        initialDelayMs: 1000,
-                        maxDelayMs: 8000,
-                        onRetry: (attempt, error) => {
-                            logError(error, `dashboard-client: sync retry attempt ${attempt}`, "low");
-                        },
-                    }
-                );
-
-                if (isMounted) {
-                    setSyncCounts(rows);
-                }
-            } catch (error) {
-                logError(error, "dashboard-client: ensureFirstFullSync/getSyncCounts", "medium");
-                const message = getUserFriendlyErrorMessage(error, "sync");
-                if (isMounted) {
-                    setSyncError(message);
-                    toast({ title: "Sync failed", description: message, variant: "destructive" });
-                }
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
-            }
-        })();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [syncRunId, toast]);
+    // Removed technical sync effect (moved to Data Audit report)
     
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
@@ -279,40 +228,7 @@ export default function DashboardClient() {
         }
     }, [filteredData]);
     
-    const appCountsMap = useMemo(() => ({
-        suppliers: suppliers.length,
-        customers: customers.length,
-        payments: supplierPayments.length,
-        customerPayments: customerPayments.length,
-        incomes: incomes.length,
-        expenses: expenses.length,
-        fundTransactions: fundTransactions.length,
-        banks: globalData.banks.length,
-        bankBranches: (globalData as any).bankBranches?.length || 0,
-        bankAccounts: bankAccounts.length,
-        supplierBankAccounts: (globalData as any).supplierBankAccounts?.length || 0,
-        projects: projects.length,
-        loans: loans.length,
-    }), [suppliers, customers, supplierPayments, customerPayments, incomes, expenses, fundTransactions, globalData.banks, (globalData as any).bankBranches, bankAccounts, (globalData as any).supplierBankAccounts, projects, loans]);
-
-    const softwareCounts = useMemo(() => {
-        const entries: Array<{ name: string; count: number }> = [];
-        const push = (name: string, count: number | undefined | null) => entries.push({ name, count: Number(count || 0) });
-        push('suppliers', appCountsMap.suppliers);
-        push('customers', appCountsMap.customers);
-        push('payments', appCountsMap.payments);
-        push('customerPayments', appCountsMap.customerPayments);
-        push('incomes', appCountsMap.incomes);
-        push('expenses', appCountsMap.expenses);
-        push('fundTransactions', appCountsMap.fundTransactions);
-        push('banks', appCountsMap.banks);
-        push('bankBranches', appCountsMap.bankBranches);
-        push('bankAccounts', appCountsMap.bankAccounts);
-        push('supplierBankAccounts', appCountsMap.supplierBankAccounts);
-        push('projects', appCountsMap.projects);
-        push('loans', appCountsMap.loans);
-        return entries.filter(row => row.count > 0);
-    }, [appCountsMap]);
+    // Technical counts removed (moved to Data Audit report)
 
     const groupDataByField = React.useCallback(
         <T extends { amount: number } & Record<string, unknown>>(
@@ -549,18 +465,7 @@ export default function DashboardClient() {
                 incomeExpenseChartData={incomeExpenseChartData}
             />
             
-            {syncError && (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-                    <div className="text-sm text-destructive">{syncError}</div>
-                    <Button variant="outline" size="sm" onClick={() => setSyncRunId(v => v + 1)}>
-                        Retry sync
-                    </Button>
-                </div>
-            )}
-
-            <SyncCountsTable syncCounts={syncCounts} appCountsMap={appCountsMap as Record<string, number>} />
-            
-            <SoftwareCountsTable softwareCounts={softwareCounts} />
+            {/* Technical counters moved to Data Audit report */}
             
             <FinancialBreakdown
                 level1Data={level1Data}

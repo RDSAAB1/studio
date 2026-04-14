@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { getFirebaseAuth } from '@/lib/firebase';
+import { DEFAULT_WORKER_URL } from '@/lib/d1-sync';
 
 export default function OnboardPage() {
     const [businesses, setBusinesses] = useState([]);
@@ -24,7 +25,7 @@ export default function OnboardPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/list',
+                    url: `${DEFAULT_WORKER_URL}/onboard/list`,
                     method: 'GET',
                     headers: { 'Authorization': 'Bearer jrmd2026', 'X-User-Id': userId }
                 })
@@ -61,7 +62,7 @@ export default function OnboardPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/company',
+                    url: `${DEFAULT_WORKER_URL}/onboard/company`,
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer jrmd2026', 'X-User-Id': userId },
                     body: { name: companyName }
@@ -82,7 +83,7 @@ export default function OnboardPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/sub-company',
+                    url: `${DEFAULT_WORKER_URL}/onboard/sub-company`,
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer jrmd2026', 'X-User-Id': userId },
                     body: { companyId: selectedBiz.id, name: subName }
@@ -103,7 +104,7 @@ export default function OnboardPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/season',
+                    url: `${DEFAULT_WORKER_URL}/onboard/season`,
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer jrmd2026', 'X-User-Id': userId },
                     body: { companyId: selectedBiz.id, subCompanyId: selectedSub.id, name: seasonName }

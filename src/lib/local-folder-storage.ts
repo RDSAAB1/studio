@@ -462,7 +462,7 @@ export async function loadFromFolderToDexie(folderPath: string): Promise<{ succe
       suppliers, customers, supplierPayments, customerPayments,
       ledgerAccounts, ledgerEntries, ledgerCashAccounts, expenses, incomes,
       banks, bankBranches, bankAccounts, supplierBankAccounts,
-      mandiReports, employees, payroll, attendance, inventoryItems, projects,
+      mandiReports, inventoryItems,
       loans, fundTransactions, options, settings,
       incomeCategories, expenseCategories, accounts, manufacturingCosting,
       kantaParchi, customerDocuments, inventoryAddEntries,
@@ -513,11 +513,7 @@ export async function loadFromFolderToDexie(folderPath: string): Promise<{ succe
     if (db.bankAccounts) { loaded += await putOrSkip(db.bankAccounts, bankAccounts as any); notify('bankAccounts'); }
     if (db.supplierBankAccounts) { loaded += await putOrSkip(db.supplierBankAccounts, supplierBankAccounts as any); notify('supplierBankAccounts'); }
     if (db.mandiReports) { loaded += await putOrSkip(db.mandiReports, mandiReports as MandiReport[]); }
-    if (db.employees) { loaded += await putOrSkip(db.employees, employees as any); notify('employees'); }
-    if (db.payroll) { loaded += await putOrSkip(db.payroll, payroll as any); notify('payroll'); }
-    if (db.attendance) { loaded += await putOrSkip(db.attendance, attendance as any); notify('attendance'); }
     if (db.inventoryItems) { loaded += await putOrSkip(db.inventoryItems, inventoryItems as any); notify('inventoryItems'); }
-    if (db.projects) { loaded += await putOrSkip(db.projects, projects as any); notify('projects'); }
     if (db.loans) { loaded += await putOrSkip(db.loans, loans as any); notify('loans'); }
     if (db.fundTransactions) { loaded += await putOrSkip(db.fundTransactions, fundTransactions as any); notify('fundTransactions'); }
     if (db.options) { loaded += await putOrSkip(db.options, options as any); notify('options'); }
@@ -959,11 +955,7 @@ export async function syncCollectionToFolder(collectionName: string): Promise<bo
     else if (collectionName === 'bankAccounts') data = (await db.bankAccounts.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'supplierBankAccounts') data = (await db.supplierBankAccounts.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'mandiReports') data = (await db.mandiReports.toArray()) as unknown as Record<string, unknown>[];
-    else if (collectionName === 'employees') data = (await db.employees.toArray()) as unknown as Record<string, unknown>[];
-    else if (collectionName === 'payroll') data = (await db.payroll.toArray()) as unknown as Record<string, unknown>[];
-    else if (collectionName === 'attendance') data = (await db.attendance.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'inventoryItems') data = (await db.inventoryItems.toArray()) as unknown as Record<string, unknown>[];
-    else if (collectionName === 'projects') data = (await db.projects.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'loans') data = (await db.loans.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'fundTransactions') data = (await db.fundTransactions.toArray()) as unknown as Record<string, unknown>[];
     else if (collectionName === 'options') data = (await db.options.toArray()) as unknown as Record<string, unknown>[];

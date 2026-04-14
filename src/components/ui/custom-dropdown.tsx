@@ -324,15 +324,16 @@ interface CustomDropdownProps {
             
             // EXACT STARTS WITH: Check if field starts with search term (for autocomplete-like behavior)
             if (searchText.startsWith(lowercasedSearchTerm) && lowercasedSearchTerm.length > 0) {
-                quickMatches.push({ item, distance: 0 });
+                quickMatches.push({ item, distance: 0 }); // Highest priority
                 continue;
             }
             
             // PARTIAL EXACT MATCH: Check if search term is contained exactly (substring match)
             if (searchText.includes(lowercasedSearchTerm) && lowercasedSearchTerm.length > 0) {
-                quickMatches.push({ item, distance: 0 });
+                // Give partial matches slightly lower priority (0.1) so startsWith always comes first
+                quickMatches.push({ item, distance: 0.1 });
                 continue;
-                }
+            }
                 
             // FUZZY MATCHING: Only if no exact match found (for spelling mistakes)
             if (quickMatches.length < 50) {
@@ -599,17 +600,9 @@ interface CustomDropdownProps {
                                 e.stopPropagation();
                                 onGoClick();
                             } else if (e.key === "Enter") {
-                                // If dropdown is closed and Enter is pressed
-                                // If there's a search term and matches, select the first one
-                                if (debouncedSearchTerm && filteredItems.length > 0) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleSelect(filteredItems[0]);
-                                } else {
-                                    // No search term or no matches - allow form to handle (move to next field)
-                                    // Don't prevent default or stop propagation
-                                    return;
-                                }
+                                // If dropdown is closed and Enter is pressed, do NOT forcefully select a partial match.
+                                // Let the main form handler catch it (to move to the next field).
+                                return;
                             }
                             return;
                         }
@@ -617,7 +610,15 @@ interface CustomDropdownProps {
                         // When dropdown is open, handle Enter key
                         if (e.key === "Enter") {
                             e.preventDefault();
-                            e.stopPropagation();
+                            e.stopPropagation(); // Prevent form submission or other handlers
+                        }
+
+                        // Auto-complete top item on Tab
+                        if (e.key === "Tab" && isOpen && filteredItems.length > 0) {
+                            // We do NOT prevent default so it still jumps to the next input field, 
+                            // but we do fire the complete selection for the intended item!
+                            const idx = highlightedIndex >= 0 ? highlightedIndex : 0;
+                            handleSelect(filteredItems[idx]);
                         }
 
                         // Handle keyboard navigation when dropdown is open
@@ -635,12 +636,33 @@ interface CustomDropdownProps {
                             e.preventDefault();
                             e.stopPropagation(); // Prevent form submission or other handlers
                             if (highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
+                                // User explicitly highlighted an item using arrow keys
                                 handleSelect(filteredItems[highlightedIndex]);
-                            } else if (filteredItems.length > 0) {
-                                // If any item matches, select the first one (as requested by user)
-                                handleSelect(filteredItems[0]);
+                            } else if (searchTerm) {
+                                // SMART SELECTION LOGIC:
+                                const lowerSearch = searchTerm.trim().toLowerCase();
+                                // 1. Check if there's an Exact string match
+                                const exactMatch = filteredItems.find(item => 
+                                    (item.label || '').trim().toLowerCase() === lowerSearch
+                                );
+                                
+                                if (exactMatch) {
+                                    handleSelect(exactMatch);
+                                } else {
+                                    // Treat as NEW manual entry (allows typing "Jeet" without selecting "Ajeet")
+                                    if (onAdd) {
+                                        const normalizedTerm = searchTerm.trim().toUpperCase();
+                                        onAdd(normalizedTerm);
+                                        onChange(normalizedTerm);
+                                    } else {
+                                        onChange(searchTerm); // Keep the custom value
+                                    }
+                                    setIsOpen(false);
+                                }
                             } else if (showGoButton && onGoClick) {
                                 onGoClick();
+                            } else {
+                                setIsOpen(false);
                             }
                         } else if (e.key === "Escape") {
                             e.preventDefault();
@@ -774,8 +796,8 @@ interface CustomDropdownProps {
                                             )}
                                                 style={{ height: ITEM_HEIGHT, pointerEvents: 'auto' }}
                                         >
-                                            <div className="flex items-center justify-between w-full">
-                                                <span className="text-xs truncate">
+                                            <div className="flex items-center justify-between w-full gap-2">
+                                                <span className="text-xs truncate flex-1 leading-snug">
                                                     {item.label}
                                                 </span>
                                             </div>

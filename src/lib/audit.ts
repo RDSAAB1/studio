@@ -296,7 +296,7 @@ async function getInternalCollectionName(firestoreName: string): Promise<string>
 }
 
 /** Collections that have direct IndexedDB table mapping (for restore) */
-const IDB_RESTORE_TABLES = new Set(["suppliers", "customers", "payments", "customerPayments", "loans", "projects", "fundTransactions", "inventoryItems", "bankAccounts", "banks", "bankBranches", "accounts", "employees", "kantaParchi", "customerDocuments", "supplierBankAccounts"]);
+const IDB_RESTORE_TABLES = new Set(["suppliers", "customers", "payments", "customerPayments", "loans", "fundTransactions", "inventoryItems", "bankAccounts", "banks", "bankBranches", "accounts", "kantaParchi", "customerDocuments", "supplierBankAccounts"]);
 
 /** Restore from recycle bin */
 export async function restoreFromRecycleBin(entryId: string): Promise<string | null> {

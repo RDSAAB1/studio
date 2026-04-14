@@ -20,24 +20,19 @@ import DashboardClient from "@/app/dashboard-client";
 const RtgsReportClient = dynamic(() => import("./rtgs-report/rtgs-report-client"));
 const DailySupplierReportClient = dynamic(() => import("./daily-supplier-report/daily-supplier-report-client"));
 const SixRReportPage = dynamic(() => import("./6r-report/page"));
+const DailyBusinessReport = dynamic(() => import("../finance/daily-business-report/page"), { ssr: false });
 const VoucherImportTool = dynamic(() => import("@/app/tools/voucher-import/page"));
 const MandiReportHistory = dynamic(() => import("@/components/sales/mandi-report-history").then(m => m.MandiReportHistory));
 const FirestoreMonitorPage = dynamic(() => import("@/app/admin/firestore-monitor/page"));
+const DataAuditPage = dynamic(() => import("@/app/sales/reports/data-audit/page"));
 
-// HR Modules
-const EmployeeDatabasePage = dynamic(() => import("@/app/hr/employee-database/page"));
-const PayrollManagementPage = dynamic(() => import("@/app/hr/payroll-management/page"));
-const AttendanceTrackingPage = dynamic(() => import("@/app/hr/attendance-tracking/page"));
-const ContractPaymentsPage = dynamic(() => import("@/app/hr/contract-payments/page"));
+// Inventory Modules
 
 // Inventory Modules
 const InventoryManagementPage = dynamic(() => import("@/app/inventory/inventory-management/page"));
 const InventoryAddPage = dynamic(() => import("@/app/inventory/inventory-add/page"));
 
-// Project Management Modules
-const ProjectDashboardPage = dynamic(() => import("@/app/projects/dashboard/page"));
-const ProjectTasksPage = dynamic(() => import("@/app/projects/tasks/page"));
-const ProjectCollaborationPage = dynamic(() => import("@/app/projects/collaboration/page"));
+// Cash \u0026 Bank Modules
 
 // Cash & Bank Modules
 const CashBankPage = dynamic(() => import("@/app/cash-bank/page"));
@@ -48,8 +43,6 @@ const BankManagementPage = dynamic(() => import("@/app/settings/bank-management/
 const ErpMigrationPage = dynamic(() => import("@/app/settings/erp-migration/page"));
 // Admin Modules (moved into Unified Sales SPA)
 const AdminMigrationsPage = dynamic(() => import("@/app/admin/migrations/page"));
-const AdminDiagnosticsPage = dynamic(() => import("@/app/admin/diagnostics/page"));
-const AdminTasksPage = dynamic(() => import("@/app/admin/tasks/page"));
 import ActivityHistoryPage from "@/app/activity-history/page";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -57,15 +50,13 @@ type SalesTab =
   | "dashboard" 
   | "supplier-entry" | "customer-entry" 
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
-  | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor"
-  | "hr-employee-database" | "hr-payroll-management" | "hr-attendance-tracking" | "hr-contract-payments"
+  | "daily-business-report" | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor" | "reports-data-audit"
   | "inventory-management" | "inventory-add"
-  | "project-dashboard" | "project-tasks" | "project-collaboration"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
-  | "admin-migrations" | "admin-diagnostics" | "admin-tasks";
+  | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync";
 
-type MenuType = "dashboard" | "entry" | "payments" | "reports" | "hr" | "projects" | "cash-bank" | "history" | "settings" | "admin";
+type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin";
 
 const TAB_LABELS: Record<SalesTab, string> = {
   "dashboard": "Dashboard Overview",
@@ -76,6 +67,7 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "rtgs-outsider": "RTGS Outsider",
   "income-expense": "Income & Expense",
   "ledger": "Ledger",
+  "daily-business-report": "360° Business Report",
   "daily-payments": "Daily Payments",
   "rtgs-report": "RTGS Report",
   "daily-supplier-report": "Daily Supplier Report",
@@ -83,21 +75,11 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "voucher-import": "Mandi Import",
   "mandi-report-history": "Mandi History",
   "firestore-monitor": "Firestore Monitor",
-  
-  // HR
-  "hr-employee-database": "Employee Database",
-  "hr-payroll-management": "Payroll Management",
-  "hr-attendance-tracking": "Attendance Tracking",
-  "hr-contract-payments": "Contract Payments",
+  "reports-data-audit": "Data Audit",
   
   // Inventory
-  "inventory-management": "Inventory Management",
-  "inventory-add": "Inventory Add",
-  
-  // Projects
-  "project-dashboard": "Project Dashboard",
-  "project-tasks": "Project Tasks",
-  "project-collaboration": "Collaboration",
+  "inventory-management": "Inventory",
+  "inventory-add": "Add Stock",
   
   // Cash & Bank
   "cash-bank-management": "Cash & Bank",
@@ -111,9 +93,10 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "history-delete": "Delete History",
   
   // Settings / Admin
-  "admin-migrations": "DB Migrations",
-  "admin-diagnostics": "ID Diagnostics",
-  "admin-tasks": "Task Progress",
+  "admin-local-hub": "Local Hub",
+  "admin-erp-migrate": "ERP Migrate",
+  "admin-secure-vault": "Secure Vault",
+  "admin-collection-sync": "Collection Sync",
 };
 
 export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu = "dashboard" }: { defaultTab?: SalesTab; defaultMenu?: MenuType }) {
@@ -142,18 +125,16 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         } else if (menuParam === 'reports') {
           // Mount frequently used reports immediately
           tabsToMount = [
+            'daily-business-report',
             'daily-payments', 
             'rtgs-report', 
             'daily-supplier-report',
             '6r-report',
             'mandi-report-history',
             'voucher-import',
-            'firestore-monitor'
+            'firestore-monitor',
+            'reports-data-audit'
           ];
-        } else if (menuParam === 'hr') {
-          tabsToMount = ['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'];
-        } else if (menuParam === 'projects') {
-          tabsToMount = ['project-dashboard', 'project-tasks', 'project-collaboration'];
         } else if (menuParam === 'cash-bank') {
           tabsToMount = ['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'];
         } else if (menuParam === 'history') {
@@ -161,7 +142,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         } else if (menuParam === 'settings') {
           tabsToMount = [];
         } else if (menuParam === 'admin') {
-          tabsToMount = ['admin-migrations', 'admin-diagnostics', 'admin-tasks'];
+          tabsToMount = ['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'];
         }
         
         const toAdd = tabsToMount.filter(t => !prev.includes(t));
@@ -185,6 +166,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           "supplier-payments",
           "customer-payments",
           "ledger",
+          "daily-business-report",
           "daily-payments"
         ];
         
@@ -214,12 +196,10 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
     else if (['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'].includes(value)) newMenuType = 'entry';
-    else if (['daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor'].includes(value)) newMenuType = 'reports';
-    else if (['hr-employee-database', 'hr-payroll-management', 'hr-attendance-tracking', 'hr-contract-payments'].includes(value)) newMenuType = 'hr';
-    else if (['project-dashboard', 'project-tasks', 'project-collaboration'].includes(value)) newMenuType = 'projects';
+    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor', 'reports-data-audit'].includes(value)) newMenuType = 'reports';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
-    else if (['admin-migrations', 'admin-diagnostics', 'admin-tasks'].includes(value)) newMenuType = 'admin';
+    else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
     else newMenuType = 'payments';
     
     setMenuType(newMenuType);
@@ -236,28 +216,15 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }, { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] }, { value: "inventory-add" as const, label: TAB_LABELS["inventory-add"] }];
     if (menuType === "reports") {
       return [
+        { value: "daily-business-report" as const, label: TAB_LABELS["daily-business-report"] },
         { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
         { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
         { value: "daily-supplier-report" as const, label: TAB_LABELS["daily-supplier-report"] },
         { value: "6r-report" as const, label: TAB_LABELS["6r-report"] },
-        { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
         { value: "mandi-report-history" as const, label: TAB_LABELS["mandi-report-history"] },
+        { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
         { value: "firestore-monitor" as const, label: TAB_LABELS["firestore-monitor"] },
-      ];
-    }
-    if (menuType === "hr") {
-      return [
-        { value: "hr-employee-database" as const, label: TAB_LABELS["hr-employee-database"] },
-        { value: "hr-payroll-management" as const, label: TAB_LABELS["hr-payroll-management"] },
-        { value: "hr-attendance-tracking" as const, label: TAB_LABELS["hr-attendance-tracking"] },
-        { value: "hr-contract-payments" as const, label: TAB_LABELS["hr-contract-payments"] },
-      ];
-    }
-    if (menuType === "projects") {
-      return [
-        { value: "project-dashboard" as const, label: TAB_LABELS["project-dashboard"] },
-        { value: "project-tasks" as const, label: TAB_LABELS["project-tasks"] },
-        { value: "project-collaboration" as const, label: TAB_LABELS["project-collaboration"] },
+        { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
       ];
     }
     if (menuType === "cash-bank") return [
@@ -278,9 +245,10 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     }
     if (menuType === "admin") {
       return [
-        { value: "admin-migrations" as const, label: TAB_LABELS["admin-migrations"] },
-        { value: "admin-diagnostics" as const, label: TAB_LABELS["admin-diagnostics"] },
-        { value: "admin-tasks" as const, label: TAB_LABELS["admin-tasks"] },
+        { value: "admin-local-hub" as const, label: TAB_LABELS["admin-local-hub"] },
+        { value: "admin-erp-migrate" as const, label: TAB_LABELS["admin-erp-migrate"] },
+        { value: "admin-secure-vault" as const, label: TAB_LABELS["admin-secure-vault"] },
+        { value: "admin-collection-sync" as const, label: TAB_LABELS["admin-collection-sync"] },
       ];
     }
     return [
@@ -294,10 +262,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
 
   useEffect(() => {
     setSubnav(
-      <div
-        className="grid w-full gap-1"
-        style={{ gridTemplateColumns: `repeat(${subTabs.length}, minmax(0, 1fr))` }}
-      >
+      <div className="flex items-center gap-1 w-full pb-1 sm:pb-0 px-1">
         {subTabs.map((t) => {
           const isActive = activeTab === t.value;
           return (
@@ -306,9 +271,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
               type="button"
               onClick={() => handleTabChange(t.value)}
               className={cn(
-                "h-8 w-full rounded-md px-2 text-xs font-semibold transition-colors",
-                "text-slate-700 hover:bg-white/60 hover:text-slate-950",
-                isActive && "bg-white/80 text-slate-950 border border-slate-200/80"
+                "h-8 flex-1 min-w-0 whitespace-normal break-words leading-tight flex items-center justify-center text-center rounded-[6px] px-1 sm:px-3 text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
+                "text-slate-600 hover:bg-white/40 hover:text-slate-900 border border-transparent",
+                isActive && "bg-white text-slate-950 shadow-sm border-slate-200"
               )}
             >
               {t.label}
@@ -340,6 +305,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <IncomeExpenseClient />;
         case "ledger":
           return <LedgerPageComponent />;
+        case "daily-business-report":
+          return <DailyBusinessReport />;
         case "daily-payments":
           return <DailyPaymentsPage />;
         case "rtgs-report":
@@ -354,27 +321,13 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <MandiReportHistory />;
         case "firestore-monitor":
           return <FirestoreMonitorPage />;
-        // HR
-        case "hr-employee-database":
-          return <EmployeeDatabasePage />;
-        case "hr-payroll-management":
-          return <PayrollManagementPage />;
-        case "hr-attendance-tracking":
-          return <AttendanceTrackingPage />;
-        case "hr-contract-payments":
-          return <ContractPaymentsPage />;
+        case "reports-data-audit":
+          return <DataAuditPage />;
         // Inventory
         case "inventory-management":
           return <InventoryManagementPage />;
         case "inventory-add":
           return <InventoryAddPage />;
-        // Projects
-        case "project-dashboard":
-          return <ProjectDashboardPage />;
-        case "project-tasks":
-          return <ProjectTasksPage />;
-        case "project-collaboration":
-          return <ProjectCollaborationPage />;
         // Cash & Bank
         case "cash-bank-management":
           return <CashBankPage />;
@@ -392,13 +345,14 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <BankAccountsPage />;
         case "settings-bank-management":
           return <BankManagementPage />;
-        // Admin (now inside Unified Sales SPA)
-        case "admin-migrations":
-          return <AdminMigrationsPage />;
-        case "admin-diagnostics":
-          return <AdminDiagnosticsPage />;
-        case "admin-tasks":
-          return <AdminTasksPage />;
+        case "admin-local-hub":
+          return <AdminMigrationsPage activeTab="sqlite" />;
+        case "admin-erp-migrate":
+          return <AdminMigrationsPage activeTab="erp" />;
+        case "admin-secure-vault":
+          return <AdminMigrationsPage activeTab="backups" />;
+        case "admin-collection-sync":
+          return <AdminMigrationsPage activeTab="collection-sync" />;
         default:
           return null;
       }

@@ -60,9 +60,7 @@ type MigrationSourceCollection =
   | "incomes"
   | "expenses"
   | "inventoryItems"
-  | "employees"
-  | "projects"
-  | "tasks";
+  | "inventoryItems";
 
 type ModuleMapping = {
   source: MigrationSourceCollection;
@@ -73,9 +71,6 @@ const SOURCE_MAPPINGS: ModuleMapping[] = [
   { source: "incomes", module: "sales" },
   { source: "expenses", module: "expenses" },
   { source: "inventoryItems", module: "purchase" },
-  { source: "employees", module: "employees" },
-  { source: "projects", module: "reports" },
-  { source: "tasks", module: "reports" },
 ];
 
 /**

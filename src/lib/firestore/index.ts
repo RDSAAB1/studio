@@ -6,7 +6,7 @@ export * from './banks';
 export * from './suppliers';
 export * from './customers';
 export * from './finance';
-export * from './hr';
+
 export * from './reports';
 export * from './inventory';
 export * from './ledger';

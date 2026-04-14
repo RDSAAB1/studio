@@ -240,7 +240,6 @@ export type Transaction = {
   expenseType?: 'Personal' | 'Business';
   mill?: string;
   expenseNature?: 'Permanent' | 'Seasonal';
-  projectId?: string; 
   loanId?: string; 
   bankAccountId?: string;
   isRecurring?: boolean;
@@ -616,33 +615,6 @@ export type MandiHeaderSettings = {
   financialYear: string;
 };
 
-export type Employee = {
-    id: string;
-    employeeId: string;
-    name: string;
-    position: string;
-    contact: string;
-    baseSalary: number;
-    monthlyLeaveAllowance: number;
-    isDeleted?: boolean;
-};
-
-export type PayrollEntry = {
-    id: string;
-    employeeId: string;
-    payPeriod: string; // e.g., "2024-07"
-    amount: number;
-    createdAt?: Date;
-    updatedAt?: Date;
-};
-
-export type AttendanceEntry = {
-    id: string; 
-    date: string; 
-    employeeId: string;
-    status: 'Present' | 'Absent' | 'Leave' | 'Half-day';
-};
-
 export type ReceiptFieldSettings = {
     date: boolean;
     name: boolean;
@@ -701,29 +673,6 @@ export type ConsolidatedReceiptData = {
 };
 
 export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan' | 'receipt' | 'rtgs-receipt';
-
-export type Project = {
-    id: string;
-    name: string;
-    description?: string;
-    status: 'Open' | 'InProgress' | 'Completed' | 'OnHold';
-    startDate: string;
-    endDate?: string;
-    totalCost?: number;
-    totalBilled?: number;
-    createdAt?: string;
-    updatedAt?: string;
-};
-
-export type Task = {
-  id: string;
-  projectId: string;
-  name: string;
-  description?: string;
-  status: 'Open' | 'InProgress' | 'Completed';
-  assignedTo?: string;
-  dueDate?: string;
-};
 
 export type Loan = {
     id: string;

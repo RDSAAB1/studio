@@ -15,8 +15,6 @@
  *             Payments/supplier-payments.xlsx, ...
  *             CashAndBank/banks.xlsx, ...
  *             Reports/mandi-reports.xlsx
- *             HR/employees.xlsx, ...
- *             Projects/projects.xlsx
  *
  * Flat mode (backward compatible):
  *   Folder/
@@ -207,11 +205,7 @@ export const LOCAL_EXCEL_MAPPING_ORDER: [string, string, string][] = [
   ['bankAccounts', 'CashAndBank', 'bank-accounts.xlsx'],
   ['supplierBankAccounts', 'CashAndBank', 'supplier-bank-accounts.xlsx'],
   ['mandiReports', 'Reports', 'mandi-reports.xlsx'],
-  ['employees', 'HR', 'employees.xlsx'],
-  ['payroll', 'HR', 'payroll.xlsx'],
-  ['attendance', 'HR', 'attendance.xlsx'],
   ['inventoryItems', 'Entry', 'inventory-items.xlsx'],
-  ['projects', 'Projects', 'projects.xlsx'],
   // Cash & Bank: Loan Management & Fund (Capital) Transactions
   ['loans', 'CashAndBank', 'loans.xlsx'],
   ['fundTransactions', 'CashAndBank', 'fund-transactions.xlsx'],

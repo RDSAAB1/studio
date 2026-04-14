@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment, Account } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, FundTransaction, Loan, BankAccount, Income, Expense, Payment, Account } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency, generateReadableId, getUserFriendlyErrorMessage } from "@/lib/utils";
 import { logError } from "@/lib/error-logger";
 
@@ -32,7 +32,7 @@ import { useCategoryManager } from "./hooks/use-category-manager";
 
 export type DisplayTransaction = (Income | Expense) & { id: string };
 import { useAccountManager } from "./hooks/use-account-manager";
-import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime, getAllIncomes, getTotalExpenseCount } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getPaymentsRealtime, getAllIncomes, getTotalExpenseCount } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -68,7 +68,6 @@ const transactionFormSchema = z.object({
   expenseType: z.enum(["Personal", "Business"]).optional(),
   mill: z.string().optional(), 
   expenseNature: z.string().optional(),
-  projectId: z.string().optional(),
   loanId: z.string().optional(),
   isInternal: z.boolean().optional(),
 });
@@ -101,7 +100,6 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
     taxAmount: 0,
     cdAmount: 0,
     expenseType: 'Business',
-    projectId: 'none',
     isInternal: false,
   };
 };
@@ -123,7 +121,6 @@ export default function IncomeExpenseClient() {
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [totalExpenseCount, setTotalExpenseCount] = useState<number | null>(null);
 
   // NO PAGE LOADING - Data loads initially, then only CRUD updates
@@ -182,10 +179,9 @@ export default function IncomeExpenseClient() {
         // Note: incomes, expenses, payments are handled by globalData
         
         const unsubLoans = getLoansRealtime(setLoans, () => {});
-        const unsubProjects = getProjectsRealtime(setProjects, () => {});
 
         return () => {
-             unsubLoans(); unsubProjects();
+             unsubLoans();
         }
     }, []); // Only run once on mount
 
@@ -824,7 +820,6 @@ export default function IncomeExpenseClient() {
         date: format(values.date, "yyyy-MM-dd"),
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
-        projectId: values.projectId === 'none' ? '' : values.projectId,
         status: values.status as Transaction['status'],
         expenseType: values.expenseType as Transaction['expenseType'],
         expenseNature: values.expenseNature as Transaction['expenseNature'],
@@ -1293,7 +1288,6 @@ export default function IncomeExpenseClient() {
                 editingTransaction={editingTransaction}
                 setLastAmountSource={setLastAmountSource}
                 bankAccounts={bankAccounts}
-                projects={projects}
                 selectedTransactionType={selectedTransactionType === 'Income' ? 'Income' : 'Expense'}
                 errors={errors}
               />

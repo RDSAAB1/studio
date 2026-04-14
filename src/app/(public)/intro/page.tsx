@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
-  Building2,
+  Building,
   BarChart3,
   Zap,
   Shield,
@@ -49,7 +49,7 @@ export default function IntroPage() {
             style={{ animationFillMode: "forwards", animationDelay: "0.1s" }}
           >
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
-              <Building2 className="w-7 h-7 text-white stroke-[1.5]" />
+              <Building className="w-7 h-7 text-white stroke-[1.5]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight font-jakarta">
@@ -111,7 +111,7 @@ export default function IntroPage() {
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_24px_rgba(99,102,241,0.35)]">
-                <Building2 className="w-6 h-6 text-white stroke-[1.5]" />
+                <Building className="w-6 h-6 text-white stroke-[1.5]" />
               </div>
               <div>
                 <span className="font-bold text-white font-jakarta text-lg">BizSuite</span>

@@ -65,15 +65,15 @@ export const EXCEL_COLUMN_ORDER: Record<string, string[]> = {
   expenses: [
     'id', 'transactionId', 'date', 'type', 'transactionType', 'category', 'subCategory', 'amount', 'payee',
     'description', 'paymentMethod', 'status', 'taxAmount', 'cdAmount', 'expenseType', 'mill', 'expenseNature',
-    'projectId', 'loanId', 'bankAccountId', 'isRecurring', 'isDeleted', 'createdAt', 'updatedAt',
+    'loanId', 'bankAccountId', 'isRecurring', 'isDeleted', 'createdAt', 'updatedAt',
   ],
   incomes: [
     'id', 'transactionId', 'date', 'type', 'transactionType', 'category', 'subCategory', 'amount', 'payee',
-    'description', 'paymentMethod', 'status', 'taxAmount', 'cdAmount', 'projectId', 'bankAccountId',
+    'description', 'paymentMethod', 'status', 'taxAmount', 'cdAmount', 'bankAccountId',
     'isRecurring', 'isDeleted', 'createdAt', 'updatedAt',
   ],
 
-  // Reports & HR
+  // Reports
   mandiReports: [
     'id', 'voucherNo', 'bookNo', 'purchaseDate', 'sellerName', 'fatherName', 'district', 'tehsil', 'village',
     'khasraNo', 'khasraArea', 'mobile', 'commodity', 'quantityQtl', 'ratePerQtl', 'grossAmount', 'netAmount',
@@ -81,13 +81,9 @@ export const EXCEL_COLUMN_ORDER: Record<string, string[]> = {
     'bankAccount', 'ifsc', 'bankName', 'bankBranch', 'transactionNumber', 'traderReceiptNo', 'traderName',
     'buyerFirm', 'buyerLicense', 'mandiName', 'mandiSiteType', 'mandiSiteName', 'narration', 'createdAt', 'updatedAt',
   ],
-  employees: ['id', 'name', 'email', 'phone', 'role', 'createdAt', 'updatedAt'],
-  payroll: ['id', 'employeeId', 'period', 'amount', 'createdAt', 'updatedAt'],
-  attendance: ['id', 'employeeId', 'date', 'status', 'createdAt', 'updatedAt'],
 
-  // Entry & Projects
+  // Entry & Inventory
   inventoryItems: ['id', 'name', 'variety', 'unit', 'createdAt', 'updatedAt'],
-  projects: ['id', 'name', 'description', 'createdAt', 'updatedAt'],
 
   // Cash & Bank: Loan Management & Fund Transactions
   loans: [

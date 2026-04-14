@@ -1,9 +1,7 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { Customer, CustomerPayment, Payment, Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount } from './definitions';
+import type { Customer, CustomerPayment, Payment, Transaction, IncomeCategory, ExpenseCategory, FundTransaction, Loan, BankAccount } from './definitions';
 import { format } from 'date-fns';
 
 // --- Types ---
@@ -23,7 +21,6 @@ interface ExpenseTrackerState {
     transactions: Transaction[];
     incomeCategories: IncomeCategory[];
     expenseCategories: ExpenseCategory[];
-    projects: Project[];
 }
 
 interface CashBankState {
@@ -95,10 +92,6 @@ const initialCashBankFormState: Partial<Loan> = {
 
 // --- Contexts and Provider ---
 
-const SupplierEntryContext = createContext<StateStoreContextType | undefined>(undefined);
-const CustomerEntryContext = createContext<StateStoreContextType | undefined>(undefined);
-const ExpenseTrackerContext = createContext<StateStoreContextType | undefined>(undefined);
-const CashBankContext = createContext<StateStoreContextType | undefined>(undefined);
 const StateStoreContext = createContext<StateStoreContextType | undefined>(undefined);
 
 export const StateProvider = ({ children }: { children: ReactNode }) => {
@@ -115,7 +108,6 @@ export const StateProvider = ({ children }: { children: ReactNode }) => {
         transactions: [],
         incomeCategories: [],
         expenseCategories: [],
-        projects: [],
     });
     const [cashBank, setCashBank] = useState<CashBankState>({
         fundTransactions: [],
@@ -183,8 +175,6 @@ export const useExpenseTrackerState = () => {
             context.setExpenseTracker(prev => ({ ...prev, incomeCategories: categories })),
         setExpenseCategories: (categories: ExpenseCategory[]) =>
             context.setExpenseTracker(prev => ({ ...prev, expenseCategories: categories })),
-        setProjects: (projects: Project[]) =>
-            context.setExpenseTracker(prev => ({ ...prev, projects })),
     };
 };
 

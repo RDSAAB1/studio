@@ -484,6 +484,34 @@ export default function RootLayout({ children, params }: LayoutProps) {
         return () => window.removeEventListener('folder:write-failed', handler);
     }, [toast]);
 
+    // Web Auto-Fullscreen logic (first interaction)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        // Skip for Electron - it has its own window management
+        if ((window as any).electron || (window as any).__ELECTRON__) return;
+
+        const handleFirstInteraction = () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            // Remove listeners immediately after first interaction
+            document.removeEventListener('click', handleFirstInteraction);
+            document.removeEventListener('keydown', handleFirstInteraction);
+            document.removeEventListener('touchstart', handleFirstInteraction);
+        };
+        
+        document.addEventListener('click', handleFirstInteraction, { once: true, capture: true });
+        document.addEventListener('keydown', handleFirstInteraction, { once: true, capture: true });
+        document.addEventListener('touchstart', handleFirstInteraction, { once: true, capture: true });
+
+        return () => {
+            document.removeEventListener('click', handleFirstInteraction, { capture: true });
+            document.removeEventListener('keydown', handleFirstInteraction, { capture: true });
+            document.removeEventListener('touchstart', handleFirstInteraction, { capture: true });
+        };
+    }, []);
+
     // ✅ OPTIMIZED: Combined service worker registration and message handling
     useEffect(() => {
         const safeGetRegistrations = () => {

@@ -168,11 +168,8 @@ async function _importDexieToSqlite(selectedCollections?: string[]): Promise<{
   await importTable('loans', (db as any).loans);
   await importTable('fundTransactions', (db as any).fundTransactions);
 
-  // Reports & HR
+  // Reports
   await importTable('mandiReports', (db as any).mandiReports);
-  await importTable('employees', (db as any).employees);
-  await importTable('payroll', (db as any).payroll);
-  await importTable('attendance', (db as any).attendance);
 
   // Entry & Inventory
   await importTable('inventoryItems', (db as any).inventoryItems);
@@ -180,8 +177,7 @@ async function _importDexieToSqlite(selectedCollections?: string[]): Promise<{
   await importTable('kantaParchi', (db as any).kantaParchi);
   await importTable('customerDocuments', (db as any).customerDocuments);
 
-  // Projects & Settings
-  await importTable('projects', (db as any).projects);
+  // Settings
   await importTable('options', (db as any).options);
   await importTable('settings', (db as any).settings);
   await importTable('incomeCategories', (db as any).incomeCategories);

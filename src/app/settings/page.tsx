@@ -22,7 +22,6 @@ import { DataMigrationCard } from "@/components/settings/data-migration-card";
 import { AddCompanyUserCard } from "@/components/settings/add-company-user-card";
 import { ChangePasswordCard } from "@/components/settings/change-password-card";
 import { CompanyUserList } from "@/components/settings/company-user-list";
-import { CloudSyncCard } from "@/components/settings/cloud-sync-card";
 
 
 import { Button } from '@/components/ui/button';
@@ -147,7 +146,7 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
   const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
   const searchParams = useSearchParams();
   const tabFromUrl = (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
-  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account", "cloud-sync"].includes(tabFromUrl)) ? tabFromUrl : "company";
+  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
   const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -597,7 +596,6 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                     <TabsTrigger value="receipts" className="flex items-center gap-1.5 py-2"><FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Receipts</span></TabsTrigger>
                     <TabsTrigger value="formats" className="flex items-center gap-1.5 py-2"><List className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Formats</span></TabsTrigger>
                     <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
-                    <TabsTrigger value="cloud-sync" className="flex items-center gap-1.5 py-2"><Cloud className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cloud Sync</span></TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
                     <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
@@ -874,9 +872,6 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
                         )}
                     </SettingsCard>
                 </TabsContent>
-                 <TabsContent value="cloud-sync" className="mt-6">
-                    <CloudSyncCard />
-                 </TabsContent>
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>

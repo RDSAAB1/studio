@@ -91,10 +91,10 @@ body {
    Print dialogs use iframe.contentWindow.print() so they bypass this.
    Pages with print area (e.g. Ledger #statement-print-area) override with visibility: visible. */
 @media print {
-  body * {
+  body:not(.is-print-window) > * {
     visibility: hidden !important;
   }
-  body {
+  body:not(.is-print-window) {
     visibility: visible !important;
     background: white !important;
   }

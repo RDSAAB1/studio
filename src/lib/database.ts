@@ -1,4 +1,4 @@
-import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, PayrollEntry, Payment, Project, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, Employee, AttendanceEntry, FormatSettings, Income, Expense, LedgerCashAccount } from './definitions';
+import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, Payment, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, FormatSettings, Income, Expense, LedgerCashAccount } from './definitions';
 import { getErpSelection } from '@/lib/tenancy';
 import { logError } from './error-logger';
 import Dexie, { type Table } from 'dexie';
@@ -17,6 +17,13 @@ if (syncChannel) {
         // Trigger local events to refresh UI components
         notifyChange(tableName, 'external');
     };
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('erp:selection-changed', () => {
+        console.log('[Database] Season/Company selection changed, refreshing all UI...');
+        notifyChange('all');
+    });
 }
 
 export const notifyChange = (tableName: string, source?: string) => {
@@ -75,7 +82,7 @@ export const notifyChange = (tableName: string, source?: string) => {
  * In Electron, this is handled by SQLite triggers. In Web, we must do it manually.
  */
 export const logSyncChange = async (table: string, id: string, operation: 'upsert' | 'delete', data?: any) => {
-    if (!isElectron && dexieDb && table !== '_sync_log' && table !== '_sync_meta') {
+    if (!checkIsElectron() && dexieDb && table !== '_sync_log' && table !== '_sync_meta') {
         try {
             await (dexieDb as any)._sync_log.put({
                 id: `${table}:${id}`,
@@ -91,7 +98,7 @@ export const logSyncChange = async (table: string, id: string, operation: 'upser
     }
 };
 
-const isElectron = typeof window !== 'undefined' && (window as any).electron !== undefined;
+const checkIsElectron = () => typeof window !== 'undefined' && (window as any).electron !== undefined;
 
 // --- Dexie (IndexedDB) Instance for Web Fallback ---
 class AppDexie extends Dexie {
@@ -102,9 +109,9 @@ class AppDexie extends Dexie {
     // Note: SQLite uses 'id' as primary key for everything.
     const schema: Record<string, string> = {};
     const tables = [
-      'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+      'companies', 'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
       'transactions', 'options', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts',
-      'settings', 'projects', 'loans', 'fundTransactions', 'employees', 'payroll', 'attendance',
+      'settings', 'loans', 'fundTransactions',
       'inventoryItems', 'ledgerAccounts', 'ledgerEntries', 'mandiReports', 'kantaParchi',
       'manufacturingCosting', 'incomeCategories', 'expenseCategories', 'customerDocuments',
       'accounts', 'inventoryAddEntries', 'incomes', 'expenses', 'expenseTemplates', 'ledgerCashAccounts',
@@ -154,21 +161,71 @@ class HybridTable<T> {
     }
   }
 
+  private injectTenancy(options: any = {}): any {
+    if (this.tableName.startsWith('_')) return options;
+    const erp = getErpSelection();
+    if (!erp) return options;
+
+    const where = options.where || {};
+    
+    // Filter by season for transaction/seasonal tables
+    const SEASONAL_TABLES = [
+      'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
+      'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
+      'mandiReports', 'inventoryAddEntries', 'kantaParchi', 
+      'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
+    ];
+
+    // Always filter by company and sub-company (Web only)
+    // In Electron (SQLite), the database file itself is the boundary.
+    if (!checkIsElectron()) {
+      where._company_id = erp.companyId;
+      where._sub_company_id = erp.subCompanyId;
+    }
+
+    const isSeasonal = SEASONAL_TABLES.includes(this.tableName);
+    if (isSeasonal) {
+      where._year = erp.seasonKey;
+    }
+
+    return { ...options, where };
+  }
+
   async toArray(): Promise<T[]> {
     if (typeof window === 'undefined') return [];
-    if (isElectron) return (window as any).electron.sqliteAll(this.tableName);
-    return this.dexieTable ? this.dexieTable.toArray() : [];
+    if (checkIsElectron()) {
+      return (window as any).electron.sqliteQuery(this.tableName, this.injectTenancy());
+    }
+    const erp = getErpSelection();
+    let promise = this.dexieTable ? this.dexieTable.toArray() : Promise.resolve([]);
+    if (erp && !this.tableName.startsWith('_')) {
+        promise = promise.then(data => data.filter((item: any) => {
+            const SEASONAL_TABLES = ['payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions', 'mandiReports', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'];
+            const isSeasonal = SEASONAL_TABLES.includes(this.tableName);
+            
+            if (isSeasonal) {
+                // For seasonal tables, we still filter by year to keep seasons separate
+                return item._year === erp.seasonKey;
+            }
+            // For other tables, we return everything (global mode)
+            return true;
+        }));
+    }
+    return promise;
   }
 
   async count(): Promise<number> {
     if (typeof window === 'undefined') return 0;
-    if (isElectron) return (window as any).electron.sqliteCount(this.tableName);
-    return this.dexieTable ? this.dexieTable.count() : 0;
+    if (checkIsElectron()) {
+        const results = await (window as any).electron.sqliteQuery(this.tableName, this.injectTenancy({ select: 'count(*) as count' }));
+        return results?.[0]?.count || 0;
+    }
+    return (await this.toArray()).length;
   }
 
   async get(id: string | number): Promise<T | undefined> {
     if (typeof window === 'undefined') return undefined;
-    if (isElectron) return (window as any).electron.sqliteGet(this.tableName, String(id));
+    if (checkIsElectron()) return (window as any).electron.sqliteGet(this.tableName, String(id));
     return this.dexieTable ? this.dexieTable.get(String(id)) : undefined;
   }
 
@@ -193,7 +250,7 @@ class HybridTable<T> {
     const id = (item as any).id;
     
     try {
-        if (isElectron) {
+        if (checkIsElectron()) {
             const options = { skipLog: source === 'sync' };
             const res = await (window as any).electron.sqlitePut(this.tableName, item as any, options);
             if (!res?.success) throw new Error(res?.error || 'SQLite put failed');
@@ -233,7 +290,7 @@ class HybridTable<T> {
     });
     
     try {
-        if (isElectron) {
+        if (checkIsElectron()) {
             const options = { skipLog: source === 'sync' };
             if (this.tableName === '_sync_log') {
                 console.log(`[Database] Manual Sync Log Push:`, items);
@@ -269,7 +326,7 @@ class HybridTable<T> {
     if (stringIds.length === 0) return;
 
     try {
-        if (isElectron) {
+        if (checkIsElectron()) {
             const options = { skipLog: source === 'sync' };
             const res = await (window as any).electron.sqliteBulkDelete(this.tableName, stringIds, options);
             if (!res?.success) throw new Error(res?.error || 'SQLite bulkDelete failed');
@@ -310,7 +367,7 @@ class HybridTable<T> {
     const trimmedId = String(id).trim();
     if (!trimmedId) return;
 
-    if (isElectron) {
+    if (checkIsElectron()) {
       const res = await (window as any).electron.sqliteDelete(this.tableName, trimmedId);
       if (!res?.success) throw new Error(res?.error || 'SQLite delete failed');
     } else if (this.dexieTable) {
@@ -332,7 +389,7 @@ class HybridTable<T> {
   }
 
   async clear(): Promise<void> {
-    if (isElectron) {
+    if (checkIsElectron()) {
       console.warn(`Table.clear() called for ${this.tableName} - restricted in SQLite mode`);
     } else if (this.dexieTable) {
       await this.dexieTable.clear();
@@ -355,14 +412,14 @@ class HybridTable<T> {
       count: async () => (await dataPromise).length, // Note: this counts the filtered/sliced result
       limit: (n: number) => {
         const newOptions = { ...queryOptions, limit: n };
-        if (isElectron) {
+        if (checkIsElectron()) {
           return this.createCollection((window as any).electron.sqliteQuery(this.tableName, newOptions), newOptions);
         }
         return this.createCollection(dataPromise.then(d => d.slice(0, n)), newOptions);
       },
       offset: (n: number) => {
         const newOptions = { ...queryOptions, offset: n };
-        if (isElectron) {
+        if (checkIsElectron()) {
           return this.createCollection((window as any).electron.sqliteQuery(this.tableName, newOptions), newOptions);
         }
         return this.createCollection(dataPromise.then(d => d.slice(n)), newOptions);
@@ -370,7 +427,7 @@ class HybridTable<T> {
       orderBy: (field: string) => {
         // Simple client-side sort for Dexie fallback, SQL handles it via queryOptions
         const newOptions = { ...queryOptions, orderBy: field };
-        if (isElectron) {
+        if (checkIsElectron()) {
            return this.createCollection((window as any).electron.sqliteQuery(this.tableName, newOptions), newOptions);
         }
         return this.createCollection(dataPromise.then(d => {
@@ -391,42 +448,47 @@ class HybridTable<T> {
   where(field: string) {
     return {
       equals: (value: any) => {
-        const queryOptions = { where: { [field]: value } };
-        if (isElectron) {
+        const queryOptions = this.injectTenancy({ where: { [field]: value } });
+        if (checkIsElectron()) {
           return this.createCollection((window as any).electron.sqliteQuery(this.tableName, queryOptions), queryOptions);
         }
         // Dexie fallback
         return this.createCollection(
-          this.dexieTable ? this.dexieTable.where(field).equals(value).toArray() : Promise.resolve([])
+          this.toArray().then(items => items.filter((item: any) => item[field] === value))
         );
       },
       anyOf: (values: any[]) => {
-        if (isElectron) {
+        const queryOptions = this.injectTenancy({});
+        if (checkIsElectron()) {
            return this.createCollection(this.toArray().then(all => {
              const set = new Set(values);
              return all.filter((item: any) => set.has(item[field]));
-           }));
+           }), queryOptions);
         }
         return this.createCollection(
-          this.dexieTable ? this.dexieTable.where(field).anyOf(values).toArray() : Promise.resolve([])
+          this.toArray().then(items => {
+             const set = new Set(values);
+             return items.filter((item: any) => set.has(item[field]));
+          })
         );
       },
       startsWith: (prefix: string) => {
-        if (isElectron) {
+        const queryOptions = this.injectTenancy({});
+        if (checkIsElectron()) {
           return this.createCollection(this.toArray().then(all =>
             all.filter((item: any) => String(item[field]).startsWith(prefix))
-          ));
+          ), queryOptions);
         }
         return this.createCollection(
-          this.dexieTable ? this.dexieTable.where(field).startsWith(prefix).toArray() : Promise.resolve([])
+          this.toArray().then(items => items.filter((item: any) => String(item[field]).startsWith(prefix)))
         );
       }
     };
   }
 
   orderBy(field: string) {
-    const queryOptions = { orderBy: field };
-    if (isElectron) {
+    const queryOptions = this.injectTenancy({ orderBy: field });
+    if (checkIsElectron()) {
       return {
         ...this.createCollection((window as any).electron.sqliteQuery(this.tableName, queryOptions), queryOptions),
         reverse: () => {
@@ -436,11 +498,13 @@ class HybridTable<T> {
       };
     }
     // Dexie fallback
-    const promise = this.dexieTable ? this.dexieTable.orderBy(field).toArray() : Promise.resolve([]);
+    const promise = this.toArray().then(items => {
+        return [...items].sort((a: any, b: any) => (a[field] > b[field] ? 1 : -1));
+    });
     return {
       ...this.createCollection(promise, queryOptions),
       reverse: () => {
-        const revPromise = this.dexieTable ? this.dexieTable.orderBy(field).reverse().toArray() : Promise.resolve([]);
+        const revPromise = promise.then(items => [...items].reverse());
         return this.createCollection(revPromise, { ...queryOptions, reverse: true });
       }
     };
@@ -450,6 +514,7 @@ class HybridTable<T> {
 
 // --- SQLite Database Mock ---
 export class AppDatabase {
+  companies = new HybridTable<any>('companies');
   suppliers = new HybridTable<Customer>('suppliers');
   customers = new HybridTable<Customer>('customers');
   payments = new HybridTable<Payment>('payments');
@@ -462,12 +527,8 @@ export class AppDatabase {
   bankAccounts = new HybridTable<BankAccount>('bankAccounts');
   supplierBankAccounts = new HybridTable<BankAccount>('supplierBankAccounts');
   settings = new HybridTable<RtgsSettings | ReceiptSettings | FormatSettings | Holiday>('settings');
-  projects = new HybridTable<Project>('projects');
   loans = new HybridTable<Loan>('loans');
   fundTransactions = new HybridTable<FundTransaction>('fundTransactions');
-  employees = new HybridTable<Employee>('employees');
-  payroll = new HybridTable<PayrollEntry>('payroll');
-  attendance = new HybridTable<AttendanceEntry>('attendance');
   inventoryItems = new HybridTable<InventoryItem>('inventoryItems');
   ledgerAccounts = new HybridTable<LedgerAccount>('ledgerAccounts');
   ledgerEntries = new HybridTable<LedgerEntry>('ledgerEntries');
@@ -561,7 +622,7 @@ export function setDbInUseByFolderLoad(inUse: boolean) { /* no-op */ }
 export async function getSyncCounts(): Promise<any[]> {
   const rows = [];
   const tables = [
-    'suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'employees',
+    'suppliers', 'customers', 'payments', 'customerPayments', 'banks',
     'incomeCategories', 'expenseCategories', 'incomes', 'expenses'
   ];
   for (const t of tables) {
@@ -572,7 +633,7 @@ export async function getSyncCounts(): Promise<any[]> {
 }
 
 export async function clearAllLocalData(mode: 'UNIT' | 'SEASON' = 'UNIT') {
-  if (isElectron) {
+  if (checkIsElectron()) {
     try {
       console.log(`[Database] Clearing local tables for ${mode} switch...`);
       const res = await (window as any).electron.sqliteClearAllTables({
@@ -593,7 +654,7 @@ export async function clearAllLocalData(mode: 'UNIT' | 'SEASON' = 'UNIT') {
       const tablesToClear = mode === 'SEASON' 
         ? ['payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
            'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
-           'mandiReports', 'payroll', 'attendance', 'inventoryAddEntries', 'kantaParchi', 
+           'mandiReports', 'inventoryAddEntries', 'kantaParchi', 
            'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers']
         : dexieDb.tables.filter(t => !['_sync_log', 'companies'].includes(t.name)).map(t => t.name);
 

@@ -11,14 +11,17 @@ interface SyncCountRow {
 interface SyncCountsTableProps {
     syncCounts: SyncCountRow[];
     appCountsMap: Record<string, number>;
+    hideTitle?: boolean;
 }
 
-export const SyncCountsTable = ({ syncCounts, appCountsMap }: SyncCountsTableProps) => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Sync Counts</CardTitle>
-        </CardHeader>
-        <CardContent>
+export const SyncCountsTable = ({ syncCounts, appCountsMap, hideTitle }: SyncCountsTableProps) => (
+    <Card className={hideTitle ? "border-none shadow-none" : ""}>
+        {!hideTitle && (
+            <CardHeader>
+                <CardTitle>Sync Counts</CardTitle>
+            </CardHeader>
+        )}
+        <CardContent className={hideTitle ? "p-0" : ""}>
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -53,15 +56,18 @@ interface SoftwareCountRow {
 
 interface SoftwareCountsTableProps {
     softwareCounts: SoftwareCountRow[];
+    hideTitle?: boolean;
 }
 
-export const SoftwareCountsTable = ({ softwareCounts }: SoftwareCountsTableProps) => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Software Table Counts</CardTitle>
-            <CardDescription>App ke andar loaded entries ka summary</CardDescription>
-        </CardHeader>
-        <CardContent>
+export const SoftwareCountsTable = ({ softwareCounts, hideTitle }: SoftwareCountsTableProps) => (
+    <Card className={hideTitle ? "border-none shadow-none" : ""}>
+        {!hideTitle && (
+            <CardHeader>
+                <CardTitle>Software Table Counts</CardTitle>
+                <CardDescription>App ke andar loaded entries ka summary</CardDescription>
+            </CardHeader>
+        )}
+        <CardContent className={hideTitle ? "p-0" : ""}>
             <Table>
                 <TableHeader>
                     <TableRow>

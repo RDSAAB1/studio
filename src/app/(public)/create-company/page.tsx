@@ -26,12 +26,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Building2,
+  Building,
   FolderOpen,
   Mail,
   Lock,
   Layers,
-  FileText,
+  CalendarDays,
   ArrowLeft,
   Loader2,
 } from "lucide-react";
@@ -183,7 +183,7 @@ export default function CreateCompanyPage() {
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
+              <Building className="w-6 h-6 text-white" />
             </div>
             <div>
               <span className="font-bold text-white text-lg">Create Company</span>
@@ -218,7 +218,7 @@ export default function CreateCompanyPage() {
             <div>
               <Label className="text-slate-400 text-sm">Company Name</Label>
               <div className="relative mt-1">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <Input
                   placeholder="e.g. ABC Traders"
                   className={`pl-10 ${inputClass}`}
@@ -280,7 +280,7 @@ export default function CreateCompanyPage() {
             <div>
               <Label className="text-slate-400 text-sm">Season</Label>
               <div className="relative mt-1">
-                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <Input
                   placeholder="e.g. 2024-25, 2025 A"
                   className={`pl-10 ${inputClass}`}
@@ -300,7 +300,7 @@ export default function CreateCompanyPage() {
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Building2 className="mr-2 h-4 w-4" />
+                <Building className="mr-2 h-4 w-4" />
               )}
               Create Company
             </Button>

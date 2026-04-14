@@ -42,9 +42,6 @@ type CollectionName =
     | 'expenses'
     | 'loans'
     | 'fundTransactions'
-    | 'projects'
-    | 'employees'
-    | 'payroll'
     | 'supplierBankAccounts'
     | 'inventoryItems';
 
@@ -324,12 +321,6 @@ function getLocalTable(collectionName: CollectionName) {
             return db.loans;
         case 'fundTransactions':
             return db.fundTransactions;
-        case 'projects':
-            return db.projects;
-        case 'employees':
-            return db.employees;
-        case 'payroll':
-            return db.payroll;
         case 'inventoryItems':
             return db.inventoryItems;
         default:

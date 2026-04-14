@@ -9,7 +9,7 @@ import {
   Landmark,
   Users2,
   Database,
-  CalendarCheck,
+
   FilePlus,
   Banknote,
   FileText,
@@ -25,6 +25,8 @@ import {
   PieChart,
   History,
   Calculator,
+  Warehouse,
+  Package,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -46,13 +48,24 @@ export const allMenuItems: MenuItem[] = [
     id: "sales-entry",
     name: "Entry",
     icon: FilePlus,
-    href: "/sales?menu=entry&tab=supplier-entry",
+    subMenus: [
+      { id: "supplier-entry", name: "Supplier Entry", icon: FilePlus, href: "/sales?menu=entry&tab=supplier-entry" },
+      { id: "customer-entry", name: "Customer Entry", icon: Users2, href: "/sales?menu=entry&tab=customer-entry" },
+      { id: "inventory-management", name: "Inventory", icon: Warehouse, href: "/sales?menu=entry&tab=inventory-management" },
+      { id: "inventory-add", name: "Add Stock", icon: Package, href: "/sales?menu=entry&tab=inventory-add" },
+    ],
   },
   {
     id: "sales-payments",
     name: "Payments",
     icon: Wallet,
-    href: "/sales?menu=payments&tab=supplier-payments",
+    subMenus: [
+      { id: "supplier-payments", name: "Supplier Payments", icon: Wallet, href: "/sales?menu=payments&tab=supplier-payments" },
+      { id: "customer-payments", name: "Customer Payments", icon: Users, href: "/sales?menu=payments&tab=customer-payments" },
+      { id: "rtgs-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales?menu=payments&tab=rtgs-outsider" },
+      { id: "income-expense", name: "Incomes & Expenses", icon: Landmark, href: "/sales?menu=payments&tab=income-expense" },
+      { id: "ledger", name: "Ledgers", icon: Database, href: "/sales?menu=payments&tab=ledger" },
+    ],
   },
   {
     id: "cash-bank",
@@ -69,33 +82,15 @@ export const allMenuItems: MenuItem[] = [
     name: "Reports",
     icon: PieChart,
     subMenus: [
-      { id: "finance/daily-business-report", name: "360° Business Report", icon: PieChart, href: "/finance/daily-business-report" },
+      { id: "daily-business-report", name: "360° Business Report", icon: PieChart, href: "/sales?menu=reports&tab=daily-business-report" },
       { id: "daily-payments", name: "Daily Payments", icon: Wallet, href: "/sales?menu=reports&tab=daily-payments" },
       { id: "daily-supplier-report", name: "Daily Supplier Report", icon: FileText, href: "/sales?menu=reports&tab=daily-supplier-report" },
       { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=reports&tab=rtgs-report" },
       { id: "6r-report", name: "6R Report", icon: FileText, href: "/sales?menu=reports&tab=6r-report" },
+      { id: "mandi-report-history", name: "Mandi History", icon: History, href: "/sales?menu=reports&tab=mandi-report-history" },
+      { id: "voucher-import", name: "Mandi Import", icon: Database, href: "/sales?menu=reports&tab=voucher-import" },
+      { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=reports&tab=reports-data-audit" },
     ],
-  },
-  {
-    id: "hr",
-    name: "HR Management",
-    icon: Users,
-    subMenus: [
-      { id: "hr-employee-database", name: "Employee Database", icon: Database, href: "/sales?menu=hr&tab=hr-employee-database" },
-      { id: "hr-payroll-management", name: "Payroll Management", icon: Calculator, href: "/sales?menu=hr&tab=hr-payroll-management" },
-      { id: "hr-attendance-tracking", name: "Attendance Tracking", icon: CalendarCheck, href: "/sales?menu=hr&tab=hr-attendance-tracking" },
-      { id: "hr-contract-payments", name: "Contract Payments", icon: FileText, href: "/sales?menu=hr&tab=hr-contract-payments" },
-    ],
-  },
-  {
-    id: "projects",
-    name: "Projects",
-    icon: Lightbulb,
-    subMenus: [
-      { id: "project-dashboard", name: "Project Dashboard", icon: LayoutDashboard, href: "/sales?menu=projects&tab=project-dashboard" },
-      { id: "project-tasks", name: "Tasks", icon: ClipboardCheck, href: "/sales?menu=projects&tab=project-tasks" },
-      { id: "project-collaboration", name: "Collaboration", icon: Users2, href: "/sales?menu=projects&tab=project-collaboration" },
-    ]
   },
   {
     id: "history",
@@ -121,9 +116,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Wrench,
     subMenus: [
         // All admin tools now live inside unified /sales SPA (single route)
-        { id: "admin/migrations", name: "Data Migration", icon: Database, href: "/sales?menu=admin&tab=admin-migrations" },
-        { id: "admin/diagnostics", name: "ID Diagnostics", icon: Search, href: "/sales?menu=admin&tab=admin-diagnostics" },
-        { id: "admin/tasks", name: "Task Progress", icon: ClipboardCheck, href: "/sales?menu=admin&tab=admin-tasks" },
+        { id: "admin/migrations", name: "Data Migration", icon: Database, href: "/sales?menu=admin&tab=admin-local-hub" },
     ]
   },
 ];

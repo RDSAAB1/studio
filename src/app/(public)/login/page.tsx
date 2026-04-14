@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 import {
-  Building2,
+  Building,
   BarChart3,
   Zap,
   Shield,
@@ -35,7 +35,7 @@ function AuthPageContent() {
         <div className="relative z-10 w-full max-w-2xl">
           <div className="flex items-center gap-4 mb-8 auth-slide-up opacity-0" style={{ animationFillMode: "forwards" }}>
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
-              <Building2 className="w-7 h-7 text-white stroke-[1.5]" />
+              <Building className="w-7 h-7 text-white stroke-[1.5]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight font-jakarta">BizSuite</h1>

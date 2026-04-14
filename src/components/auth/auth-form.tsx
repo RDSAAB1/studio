@@ -18,7 +18,7 @@ import {
   Loader2,
   LogIn,
   UserPlus,
-  Building2,
+  Building,
   ArrowLeft,
   Mail,
   Lock,
@@ -312,7 +312,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       )}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_24px_rgba(99,102,241,0.35)]">
-          <Building2 className="w-6 h-6 text-white stroke-[1.5]" />
+          <Building className="w-6 h-6 text-white stroke-[1.5]" />
         </div>
         <div>
           <span className="font-bold text-white font-jakarta text-lg">BizSuite</span>

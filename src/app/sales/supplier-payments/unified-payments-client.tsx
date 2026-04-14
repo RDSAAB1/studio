@@ -48,7 +48,7 @@ import { useOutsiderPayments } from "@/hooks/use-outsider-payments";
 import { GovHistoryTableDirect } from '@/components/sales/supplier-payments/gov-history-table-direct';
 import { usePaymentFilters } from "./hooks/use-payment-filters";
 import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
-import { ProcessingOverlay } from "../../../components/sales/supplier-payments/processing-overlay";
+import { ProcessingOverlay } from "@/components/ui/processing-overlay";
 
 
 // Helper functions for formatting
@@ -160,6 +160,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
   const [isDeleteProcessing, setIsDeleteProcessing] = useState(false);
   const [showProcessingOverlay, setShowProcessingOverlay] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const processingStartRef = React.useRef<number | null>(null);
   const MIN_PROCESS_OVERLAY_MS = 1000;
   const { toast } = useToast();
@@ -220,26 +221,32 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   };
   const hook: UnifiedPaymentsHook = { ...defaultHook, ...(rawHook as any) };
 
-  // Keep the processing window visible for at least MIN_PROCESS_OVERLAY_MS
-  // so UI has time to settle before overlay disappears.
+  // Keep the processing window visible for at least a few seconds
+  // so the user can see the "Success" state clearly.
   useEffect(() => {
     const isBusy = Boolean(hook.isProcessing || isDeleteProcessing);
     if (isBusy) {
       if (!showProcessingOverlay) {
         processingStartRef.current = Date.now();
         setShowProcessingOverlay(true);
+        setIsSuccess(false);
       }
       return;
     }
 
     if (!showProcessingOverlay) return;
 
+    // When busy stops, we signal success
+    setIsSuccess(true);
+
     const startedAt = processingStartRef.current ?? Date.now();
     const elapsed = Date.now() - startedAt;
-    const remaining = Math.max(MIN_PROCESS_OVERLAY_MS - elapsed, 0);
+    const SUCCESS_DISPLAY_MS = 2000;
+    const remaining = Math.max(SUCCESS_DISPLAY_MS - elapsed, 0);
 
     const timer = window.setTimeout(() => {
       setShowProcessingOverlay(false);
+      setIsSuccess(false);
       processingStartRef.current = null;
     }, remaining);
 
@@ -688,6 +695,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
              <ProcessingOverlay 
                show={showProcessingOverlay} 
                isDeleting={isDeleteProcessing} 
+               isSuccess={isSuccess}
              />
              {type === 'outsider' ? (
                 // For outsider: No tabs, just show payment content directly

@@ -10,7 +10,7 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { Loader2, Save, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { UseFormReturn } from "react-hook-form";
-import type { BankAccount, Project } from "@/lib/definitions";
+import type { BankAccount } from "@/lib/definitions";
 
 type TransactionFormValues = {
   id?: string;
@@ -32,7 +32,6 @@ type TransactionFormValues = {
   expenseType?: "Personal" | "Business";
   mill?: string;
   expenseNature?: string;
-  projectId?: string;
   loanId?: string;
   isInternal?: boolean;
 };
@@ -46,7 +45,6 @@ interface TransactionFormProps {
   editingTransaction: { id: string } | null;
   setLastAmountSource: (source: 'income' | 'expense' | null) => void;
   bankAccounts: BankAccount[];
-  projects: Project[];
   selectedTransactionType: "Income" | "Expense";
   errors: UseFormReturn<TransactionFormValues>["formState"]["errors"];
 }
@@ -60,7 +58,6 @@ export const TransactionForm = memo(function TransactionForm({
   editingTransaction,
   setLastAmountSource,
   bankAccounts,
-  projects,
   selectedTransactionType,
   errors,
 }: TransactionFormProps) {

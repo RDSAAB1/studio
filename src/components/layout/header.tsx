@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from 'next/dynamic';
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle, ClipboardList, CreditCard } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle, ClipboardList, CreditCard, Maximize, Minimize } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,68 @@ const DynamicIslandToaster = dynamic(
 interface HeaderProps {
   toggleSidebar: () => void;
 }
+
+const FullscreenToggle = () => {
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const onFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    }, []);
+
+    // Try auto-fullscreen on first user interaction for the web
+    useEffect(() => {
+        const isElectron = typeof window !== 'undefined' && ((window as any).electron || (window as any).__ELECTRON__);
+        if (isElectron) return; // Electron has its own window controls
+
+        const handleFirstInteraction = () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            document.removeEventListener('click', handleFirstInteraction);
+            document.removeEventListener('keydown', handleFirstInteraction);
+        };
+        document.addEventListener('click', handleFirstInteraction, { once: true });
+        document.addEventListener('keydown', handleFirstInteraction, { once: true });
+        
+        return () => {
+            document.removeEventListener('click', handleFirstInteraction);
+            document.removeEventListener('keydown', handleFirstInteraction);
+        };
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(e => console.error(e));
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(e => console.error(e));
+            }
+        }
+    };
+
+    // Hide the button if we are in Electron since it has native window controls
+    const isElectron = typeof window !== 'undefined' && ((window as any).electron || (window as any).__ELECTRON__);
+    if (isElectron) return null;
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
+        >
+            {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            <span className="sr-only">Toggle Fullscreen</span>
+        </Button>
+    );
+};
 
 const NetworkStatusIndicator = () => {
     const [isOnline, setIsOnline] = useState(true);
@@ -257,6 +319,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
           <NotificationBell />
           <DraggableCalculator />
+          <FullscreenToggle />
           <Button
             variant="ghost"
             size="icon"

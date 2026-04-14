@@ -7,7 +7,7 @@ import { Customer, ReceiptSettings, BankAccount } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
-import { MapPin, Phone, Mail, Building2, Hash, Calendar, FileText, Wheat, Globe, Truck } from 'lucide-react';
+import { MapPin, Phone, Mail, Building, Hash, Calendar, FileText, Wheat, Globe, Truck } from 'lucide-react';
 
 interface TaxInvoiceProps {
     customer: Customer;
@@ -178,7 +178,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400 stroke-2" />
+                            <Building className="w-3.5 h-3.5 text-slate-400 stroke-2" />
                             <span className="text-[12px] font-black text-slate-950 uppercase leading-none tracking-tight">
                                 {String(settings.companyStateName || "UTTAR PRADESH").toUpperCase()} (09)
                             </span>

@@ -15,9 +15,9 @@ export const SQLITE_ALLOWED_TABLES = [
   'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
   'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
   'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
-  'mandiReports', 'employees', 'payroll', 'attendance',
+  'mandiReports',
   'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
-  'projects', 'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
+  'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
   'manufacturingCosting', 'expenseTemplates',
 ].sort();
 

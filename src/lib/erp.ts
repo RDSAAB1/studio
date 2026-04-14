@@ -27,7 +27,7 @@ export type CompanyId = string;
 export type SubCompanyId = string;
 export type YearValue = number;
 
-export type ERPModule = "sales" | "purchase" | "expenses" | "employees" | "reports";
+export type ERPModule = "sales" | "purchase" | "expenses" | "reports";
 
 export type CompanyRole = "admin" | "manager" | "staff";
 

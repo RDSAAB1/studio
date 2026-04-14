@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Building2, Layers, FileText, Plus, X, HardDrive, Loader2, Database } from "lucide-react";
+import { Building, Layers, CalendarDays, Plus, X, HardDrive, Loader2, Database, CheckCircle2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +75,13 @@ export function ErpCompanySelector({
   const [uiSubCompanyId, setUiSubCompanyId] = useState<string | null>(null);
   const [companyRole, setCompanyRole] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    isSyncing: boolean;
+    syncCount: number;
+  }>({ isOpen: false, title: "", description: "", isSyncing: false, syncCount: 0 });
   const confirmShownRef = React.useRef(false);
   const folderDialogOpen = false;
   const setFolderDialogOpen = () => {};
@@ -169,8 +177,30 @@ export function ErpCompanySelector({
       try {
         await pushLocalChanges();
         await setSelection(sel, { skipReload: true });
-        await performFullSync('all', true);
-        toast({ title: `Switched to ${c.name}`, description: "Data synced for new context." });
+        
+        // Show success UI instantly
+        setSuccessInfo({
+            isOpen: true,
+            isSyncing: true,
+            syncCount: 0,
+            title: `Switched to ${c.name}`,
+            description: "Context updated. Syncing data in background..."
+        });
+
+        // Trigger sync and capture result
+        const result = await performFullSync('all', true);
+        if (result) {
+            setSuccessInfo(prev => ({ 
+                ...prev, 
+                isSyncing: false, 
+                syncCount: result.total,
+                description: result.total > 0 
+                    ? `Success! ${result.total} records synchronized.`
+                    : "Context updated. No new data to sync."
+            }));
+        } else {
+            setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+        }
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
         await setSelection(sel, { skipReload: true });
@@ -193,8 +223,29 @@ export function ErpCompanySelector({
       try {
         await pushLocalChanges();
         await setSelection(sel, { skipReload: true });
-        await performFullSync('all', true);
-        toast({ title: `Switched to ${s.name}`, description: "Data synced for new unit." });
+        
+        // Show success UI instantly
+        setSuccessInfo({
+            isOpen: true,
+            isSyncing: true,
+            syncCount: 0,
+            title: `Switched to ${s.name}`,
+            description: "Unit updated. Syncing data in background..."
+        });
+
+        const result = await performFullSync('all', true);
+        if (result) {
+            setSuccessInfo(prev => ({ 
+                ...prev, 
+                isSyncing: false, 
+                syncCount: result.total,
+                description: result.total > 0 
+                  ? `Success! ${result.total} records synchronized.`
+                  : "Unit updated. No new data to sync."
+            }));
+        } else {
+            setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+        }
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
         await setSelection(sel, { skipReload: true });
@@ -215,8 +266,29 @@ export function ErpCompanySelector({
     try {
       await pushLocalChanges();
       await setSelection(sel, { skipReload: true });
-      await performFullSync('all', true);
-      toast({ title: `Switched to ${s.name}`, description: "Data synced for new season." });
+      
+      // Show success UI instantly
+      setSuccessInfo({
+          isOpen: true,
+          isSyncing: true,
+          syncCount: 0,
+          title: `Switched to ${s.name}`,
+          description: "Season updated. Syncing data in background..."
+      });
+
+      const result = await performFullSync('all', true);
+      if (result) {
+          setSuccessInfo(prev => ({ 
+              ...prev, 
+              isSyncing: false, 
+              syncCount: result.total,
+              description: result.total > 0 
+                  ? `Success! ${result.total} records synchronized.`
+                  : "Season updated. No new data to sync."
+          }));
+      } else {
+          setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+      }
     } catch (e) {
       toast({ title: "Sync failed", description: String(e), variant: "destructive" });
       await setSelection(sel, { skipReload: true });
@@ -300,6 +372,55 @@ export function ErpCompanySelector({
 
   return (
     <TooltipProvider delayDuration={300}>
+      <Dialog open={successInfo.isOpen} onOpenChange={(open) => setSuccessInfo(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-sm p-0 overflow-hidden border-0 bg-transparent shadow-none">
+          <div className="relative overflow-hidden rounded-2xl bg-slate-950/80 p-8 text-center backdrop-blur-xl border border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]">
+            {/* Animated background glow */}
+            <div className="absolute -top-24 -left-24 h-48 w-48 bg-emerald-500/10 blur-[60px]" />
+            <div className="absolute -bottom-24 -right-24 h-48 w-48 bg-blue-500/10 blur-[60px]" />
+            
+            <div className="relative z-10 space-y-6">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+                {successInfo.isSyncing ? (
+                  <Loader2 className="h-10 w-10 text-emerald-400 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-10 w-10 text-emerald-400 animate-in zoom-in duration-300" />
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <DialogTitle className="text-xl font-bold tracking-tight text-white leading-tight">
+                  {successInfo.title}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-slate-400">
+                  {successInfo.description}
+                </DialogDescription>
+              </div>
+              
+              <Button 
+                disabled={successInfo.isSyncing}
+                onClick={() => setSuccessInfo(prev => ({ ...prev, isOpen: false }))}
+                className={cn(
+                  "w-full font-semibold transition-all duration-500",
+                  successInfo.isSyncing 
+                    ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98]"
+                )}
+              >
+                {successInfo.isSyncing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center gap-2">
         {!hideCompanySelector && (
           <DropdownMenu>
@@ -311,7 +432,7 @@ export function ErpCompanySelector({
                     size="icon"
                     className={dropdownClass}
                   >
-                    <Building2 className="h-4 w-4" />
+                    <Building className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -469,7 +590,7 @@ export function ErpCompanySelector({
                     className={hasEffectiveCompanies && selectedCompany && selectedSubCompany ? dropdownClass : disabledClass}
                     disabled={!hasEffectiveCompanies || !selectedCompany || !selectedSubCompany}
                   >
-                    <FileText className="h-5 w-5" />
+                    <CalendarDays className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -693,7 +814,7 @@ export function ErpCompanySelector({
       {hasEffectiveCompanies && selectedCompany && !selection && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm">
           <div className="max-w-md mx-4 p-6 rounded-xl border border-violet-900/30 bg-violet-950/95 text-white shadow-2xl text-center space-y-4">
-            <Building2 className="h-12 w-12 text-violet-400 mx-auto" />
+            <Building className="h-12 w-12 text-violet-400 mx-auto" />
             <h2 className="text-xl font-semibold">Setup Required</h2>
             <p className="text-white/80 text-sm">
                 {selectedCompany.name} needs at least one unit and one season to start.
