@@ -680,7 +680,7 @@ interface CustomDropdownProps {
                     data-lpignore="true"
                     data-1p-ignore="true"
                     name={`custom-dropdown-${Math.random().toString(36).substring(7)}`}
-                    className={cn("w-full h-8 text-sm", showSearch ? "pl-8" : "pl-3", showGoButton ? "pr-14" : "pr-8", inputClassName)}
+                    className={cn("w-full h-7 text-[10px] rounded-md border-solid", showSearch ? "pl-8" : "pl-3", showGoButton ? "pr-14" : "pr-8", inputClassName)}
                     readOnly={!showSearch}
                 />
                 {showGoButton && (
@@ -688,7 +688,7 @@ interface CustomDropdownProps {
                         <Button
                             type="button"
                             size="sm"
-                            className="h-5 rounded-full px-2.5 text-[10px]"
+                            className="h-5 rounded-md px-2.5 text-[10px] border-none shadow-none"
                             onClick={onGoClick}
                         >
                             Go

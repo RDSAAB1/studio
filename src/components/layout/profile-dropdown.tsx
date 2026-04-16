@@ -81,9 +81,9 @@ export function ProfileDropdown() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full p-0 text-white/90 hover:bg-white/10 hover:text-white border-0 focus:ring-0 focus:ring-offset-0"
+            className="h-8 w-8 lg:h-9 lg:w-9 rounded-full p-0 text-white/90 hover:bg-white/10 hover:text-white border-0 focus:ring-0 focus:ring-offset-0"
           >
-            <Avatar className="h-8 w-8 ring-2 ring-white/20">
+            <Avatar className="h-7 w-7 lg:h-8 lg:w-8 ring-2 ring-white/20">
               <AvatarImage src={user.photoURL || customPhotoUrl || undefined} alt={displayName} />
               <AvatarFallback className="bg-violet-600/80 text-white text-xs font-medium">
                 {initials}

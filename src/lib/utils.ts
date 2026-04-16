@@ -477,7 +477,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         transportAmount: transportAmount, // Transport Amount = Transportation Rate × Final Weight
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
-        calculatedRate: isQualityBasedVariety ? calculatedRate : undefined, // Store calculated rate for quality-based varieties
+        calculatedRate: isQualityBasedVariety ? calculatedRate : null, // Use null instead of undefined for Firebase safety
     }
 };
 

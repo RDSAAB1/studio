@@ -195,8 +195,9 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
       <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
-          <ScrollArea ref={scrollRef} className={`h-full w-full ${maxRows ? "pointer-events-none" : ""}`}>
-            <Table className="table-fixed w-full">
+          <div className={`flex-1 overflow-y-auto overscroll-contain w-full ${maxRows ? "pointer-events-none" : ""}`}>
+            <div className="w-full overflow-x-auto">
+              <Table className="w-full min-w-[700px] xl:min-w-0 translate-z-0">
               <TableHeader className="table-header-compact z-20">
                 <TableRow className="border-b-0 overflow-hidden">
                   {historyType === 'cash' && (
@@ -599,7 +600,8 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                   )}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
+          </div>
           </div>
         </div>
       </CardContent>

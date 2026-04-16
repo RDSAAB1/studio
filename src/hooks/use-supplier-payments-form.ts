@@ -20,6 +20,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [drCr, setDrCr] = useState<'Debit' | 'Credit'>('Debit');
     const [extraAmount, setExtraAmount] = useState(0);
     const [notes, setNotes] = useState('');
+    const [from, setFrom] = useState('');
 
     const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
     const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -161,13 +162,23 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
+            const isOutsider = selectedCustomerKey === 'OUTSIDER';
+            const prefix = isOutsider ? 'RO' : 'R';
+            
             const lastNum = rtgsPayments.reduce((max, p) => {
+                const roMatch = p.rtgsSrNo?.match(/^RO(\d+)$/);
                 const rtMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
                 const rMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
-                const num = rtMatch ? parseInt(rtMatch[1], 10) : (rMatch ? parseInt(rMatch[1], 10) : 0);
+                
+                let num = 0;
+                if (isOutsider) {
+                    num = roMatch ? parseInt(roMatch[1], 10) : 0;
+                } else {
+                    num = rtMatch ? parseInt(rtMatch[1], 10) : (rMatch ? parseInt(rMatch[1], 10) : 0);
+                }
                 return num > max ? num : max;
             }, 0);
-            return generateReadableId('R', lastNum, 5); // Changed from RT to R
+            return generateReadableId(prefix, lastNum, 5); 
         }
     
         if (method === 'Gov.') {
@@ -221,7 +232,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (!numericPartStr) return;
 
         const num = parseInt(numericPartStr, 10);
-        const formattedId = 'R' + String(num).padStart(5, '0'); // Changed from RT to R
+        const isOutsider = selectedCustomerKey === 'OUTSIDER';
+        const formattedId = (isOutsider ? 'RO' : 'R') + String(num).padStart(5, '0');
         setRtgsSrNo(formattedId);
         setPaymentId(formattedId); // Keep primary ID in sync for RTGS
 
@@ -330,6 +342,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setUtrNo('');
         setCheckNo('');
         setNotes('');
+        setFrom('');
         setRtgsQuantity(0);
         setRtgsRate(0);
         setRtgsAmount(0);
@@ -366,6 +379,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         drCr, setDrCr,
         extraAmount, setExtraAmount,
         notes, setNotes,
+        from, setFrom,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
         isPayeeEditing, setIsPayeeEditing,

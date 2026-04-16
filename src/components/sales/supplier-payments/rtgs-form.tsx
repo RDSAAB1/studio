@@ -23,6 +23,12 @@ interface RtgsFormProps {
     bankAccounts?: BankAccount[];
     banks?: Bank[];
     bankBranches?: BankBranch[];
+    from?: string;
+    setFrom?: (from: string) => void;
+    selectedAccountId?: string;
+    setSelectedAccountId?: (id: string) => void;
+    internalBankAccounts?: BankAccount[];
+    financialState?: any;
 }
 
 export const RtgsForm = (props: RtgsFormProps) => {
@@ -32,9 +38,15 @@ export const RtgsForm = (props: RtgsFormProps) => {
         editingPayment, setIsBankSettingsOpen,
         supplierDetails = {},
         setSupplierDetails,
-        bankAccounts = [],
         banks: propsBanks,
         bankBranches: propsBankBranches,
+        from = '',
+        setFrom,
+        selectedAccountId,
+        setSelectedAccountId,
+        internalBankAccounts = [],
+        financialState,
+        bankAccounts = [], // Added here
     } = props;
     
     // Use props if provided, otherwise get from useSupplierData hook
@@ -84,6 +96,25 @@ export const RtgsForm = (props: RtgsFormProps) => {
         });
         return Array.from(uniqueBranches.values());
     }, [bankDetails.bank, bankBranches]);
+    
+    // Internal Bank Account Options (From)
+    const paymentFromOptions = React.useMemo(() => {
+        const balances = financialState?.balances || new Map();
+        const safeBankAccounts = Array.isArray(internalBankAccounts) ? internalBankAccounts : [];
+        const bankOptions = safeBankAccounts.map((acc: any) => ({ 
+            value: acc.id, 
+            label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (₹${(balances.get(acc.id) || 0).toLocaleString('en-IN')})`,
+            displayValue: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)})`,
+            name: acc.accountHolderName
+        }));
+        const adjustmentOption = {
+            value: 'Adjustment',
+            label: 'Adjustment (No Account Change)',
+            displayValue: 'Adjustment',
+            name: 'Adjustment'
+        };
+        return [...bankOptions, adjustmentOption];
+    }, [financialState?.balances, internalBankAccounts]);
 
     // Filter accounts based on selected Bank and Branch
     const filteredBankAccounts = React.useMemo(() => {
@@ -254,6 +285,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
                                 }
                             }}
                             placeholder="Select or enter name"
+                            inputClassName="h-7 rounded-lg text-[10px]"
                         />
                     </div>
                     <div className="space-y-0.5">
@@ -265,6 +297,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
                             onChange={handleBankSelect}
                             onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }}
                             placeholder="Select or add bank"
+                            inputClassName="h-7 rounded-lg text-[10px]"
                         />
                     </div>
                 </div>
@@ -279,11 +312,12 @@ export const RtgsForm = (props: RtgsFormProps) => {
                             onChange={handleBranchSelect}
                             onAdd={handleAddBranch}
                             placeholder="Select or add branch"
+                            inputClassName="h-7 rounded-[4px] text-[9.5px]"
                         />
                     </div>
                     <div className="space-y-0.5">
                         <Label htmlFor="rtgsIfsc" className="text-[10px]">IFSC</Label>
-                        <Input id="rtgsIfsc" name="rtgsIfsc" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-7 text-[10px] font-mono uppercase"/>
+                        <Input id="rtgsIfsc" name="rtgsIfsc" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-7 text-[10px] font-mono uppercase rounded-lg border-slate-200/80"/>
                     </div>
                 </div>
                 {/* Row 3 */}
@@ -350,6 +384,28 @@ export const RtgsForm = (props: RtgsFormProps) => {
                                 }
                             }}
                             placeholder="Select or enter account number"
+                            inputClassName="h-7 rounded-lg text-[10px]"
+                        />
+                    </div>
+                    {/* From field for RTGS Source identification using internal accounts */}
+                    <div className="space-y-0.5">
+                        <Label htmlFor="rtgsFrom" className="text-[10px]">From (Internal Account)</Label>
+                        <CustomDropdown
+                            id="rtgsFrom"
+                            options={paymentFromOptions}
+                            value={selectedAccountId || ''}
+                            onChange={(val) => {
+                                if (setSelectedAccountId && val) {
+                                    setSelectedAccountId(val);
+                                    // Also sync 'from' string for report/audit
+                                    const selectedOpt = paymentFromOptions.find(o => o.value === val);
+                                    if (selectedOpt && setFrom) {
+                                        setFrom(selectedOpt.displayValue);
+                                    }
+                                }
+                            }}
+                            placeholder="Select source account"
+                            inputClassName="h-7 rounded-lg text-[10px]"
                         />
                     </div>
                     {/* Check No. field removed - will be filled from RTGS Report */}

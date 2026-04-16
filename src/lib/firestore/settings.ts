@@ -45,31 +45,54 @@ export async function deleteCompanyEmailSettings(erp?: { companyId: string; subC
 }
 
 export async function getRtgsSettings(): Promise<RtgsSettings> {
+    // Always check local settings first (Web/Dexie or Electron/SQLite)
+    const { getReceiptSettingsFromLocal } = await import('../database');
+    const local = await getReceiptSettingsFromLocal();
+    if (local && local.companyName !== "JAGDAMBE RICE MILL" || local?.defaultBankAccountId) {
+        return local as RtgsSettings;
+    }
+
     if (isSqliteMode()) {
-        const { getReceiptSettingsFromLocal } = await import('../database');
-        const local = await getReceiptSettingsFromLocal();
         if (local) return local as RtgsSettings;
     }
 
     const docRef = doc(settingsCollection, "companyDetails");
     const docSnap = await getDoc(docRef);
+    let data: RtgsSettings;
     if (docSnap.exists()) {
-        const data = docSnap.data() as RtgsSettings;
-        if (data.defaultBankAccountId) {
+        data = docSnap.data() as RtgsSettings;
+        if (data.defaultBankAccountId && !data.defaultBank) {
+            // Try direct fetch first
             const bankDoc = await getDoc(doc(bankAccountsCollection, data.defaultBankAccountId));
             if (bankDoc.exists()) {
                 data.defaultBank = bankDoc.data() as BankAccount;
+            } else {
+                // Fallback: search by account number (often used as fallback ID)
+                const q = query(bankAccountsCollection, where("accountNumber", "==", data.defaultBankAccountId));
+                const qSnap = await getDocs(q);
+                if (!qSnap.empty) {
+                    data.defaultBank = { ...qSnap.docs[0].data(), id: qSnap.docs[0].id } as BankAccount;
+                }
             }
         }
-        return data;
+    } else {
+        data = {
+            companyName: "JAGDAMBE RICE MILL",
+            companyAddress1: "Devkali Road, Banda, Shajahanpur",
+            companyAddress2: "Near Devkali, Uttar Pradesh",
+            contactNo: "9555130735",
+            gmail: "JRMDofficial@gmail.com",
+        } as RtgsSettings;
     }
+
     return {
-        companyName: "BizSuite DataFlow",
-        companyAddress1: "123 Business Rd",
-        companyAddress2: "Suite 100, BizCity",
-        contactNo: "9876543210",
-        gmail: "contact@bizsuite.com",
-    } as RtgsSettings;
+        ...data,
+        companyName: data.companyName || "JAGDAMBE RICE MILL",
+        companyAddress1: data.companyAddress1 || "Devkali Road, Banda, Shajahanpur",
+        companyAddress2: data.companyAddress2 || "Near Devkali, Uttar Pradesh",
+        contactNo: data.contactNo || "9555130735",
+        gmail: data.gmail || "JRMDofficial@gmail.com",
+    };
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
@@ -94,42 +117,53 @@ const defaultReceiptFields: ReceiptFieldSettings = {
 };
 
 export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
+    // Always check local settings first
+    const { getReceiptSettingsFromLocal } = await import('../database');
+    const local = await getReceiptSettingsFromLocal();
+    if (local && local.companyName !== "JAGDAMBE RICE MILL" || local?.defaultBankAccountId) {
+        return local;
+    }
+
     if (isSqliteMode()) {
-        const { getReceiptSettingsFromLocal } = await import('../database');
-        return await getReceiptSettingsFromLocal();
+        return local;
     }
     const docRef = doc(settingsCollection, "companyDetails");
     const docSnap = await getDoc(docRef);
+    let data: Partial<ReceiptSettings> = {};
     if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<ReceiptSettings>;
-        if (data.defaultBankAccountId) {
+        data = docSnap.data() as Partial<ReceiptSettings>;
+        if (data.defaultBankAccountId && !data.defaultBank) {
             const bankDoc = await getDoc(doc(bankAccountsCollection, data.defaultBankAccountId));
             if (bankDoc.exists()) {
                 data.defaultBank = bankDoc.data() as BankAccount;
+            } else {
+                // Fallback: search by account number
+                const q = query(bankAccountsCollection, where("accountNumber", "==", data.defaultBankAccountId));
+                const qSnap = await getDocs(q);
+                if (!qSnap.empty) {
+                    data.defaultBank = { ...qSnap.docs[0].data(), id: qSnap.docs[0].id } as BankAccount;
+                }
             }
         }
-        return {
-            companyName: data.companyName || "JAGDAMBE RICE MILL",
-            companyAddress1: data.companyAddress1 || "Devkali Road, Banda, Shajahanpur",
-            companyAddress2: data.companyAddress2 || "Near Devkali, Uttar Pradesh",
-            contactNo: data.contactNo || "9555130735",
-            gmail: data.gmail || "JRMDofficial@gmail.com",
-            fields: { ...defaultReceiptFields, ...(data.fields || {}) },
-            defaultBankAccountId: data.defaultBankAccountId,
-            defaultBank: data.defaultBank,
-            companyGstin: data.companyGstin,
-            companyStateName: data.companyStateName,
-            companyStateCode: data.companyStateCode,
-            panNo: data.panNo
-        };
     }
+
     return {
-        companyName: "JAGDAMBE RICE MILL",
-        companyAddress1: "Devkali Road, Banda, Shajahanpur",
-        companyAddress2: "Near Devkali, Uttar Pradesh",
-        contactNo: "9555130735",
-        gmail: "JRMDofficial@gmail.com",
-        fields: defaultReceiptFields,
+        companyName: data.companyName || "JAGDAMBE RICE MILL",
+        companyAddress1: data.companyAddress1 || "Devkali Road, Banda, Shajahanpur",
+        companyAddress2: data.companyAddress2 || "Near Devkali, Uttar Pradesh",
+        contactNo: data.contactNo || "9555130735",
+        gmail: data.gmail || "JRMDofficial@gmail.com",
+        fields: { ...defaultReceiptFields, ...(data.fields || {}) },
+        defaultBankAccountId: data.defaultBankAccountId,
+        defaultBank: data.defaultBank,
+        companyGstin: data.companyGstin,
+        companyStateName: data.companyStateName,
+        companyStateCode: data.companyStateCode,
+        panNo: data.panNo,
+        bankHeaderLine1: data.bankHeaderLine1,
+        bankHeaderLine2: data.bankHeaderLine2,
+        bankHeaderLine3: data.bankHeaderLine3,
+        dailyPaymentLimit: data.dailyPaymentLimit
     };
 }
 

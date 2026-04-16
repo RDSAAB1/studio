@@ -54,6 +54,7 @@ interface RtgsReportRow {
     parchiNo: string;
     utrNo: string;
     supplierAddress?: string;
+    from?: string;
 }
 
 export default function RtgsReportClient() {
@@ -137,7 +138,8 @@ export default function RtgsReportClient() {
                     sixRDate: p.sixRDate || '',
                     parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
                     utrNo: p.utrNo || '',
-                    supplierAddress: p.supplierAddress || ''
+                    supplierAddress: p.supplierAddress || '',
+                    from: p.from || ''
                 };
             })
             .filter(row => row.amount > 0); // Filter out negative amounts
@@ -350,6 +352,7 @@ export default function RtgsReportClient() {
             '6R Date': p.sixRDate ? format(new Date(p.sixRDate), 'dd-MMM-yy') : '',
             'Parchi No.': p.parchiNo,
             'UTR No.': p.utrNo,
+            'From': p.from || '',
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -499,61 +502,61 @@ export default function RtgsReportClient() {
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Filter RTGS Reports</CardTitle>
-                    <CardDescription>Use the fields below to search and filter payments.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="space-y-1">
-                            <Label htmlFor="searchSrNo">Search SR No.</Label>
+                {/* Removed Header/Sub-header to save space as requested */}
+                <CardContent className="pt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="searchSrNo" className="text-[10px] font-semibold text-slate-500">Search SR No.</Label>
                             <Input
                                 id="searchSrNo"
                                 value={searchSrNo}
                                 onChange={(e) => setSearchSrNo(e.target.value)}
-                                placeholder="Enter SR No."
+                                placeholder="SR No."
+                                className="h-7 text-[10px] rounded-md"
                             />
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="searchCheckNo">Search Check No.</Label>
+                        <div className="space-y-0.5">
+                            <Label htmlFor="searchCheckNo" className="text-[10px] font-semibold text-slate-500">Search Check No.</Label>
                             <Input
                                 id="searchCheckNo"
                                 value={searchCheckNo}
                                 onChange={(e) => setSearchCheckNo(e.target.value)}
-                                placeholder="Enter Check No."
+                                placeholder="Check No."
+                                className="h-7 text-[10px] rounded-md"
                             />
                         </div>
-                         <div className="space-y-1">
-                            <Label htmlFor="searchName">Search by Name</Label>
+                         <div className="space-y-0.5">
+                            <Label htmlFor="searchName" className="text-[10px] font-semibold text-slate-500">Search by Name</Label>
                             <Input
                                 id="searchName"
                                 value={searchName}
                                 onChange={(e) => setSearchName(e.target.value)}
-                                placeholder="Enter supplier name"
+                                placeholder="Supplier name"
+                                className="h-7 text-[10px] rounded-md"
                             />
                         </div>
-                        <div className="space-y-1">
-                            <Label>Start Date</Label>
+                        <div className="space-y-0.5">
+                            <Label className="text-[10px] font-semibold text-slate-500">From Date</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                                    <Button variant={"outline"} className={cn("h-7 w-full justify-start text-left font-normal text-[10px] rounded-md", !startDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-3 w-3" />
+                                        {startDate ? format(startDate, "dd-MMM-yy") : <span>From</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
-                        <div className="space-y-1">
-                            <Label>End Date</Label>
+                        <div className="space-y-0.5">
+                            <Label className="text-[10px] font-semibold text-slate-500">To Date</Label>
                              <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                                    <Button variant={"outline"} className={cn("h-7 w-full justify-start text-left font-normal text-[10px] rounded-md", !endDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-3 w-3" />
+                                        {endDate ? format(endDate, "dd-MMM-yy") : <span>To</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                     </div>
@@ -562,11 +565,8 @@ export default function RtgsReportClient() {
 
             {/* RTGS Payments Tables with Tabs */}
             <Card>
-                <CardHeader>
-                    <CardTitle>RTGS Payment Report</CardTitle>
-                    <CardDescription>Manage RTGS payments - fill date & check number for pending payments or update completed ones.</CardDescription>
-                </CardHeader>
-                <CardContent>
+                {/* Removed Header/Sub-header to save space - Clean Mode */}
+                <CardContent className="pt-4">
                     <Tabs defaultValue="completed" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="completed">
@@ -580,12 +580,8 @@ export default function RtgsReportClient() {
                         {/* Completed Payments Tab */}
                         <TabsContent value="completed" className="mt-4 space-y-4">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                                    <h3 className="text-sm font-semibold">Completed Payments (Date & Check No. Filled)</h3>
-                                    <p className="text-xs text-muted-foreground">Payments with date and check number already filled. Select to update if check is damaged or date needs to be changed.</p>
-                    </div>
                                 {completedRows.length > 0 && settings && (
-                                    <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full justify-end">
                                         {selectedPaymentIds.size > 0 && (
                                             <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
                                                 <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
@@ -648,6 +644,7 @@ export default function RtgsReportClient() {
                                     <TableHead>Check / Parchi No.</TableHead>
                                     <TableHead>6R No. / Date</TableHead>
                                     <TableHead>UTR No.</TableHead>
+                                    <TableHead>From</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -692,6 +689,9 @@ export default function RtgsReportClient() {
                                             <TableCell>
                                                 <div className="font-medium whitespace-nowrap">{row.utrNo || '-'}</div>
                                             </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.from || '-'}</div>
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
@@ -709,10 +709,6 @@ export default function RtgsReportClient() {
                         {/* Pending Payments Tab */}
                         <TabsContent value="pending" className="mt-4 space-y-4">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div>
-                                    <h3 className="text-sm font-semibold">Pending Payments (Date & Check No. Required)</h3>
-                                    <p className="text-xs text-muted-foreground">Select payments and fill date & check number to complete them.</p>
-                                </div>
                                 {pendingRows.length > 0 && selectedPaymentIds.size > 0 && (
                                     <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
                                         <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
@@ -755,6 +751,7 @@ export default function RtgsReportClient() {
                                             <TableHead>Parchi No.</TableHead>
                                             <TableHead>6R No. / Date</TableHead>
                                             <TableHead>UTR No.</TableHead>
+                                            <TableHead>From</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -796,6 +793,9 @@ export default function RtgsReportClient() {
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="font-medium whitespace-nowrap">{row.utrNo || '-'}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium whitespace-nowrap">{row.from || '-'}</div>
                                                     </TableCell>
                                                 </TableRow>
                                             ))

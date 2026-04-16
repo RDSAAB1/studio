@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useGlobalData } from "@/contexts/global-data-context";
 import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
@@ -10,7 +10,7 @@ import { format, isSameDay, startOfDay, subDays, differenceInDays, addDays } fro
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Printer, TrendingUp, TrendingDown, DollarSign, Wallet, Warehouse, Info, BarChart3, FileSpreadsheet, FileText, ArrowLeftRight } from 'lucide-react';
+import { Printer, TrendingUp, TrendingDown, DollarSign, Wallet, Warehouse, Info, BarChart3, FileSpreadsheet, FileText, ArrowLeftRight, Activity } from 'lucide-react';
 import { Label } from "@/components/ui/label";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { printHtmlContent } from "@/lib/electron-print";
@@ -57,6 +57,13 @@ export default function DailyBusinessReport() {
     }, []);
 
     const reportData = useMemo(() => {
+        const normalizeVariety = (v: string) => {
+            const name = (v || "").toUpperCase().trim();
+            if (name.includes("WHEAT") || name.includes("GEHU") || name.includes("KANAK") || name.includes("WHEET")) return "WHEAT";
+            if (name.includes("MUSTARD") || name.includes("SARSO") || name.includes("SARSON")) return "MUSTARD";
+            if (name.includes("PADDY") || name.includes("DHAN") || name.includes(" धान")) return "PADDY";
+            return name || "UNKNOWN";
+        };
         const filterDate = startOfDay(startDate);
         const filterEndDate = startOfDay(endDate);
         const rangeInDays = differenceInDays(filterEndDate, filterDate) + 1;
@@ -160,7 +167,7 @@ export default function DailyBusinessReport() {
 
         const pMap = new Map<string, VarietySummary>();
         globalData.suppliers.filter(s => periodScope(s.date)).forEach(s => {
-            const v = (s.variety || 'Unknown').toUpperCase().trim();
+            const v = normalizeVariety(s.variety || '');
             if (!pMap.has(v)) pMap.set(v, { variety: v, totalQty: 0, totalValue: 0, avgRate: 0 });
             const e = pMap.get(v)!;
             const qty   = Number(s.netWeight) || 0;
@@ -174,7 +181,7 @@ export default function DailyBusinessReport() {
 
         const sMap = new Map<string, VarietySummary>();
         globalData.customers.filter(c => periodScope(c.date)).forEach(c => {
-            const v = (c.variety || 'Unknown').toUpperCase().trim();
+            const v = normalizeVariety(c.variety || '');
             if (!sMap.has(v)) sMap.set(v, { variety: v, totalQty: 0, totalValue: 0, avgRate: 0 });
             const e = sMap.get(v)!;
             e.totalQty += Number(c.netWeight) || 0;
@@ -199,7 +206,7 @@ export default function DailyBusinessReport() {
 
         const varietyDayData: Record<string, any[]> = {};
         globalData.suppliers.filter(s => periodScope(s.date)).forEach(s => {
-            const v = (s.variety || 'Unknown').toUpperCase().trim();
+            const v = normalizeVariety(s.variety || '');
             if (!varietyDayData[v]) varietyDayData[v] = [];
             const dayStr = format(offsetDate(s.date), 'dd MMM yyyy');
             let dEntry = varietyDayData[v].find(de => de.date === dayStr);
@@ -223,12 +230,12 @@ export default function DailyBusinessReport() {
         });
 
         const stockMap = new Map<string, number>();
-        globalData.suppliers.filter(s => offsetDate(s.date) <= filterEndDate).forEach(s => {
-            const v = (s.variety || 'Unknown').toUpperCase().trim();
-            stockMap.set(v, (stockMap.get(v) || 0) + (Number(s.netWeight) || 0));
+        globalData.suppliers.forEach(s => {
+            const v = normalizeVariety(s.variety || '');
+            stockMap.set(v, (stockMap.get(v) || 0) + (Number(s.weight) || 0));
         });
-        globalData.customers.filter(c => offsetDate(c.date) <= filterEndDate).forEach(c => {
-            const v = (c.variety || 'Unknown').toUpperCase().trim();
+        globalData.customers.forEach(c => {
+            const v = normalizeVariety(c.variety || '');
             stockMap.set(v, (stockMap.get(v) || 0) - (Number(c.netWeight) || 0));
         });
 
@@ -237,45 +244,10 @@ export default function DailyBusinessReport() {
                 const resultArr: any[] = [];
                 const daysInRange = Array.from({ length: rangeInDays }).map((_, i) => addDays(filterDate, i));
                 
-                let opCashHand = 0; let opCashHome = 0;
-                const opBanks = new Map<string, number>();
-                globalData.bankAccounts.forEach(acc => opBanks.set(acc.id, 0));
-
-                const isBefore = (d: any) => offsetDate(d) < filterDate;
-
-                globalData.fundTransactions.filter(t => isBefore(t.date)).forEach(t => {
-                    const amt = Number(t.amount) || 0;
-                    if (t.source === 'CashInHand') opCashHand -= amt;
-                    if (t.destination === 'CashInHand') opCashHand += amt;
-                    if (t.source === 'CashAtHome') opCashHome -= amt;
-                    if (t.destination === 'CashAtHome') opCashHome += amt;
-                    if (opBanks.has(t.source)) opBanks.set(t.source, (opBanks.get(t.source) || 0) - amt);
-                    if (opBanks.has(t.destination)) opBanks.set(t.destination, (opBanks.get(t.destination) || 0) + amt);
-                });
-                globalData.incomes.filter(i => isBefore(i.date) && !i.isInternal).forEach(i => {
-                    const amt = Number(i.amount) || 0;
-                    if (i.bankAccountId === 'CashAtHome') opCashHome += amt;
-                    else if (i.bankAccountId === 'CashInHand' || (i.paymentMethod === 'Cash' && !i.bankAccountId)) opCashHand += amt;
-                    else if (i.bankAccountId && opBanks.has(i.bankAccountId)) opBanks.set(i.bankAccountId, (opBanks.get(i.bankAccountId) || 0) + amt);
-                });
-                globalData.expenses.filter(e => isBefore(e.date) && !e.isInternal).forEach(e => {
-                    const amt = Number(e.amount) || 0;
-                    if (e.bankAccountId === 'CashAtHome') opCashHome -= amt;
-                    else if (e.bankAccountId === 'CashInHand' || (e.paymentMethod === 'Cash' && !e.bankAccountId)) opCashHand -= amt;
-                    else if (e.bankAccountId && opBanks.has(e.bankAccountId)) opBanks.set(e.bankAccountId, (opBanks.get(e.bankAccountId) || 0) - amt);
-                });
-                globalData.supplierPayments.filter(p => isBefore(p.date) && (p as any).status !== 'Pending').forEach(p => {
-                    const amt = Number(p.amount) || 0;
-                    if (p.bankAccountId === 'CashAtHome') opCashHome -= amt;
-                    else if (p.bankAccountId === 'CashInHand' || (p.receiptType === 'Cash' && !p.bankAccountId)) opCashHand -= amt;
-                    else if (p.bankAccountId && opBanks.has(p.bankAccountId)) opBanks.set(p.bankAccountId, (opBanks.get(p.bankAccountId) || 0) - amt);
-                });
-                globalData.customerPayments.filter(p => isBefore(p.date)).forEach(p => {
-                    const amt = Number(p.amount) || 0;
-                    if (p.bankAccountId === 'CashAtHome') opCashHome += amt;
-                    else if (p.bankAccountId === 'CashInHand' || (p.paymentMethod === 'Cash' && !p.bankAccountId)) opCashHand += amt;
-                    else if (p.bankAccountId && opBanks.has(p.bankAccountId)) opBanks.set(p.bankAccountId, (opBanks.get(p.bankAccountId) || 0) + amt);
-                });
+                const opening = getBalancesAtDate(subDays(filterDate, 1));
+                let opCashHand = opening.cashInHand;
+                let opCashHome = opening.cashAtHome;
+                const opBanks = opening.bankBalances;
 
                 resultArr.push({ date: filterDate.toISOString(), particulars: "OPENING BALANCE: CASH IN HAND", id: 'OP-CASH', debit: 0, credit: opCashHand, type: 'Liquid' });
                 resultArr.push({ date: filterDate.toISOString(), particulars: "OPENING BALANCE: CASH AT HOME", id: 'OP-HOME', debit: 0, credit: opCashHome, type: 'Liquid' });
@@ -298,8 +270,9 @@ export default function DailyBusinessReport() {
                             const gross  = qty * rate;
                             const lab    = Number(s.labouryAmount) || 0;
                             const kn     = Number(s.kanta)         || 0;
-                            const varietyName = (s.variety || '').toUpperCase().trim();
-                            const variety = varietyName ? ` [${varietyName}]` : '';
+                            const vNameRaw = (s.variety || '').toUpperCase().trim();
+                            const vNameNormalized = normalizeVariety(vNameRaw);
+                            const variety = vNameRaw ? ` [${vNameRaw}]` : '';
                             const inclusions = [
                                 lab > 0 ? `Lab ₹${Math.round(lab).toLocaleString('en-IN')}` : '',
                                 kn  > 0 ? `Kanta ₹${Math.round(kn).toLocaleString('en-IN')}` : '',
@@ -325,33 +298,107 @@ export default function DailyBusinessReport() {
                             id: 'LABR', debit: 0, credit: dLab, type: 'Labour'
                         });
 
-                        // Kanta = CREDIT (already deducted from farmer payment, comes to us)
-                        if (dKn > 0) resultArr.push({
+                        // PURCHASE & P ADJUSTMENT (Purchase Flow)
+                        const dPurchaseAdj = dNet - (daySupps.reduce((s, p) => s + (Number(p.netAmount) || 0), 0));
+
+                        if (dNet > 0) resultArr.push({
                             date: dStr,
-                            particulars: `(${daySupps.length} parchi)`,
-                            id: 'KANT', debit: 0, credit: dKn, type: 'Kanta'
+                            particulars: `DAILY STOCK PURCHASE (${daySupps.length} parchi | Gross)`,
+                            id: 'PURCH', debit: 0, credit: Math.round(dNet), type: 'Purchase'
                         });
 
-                        // Net value CREDIT = gross value MINUS labour MINUS kanta (actual stock value credited)
-                        const netCredit = dNet - dLab - dKn;
-                        if (netCredit > 0) resultArr.push({
+                        if (dPurchaseAdj > 1) resultArr.push({
                             date: dStr,
-                            particulars: `Net Stock Value Credit (${daySupps.length} parchi | Gross ₹${Math.round(dNet).toLocaleString('en-IN')} − Lab ₹${Math.round(dLab).toLocaleString('en-IN')} − Kanta ₹${Math.round(dKn).toLocaleString('en-IN')} = ₹${Math.round(netCredit).toLocaleString('en-IN')})`,
-                            id: 'NETV', debit: 0, credit: netCredit, type: 'P ADJUSTMENT'
+                            particulars: `P ADJUSTMENT (Total Purchase Deductions)`,
+                            id: 'PADJ', debit: 0, credit: Math.round(dPurchaseAdj), type: 'Adjustment'
                         });
                     }
+
+                    // S ADJUSTMENT (Stock Debit)
+                    const daySales = globalData.customers.filter(c => isSameDay(new Date(c.date), dDate));
+                    const dSalesGross = daySales.reduce((sum, s) => sum + ((Number(s.netWeight) || 0) * (Number(s.rate) || 0)), 0);
+                    // S ADJUSTMENT (Stock Debit) - Total Base Value after Deductions
+                    const dSalesNet = daySales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+                    
+                    // Breakdown of all possible differences (Individual Rows with Detail)
+                    const vLab   = daySales.reduce((s, p) => s + (Number(p.labouryAmount) || 0), 0);
+                    const vKanta = daySales.reduce((s, p) => s + (Number(p.kanta) || 0), 0);
+                    const vBagAm = daySales.reduce((s, p) => s + (Number((p as any).bagAmount || 0)), 0);
+                    const vTrans = daySales.reduce((s, p) => s + (Number((p as any).transportAmount || 0)), 0);
+                    const vBrok  = daySales.reduce((s, p) => s + (Number(p.brokerageAmount || 0)), 0);
+                    const vOther = daySales.reduce((s, p) => s + (Number((p as any).otherCharges || 0)), 0);
+                    const vBagWt = daySales.reduce((s, p) => s + (Number((p as any).bagWeightDeductionAmount || 0)), 0);
+
+                    // Net Base = Total Receipt Amount - (All the things that were ADDED to the base price as extra revenue)
+                    // This naturally keeps "Reductions" (CD, Brokerage Deductions, Karta) and "Brokerage Income" INSIDE the net base.
+                    const dSalesNetBase = dSalesNet - (vLab + vKanta + vBagAm + vTrans + vOther);
+
+                    // Metadata for details
+                    const tBags = daySales.reduce((s, p) => s + (Number((p as any).bags) || 0), 0);
+                    const tBagKgTotal = daySales.reduce((s, p) => s + ((Number((p as any).bags) || 0) * (Number((p as any).bagWeightKg) || 0)), 0);
+                    const avgBagWt = tBags > 0 ? (tBagKgTotal / tBags).toFixed(2) : '0';
+                    const tBagWtQtl = (tBagKgTotal / 100).toFixed(2);
+
+                    const firstRate = daySales.length > 0 ? (Number(daySales[0].rate) || 1) : 1;
+
+                    if (dSalesNetBase > 0) resultArr.push({
+                        date: dStr,
+                        particulars: `ADJUSTMENT (S Net Sales Base | ${daySales.length} parchi | Total Bags: ${tBags})`,
+                        id: 'SADJ', debit: Math.round(dSalesNetBase), credit: 0, type: 'Adjustment'
+                    });
+
+                    // Individual Sales acting as Credits (Net Value)
+                    daySales.forEach(c => {
+                        const namePart = [c.name, c.companyName, c.address].filter((x): x is string => typeof x === 'string').map(x => x.trim()).join(', ');
+                        const vName = (c.variety || '').toUpperCase().trim();
+                        resultArr.push({
+                            date: c.date,
+                            particulars: `${namePart.split(',')[0]} (${vName}) | Sale Net Receipt`,
+                            id: c.id.slice(-6).toUpperCase(), debit: 0, credit: Number(c.amount) || 0, type: 'Sale'
+                        });
+                    });
+
+                    const transMap = new Map<number, number>();
+                    daySales.forEach(s => {
+                        const tr = Number((s as any).transportationRate) || 0;
+                        const wt = Number(s.weight) || 0;
+                        if (tr > 0 && wt > 0) transMap.set(tr, (transMap.get(tr) || 0) + wt);
+                    });
+                    const transDetail = Array.from(transMap.entries()).map(([r, w]) => `${w.toFixed(2)} QTL @ ₹${r}`).join(' + ');
+
+                    // SEPARATE ULTRA-DETAILED ADJUSTMENT ROWS (DEBIT - Surplus/Income)
+                    if (Math.round(vLab) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Labour for ${tBags} Bags)`, id: 'SLE-LAB', debit: Math.round(vLab), credit: 0, type: 'Adjustment'
+                    });
+                    if (Math.round(vKanta) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Kanta Charges)`, id: 'SLE-KN', debit: Math.round(vKanta), credit: 0, type: 'Adjustment'
+                    });
+                    if (Math.round(vBagWt) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Bag Weight Adj | ${tBags} Bags @ ~${avgBagWt}kg | Total ${tBagWtQtl} QTL reduced)`, id: 'SLE-BW', debit: Math.round(vBagWt), credit: 0, type: 'Adjustment'
+                    });
+                    if (Math.round(vBagAm) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Bag Charges | ${tBags} Bags)`, id: 'SLE-BG', debit: Math.round(vBagAm), credit: 0, type: 'Adjustment'
+                    });
+                    if (Math.round(vTrans) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Transport/Freight | ${transDetail})`, id: 'SLE-TR', debit: Math.round(vTrans), credit: 0, type: 'Adjustment'
+                    });
+                    
+                    if (Math.round(vOther) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Misc Income)`, id: 'SLE-OT', debit: Math.round(vOther), credit: 0, type: 'Adjustment'
+                    });
+
+                    // Final Check for exact balance against receipts
+                    const totalDebitTracked = dSalesNetBase + vLab + vKanta + vBagAm + vTrans + vOther;
+                    const diff = dSalesNet - totalDebitTracked;
+                    if (Math.round(diff) > 1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Rounding Surplus)`, id: 'SLE-RS', debit: Math.round(diff), credit: 0, type: 'Adjustment'
+                    });
+                    else if (Math.round(diff) < -1) resultArr.push({
+                        date: dStr, particulars: `ADJUSTMENT (Sales Rounding Loss)`, id: 'SLE-RL', debit: 0, credit: Math.round(Math.abs(diff)), type: 'Adjustment'
+                    });
                 });
                 return resultArr;
             })(),
-            ...globalData.customers.filter(c => periodScope(c.date)).map(c => {
-                const namePart = [c.name, c.companyName, c.address].filter((x): x is string => typeof x === 'string').map(x => x.trim()).join(', ');
-                const variety = (c.variety || '').toUpperCase().trim();
-                return {
-                    date: c.date,
-                    particulars: `${namePart} (${variety}) | Qty: ${Number(c.netWeight || 0).toFixed(2)} QTL`,
-                    id: c.id.slice(-6).toUpperCase(), debit: 0, credit: Number(c.amount) || 0, type: 'Sale'
-                };
-            }),
             ...globalData.supplierPayments.filter(p => periodScope(p.date)).map(p => {
                 const method = p.receiptType || p.paymentMethod || 'Cash';
                 const ref = p.utrNo || p.checkNo ? ` | Ref: ${p.utrNo || p.checkNo}` : '';
@@ -455,21 +502,29 @@ export default function DailyBusinessReport() {
 
                 const filteredIncomes = globalData.incomes.filter(i => periodScope(i.date) && !i.isInternal);
                 const filteredExpenses = globalData.expenses.filter(e => periodScope(e.date) && !e.isInternal);
+                const filteredSales = globalData.customers.filter(c => periodScope(c.date));
 
-                [...filteredIncomes, ...filteredExpenses].forEach(t => {
+                [...filteredIncomes, ...filteredExpenses, ...filteredSales.map(s => ({
+                    ...s,
+                    payee: s.companyName || s.name || 'Customer',
+                    category: 'SALES',
+                    amount: s.amount,
+                    isIncome: true
+                }))].forEach((t: any) => {
                     const dStr = format(startOfDay(new Date(t.date)), 'yyyy-MM-dd');
                     if (!dayGroups.has(dStr)) dayGroups.set(dStr, new Map());
                     const subGroup = dayGroups.get(dStr)!;
 
-                    const subCat = (t.subCategory || t.category || 'Other').toUpperCase().trim();
+                    const subCat = (t.category || 'Other').toUpperCase().trim();
                     if (!subGroup.has(subCat)) {
                         subGroup.set(subCat, { debits: [], credits: [] });
                     }
                     const g = subGroup.get(subCat)!;
-                    const isIncome = 'transactionType' in t ? t.transactionType === 'Income' : (filteredIncomes.includes(t as any));
+                    
+                    const isIncome = t.isIncome || ('transactionType' in t ? t.transactionType === 'Income' : (filteredIncomes.includes(t as any)));
                     
                     if (isIncome) {
-                        g.credits.push({ payee: t.payee, amount: Number(t.amount) || 0, description: t.description });
+                        g.credits.push({ payee: t.payee, amount: Number(t.amount) || 0, description: t.variety });
                     } else {
                         g.debits.push({ payee: t.payee, amount: Number(t.amount) || 0, description: t.description });
                     }
@@ -507,6 +562,116 @@ export default function DailyBusinessReport() {
                 });
 
                 return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            })(),
+            audit360Zones: (() => {
+                const zones: Record<string, { label: string, rows: any[], total: number, stats: any }> = {
+                    PURCHASE: { label: 'Purchase Zone', rows: [], total: 0, stats: { qty: 0, parchi: 0 } },
+                    SALE: { label: 'Sale Zone', rows: [], total: 0, stats: { qty: 0, parchi: 0 } },
+                    ADJUSTMENT: { label: 'Adjustment Zone', rows: [], total: 0, stats: { margin: 0 } },
+                    EXPENSE: { label: 'Expense Zone', rows: [], total: 0, stats: { topCat: '' } },
+                    INCOME: { label: 'Income Zone', rows: [], total: 0, stats: { topCat: '' } },
+                    INTERNAL: { label: 'Internal Cashflow', rows: [], total: 0, stats: { count: 0 } }
+                };
+
+                const filterDate = startOfDay(startDate);
+                const filterEndDate = startOfDay(endDate);
+
+                // 1. Purchase Zone (Procurement)
+                globalData.suppliers.filter(s => {
+                    const d = startOfDay(new Date(s.date));
+                    return d >= filterDate && d <= filterEndDate;
+                }).forEach(s => {
+                    const amt = Number(s.netAmount) || 0;
+                    const wt = Number(s.netWeight) || 0;
+                    const lab = Number(s.labouryAmount) || 0;
+                    const kan = Number(s.kanta) || 0;
+                    const krt = Number(s.kartaAmount) || 0;
+                    const brk = Number(s.brokerageAmount) || 0;
+
+                    zones.PURCHASE.rows.push({
+                        date: s.date,
+                        item: s.name,
+                        details: `${wt.toFixed(2)} QTL | ${s.variety}`,
+                        amount: amt,
+                        laboury: lab, kanta: kan, kartaAmt: krt, brokerage: brk,
+                        tag: s.id.slice(-4)
+                    });
+                    zones.PURCHASE.total += amt;
+                    zones.PURCHASE.stats.qty += wt;
+                    zones.PURCHASE.stats.parchi++;
+
+                    // Operational Adjustments (These are credits to the company deducted from purchase)
+                    if (lab > 0) zones.ADJUSTMENT.rows.push({ date: s.date, item: 'PUR. LABOUR', details: `From ${s.name}`, amount: lab, type: 'IN', tag: 'LAB' });
+                    if (kan > 0) zones.ADJUSTMENT.rows.push({ date: s.date, item: 'PUR. KANTA', details: `From ${s.name}`, amount: kan, type: 'IN', tag: 'KAN' });
+                    if (krt > 0) zones.ADJUSTMENT.rows.push({ date: s.date, item: 'PUR. KARTA', details: `From ${s.name}`, amount: krt, type: 'IN', tag: 'KRT' });
+                });
+
+                // 2. Sale Zone (Revenue)
+                globalData.customers.filter(c => {
+                    const d = startOfDay(new Date(c.date));
+                    return d >= filterDate && d <= filterEndDate;
+                }).forEach(c => {
+                    const amt = Number(c.amount) || 0;
+                    const wt = Number(c.netWeight) || 0;
+                    zones.SALE.rows.push({
+                        date: c.date,
+                        item: c.companyName || c.name,
+                        details: `${wt.toFixed(2)} QTL Sold | ${c.variety}`,
+                        amount: amt,
+                        tag: 'SALE'
+                    });
+                    zones.SALE.total += amt;
+                    zones.SALE.stats.qty += wt;
+                    zones.SALE.stats.parchi++;
+
+                    // Sale-Side Adjustments
+                    const vLab = Number(c.labouryAmount) || 0;
+                    const vKan = Number(c.kanta) || 0;
+                    const vBag = Number((c as any).bagAmount || 0);
+                    if (vLab > 0) zones.ADJUSTMENT.rows.push({ date: c.date, item: 'SALE LABOUR', details: `${c.name}`, amount: vLab, type: 'IN', tag: 'SLAB' });
+                    if (vKan > 0) zones.ADJUSTMENT.rows.push({ date: c.date, item: 'SALE KANTA', details: `${c.name}`, amount: vKan, type: 'IN', tag: 'SKAN' });
+                    if (vBag > 0) zones.ADJUSTMENT.rows.push({ date: c.date, item: 'BAG CHARGES', details: `${c.name}`, amount: vBag, type: 'IN', tag: 'BAG' });
+                });
+
+                // 3. Expense Zone
+                globalData.expenses.filter(e => {
+                    const d = startOfDay(new Date(e.date));
+                    return d >= filterDate && d <= filterEndDate;
+                }).forEach(e => {
+                    const amt = Number(e.amount) || 0;
+                    zones.EXPENSE.rows.push({ date: e.date, item: e.payee, details: e.category, amount: amt, tag: 'EXP' });
+                    zones.EXPENSE.total += amt;
+                });
+
+                // 4. Income Zone (Other Incomes)
+                globalData.incomes.filter(i => {
+                    const d = startOfDay(new Date(i.date));
+                    return d >= filterDate && d <= filterEndDate;
+                }).forEach(i => {
+                    const amt = Number(i.amount) || 0;
+                    zones.INCOME.rows.push({ date: i.date, item: i.payee, details: i.category, amount: amt, tag: 'INC' });
+                    zones.INCOME.total += amt;
+                });
+
+                // 5. Internal Cashflow Zone (Contra)
+                globalData.fundTransactions.filter(t => {
+                    const d = startOfDay(new Date(t.date));
+                    return d >= filterDate && d <= filterEndDate;
+                }).forEach(t => {
+                    const amt = Number(t.amount) || 0;
+                    zones.INTERNAL.rows.push({ date: t.date, item: `${t.source} ➔ ${t.destination}`, details: t.description || 'Internal Transfer', amount: amt, tag: 'CASHFLOW' });
+                    zones.INTERNAL.total += amt;
+                    zones.INTERNAL.stats.count++;
+                });
+
+                return Object.entries(zones).map(([key, zone]) => {
+                    const maxAmt = Math.max(...zone.rows.map(r => r.amount), 1);
+                    return {
+                        key, ...zone,
+                        rows: zone.rows.map(r => ({ ...r, intensity: (r.amount / maxAmt) * 100 }))
+                                 .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    };
+                });
             })()
         };
     }, [startDate, endDate, globalData, loans]);
@@ -574,11 +739,19 @@ export default function DailyBusinessReport() {
         XLSX.writeFile(workbook, `Business_Report_360_${dateRangeStr}.xlsx`);
     };
 
-    const handlePrint = async () => {
-        if (!reportData) return;
-        try {
+        const handlePrint = async () => {
+            if (!reportData) return;
+            try {
+                const normV = (v: string | null | undefined) => {
+                    const name = (v || "").toUpperCase().replace(/\s+/g, " ").trim();
+                    if (!name) return "UNKNOWN";
+                    if (name.includes("WHEAT") || name.includes("GEHU") || name.includes("KANAK") || name.includes("WHEET") || name.includes("WEHT")) return "WHEAT";
+                    if (name.includes("MUSTARD") || name.includes("SARSO") || name.includes("SARSON") || name.includes("RYA")) return "MUSTARD";
+                    if (name.includes("PADDY") || name.includes("DHAN") || name.includes("PR-") || name.includes(" धान")) return "PADDY";
+                    return name;
+                };
 
-        const escapeHtml = (value?: string | null) => {
+                const escapeHtml = (value?: string | null) => {
             if (!value) return "";
             return String(value)
                 .replace(/&/g, "&amp;")
@@ -600,51 +773,66 @@ export default function DailyBusinessReport() {
             <head>
                 <title>${escapeHtml(companyName)} - ${dateRangeText}</title>
                 <style>
-                    body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; margin: 0; padding: 25px; line-height: 1.4; background: #fff; }
-                    .header { text-align: center; border-bottom: 3px solid #a78bca; padding-bottom: 15px; margin-bottom: 25px; }
-                    .header h1 { margin: 0; color: #5c3e7b; font-size: 28px; text-transform: uppercase; font-weight: 900; letter-spacing: -0.5px; }
-                    .header p { margin: 8px 0 0 0; color: #64748b; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
+                    body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; margin: 0; padding: 20px; line-height: 1.2; background: #fff; letter-spacing: -0.01em; }
+                    .header { text-align: left; border-bottom: 3.5px solid #1a365d; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+                    .header-left h1 { margin: 0; color: #1a365d; font-size: 32px; font-weight: 900; letter-spacing: -0.04em; line-height: 0.9; }
+                    .header-left p { margin: 8px 0 0 0; color: #64748b; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+                    .header-right { text-align: right; color: #94a3b8; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+
+                    .section { margin-bottom: 45px; page-break-inside: auto !important; margin-top: 35px; }
+                    .section-title { font-size: 11px; font-weight: 900; color: #ffffff; background: #334155 !important; padding: 8px 12px; margin-bottom: 0px; text-transform: uppercase; letter-spacing: 1px; border-radius: 4px 4px 0 0; -webkit-print-color-adjust: exact; }
                     
-                    .section { margin-bottom: 30px; page-break-inside: avoid; }
-                    .section-title { font-size: 13px; font-weight: 900; color: #ffffff; background: #a78bca; padding: 9px 14px; margin-bottom: 0px; text-transform: uppercase; letter-spacing: 1px; border-radius: 4px 4px 0 0; }
+                    .v-ledger-table { width: 100%; border-collapse: collapse; margin-top: 0px; margin-bottom: 0px; border: 0.5px solid #cbd5e1; table-layout: fixed; }
+                    .v-ledger-table th { background: #334155 !important; color: #ffffff !important; padding: 7px 5px; font-size: 8.5px; border: 0.5px solid #ffffff33; text-transform: uppercase; font-weight: 900; letter-spacing: 0.2px; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .v-ledger-table td { padding: 5px 4px; font-size: 9px; border: 0.5px solid #cbd5e1; text-align: center; color: #0f172a; font-weight: 500; }
+                    .v-ledger-table tr:nth-child(even) { background: #fcfcfc; }
                     
-                    .v-ledger-table { width: 100%; border-collapse: collapse; margin-top: 0px; margin-bottom: 15px; border: 1px solid #e2e8f0; table-layout: fixed; }
-                    .v-ledger-table th { background: #f1f5f9; color: #1e293b; padding: 8px 6px; font-size: 9px; border: 1px solid #e2e8f0; text-transform: uppercase; font-weight: 900; letter-spacing: 0.3px; }
-                    .v-ledger-table td { padding: 6px 5px; font-size: 9px; border: 1px solid #e2e8f0; text-align: center; color: #334155; }
-                    .v-ledger-table tr:nth-child(even) { background: #ffffff; }
-                    
-                    .v-header-label { background: #a78bca; color: white; padding: 10px 15px; font-weight: 900; font-size: 12px; display: flex; justify-content: space-between; border: 1px solid #a78bca; border-bottom: none; margin-top: 20px; border-radius: 4px 4px 0 0; }
+                    .v-header-label { background: #334155 !important; color: white; padding: 8px 12px; font-weight: 900; font-size: 11px; display: flex; justify-content: space-between; border: 1px solid #334155; border-bottom: none; margin-top: 30px; margin-bottom: 0px; border-radius: 4px 4px 0 0; -webkit-print-color-adjust: exact; }
                     
                     .row-main { font-weight: 800; color: #0f172a; font-size: 10px; }
                     .row-sub { font-size: 8px; color: #64748b; font-weight: 600; }
-                    .val-label { color: #2563eb; font-weight: 800; }
-                    .cut-label { color: #dc2626; font-weight: 800; }
+                    .val-label { color: #2563eb; font-weight: 900; }
+                    .cut-label { color: #dc2626; font-weight: 900; }
                     
-                    .total-row { background: #a78bca !important; color: white !important; font-weight: 900 !important; }
-                    .total-row td { border-color: #b89fd4; color: white !important; font-weight: 900; }
-                    .total-row .row-sub { color: #e9d5ff !important; }
+                    .total-row { background: #1e293b !important; color: white !important; font-weight: 900 !important; }
+                    .total-row td { border-color: #334155; color: white !important; font-weight: 900; font-size: 10px; }
+                    .total-row .row-sub { color: #cbd5e1 !important; }
 
-                    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 20px; }
-                    .result-box { border: 2px solid #a78bca; padding: 20px; border-radius: 12px; display: flex; justify-content: space-around; margin-top: 25px; background: #f8fafc; }
+                    .result-box { border: 2.5px solid #1a365d; padding: 20px; border-radius: 0px; display: flex; justify-content: space-around; margin-top: 20px; background: #fff; }
                     .result-item { text-align: center; }
-                    .result-item label { display: block; font-size: 9px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
-                    .result-item span { font-size: 20px; font-weight: 900; color: #5c3e7b; }
+                    .result-item label { display: block; font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+                    .result-item span { font-size: 24px; font-weight: 900; color: #1a365d; }
                     .positive { color: #059669 !important; }
                     .negative { color: #dc2626 !important; }
+
+                    .audit-grid { display: flex; flex-direction: column; width: 100%; }
+                    .audit-grid-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid #f1f5f9; padding: 2px 0; }
+                    .audit-label { font-size: 7px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+                    .audit-value { font-size: 8.5px; font-weight: 800; color: #1e293b; font-family: monospace; }
+                    .net-pos-cell { text-align: right; background: #f8fafc !important; -webkit-print-color-adjust: exact; padding: 4px 8px; border-left: 1px solid #e2e8f0; }
+                    .net-pos-label { font-size: 7px; font-weight: 900; color: #5c3e7b; text-transform: uppercase; display: block; margin-bottom: 2px; }
+                    .net-pos-value { font-size: 11px; font-weight: 900; color: #0f172a; }
                     
                     @media print {
                         body { padding: 0px; }
-                        .section-title { background: #a78bca !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        .v-ledger-table th { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        .total-row { background: #a78bca !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        .v-header-label { background: #a78bca !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .section-title { background: #1a365d !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .v-ledger-table th { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .total-row { background: #1e293b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .v-header-label { background: #334155 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        @page { size: landscape; margin: 0.5cm; margin-top: 2.0cm; }
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>${escapeHtml(toTitleCase(companyName))}</h1>
-                    <p>AUDITED PROCUREMENT & SALES OPERATIONS | ${dateRangeText}</p>
+                    <div class="header-left">
+                        <h1>${escapeHtml(toTitleCase(companyName))}</h1>
+                        <p>AUDITED PROCUREMENT & SALES OPERATIONS | ${dateRangeText}</p>
+                    </div>
+                    <div class="header-right">
+                        SYSTEM GENERATED AUDIT<br>
+                        ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN')}
+                    </div>
                 </div>
 
                 <div class="section">
@@ -652,175 +840,298 @@ export default function DailyBusinessReport() {
                     <table class="v-ledger-table" style="margin-bottom: 10px;">
                         <thead>
                             <tr>
-                                <th style="width: 50px;">DATE</th>
-                                <th>CASH HAND</th>
-                                <th>CASH HOME</th>
+                            <tr style="background: #334155 !important; color: white !important;">
+                                <th style="width: 75px; border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; font-size: 8.5px; padding: 7px 5px; -webkit-print-color-adjust: exact;" rowspan="2">BUSINESS DAY</th>
+                                <th colspan="2" style="border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; font-size: 8.5px; padding: 7px 5px; -webkit-print-color-adjust: exact;">CASH HAND</th>
+                                <th colspan="2" style="border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; font-size: 8.5px; padding: 7px 5px; -webkit-print-color-adjust: exact;">CASH HOME</th>
                                 ${globalData.bankAccounts.map(acc => `
-                                    <th>${escapeHtml(acc.bankName)}<br><small>${acc.accountNumber.slice(-4)}</small></th>
+                                    <th colspan="2" style="border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; font-size: 8.5px; padding: 7px 5px; -webkit-print-color-adjust: exact;">
+                                        ${escapeHtml(acc.bankName)}
+                                    </th>
                                 `).join('')}
-                                <th style="background: #a78bca; color: white;">NET POS.</th>
+                                <th style="background: #334155 !important; border: 0.5px solid #ffffff33; color: white !important; font-size: 8.5px; padding: 7px 5px; -webkit-print-color-adjust: exact;">CONSOLIDATED BALANCE</th>
+                            </tr>
+                            <tr style="background: #334155 !important; font-size: 6.5px; color: white !important;">
+                                ${['CashHand', 'CashHome', ...globalData.bankAccounts].map(() => `
+                                    <th style="border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact;">OPENING / IN (+)</th>
+                                    <th style="border: 0.5px solid #ffffff33; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact;">CLOSING / OUT (-)</th>
+                                `).join('')}
+                                <th style="background: #334155 !important; border: 0.5px solid #ffffff33; font-size: 8px; color: white !important; -webkit-print-color-adjust: exact;">FINAL AUDIT</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${reportData.dayWiseLiquidity.map((d: any) => `
-                                <tr>
-                                    <td style="font-weight: 900;">${d.date}</td>
+                            ${(reportData.dayWiseLiquidity || []).map((d: any) => `
+                                <!-- BLOCK: BALANCE -->
+                                <tr style="border-top: 1.5px solid #cbd5e1; background: #f8fafc !important;">
+                                    <td style="font-weight: 900; font-size: 10px; color: #1e293b; text-align: center; border: 0.5px solid #e2e8f0; background: #f1f5f9 !important;" rowspan="2">${d.date}</td>
                                     ${['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map(a => a.id)].map((id: string) => {
-                                        const m = d.metrics[id];
+                                        const m = d.metrics[id] || { opening: 0, closing: 0 };
                                         return `
-                                            <td style="padding: 2px;">
-                                                <div style="border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; background: #fff;">
-                                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; background: #fff; border-bottom: 1px solid #f1f5f9;">
-                                                        <span style="font-size: 7.5px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Opening</span>
-                                                        <span style="font-size: 9px; font-weight: 800; color: #334155;">${Math.round(m.opening).toLocaleString('en-IN')}</span>
-                                                    </div>
-                                                    
-                                                    <div style="display: flex; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
-                                                        <div style="flex: 1; text-align: center; padding: 3px 1px; border-right: 1px solid #f1f5f9;">
-                                                            <span style="font-size: 9px; font-weight: 900; color: #059669;">${m.income > 0 ? '+' + Math.round(m.income).toLocaleString('en-IN') : '-'}</span>
-                                                        </div>
-                                                        <div style="flex: 1; text-align: center; padding: 3px 1px;">
-                                                            <span style="font-size: 9px; font-weight: 900; color: #dc2626;">${m.expense > 0 ? '-' + Math.round(m.expense).toLocaleString('en-IN') : '-'}</span>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; background: #fff; border-top: 1px solid #f1f5f9;">
-                                                        <span style="font-size: 7.5px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Closing</span>
-                                                        <span style="font-size: 10px; font-weight: 900; color: #5c3e7b;">${Math.round(m.closing).toLocaleString('en-IN')}</span>
-                                                    </div>
-                                                </div>
-                                            </td>
+                                            <td style="font-size: 8.5px; font-family: monospace; color: #64748b; border: 0.5px solid #f1f5f9; text-align: right; padding-right: 4px;">${Math.round(m.opening || 0).toLocaleString('en-IN')}</td>
+                                            <td style="font-size: 9px; font-family: monospace; color: #0f172a; font-weight: 900; background: #f0f7ff !important; border: 0.5px solid #e2e8f0; text-align: right; padding-right: 4px;">${Math.round(m.closing || 0).toLocaleString('en-IN')}</td>
                                         `;
                                     }).join('')}
-                                    <td style="padding: 3px; text-align: center; vertical-align: middle;">
-                                        <div style="background: #a78bca; border-radius: 4px; padding: 6px 4px; height: 100%; display: flex; flex-direction: column; justify-content: center; min-height: 28px;">
-                                            <span style="font-size: 7px; color: #e9d5ff; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">Net Pos.</span>
-                                            <span style="font-size: 11.5px; font-weight: 900; color: white;">${Math.round(d.totalClosing).toLocaleString('en-IN')}</span>
-                                        </div>
+                                    <td style="text-align: right; font-weight: 900; font-size: 13px; font-family: monospace; color: #000 !important; padding-right: 6px; border: 0.5px solid #cbd5e1; background: #fff !important;" rowspan="2">
+                                        ${Math.round(d.totalClosing || 0).toLocaleString('en-IN')}
                                     </td>
+                                </tr>
+                                <!-- BLOCK: FLOW -->
+                                <tr style="background: #fff !important; border-bottom: 1.5px solid #cbd5e1;">
+                                    ${['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map(a => a.id)].map((id: string) => {
+                                        const m = d.metrics[id] || { income: 0, expense: 0 };
+                                        return `
+                                            <td style="font-size: 8.5px; font-family: monospace; color: #059669; font-weight: 900; border: 0.5px solid #f1f5f9; text-align: right; padding-right: 4px; font-style: italic;">+ ${m.income > 0 ? Math.round(m.income).toLocaleString('en-IN') : '–'}</td>
+                                            <td style="font-size: 8.5px; font-family: monospace; color: #dc2626; font-weight: 900; border: 0.5px solid #f1f5f9; text-align: right; padding-right: 4px; font-style: italic;">– ${m.expense > 0 ? Math.round(m.expense).toLocaleString('en-IN') : '–'}</td>
+                                        `;
+                                    }).join('')}
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
-                    <div style="text-align: right; font-weight: 900; font-size: 14px; color: #5c3e7b; margin-top: 5px;">
+                    <div style="text-align: right; font-weight: 900; font-size: 14px; color: #1a365d; margin-top: 5px;">
                         REPORT PERIOD CLOSING LIQUIDITY: ${formatCurrency(reportData.liquid.total)}
                     </div>
                 </div>
 
-                <!-- Section B: Variety-Wise Audited Purchase Ledgers -->
-                ${(() => {
-                    const varietyGroups: Record<string, any[]> = {};
-                    const filtered = globalData.suppliers.filter(s => {
-                        const ed = startOfDay(new Date(s.date));
-                        return ed >= startOfDay(startDate) && ed <= startOfDay(endDate);
-                    });
-
-                    filtered.forEach(s => {
-                        const v = s.variety?.trim() || 'OTHERS';
-                        if (!varietyGroups[v]) varietyGroups[v] = [];
-                        varietyGroups[v].push(s);
-                    });
-
-                    return Object.entries(varietyGroups).map(([vName, entries]) => {
-                        const dayBuckets: Record<string, any[]> = {};
-                        (entries as any[]).forEach(e => {
-                            const dStr = format(new Date(e.date), 'yyyy-MM-dd');
-                            if (!dayBuckets[dStr]) dayBuckets[dStr] = [];
-                            dayBuckets[dStr].push(e);
-                        });
-
-                        const rows = Object.entries(dayBuckets).map(([dDate, ents]) => {
-                            const m = (ents as any[]).reduce((acc: any, s: any) => ({
-                                parchi: acc.parchi + 1,
-                                gross: acc.gross + (Number(s.grossWeight) || 0),
-                                tier: acc.tier + (Number(s.teirWeight) || 0),
-                                baseWt: acc.baseWt + (Number(s.weight) || 0),
-                                kartaWt: acc.kartaWt + (Number(s.kartaWeight) || 0),
-                                finalWt: acc.finalWt + (Number(s.netWeight) || 0),
-                                totalAmt: acc.totalAmt + (Number(s.amount) || 0),
-                                kartaAmt: acc.kartaAmt + (Number(s.kartaAmount) || 0),
-                                labAmt: acc.labAmt + (Number(s.labouryAmount) || 0),
-                                kanAmt: acc.kanAmt + (Number(s.kanta) || 0),
-                                original: acc.original + (Number(s.originalNetAmount) || 0),
-                                balance: acc.balance + (Number(s.netAmount) || 0),
-                                paid: acc.paid + (Number(s.originalNetAmount || 0) - Number(s.netAmount || 0)),
-                                sumRate: acc.sumRate + (Number(s.rate) || 0),
-                                sumKartaPct: acc.sumKartaPct + (Number(s.kartaPercentage) || 0)
-                            }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, balance:0, paid:0, sumRate:0, sumKartaPct:0 });
-                            
-                            return { date: format(new Date(dDate), 'dd MMM yyyy'), ...m, avgRate: m.totalAmt / m.baseWt || 0, avgKartaPct: m.sumKartaPct / (ents as any[]).length };
-                        });
-
-                        const vTotal = rows.reduce((a: any, b: any) => ({
-                             parchi: a.parchi + b.parchi, gross: a.gross + b.gross, tier: a.tier + b.tier,
-                             baseWt: a.baseWt + b.baseWt, kartaWt: a.kartaWt + b.kartaWt, finalWt: a.finalWt + b.finalWt,
-                             totalAmt: a.totalAmt + b.totalAmt, kartaAmt: a.kartaAmt + b.kartaAmt,
-                             labAmt: a.labAmt + b.labAmt, kanAmt: a.kanAmt + b.kanAmt,
-                             original: a.original + b.original, paid: a.paid + b.paid, balance: a.balance + b.balance
-                        }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, paid:0, balance:0 });
+                <div class="section">
+                    <div class="section-title">SECTION Z: 360° PARALLEL AUDIT LEDGER & OPERATIONAL SUMMARY</div>
+                    
+                    ${(() => {
+                        const pZone = reportData.audit360Zones.find(z => z.key === 'PURCHASE');
+                        const pRows = pZone?.rows || [];
+                        const sums = pRows.reduce((acc, r) => {
+                            acc.l += (Number(r.laboury) || 0);
+                            acc.k += (Number(r.kanta) || 0);
+                            acc.b += (Number(r.brokerage) || 0);
+                            acc.kr += (Number(r.kartaAmt) || 0);
+                            return acc;
+                        }, { l:0, k:0, b:0, kr:0 });
 
                         return `
-                        <div style="page-break-inside: avoid;">
-                            <div class="v-header-label">
-                                <span>VARIETY: ${vName.toUpperCase()} PROCUREMENT</span>
-                                <span>TOTAL QNTL: ${vTotal.finalWt.toFixed(2)}</span>
+                        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 15px;">
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #fff8f1 !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #9a3412; text-transform: uppercase;">PUR QTY</div>
+                                <div style="font-size: 10px; font-weight: 900;">${(pZone?.stats?.qty || 0).toFixed(2)} QTL</div>
                             </div>
-                            <table class="v-ledger-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 12%;">Timeline</th>
-                                        <th style="width: 10%;">Gross/Tier</th>
-                                        <th style="width: 12%;">Audit Cut</th>
-                                        <th style="width: 10%;">Net Wt</th>
-                                        <th style="width: 14%;">Rate/Value</th>
-                                        <th style="width: 14%;">Krt/Lab/Kan</th>
-                                        <th style="width: 14%;">Liab/Paid</th>
-                                        <th style="width: 14%; background: #f1f5f9; color: #1e293b;">Payable</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rows.map(r => `
-                                        <tr>
-                                            <td><div class="row-main">${r.date}</div><div class="row-sub">Parchi: ${r.parchi}</div></td>
-                                            <td><div class="row-main">${r.gross.toFixed(1)}</div><div class="row-sub">${r.tier.toFixed(1)}</div></td>
-                                            <td><div class="row-main">${r.baseWt.toFixed(1)}</div><div class="row-sub cut-label">-${r.kartaWt.toFixed(1)}</div></td>
-                                            <td><div class="row-main" style="font-size: 11px;">${r.finalWt.toFixed(2)}</div></td>
-                                            <td><div class="val-label">₹${Math.round(r.finalWt > 0 ? (r.totalAmt - r.labAmt - r.kanAmt) / r.finalWt : 0)}/QTL</div><div class="row-sub">₹${Math.round(r.totalAmt - r.labAmt - r.kanAmt).toLocaleString()}</div></td>
-                                            <td><div class="row-main">${r.avgKartaPct.toFixed(1)}% / ₹${Math.round(r.kartaAmt)}</div><div class="row-sub">L:${Math.round(r.labAmt)} | K:${Math.round(r.kanAmt)}</div></td>
-                                            <td><div class="row-main">₹${Math.round(r.original).toLocaleString()}</div><div class="row-sub">PD:₹${Math.round(r.paid).toLocaleString()}</div></td>
-                                            <td style="font-weight: 900; background: #f8fafc;">₹${Math.round(r.balance).toLocaleString()}</td>
-                                        </tr>
-                                    `).join('')}
-                                    <tr class="total-row">
-                                        <td>TOTAL: ${vTotal.parchi}</td>
-                                        <td>${vTotal.gross.toFixed(1)} / ${vTotal.tier.toFixed(1)}</td>
-                                        <td>${vTotal.baseWt.toFixed(1)} / -${vTotal.kartaWt.toFixed(1)}</td>
-                                        <td style="color: #d8b4fe; font-size: 11px;">${vTotal.finalWt.toFixed(2)}</td>
-                                        <td>₹${Math.round(vTotal.finalWt > 0 ? (vTotal.totalAmt - vTotal.labAmt - vTotal.kanAmt) / vTotal.finalWt : 0)}/QTL  ₹${Math.round(vTotal.totalAmt - vTotal.labAmt - vTotal.kanAmt).toLocaleString()}</td>
-                                        <td>₹${Math.round(vTotal.kartaAmt).toLocaleString()} | ${Math.round(vTotal.labAmt)}/${Math.round(vTotal.kanAmt)}</td>
-                                        <td>₹${Math.round(vTotal.original).toLocaleString()} / ₹${Math.round(vTotal.paid).toLocaleString()}</td>
-                                        <td style="background: #a78bca; color: white; font-weight: 900;">₹${Math.round(vTotal.balance).toLocaleString()}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #f0fdf4 !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #166534; text-transform: uppercase;">SALES QTY</div>
+                                <div style="font-size: 10px; font-weight: 900;">${(reportData.audit360Zones.find(z=>z.key==='SALE')?.stats?.qty || 0).toFixed(2)} QTL</div>
+                            </div>
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #f5f3ff !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #5b21b6; text-transform: uppercase;">TOTAL LABOUR</div>
+                                <div style="font-size: 10px; font-weight: 900;">₹${Math.round(sums.l).toLocaleString()}</div>
+                            </div>
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #fff1f2 !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #9f1239; text-transform: uppercase;">TOTAL KANTA</div>
+                                <div style="font-size: 10px; font-weight: 900;">₹${Math.round(sums.k).toLocaleString()}</div>
+                            </div>
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #fff7ed !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #9a3412; text-transform: uppercase;">TOTAL KARTA</div>
+                                <div style="font-size: 10px; font-weight: 900;">₹${Math.round(sums.kr).toLocaleString()}</div>
+                            </div>
+                            <div style="border: 0.5px solid #e2e8f0; padding: 5px; text-align: center; border-radius: 4px; background: #eff6ff !important;">
+                                <div style="font-size: 6px; font-weight: 800; color: #1e40af; text-transform: uppercase;">TOTAL BROKERAGE</div>
+                                <div style="font-size: 10px; font-weight: 900;">₹${Math.round(sums.b).toLocaleString()}</div>
+                            </div>
                         </div>`;
-                    }).join('');
-                })()}
+                    })()}
+
+                    <table class="v-ledger-table" style="width: 100%; border-collapse: collapse; -webkit-print-color-adjust: exact; table-layout: fixed;">
+                        <thead>
+                             <tr style="background: #1e293b !important; color: white !important;">
+                                <th colspan="2" style="background: #b45309 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">PURCHASE ZONE</th>
+                                <th colspan="2" style="background: #047857 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">SALE ZONE</th>
+                                <th colspan="2" style="background: #9f1239 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">ADJUSTMENT ZONE</th>
+                                <th colspan="2" style="background: #334155 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">EXPENSE ZONE</th>
+                                <th colspan="2" style="background: #3730a3 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">INCOME ZONE</th>
+                                <th colspan="2" style="background: #0891b2 !important; border: 0.5px solid #ffffff33; font-size: 7.5px;">INTERNAL</th>
+                            </tr>
+                            <tr style="background: #475569 !important; color: white !important; font-size: 6px;">
+                                <th style="width: 15%;">PARTICULAR</th><th>AMT</th>
+                                <th>PARTICULAR</th><th>AMT</th>
+                                <th>PARTICULAR</th><th>AMT</th>
+                                <th>PARTICULAR</th><th>AMT</th>
+                                <th>PARTICULAR</th><th>AMT</th>
+                                <th>PARTICULAR</th><th>AMT</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 7.5px;">
+                            ${(() => {
+                                const pRows = reportData.audit360Zones.find(z => z.key === 'PURCHASE')?.rows || [];
+                                const sRows = reportData.audit360Zones.find(z => z.key === 'SALE')?.rows || [];
+                                const aRows = reportData.audit360Zones.find(z => z.key === 'ADJUSTMENT')?.rows || [];
+                                const eRows = reportData.audit360Zones.find(z => z.key === 'EXPENSE')?.rows || [];
+                                const iRows = reportData.audit360Zones.find(z => z.key === 'INCOME')?.rows || [];
+                                const cRows = reportData.audit360Zones.find(z => z.key === 'INTERNAL')?.rows || [];
+                                
+                                const maxRows = Math.max(pRows.length, sRows.length, aRows.length, eRows.length, iRows.length, cRows.length);
+                                return Array.from({ length: maxRows }).map((_, i) => `
+                                    <tr>
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${pRows[i] ? escapeHtml(pRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #b45309;">${pRows[i] ? format(new Date(pRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace; font-weight: 900;">${pRows[i] ? Math.round(pRows[i].amount).toLocaleString() : ''}</td>
+                                        
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${sRows[i] ? escapeHtml(sRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #047857;">${sRows[i] ? format(new Date(sRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace;">${sRows[i] ? Math.round(sRows[i].amount).toLocaleString() : ''}</td>
+                                        
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${aRows[i] ? escapeHtml(aRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #9f1239;">${aRows[i] ? format(new Date(aRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace;">${aRows[i] ? Math.round(aRows[i].amount).toLocaleString() : ''}</td>
+                                        
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${eRows[i] ? escapeHtml(eRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #334155;">${eRows[i] ? format(new Date(eRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace;">${eRows[i] ? Math.round(eRows[i].amount).toLocaleString() : ''}</td>
+
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${iRows[i] ? escapeHtml(iRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #3730a3;">${iRows[i] ? format(new Date(iRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace;">${iRows[i] ? Math.round(iRows[i].amount).toLocaleString() : ''}</td>
+
+                                        <td style="border: 0.5px solid #e2e8f0; padding: 2px 5px;">
+                                            <div style="display: flex; justify-content: space-between; font-weight: 800; color: #000;">
+                                                <span>${cRows[i] ? escapeHtml(cRows[i].item) : '-'}</span>
+                                                <span style="font-size: 6px; color: #0891b2;">${cRows[i] ? format(new Date(cRows[i].date), 'dd/MM') : ''}</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; border: 0.5px solid #e2e8f0; font-family: monospace;">${cRows[i] ? Math.round(cRows[i].amount).toLocaleString() : ''}</td>
+                                    </tr>
+                                `).join('');
+                            })()}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Section B: Variety-Wise Procurement Audit</div>
+                    ${(() => {
+                        const filtered = globalData.suppliers.filter(s => {
+                            const ed = startOfDay(new Date(s.date));
+                            return ed >= startOfDay(startDate) && ed <= startOfDay(endDate);
+                        });
+                        const varietyGroups: Record<string, any[]> = {};
+                        filtered.forEach(s => {
+                            const v = normV(s.variety);
+                            if (!varietyGroups[v]) varietyGroups[v] = [];
+                            varietyGroups[v].push(s);
+                        });
+
+                        return Object.entries(varietyGroups).map(([vName, entries]) => {
+                            const dayBuckets: Record<string, any[]> = {};
+                            (entries as any[]).forEach(e => {
+                                const dStr = format(new Date(e.date), 'yyyy-MM-dd');
+                                if (!dayBuckets[dStr]) dayBuckets[dStr] = [];
+                                dayBuckets[dStr].push(e);
+                            });
+
+                            const rows = Object.entries(dayBuckets).map(([dDate, ents]) => {
+                                const m = (ents as any[]).reduce((acc: any, s: any) => ({
+                                    parchi: acc.parchi + 1,
+                                    gross: acc.gross + (Number(s.grossWeight) || 0),
+                                    tier: acc.tier + (Number(s.teirWeight) || 0),
+                                    baseWt: acc.baseWt + (Number(s.weight) || 0),
+                                    kartaWt: acc.kartaWt + (Number(s.kartaWeight) || 0),
+                                    finalWt: acc.finalWt + (Number(s.netWeight) || 0),
+                                    totalAmt: acc.totalAmt + (Number(s.amount) || 0),
+                                    kartaAmt: acc.kartaAmt + (Number(s.kartaAmount) || 0),
+                                    labAmt: acc.labAmt + (Number(s.labouryAmount) || 0),
+                                    kanAmt: acc.kanAmt + (Number(s.kanta) || 0),
+                                    original: acc.original + (Number(s.originalNetAmount) || 0),
+                                    balance: acc.balance + (Number(s.netAmount) || 0),
+                                    paid: acc.paid + (Number(s.originalNetAmount || 0) - Number(s.netAmount || 0)),
+                                    sumRate: acc.sumRate + (Number(s.rate) || 0),
+                                    sumKartaPct: acc.sumKartaPct + (Number(s.kartaPercentage) || 0)
+                                }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, balance:0, paid:0, sumRate:0, sumKartaPct:0 });
+                                
+                                return { date: format(new Date(dDate), 'dd MMM yyyy'), ...m, avgRate: m.totalAmt / m.baseWt || 0, avgKartaPct: m.sumKartaPct / (ents as any[]).length };
+                            });
+
+                            const vTotal = rows.reduce((a: any, b: any) => ({
+                                 parchi: a.parchi + b.parchi, gross: a.gross + b.gross, tier: a.tier + b.tier,
+                                 baseWt: a.baseWt + b.baseWt, kartaWt: a.kartaWt + b.kartaWt, finalWt: a.finalWt + b.finalWt,
+                                 totalAmt: a.totalAmt + b.totalAmt, kartaAmt: a.kartaAmt + b.kartaAmt,
+                                 labAmt: a.labAmt + b.labAmt, kanAmt: a.kanAmt + b.kanAmt,
+                                 original: a.original + b.original, paid: a.paid + b.paid, balance: a.balance + b.balance
+                            }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, paid:0, balance:0 });
+
+                            return `
+                            <div style="page-break-inside: auto;">
+                                <div class="v-header-label">
+                                    <span>VARIETY: ${vName.toUpperCase()} PROCUREMENT</span>
+                                    <span>TOTAL QNTL: ${vTotal.finalWt.toFixed(2)}</span>
+                                </div>
+                                <table class="v-ledger-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 12%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Timeline</th>
+                                            <th style="width: 10%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Gross/Tier</th>
+                                            <th style="width: 12%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Audit Cut</th>
+                                            <th style="width: 10%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Net Wt</th>
+                                            <th style="width: 14%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Rate/Value</th>
+                                            <th style="width: 14%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Krt/Lab/Kan</th>
+                                            <th style="width: 14%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Liab/Paid</th>
+                                            <th style="width: 14%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Payable</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${rows.map(r => `
+                                            <tr>
+                                                <td><div class="row-main">${r.date}</div><div class="row-sub">Parchi: ${r.parchi}</div></td>
+                                                <td><div class="row-main">${r.gross.toFixed(1)}</div><div class="row-sub">${r.tier.toFixed(1)}</div></td>
+                                                <td><div class="row-main">${r.baseWt.toFixed(1)}</div><div class="row-sub cut-label">-${r.kartaWt.toFixed(1)}</div></td>
+                                                <td><div class="row-main" style="font-size: 11px;">${r.finalWt.toFixed(2)}</div></td>
+                                                <td><div class="val-label">₹${Math.round(r.finalWt > 0 ? r.original / r.finalWt : 0)}/QTL</div><div class="row-sub">₹${Math.round(r.original).toLocaleString()}</div></td>
+                                                <td><div class="row-main">${r.avgKartaPct.toFixed(1)}% / ₹${Math.round(r.kartaAmt)}</div><div class="row-sub">L:${Math.round(r.labAmt)} | K:${Math.round(r.kanAmt)}</div></td>
+                                                <td><div class="row-main">₹${Math.round(r.original).toLocaleString()}</div><div class="row-sub">PD:₹${Math.round(r.paid).toLocaleString()}</div></td>
+                                                <td style="color: #0f172a; font-weight: 900; font-size: 11px; border-left: 1px solid #e2e8f0; text-align: right; padding-right: 6px;">₹${Math.round(r.balance).toLocaleString()}</td>
+                                            </tr>
+                                        `).join('')}
+                                        <tr class="total-row">
+                                            <td>TOTAL: ${vTotal.parchi} P</td>
+                                            <td>${vTotal.gross.toFixed(1)} / ${vTotal.tier.toFixed(1)}</td>
+                                            <td>${vTotal.baseWt.toFixed(1)} / -${vTotal.kartaWt.toFixed(1)}</td>
+                                            <td style="color: #cbd5e1; font-size: 11px;">${vTotal.finalWt.toFixed(2)}</td>
+                                            <td>₹${Math.round(vTotal.finalWt > 0 ? vTotal.original / vTotal.finalWt : 0)}/QTL</td>
+                                            <td>${Math.round(vTotal.labAmt + vTotal.kanAmt + vTotal.kartaAmt).toLocaleString()}</td>
+                                            <td>₹${Math.round(vTotal.original).toLocaleString()}</td>
+                                            <td style="background: #0f172a; color: white; font-weight: 900; font-size: 12px;">₹${Math.round(vTotal.balance).toLocaleString()}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>`;
+                        }).join('');
+                    })()}
+                </div>
 
                 <div class="section">
                     <div class="section-title">Section C: Daily Financial Distribution Ledger</div>
                     <table class="v-ledger-table">
                         <thead>
                             <tr>
-                                <th style="width: 12%;">Date</th>
-                                <th style="text-align: right;">Sup Cash</th>
-                                <th style="text-align: right;">Sup RTGS</th>
-                                <th style="text-align: right;">Gov Dist</th>
-                                <th style="text-align: right;">Tot Pay</th>
-                                <th style="text-align: right;">Expenses</th>
-                                <th style="text-align: right;">Income</th>
-                                <th style="text-align: right;">S/E Cash</th>
-                                <th style="text-align: right; background: #f1f5f9; color: #1e293b;">Net Total</th>
+                                <th style="width: 12%; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Date</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Sup Cash</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Sup RTGS</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Gov Dist</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; -webkit-print-color-adjust: exact; border: 0.5px solid #ffffff33;">Tot Pay</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -831,22 +1142,14 @@ export default function DailyBusinessReport() {
                                     <td style="text-align: right;">${d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
                                     <td style="text-align: right;">${d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
                                     <td style="text-align: right; font-weight: bold;">${d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
-                                    <td style="text-align: right; color: #dc2626; font-weight: bold;">${d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
-                                    <td style="text-align: right; color: #059669; font-weight: bold;">${d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
-                                    <td style="text-align: right; color: #7c3aed; font-weight: bold;">${d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
-                                    <td style="text-align: right; font-weight: 900; background: #f8fafc;">${d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                 </tr>
                             `).join('')}
-                            <tr class="total-row">
-                                <td colspan="1">OVERALL TOTAL</td>
-                                <td style="text-align: right;">${reportData.distribution.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.govDist.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.expenses.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.incomes.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right;">${reportData.distribution.seCash.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
-                                <td style="text-align: right; background: #a78bca; color: white; font-weight: 900;">${reportData.distribution.netTotalBalance.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</td>
+                            <tr class="total-row" style="background: #334155 !important; color: white !important;">
+                                <td style="color: white !important;">PERIOD TOTAL</td>
+                                <td style="text-align: right; color: white !important;">${reportData.distribution.supplierCash.toLocaleString('en-IN')}</td>
+                                <td style="text-align: right; color: white !important;">${reportData.distribution.supplierRtgs.toLocaleString('en-IN')}</td>
+                                <td style="text-align: right; color: white !important;">${reportData.distribution.govDist.toLocaleString('en-IN')}</td>
+                                <td style="text-align: right; background: #334155 !important; color: white !important; font-weight: 900; font-size: 11px; border: 1px solid #ffffff33; -webkit-print-color-adjust: exact;">${reportData.distribution.totalPayments.toLocaleString('en-IN')}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -857,8 +1160,8 @@ export default function DailyBusinessReport() {
                     <table class="v-ledger-table" style="table-layout: auto;">
                         <thead>
                             <tr>
-                                <th style="text-align: left;">Variety Name</th>
-                                <th style="text-align: right;">Available Stock (QTL)</th>
+                                <th style="text-align: left; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Variety Name</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Available Stock (QTL)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -877,11 +1180,11 @@ export default function DailyBusinessReport() {
                     <table class="v-ledger-table">
                         <thead>
                             <tr>
-                                <th style="width: 10%;">DATE</th>
-                                <th style="text-align: left; padding-left: 10px; width: 30%;">PARTICULAR</th>
-                                <th style="text-align: left; padding-left: 10px;">DETAILS / DESCRIPTION</th>
-                                <th style="text-align: right; padding-right: 15px; width: 100px;">DEBIT</th>
-                                <th style="text-align: right; padding-right: 15px; width: 100px;">CREDIT</th>
+                                <th style="width: 10%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">DATE</th>
+                                <th style="text-align: left; padding-left: 10px; width: 30%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">PARTICULAR</th>
+                                <th style="text-align: left; padding-left: 10px; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">DETAILS / DESCRIPTION</th>
+                                <th style="text-align: right; padding-right: 15px; width: 100px; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">DEBIT</th>
+                                <th style="text-align: right; padding-right: 15px; width: 100px; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">CREDIT</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -900,7 +1203,7 @@ export default function DailyBusinessReport() {
                                     </tr>
                                 `).join('')}
                                 <tr class="total-row">
-                                    <td colspan="3" style="text-align: left; padding-left: 15px;">OVERALL AUDIT TOTAL</td>
+                                    <td colspan="3" style="text-align: left; padding-left: 15px;">CONSOLIDATED AUDIT TOTALS</td>
                                     <td style="text-align: right; padding-right: 15px;">${reportData.audit360.reduce((s, r) => s + r.debit, 0).toLocaleString('en-IN')}</td>
                                     <td style="text-align: right; padding-right: 15px;">${reportData.audit360.reduce((s, r) => s + r.credit, 0).toLocaleString('en-IN')}</td>
                                 </tr>
@@ -908,16 +1211,16 @@ export default function DailyBusinessReport() {
                         </tbody>
                     </table>
                 </div>
-            </div>
+
 
                 <div class="section">
                     <div class="section-title">Section F: Audited Sales Recap</div>
                     <table class="v-ledger-table" style="table-layout: auto;">
                         <thead>
                             <tr>
-                                <th style="text-align: left;">Variety Name</th>
-                                <th style="text-align: right;">Qty Sold (QTL)</th>
-                                <th style="text-align: right;">Value (₹)</th>
+                                <th style="text-align: left; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Variety Name</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Qty Sold (QTL)</th>
+                                <th style="text-align: right; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Value (₹)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -929,9 +1232,9 @@ export default function DailyBusinessReport() {
                                 </tr>
                             `).join('')}
                             <tr class="total-row">
-                                <td style="text-align: left;">TOTAL SALES SUMMARY</td>
+                                <td style="text-align: left;">NET SALES SUMMARY</td>
                                 <td style="text-align: right;">${reportData.sales.reduce((s, v) => s + v.totalQty, 0).toFixed(2)}</td>
-                                <td style="text-align: right;">${formatCurrency(reportData.sales.reduce((s, v) => s + v.totalValue, 0))}</td>
+                                <td style="text-align: right; background: #334155 !important; color: white !important; font-weight: 900; font-size: 11px; border: 1px solid #ffffff33;">${formatCurrency(reportData.sales.reduce((s, v) => s + v.totalValue, 0))}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -960,13 +1263,13 @@ export default function DailyBusinessReport() {
                     <table class="v-ledger-table" style="table-layout: auto;">
                         <thead>
                             <tr>
-                                <th style="text-align: left; width: 8%;">Date</th>
-                                <th style="text-align: left; width: 10%;">Type</th>
-                                <th style="text-align: left; width: 38%;">Particulars</th>
-                                <th style="text-align: left; width: 10%;">Ref ID</th>
-                                <th style="text-align: right; width: 12%;">Debit (−)</th>
-                                <th style="text-align: right; width: 12%;">Credit (+)</th>
-                                <th style="text-align: right; width: 10%; background: #a78bca; color: white;">Balance</th>
+                                <th style="text-align: left; width: 8%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Date</th>
+                                <th style="text-align: left; width: 10%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Type</th>
+                                <th style="text-align: left; width: 38%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Particulars</th>
+                                <th style="text-align: left; width: 10%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Ref ID</th>
+                                <th style="text-align: right; width: 12%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Debit (DR)</th>
+                                <th style="text-align: right; width: 12%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Credit (CR)</th>
+                                <th style="text-align: right; width: 10%; background: #334155 !important; color: white !important; border: 0.5px solid #ffffff33; -webkit-print-color-adjust: exact;">Balance</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -975,19 +1278,19 @@ export default function DailyBusinessReport() {
                                 return reportData.consolidatedLedger.map((t: any) => {
                                     runningBal += (t.credit - t.debit);
                                     const typeColors: Record<string, {bg: string, color: string}> = {
-                                        'Purchase':         { bg: '#fee2e2', color: '#dc2626' },
-                                        'Labour':           { bg: '#dcfce7', color: '#16a34a' },
-                                        'Kanta':            { bg: '#dcfce7', color: '#16a34a' },
-                                        'Expense':          { bg: '#fee2e2', color: '#dc2626' },
-                                        'Supplier Payment': { bg: '#fce7f3', color: '#be185d' },
-                                        'Transfer Out':     { bg: '#ffedd5', color: '#c2410c' },
-                                        'Transfer In':      { bg: '#ccfbf1', color: '#0f766e' },
-                                        'Loan':             { bg: '#e0e7ff', color: '#4338ca' },
-                                        'Sale':             { bg: '#dcfce7', color: '#16a34a' },
-                                        'Customer Receipt': { bg: '#dcfce7', color: '#16a34a' },
-                                        'Income':           { bg: '#d1fae5', color: '#065f46' },
-                                        'P ADJUSTMENT':     { bg: '#e0f2fe', color: '#0369a1' },
-                                        'Liquid':           { bg: '#f3f4f6', color: '#374151' },
+                                        'Purchase':         { bg: '#fee2e2', color: '#b91c1c' },
+                                        'Labour':           { bg: '#f0fdf4', color: '#15803d' },
+                                        'Kanta':            { bg: '#f0fdf4', color: '#15803d' },
+                                        'Expense':          { bg: '#fef2f2', color: '#991b1b' },
+                                        'Supplier Payment': { bg: '#fff1f2', color: '#be123c' },
+                                        'Transfer Out':     { bg: '#fff7ed', color: '#9a3412' },
+                                        'Transfer In':      { bg: '#f0fdfa', color: '#0f766e' },
+                                        'Loan':             { bg: '#eef2ff', color: '#3730a3' },
+                                        'Sale':             { bg: '#f0fdf4', color: '#14532d' },
+                                        'Customer Receipt': { bg: '#f0fdf4', color: '#15803d' },
+                                        'Income':           { bg: '#ecfdf5', color: '#064e3b' },
+                                        'P ADJUSTMENT':     { bg: '#f0f9ff', color: '#075985' },
+                                        'Liquid':           { bg: '#f8fafc', color: '#1e293b' },
                                     };
                                     const tc = typeColors[t.type] || { bg: '#f1f5f9', color: '#64748b' };
                                     const debitAmt = t.debit;
@@ -1002,9 +1305,9 @@ export default function DailyBusinessReport() {
                                             </td>
                                             <td style="text-align: left; color: #334155;">${escapeHtml(t.particulars)}</td>
                                             <td style="text-align: left; font-family: monospace; color: #94a3b8; font-size: 8px;">${escapeHtml(t.id)}</td>
-                                            <td style="text-align: right; color: #dc2626; font-weight: 700;">${debitAmt > 0 ? debitAmt.toLocaleString('en-IN', { minimumFractionDigits: 0 }) : '-'}</td>
-                                            <td style="text-align: right; color: #16a34a; font-weight: 700;">${creditAmt > 0 ? creditAmt.toLocaleString('en-IN', { minimumFractionDigits: 0 }) : '-'}</td>
-                                            <td style="text-align: right; font-weight: 900; color: ${runningBal >= 0 ? '#5c3e7b' : '#dc2626'};">${Math.round(runningBal).toLocaleString('en-IN')}</td>
+                                            <td style="text-align: right; color: #b91c1c; font-weight: 700;">${debitAmt > 0 ? debitAmt.toLocaleString('en-IN', { minimumFractionDigits: 0 }) : '-'}</td>
+                                            <td style="text-align: right; color: #15803d; font-weight: 700;">${creditAmt > 0 ? creditAmt.toLocaleString('en-IN', { minimumFractionDigits: 0 }) : '-'}</td>
+                                            <td style="text-align: right; font-weight: 900; background: #f8fafc; color: ${runningBal >= 0 ? '#1a365d' : '#b91c1c'}; font-size: 10px;">${Math.round(runningBal).toLocaleString('en-IN')}</td>
                                         </tr>
                                     `;
                                 }).join('');
@@ -1066,84 +1369,132 @@ export default function DailyBusinessReport() {
                 </div>
             </div>
 
-            {/* Section A: Liquidity Audit Ledger (Detailed Breakdown) */}
-            <Card className="border-none shadow-md bg-white overflow-hidden p-0">
-                <CardHeader className="bg-[#5c3e7b] border-b py-3 text-white">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest leading-none flex items-center gap-2">
-                        <Wallet size={14} className="text-purple-200" /> Section A: Liquidity & Bank Assets Audit Ledger
+            <Card 
+                style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as any}
+                className="border-none shadow-md bg-white overflow-hidden p-0 print:shadow-none print:border print:border-slate-300"
+            >
+                <CardHeader className="bg-[#5c3e7b] py-4 print:bg-[#5c3e7b] !important">
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.15em] leading-none flex items-center gap-2 text-white print:text-white">
+                        <Wallet size={16} className="text-purple-200" /> Section A: Liquidity & Bank Assets Audit Ledger
                     </CardTitle>
-                    <CardDescription className="text-[10px] text-purple-200 uppercase tracking-tighter mt-1 font-medium">
+                    <CardDescription className="text-[10px] text-purple-200/80 uppercase tracking-widest mt-1.5 font-bold italic print:text-purple-300">
                         DAILY AUDIT: OPENING | IN(+) | OUT(-) | CLOSING
                     </CardDescription>
                 </CardHeader>
-                <div className="overflow-auto max-h-[500px]">
-                    <Table className="border-collapse">
-                        <TableHeader className="sticky top-0 z-20 shadow-md">
-                            <TableRow className="hover:bg-transparent border-none bg-slate-100 border-b-2 border-slate-300">
-                                <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-center px-3 border-r border-slate-200 min-w-[75px]">Date</TableHead>
-                                <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-center px-2 border-r border-slate-200 min-w-[155px]">Cash in Hand</TableHead>
-                                <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-center px-2 border-r border-slate-200 min-w-[155px]">Cash at Home</TableHead>
-                                {globalData.bankAccounts.map(acc => (
-                                    <TableHead key={acc.id} className="text-[11px] font-black h-11 text-slate-800 uppercase text-center px-2 border-r border-slate-200 min-w-[155px]">
-                                        <div className="truncate w-full">{acc.bankName}</div>
-                                        <div className="text-[9px] text-slate-400 font-medium tracking-tight">...{acc.accountNumber.slice(-4)}</div>
+                <div className="overflow-x-auto border-x border-b border-slate-200 relative no-scrollbar bg-white print:overflow-visible print:border-none">
+                    <Table className="border-collapse border-slate-200 print:border-slate-300">
+                        <TableHeader className="bg-[#5c3e7b] print:bg-[#5c3e7b] !important">
+                            <TableRow className="hover:bg-transparent border-none h-14">
+                                <TableHead className="w-[85px] text-center font-bold text-white font-jakarta uppercase tracking-tighter text-[11px] sticky left-0 z-50 bg-[#5c3e7b] border-r border-white/10 shadow-[2px_0_0_0_#5c3e7b] print:relative print:left-0 print:z-0 print:bg-[#5c3e7b] !important print:text-white print:border-r-2 print:border-white/20">
+                                    DATE
+                                </TableHead>
+                                
+                                {/* Asset Headings */}
+                                {['Cash Hand', 'Cash Home', ...globalData.bankAccounts.map(a => a.bankName)].map((name, idx) => (
+                                    <TableHead 
+                                        key={idx} 
+                                        colSpan={2} 
+                                        className="text-center font-extrabold text-white font-jakarta uppercase tracking-[0.1em] text-[11px] p-0 border-r border-white/10 bg-[#5c3e7b] last:border-r-0 print:bg-[#5c3e7b] !important print:text-white print:border-r-2 print:border-white/20"
+                                    >
+                                        <div className="py-2 border-b border-white/10 opacity-95">{name}</div>
+                                        <div className="flex justify-between px-3 py-1.5 text-[8px] font-black text-purple-100 tracking-[0.2em] bg-[#5c3e7b]/50 print:bg-[#5c3e7b]/50">
+                                            <span>OP / IN (+)</span>
+                                            <span className="text-white/30 text-[10px]">|</span>
+                                            <span>CL / OUT (-)</span>
+                                        </div>
                                     </TableHead>
                                 ))}
-                                <TableHead className="text-[11px] font-black h-11 text-white bg-[#5c3e7b] uppercase text-center px-2 min-w-[120px] border-l border-purple-200">Net Position</TableHead>
+                                
+                                <TableHead className="text-right px-6 font-black text-white font-jakarta uppercase tracking-[0.15em] text-[11px] sticky right-0 z-50 bg-[#5c3e7b] border-l border-white/20 shadow-[-2px_0_0_0_#5c3e7b] print:relative print:right-0 print:z-0 print:bg-[#5c3e7b] !important print:text-white print:border-l-2 print:border-white/20">
+                                    <div className="leading-tight">GRAND TOTAL</div>
+                                    <div className="text-[8px] text-purple-300 mt-1 tracking-widest font-bold font-jakarta">DAILY AUDIT</div>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
-                        <TableBody>
-                            {reportData.dayWiseLiquidity.map((d, i) => (
-                                <TableRow key={i} className="hover:bg-white transition-colors border-b border-slate-100">
-                                    <TableCell className="font-bold text-slate-700 py-2.5 text-[10px] whitespace-nowrap text-center border-r">{d.date}</TableCell>
-                                    
-                                    {/* Helper to render Audit Cell */}
-                                    {['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map(a => a.id)].map(id => {
-                                        const m = d.metrics[id] || { opening: 0, closing: 0, income: 0, expense: 0 };
-                                        return (
-                                            <TableCell key={id} className="py-1 px-1.5 align-middle border-r border-slate-200">
-                                                <div className="flex flex-col rounded-sm overflow-hidden ring-1 ring-slate-200 bg-white">
-                                                    {/* Top bar: Opening */}
-                                                    <div className="flex justify-between items-center bg-white py-[3px] px-2 border-b border-slate-100">
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Opening</span>
-                                                        <span className="text-[12px] font-black text-slate-700">{Math.round(m.opening).toLocaleString('en-IN')}</span>
-                                                    </div>
-                                                    
-                                                    {/* Middle: Flow */}
-                                                    <div className="grid grid-cols-2">
-                                                        <div className="text-center py-1 bg-white border-r border-slate-100 flex flex-col justify-center items-center">
-                                                            <span className="text-[12px] font-black text-emerald-600 tracking-tighter">{m.income > 0 ? `+${Math.round(m.income).toLocaleString('en-IN')}` : '-'}</span>
-                                                        </div>
-                                                        <div className="text-center py-1 bg-white flex flex-col justify-center items-center">
-                                                            <span className="text-[12px] font-black text-red-600 tracking-tighter">{m.expense > 0 ? `-${Math.round(m.expense).toLocaleString('en-IN')}` : '-'}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Bottom bar: Closing */}
-                                                    <div className="flex justify-between items-center bg-white py-[3px] px-2 border-t border-slate-100">
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Closing</span>
-                                                        <span className="text-[12.5px] font-black text-[#5c3e7b]">{Math.round(m.closing).toLocaleString('en-IN')}</span>
-                                                    </div>
-                                                </div>
+                        <TableBody className="[&_tr:nth-child(odd)]:bg-transparent">
+                            {reportData.dayWiseLiquidity.map((d, i) => {
+                                const isAlternateBlock = i % 2 !== 0;
+                                const blockBg = isAlternateBlock ? '#f8f9fa' : '#ffffff';
+                                const printBg = isAlternateBlock ? 'print:bg-[#f8f9fa] !important' : 'print:bg-white !important';
+                                const lightLine = '1px solid #e2e8f0'; // Subtle Slate-200
+                                
+                                return (
+                                    <Fragment key={i}>
+                                        {/* BALANCE ROW */}
+                                        <TableRow style={{ backgroundColor: blockBg }} className={`h-10 transition-none font-jakarta hover:bg-slate-100/50 ${printBg}`}>
+                                            <TableCell 
+                                                rowSpan={2} 
+                                                style={{ 
+                                                    backgroundColor: blockBg,
+                                                    borderRight: lightLine
+                                                }}
+                                                className={`font-bold text-slate-900 py-1 text-[12px] text-center sticky left-0 z-20 ${printBg} print:relative print:left-0 print:z-0 print:text-slate-950 print:font-bold print:border-r-2 print:border-slate-300`}
+                                            >
+                                                {d.date}
                                             </TableCell>
-                                        );
-                                    })}
+                                            
+                                            {['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map(a => a.id)].map((id) => {
+                                                const m = d.metrics[id] || { opening: 0, closing: 0 };
+                                                return (
+                                                    <Fragment key={`${id}-oc`}>
+                                                        <TableCell 
+                                                            style={{ backgroundColor: 'transparent', borderRight: 'none' }} 
+                                                            className={`font-code text-[11px] text-slate-400 px-3 text-right ${printBg} print:text-slate-500`}
+                                                        >
+                                                            {Math.round(m.opening).toLocaleString('en-IN')}
+                                                        </TableCell>
+                                                        <TableCell 
+                                                            style={{ backgroundColor: 'transparent', borderRight: lightLine }} 
+                                                            className={`font-code text-[11px] text-slate-900 font-bold px-3 text-right ${printBg} print:text-slate-950 print:font-black print:border-r-2 print:border-slate-200`}
+                                                        >
+                                                            {Math.round(m.closing || 0).toLocaleString('en-IN')}
+                                                        </TableCell>
+                                                    </Fragment>
+                                                );
+                                            })}
 
-                                    {/* Net Total Cell */}
-                                    <TableCell className="align-middle px-1.5 py-1 border-l border-slate-200">
-                                        <div className="flex flex-col rounded-sm overflow-hidden bg-[#5c3e7b] text-white shadow-sm h-full w-full mx-auto">
-                                            <div className="py-2 px-2 text-center flex flex-col justify-center h-full min-h-[44px]">
-                                                <span className="text-[9px] text-purple-200 font-black uppercase tracking-widest mb-[2px]">Net Position</span>
-                                                <span className="text-[14px] font-black tracking-tight">{Math.round(d.totalClosing).toLocaleString('en-IN')}</span>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                            <TableCell 
+                                                rowSpan={2} 
+                                                style={{ 
+                                                    backgroundColor: blockBg,
+                                                    borderLeft: lightLine
+                                                }}
+                                                className={`px-4 py-0 font-black text-slate-900 font-code text-[13px] text-right sticky right-0 z-20 ${printBg} print:relative print:right-0 print:z-0 print:text-slate-950 print:font-black print:border-l-2 print:border-slate-300`}
+                                            >
+                                                <div className="text-[12px]">{Math.round(d.totalClosing).toLocaleString('en-IN')}</div>
+                                                <div className="text-[9px] text-emerald-600 font-bold font-jakarta print:text-emerald-800 print:font-black">Net: {(Math.round((d.totalIn || 0) - (d.totalOut || 0))).toLocaleString('en-IN')}</div>
+                                            </TableCell>
+                                        </TableRow>
+
+                                        {/* FLOW ROW */}
+                                        <TableRow style={{ backgroundColor: blockBg }} className={`h-9 transition-none font-jakarta hover:bg-slate-100/50 ${printBg}`}>
+                                            {['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map(a => a.id)].map((id) => {
+                                                const m = d.metrics[id] || { income: 0, expense: 0 };
+                                                return (
+                                                    <Fragment key={`${id}-ie`}>
+                                                        <TableCell 
+                                                            style={{ backgroundColor: 'transparent', borderRight: 'none' }} 
+                                                            className={`font-jakarta text-[11px] text-emerald-700 font-bold px-3 text-right ${printBg} print:text-emerald-800 print:font-black`}
+                                                        >
+                                                            {m.income > 0 ? '+' + Math.round(m.income).toLocaleString('en-IN') : '–'}
+                                                        </TableCell>
+                                                        <TableCell 
+                                                            style={{ backgroundColor: 'transparent', borderRight: lightLine }} 
+                                                            className={`font-jakarta text-[11px] text-red-700 font-bold px-3 text-right ${printBg} print:text-red-800 print:font-black print:border-r-2 print:border-slate-200`}
+                                                        >
+                                                            {m.expense > 0 ? '–' + Math.round(m.expense).toLocaleString('en-IN') : '–'}
+                                                        </TableCell>
+                                                    </Fragment>
+                                                );
+                                            })}
+                                        </TableRow>
+                                    </Fragment>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>
-                <div className="bg-[#5c3e7b] text-white p-3 flex justify-between items-center">
+                <div className="bg-[#5c3e7b] text-white p-3 flex justify-between items-center font-jakarta">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-purple-200">Final Consolidated Assets</span>
                     <div className="flex items-center gap-4">
                         <div className="flex flex-col items-end">
@@ -1153,7 +1504,7 @@ export default function DailyBusinessReport() {
                         <div className="h-8 w-[1px] bg-purple-400/30 mx-2" />
                         <div className="flex flex-col items-end">
                             <span className="text-[8px] text-purple-200 uppercase font-black tracking-widest">Grand Total Value</span>
-                            <span className="text-2xl font-black font-mono text-white">₹{Math.round(reportData.liquid.total).toLocaleString('en-IN')}</span>
+                            <span className="text-2xl font-black text-white">₹{Math.round(reportData.liquid.total).toLocaleString('en-IN')}</span>
                         </div>
                     </div>
                 </div>
@@ -1172,7 +1523,7 @@ export default function DailyBusinessReport() {
                         </div>
                     </CardHeader>
                     <div className="overflow-auto max-h-[400px]">
-                        <Table>
+                        <Table className="font-jakarta">
                             <TableHeader className="sticky top-0 z-20 shadow-md">
                                 <TableRow className="hover:bg-transparent border-none bg-slate-100 border-b-2 border-slate-300">
                                     <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-center px-3 border-r border-slate-200 min-w-[75px]">Date</TableHead>
@@ -1180,36 +1531,36 @@ export default function DailyBusinessReport() {
                                     <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Supplier RTGS</TableHead>
                                     <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Gov Dist.</TableHead>
                                     <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200 bg-slate-200/50">Total Payments</TableHead>
-                                    <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200">Expenses</TableHead>
-                                    <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200">Income</TableHead>
-                                    <TableHead className="text-[11px] font-black h-11 text-purple-700 uppercase text-right px-3 border-r border-slate-200">S/E Cash</TableHead>
-                                    <TableHead className="text-[11px] font-black h-11 text-white bg-[#5c3e7b] uppercase text-right px-4">Net Total</TableHead>
+                                    <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200 print:hidden">Expenses</TableHead>
+                                    <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200 print:hidden">Income</TableHead>
+                                    <TableHead className="text-[11px] font-black h-11 text-purple-700 uppercase text-right px-3 border-r border-slate-200 print:hidden">S/E Cash</TableHead>
+                                    <TableHead className="text-[11px] font-black h-11 text-white bg-[#5c3e7b] uppercase text-right px-4 print:hidden">Net Total</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {reportData.dayWise.map((d, i) => (
                                     <TableRow key={i} className="hover:bg-white border-b border-slate-100 transition-colors">
-                                        <TableCell className="font-bold text-slate-700 py-3 text-[11px] whitespace-nowrap text-center border-r border-slate-100">{d.date}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono font-bold text-slate-900 border-r border-slate-100">{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono font-bold text-red-600 border-r border-slate-100">{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono font-bold text-emerald-600 border-r border-slate-100">{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[11px] font-mono font-bold text-purple-700 border-r border-slate-100">{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                        <TableCell className="text-right py-3 text-[12px] font-mono font-black text-slate-900">{d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                                        <TableCell className="font-bold text-slate-700 py-3 text-[11px] whitespace-nowrap text-center border-r border-slate-100 font-jakarta">{d.date}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-code text-slate-600 border-r border-slate-100">{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-code text-slate-600 border-r border-slate-100">{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-code text-slate-600 border-r border-slate-100">{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-code font-bold text-slate-900 border-r border-slate-100">{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-jakarta font-bold text-red-600 border-r border-slate-100 print:hidden">{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-jakarta font-bold text-emerald-600 border-r border-slate-100 print:hidden">{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[11px] font-jakarta font-bold text-purple-700 border-r border-slate-100 print:hidden">{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                        <TableCell className="text-right py-3 text-[12px] font-code font-black text-slate-900 print:hidden">{d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                                     </TableRow>
                                 ))}
                                     <TableRow className="bg-[#5c3e7b] text-white hover:bg-purple-800 font-bold border-t-2 border-white/20">
                                         <TableCell className="font-black uppercase py-4 text-center text-[11px] px-3">Total Period Distribution</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono font-black text-[12px] border-x border-white/10 px-3">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] text-red-200 px-3">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] text-emerald-200 px-3">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono text-[11px] text-purple-200 px-3">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
-                                        <TableCell className="text-right py-4 font-mono font-black text-[13px] bg-purple-900 border-l border-white/20 px-4">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code font-black text-[12px] border-x border-white/10 px-3">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] text-red-200 px-3 print:hidden">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] text-emerald-200 px-3 print:hidden">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code text-[11px] text-purple-200 px-3 print:hidden">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
+                                        <TableCell className="text-right py-4 font-code font-black text-[13px] bg-purple-900 border-l border-white/20 px-4 print:hidden">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -1224,7 +1575,7 @@ export default function DailyBusinessReport() {
                         </CardTitle>
                         <CardDescription className="text-[10px] text-purple-200">Real-time balance based on total history (Purchased - Sold)</CardDescription>
                     </CardHeader>
-                    <Table>
+                    <Table className="font-jakarta">
                         <TableHeader>
                             <TableRow className="bg-slate-100 border-b-2 border-slate-300">
                                 <TableHead className="py-3 px-4 text-[11px] text-slate-800 font-black uppercase">Variety Name</TableHead>
@@ -1238,7 +1589,7 @@ export default function DailyBusinessReport() {
                                 reportData.varietyStock.map((v, i) => (
                                     <TableRow key={i} className="hover:bg-white group border-b border-slate-100">
                                         <TableCell className="font-bold text-slate-900 py-3 px-4 uppercase text-[11px]">{v.variety}</TableCell>
-                                        <TableCell className={`text-right py-3 px-4 font-mono font-bold text-[11px] ${v.qty < 0 ? 'text-red-500' : 'text-slate-700'}`}>
+                                        <TableCell className={`text-right py-3 px-4 font-code font-bold text-[11px] ${v.qty < 0 ? 'text-red-500' : 'text-slate-700'}`}>
                                             {v.qty.toFixed(2)}
                                         </TableCell>
                                     </TableRow>
@@ -1258,7 +1609,7 @@ export default function DailyBusinessReport() {
                     <CardDescription className="text-[10px] mt-1 text-purple-200 uppercase tracking-tighter font-medium">Chronological Business Ledger for the selected period</CardDescription>
                 </CardHeader>
                 <div className="overflow-auto max-h-[500px]">
-                    <Table>
+                    <Table className="font-jakarta">
                         <TableHeader className="sticky top-0 z-20 shadow-md">
                             <TableRow className="hover:bg-transparent border-none bg-slate-100 border-b-2 border-slate-300">
                                 <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase px-4 border-r border-slate-200 min-w-[80px]">Date</TableHead>
@@ -1314,275 +1665,220 @@ export default function DailyBusinessReport() {
                 </div>
             </Card>
 
-            <div className="grid grid-cols-1 gap-8">
-                {/* Section B: Variety-Wise Grouped Tables (Procurement Audit) */}
-                {(() => {
-                    const varietyGroups: Record<string, any[]> = {};
-                    const filtered = globalData.suppliers.filter(s => {
-                        const ed = startOfDay(new Date(s.date));
-                        return ed >= startOfDay(startDate) && ed <= startOfDay(endDate);
-                    });
-                    
-                    filtered.forEach(s => {
-                        const v = (s.variety || 'OTHERS').trim().toUpperCase();
-                        if (!varietyGroups[v]) varietyGroups[v] = [];
-                        varietyGroups[v].push(s);
-                    });
+            {/* Section Z: Master Forensic Summary Dashboard */}
+            {(() => {
+                const pZone = reportData.audit360Zones.find(z => z.key === 'PURCHASE');
+                const pRows = pZone?.rows || [];
+                const sZone = reportData.audit360Zones.find(z => z.key === 'SALE');
+                const adjZone = reportData.audit360Zones.find(z => z.key === 'ADJUSTMENT');
+                const expZone = reportData.audit360Zones.find(z => z.key === 'EXPENSE');
+                const incZone = reportData.audit360Zones.find(z => z.key === 'INCOME');
+                
+                const totals = {
+                    labour: pRows.reduce((s, r) => s + (r.laboury || 0), 0),
+                    kanta: pRows.reduce((s, r) => s + (r.kanta || 0), 0),
+                    karta: pRows.reduce((s, r) => s + (r.kartaAmt || 0), 0),
+                    expenses: expZone?.total || 0,
+                    incomes: incZone?.total || 0
+                };
 
-                    return Object.entries(varietyGroups).map(([vName, entries], idx) => {
-                        const dayBuckets: Record<string, any[]> = {};
-                        (entries as any[]).forEach(e => {
-                            const dStr = format(new Date(e.date), 'yyyy-MM-dd');
-                            if (!dayBuckets[dStr]) dayBuckets[dStr] = [];
-                            dayBuckets[dStr].push(e);
-                        });
-
-                        const dayRows = Object.entries(dayBuckets).map(([dDate, ents]) => {
-                            const m = (ents as any[]).reduce((acc: any, s: any) => ({
-                                parchi: acc.parchi + 1,
-                                gross: acc.gross + (Number(s.grossWeight) || 0),
-                                tier: acc.tier + (Number(s.teirWeight) || 0),
-                                baseWt: acc.baseWt + (Number(s.weight) || 0),
-                                kartaWt: acc.kartaWt + (Number(s.kartaWeight) || 0),
-                                finalWt: acc.finalWt + (Number(s.netWeight) || 0),
-                                totalAmt: acc.totalAmt + (Number(s.amount) || 0),
-                                kartaAmt: acc.kartaAmt + (Number(s.kartaAmount) || 0),
-                                labAmt: acc.labAmt + (Number(s.labouryAmount) || 0),
-                                kanAmt: acc.kanAmt + (Number(s.kanta) || 0),
-                                original: acc.original + (Number(s.originalNetAmount) || 0),
-                                balance: acc.balance + (Number(s.netAmount) || 0),
-                                paid: acc.paid + (Number(s.originalNetAmount || 0) - Number(s.netAmount || 0)),
-                                sumRate: acc.sumRate + (Number(s.rate) || 0),
-                                sumKartaPct: acc.sumKartaPct + (Number(s.kartaPercentage) || 0)
-                            }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, balance:0, paid:0, sumRate:0, sumKartaPct:0 });
-                            
-                            return { date: format(new Date(dDate), 'dd MMM yyyy'), dDate, ...m, avgRate: m.totalAmt / m.baseWt || 0, avgKartaPct: m.sumKartaPct / (ents as any[]).length };
-                        }).sort((a, b) => new Date(b.dDate).getTime() - new Date(a.dDate).getTime());
-
-                        const vTotal = dayRows.reduce((a: any, b: any) => ({
-                             parchi: a.parchi + b.parchi, gross: a.gross + b.gross, tier: a.tier + b.tier,
-                             baseWt: a.baseWt + b.baseWt, kartaWt: a.kartaWt + b.kartaWt, finalWt: a.finalWt + b.finalWt,
-                             totalAmt: a.totalAmt + b.totalAmt, kartaAmt: a.kartaAmt + b.kartaAmt,
-                             labAmt: a.labAmt + b.labAmt, kanAmt: a.kanAmt + b.kanAmt,
-                             original: a.original + b.original, paid: a.paid + b.paid, balance: a.balance + b.balance
-                        }), { parchi:0, gross:0, tier:0, baseWt:0, kartaWt:0, finalWt:0, totalAmt:0, kartaAmt:0, labAmt:0, kanAmt:0, original:0, paid:0, balance:0 });
-
-                        return (
-                            <Card key={idx} className="shadow-xl border-none bg-white overflow-hidden ring-1 ring-slate-200">
-                                <CardHeader className="bg-[#5c3e7b] border-b py-4 text-white shadow-lg flex flex-row items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-2 w-2 rounded-full bg-purple-300 animate-pulse"></div>
-                                        <CardTitle className="text-[12px] font-black uppercase tracking-[0.2em] leading-none">
-                                            VARIETY: {vName} (Audit Procurement Feed)
-                                        </CardTitle>
-                                    </div>
-                                    <div className="text-[10px] font-bold px-4 py-1.5 rounded-xl bg-white/10 uppercase tracking-widest border border-white/20 backdrop-blur-sm">
-                                        Payload Volume: {vTotal.finalWt.toFixed(2)} QTL
-                                    </div>
-                                </CardHeader>
-                                <div className="overflow-auto border-x bg-slate-50/10 scrollbar-thin scrollbar-thumb-slate-200">
-                                    <Table className="relative w-full border-collapse">
-                                        <TableHeader className="bg-slate-100 border-b-2 border-slate-300 sticky top-0 z-10">
-                                            <TableRow className="hover:bg-transparent border-none">
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">DATE / PARCHI</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">GROSS / TIER</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">AUDIT (NET/KRTA)</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">FINAL WEIGHT</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-blue-900 text-center uppercase tracking-tighter">RATE / VALUE</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-orange-900 text-center uppercase tracking-tighter">EXPENSES (KRT/LB/KN)</TableHead>
-                                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">LIAB / PAID</TableHead>
-                                                <TableHead className="text-[11px] font-black h-12 text-center text-white bg-[#5c3e7b]">BALANCE DUE</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody className="bg-white text-[10px]">
-                                            {dayRows.map((r, i) => (
-                                                <TableRow key={i} className="hover:bg-blue-50/30 transition-colors border-b border-slate-100 group">
-                                                    <TableCell className="border-r border-slate-200 py-1.5 px-3 text-center bg-slate-50/50">
-                                                        <div className="font-bold text-slate-700 uppercase leading-tight">{r.date}</div>
-                                                        <div className="text-[9px] text-slate-400 font-bold mt-0.5">PARCHI: {r.parchi}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-200 py-1.5 px-2">
-                                                        <div className="text-slate-900 font-semibold">{r.gross.toFixed(2)}</div>
-                                                        <div className="text-slate-400 text-[9px] mt-0.5">TIER: {r.tier.toFixed(2)}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-100 py-1.5 px-2 bg-slate-50/20">
-                                                        <div className="text-slate-600 font-medium">{r.baseWt.toFixed(2)}</div>
-                                                        <div className="text-red-500 font-bold text-[9px] mt-0.5">CUT: -{r.kartaWt.toFixed(2)}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-100 py-1.5 px-2">
-                                                        <div className="text-slate-950 font-black text-xs">{r.finalWt.toFixed(2)}</div>
-                                                        <div className="text-slate-400 text-[8px] uppercase tracking-tighter">NET PAYLOAD</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-100 py-1.5 px-2 font-mono">
-                                                        <div className="text-blue-800 font-bold">{formatCurrency(r.avgRate)}</div>
-                                                        <div className="text-blue-900 text-[9px] mt-0.5">{formatCurrency(r.totalAmt)}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-100 py-1.5 px-2">
-                                                        <div className="text-orange-600 font-bold">{r.avgKartaPct.toFixed(1)}% / {formatCurrency(r.kartaAmt)}</div>
-                                                        <div className="text-slate-500 text-[9px] mt-0.5">L:{Math.round(r.labAmt)} | K:{Math.round(r.kanAmt)}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center border-r border-slate-100 py-1.5 px-3 bg-blue-900/5">
-                                                        <div className="text-slate-900 font-black">{formatCurrency(r.original)}</div>
-                                                        <div className="text-emerald-700 font-bold text-[9px] mt-0.5">PAID: {formatCurrency(r.paid)}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right py-1.5 px-4 font-black text-white bg-[#5c3e7b] shadow-lg text-[13px] border-l border-purple-200">
-                                                        {formatCurrency(r.balance)}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            <TableRow className="!bg-purple-900 text-white font-bold hover:!bg-purple-900 border-t-2 border-purple-800">
-                                                <TableCell className="py-3 text-center border-b-0">
-                                                    <div className="text-[9px] tracking-widest text-purple-200">CONSOLIDATED TOTAL</div>
-                                                    <div className="text-[10px] text-white">{vTotal.parchi} PARCHI</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div>{vTotal.gross.toFixed(1)}</div>
-                                                    <div className="text-[9px] text-purple-200">T: {vTotal.tier.toFixed(1)}</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div>{vTotal.baseWt.toFixed(1)}</div>
-                                                    <div className="text-[9px] text-red-200">-{vTotal.kartaWt.toFixed(1)}</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div className="text-xs text-blue-200">{vTotal.finalWt.toFixed(2)}</div>
-                                                    <div className="text-[8px] uppercase text-blue-200/50">TOTAL QNTL</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div className="font-black text-[10px]">₹{Math.round(vTotal.totalAmt / vTotal.baseWt || 0)}</div>
-                                                    <div className="text-[9px] text-blue-200 font-bold">{formatCurrency(vTotal.totalAmt).replace('₹','')}</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div className="font-bold text-[10px]">{formatCurrency(vTotal.kartaAmt).replace('₹','')}</div>
-                                                    <div className="text-[9px] text-orange-200 font-bold">L:{Math.round(vTotal.labAmt)} | K:{Math.round(vTotal.kanAmt)}</div>
-                                                </TableCell>
-                                                <TableCell className="text-center border-r border-white/10 border-b-0 text-white">
-                                                    <div className="font-bold text-[10px]">{formatCurrency(vTotal.original).replace('₹','')}</div>
-                                                    <div className="text-[9px] text-emerald-300 font-bold">{formatCurrency(vTotal.paid).replace('₹','')}</div>
-                                                </TableCell>
-                                                <TableCell className="text-right px-4 text-[14px] !bg-purple-950 text-white font-black border-l border-white/20 border-b-0">
-                                                    {formatCurrency(vTotal.balance)}
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </Card>
-                        );
-                    });
-                })()}
-                {/* Section D: Sales Summary Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <ReportTable 
-                        title="Section D: Sales Summary (Aaj Ki Sales)" 
-                        data={reportData.sales} 
-                        headers={["Variety", "Qty Sold", "Avg Sale", "Value"]}
-                        type="sales"
-                    />
-                </div>
-            </div>
-
-            {/* Inflow / Outflow Split */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card className="border-red-100 shadow-sm">
-                    <CardHeader className="bg-red-50/50 pb-2">
-                        <CardTitle className="text-sm font-bold text-red-700 flex items-center gap-2">
-                            <TrendingDown size={16} /> SECTION C: OUTFLOW BREAKDOWN
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-3">
-                        <FlowItem label="Supplier Payments" amount={reportData.outflow.supplier} />
-                        <FlowItem label="Business Expenses" amount={reportData.outflow.expenses} />
-                        <FlowItem label="CD Received (Savings)" amount={reportData.outflow.cdReceived} secondary />
-                        <div className="pt-2 border-t flex justify-between items-center font-bold text-lg text-red-600">
-                             <span>TOTAL OUTFLOW</span>
-                             <span>{formatCurrency(reportData.outflow.totalOutflow)}</span>
+                const StatBox = ({ label, val, sub, border, bg }: any) => (
+                    <div className={`relative overflow-hidden ${bg} border-2 ${border} p-3 rounded-2xl shadow-sm transition-all hover:shadow-md group`}>
+                        <div className="absolute top-0 right-0 p-1 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Activity size={40} />
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-emerald-100 shadow-sm">
-                    <CardHeader className="bg-emerald-50/50 pb-2">
-                        <CardTitle className="text-sm font-bold text-emerald-700 flex items-center gap-2">
-                            <TrendingUp size={16} /> SECTION D: INFLOW & INCOME
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-3">
-                        <FlowItem label="Customer Receipts" amount={reportData.inflow.customer} />
-                        <FlowItem label="Other Business Income" amount={reportData.inflow.other} />
-                        <FlowItem label="CD Given (Adjustment)" amount={reportData.inflow.cdGiven} secondary />
-                        <div className="pt-2 border-t flex justify-between items-center font-bold text-lg text-emerald-600">
-                             <span>TOTAL INFLOW</span>
-                             <span>{formatCurrency(reportData.inflow.totalInflow)}</span>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Section E: 360 Consolidated Audit Ledger */}
-            <Card className="shadow-xl border-none bg-white overflow-hidden ring-1 ring-slate-200">
-                <CardHeader className="bg-[#5c3e7b] border-b py-4 text-white shadow-lg flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-purple-300 animate-pulse"></div>
-                        <CardTitle className="text-[12px] font-black uppercase tracking-[0.2em] leading-none">
-                            Section E: 360 Consolidated Audit Ledger (Incomes & Expenses)
-                        </CardTitle>
+                        <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">{label}</p>
+                        <p className="text-sm font-black text-slate-900 tracking-tight">{val}</p>
+                        {sub && <p className="text-[7px] font-bold text-slate-500 mt-1 uppercase leading-none">{sub}</p>}
                     </div>
-                    <div className="text-[10px] font-bold px-4 py-1.5 rounded-xl bg-white/10 uppercase tracking-widest border border-white/20 backdrop-blur-sm">
-                        Calculated from Sub-Categories
+                );
+
+                return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                        <StatBox label="Purchase Volume" val={`${(pZone?.stats?.qty || 0).toFixed(2)} QTL`} sub={`${pZone?.stats?.parchi} Active Parchis`} border="border-amber-100" bg="bg-amber-50/30" />
+                        <StatBox label="Sales Volume" val={`${(sZone?.stats?.qty || 0).toFixed(2)} QTL`} sub="Market Distribution" border="border-emerald-100" bg="bg-emerald-50/30" />
+                        <StatBox label="Audit Adjustments" val={formatCurrency(adjZone?.total || 0)} sub="Deduction Margins (IN)" border="border-rose-100" bg="bg-rose-50/30" />
+                        <StatBox label="Operating Expense" val={formatCurrency(totals.expenses)} sub="Business Overhead" border="border-slate-200" bg="bg-slate-50" />
+                        <StatBox label="Other Income" val={formatCurrency(totals.incomes)} sub="Indirect Revenue" border="border-indigo-100" bg="bg-indigo-50/30" />
+                        <StatBox label="Operational Ops" val={`L:${Math.round(totals.labour/1000)}k | K:${Math.round(totals.kanta/1000)}k`} sub={`KARTA: ₹${Math.round(totals.karta).toLocaleString()}`} border="border-cyan-100" bg="bg-cyan-50/30" />
+                    </div>
+                );
+            })()}
+
+            {/* Section Z: Multi-Side-by-Side Parallel Ledger (Consolidated) */}
+            <Card className="shadow-none border border-slate-200 bg-white overflow-hidden">
+                <CardHeader className="bg-slate-900 border-b py-3 flex flex-row items-center justify-between text-white">
+                    <div className="flex flex-col">
+                        <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em]">Section Z: 360° Parallel Audit Ledger</CardTitle>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Purchase Consolidated Ledger (Independent Parallel Flows)</p>
                     </div>
                 </CardHeader>
-                <div className="overflow-auto border-x bg-slate-50/10 scrollbar-thin scrollbar-thumb-slate-200">
-                    <Table className="relative w-full border-collapse">
-                        <TableHeader className="bg-slate-100 border-b-2 border-slate-300 sticky top-0 z-10">
-                            <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter w-24">DATE</TableHead>
-                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter w-48">PARTICULAR (ACCOUNT / SUB)</TableHead>
-                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-slate-800 text-center uppercase tracking-tighter">DETAILS / REMARKS</TableHead>
-                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-red-900 text-center uppercase tracking-tighter w-32">DEBIT (OUT)</TableHead>
-                                <TableHead className="text-[10px] font-black h-12 border-r border-slate-200 text-emerald-900 text-center uppercase tracking-tighter w-32">CREDIT (IN)</TableHead>
+                
+                <div className="overflow-auto border-x bg-white scrollbar-thin scrollbar-thumb-slate-200" style={{ maxHeight: '800px' }}>
+                    <Table className="relative w-full border-collapse" style={{ minWidth: '2200px' }}>
+                        <TableHeader className="sticky top-0 z-30">
+                            {/* Main Zone Headings */}
+                            <TableRow className="bg-slate-900 text-white border-none h-11">
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase border-r border-slate-800 bg-amber-600/5 text-amber-500">I. Purchase Ledger</TableHead>
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase border-r border-slate-800 bg-emerald-600/5 text-emerald-500">II. Sales Pipeline</TableHead>
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase border-r border-slate-800 bg-rose-600/5 text-rose-500">III. Audit Deductions</TableHead>
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase border-r border-slate-800 bg-slate-800/10 text-slate-400">IV. Op Expenses</TableHead>
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase border-r border-slate-800 bg-indigo-600/5 text-indigo-400">V. Other Incomes</TableHead>
+                                <TableHead colSpan={2} className="text-center text-[10px] font-black uppercase bg-cyan-600/5 text-cyan-500">VI. Liquidity Flow</TableHead>
+                            </TableRow>
+                            {/* Sub-Headers */}
+                            <TableRow className="bg-slate-50 border-b border-slate-200">
+                                <TableHead className="w-[18%] text-[9px] font-bold border-r px-3">PARTICULAR</TableHead><TableHead className="w-24 text-right px-4 bg-amber-50/30">AMT</TableHead>
+                                <TableHead className="w-[15%] text-[9px] font-bold border-r px-3">PARTICULAR</TableHead><TableHead className="w-24 text-right px-4 bg-emerald-50/30">AMT</TableHead>
+                                <TableHead className="w-[15%] text-[9px] font-bold border-r px-3">PARTICULAR</TableHead><TableHead className="w-24 text-right px-4 bg-rose-50/30">AMT</TableHead>
+                                <TableHead className="w-[15%] text-[9px] font-bold border-r px-3">PARTICULAR</TableHead><TableHead className="w-24 text-right px-4 bg-slate-100/30">AMT</TableHead>
+                                <TableHead className="w-[15%] text-[9px] font-bold border-r px-3">PARTICULAR</TableHead><TableHead className="w-24 text-right px-4 bg-indigo-50/30">AMT</TableHead>
+                                <TableHead className="w-[15%] text-[9px] font-bold border-r px-3">TRANSACTION</TableHead><TableHead className="w-24 text-right px-4 bg-cyan-50/30 border-r-0">VAL</TableHead>
                             </TableRow>
                         </TableHeader>
-                        <TableBody className="bg-white text-[10px]">
-                            {reportData.audit360.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center text-slate-400 text-sm italic">
-                                        No Income or Expense entries found for this period.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                <>
-                                    {reportData.audit360.map((r, i) => (
-                                        <TableRow key={i} className="hover:bg-blue-50/30 transition-colors border-b border-slate-100 group">
-                                            <TableCell className="border-r border-slate-200 py-3 px-2 text-center font-bold text-slate-500 whitespace-nowrap">
-                                                {format(new Date(r.date), 'dd MMM yy')}
-                                            </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-3 px-4 font-bold text-slate-700 uppercase">
-                                                {r.particular}
-                                            </TableCell>
-                                            <TableCell className="border-r border-slate-200 py-3 px-4 text-slate-500 italic text-[9px]">
-                                                {r.detail}
-                                            </TableCell>
-                                            <TableCell className="text-center border-r border-slate-200 py-3 px-4 font-black text-red-600 text-[11px]">
-                                                {r.debit > 0 ? formatCurrency(r.debit) : '-'}
-                                            </TableCell>
-                                            <TableCell className="text-center border-r border-slate-200 py-3 px-4 font-black text-emerald-600 text-[11px]">
-                                                {r.credit > 0 ? formatCurrency(r.credit) : '-'}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    <TableRow className="!bg-purple-900 text-white font-bold hover:!bg-purple-900 border-t-2 border-purple-800">
-                                        <TableCell colSpan={3} className="py-3 px-4 text-left border-b-0">
-                                            <div className="text-[10px] tracking-widest text-purple-200 uppercase">OVERALL AUDIT RECONCILIATION TOTAL</div>
+                        
+                        <TableBody>
+                            {(() => {
+                                const pRows = reportData.audit360Zones.find(z => z.key === 'PURCHASE')?.rows || [];
+                                const sRows = reportData.audit360Zones.find(z => z.key === 'SALE')?.rows || [];
+                                const aRows = reportData.audit360Zones.find(z => z.key === 'ADJUSTMENT')?.rows || [];
+                                const eRows = reportData.audit360Zones.find(z => z.key === 'EXPENSE')?.rows || [];
+                                const iRows = reportData.audit360Zones.find(z => z.key === 'INCOME')?.rows || [];
+                                const cRows = reportData.audit360Zones.find(z => z.key === 'INTERNAL')?.rows || [];
+
+                                const maxRows = Math.max(pRows.length, sRows.length, aRows.length, eRows.length, iRows.length, cRows.length);
+                                
+                                if (maxRows === 0) {
+                                    return <TableRow><TableCell colSpan={12} className="h-40 text-center italic text-slate-400">No parallel data distributed.</TableCell></TableRow>;
+                                }
+
+                                return Array.from({ length: maxRows }).map((_, idx) => (
+                                    <TableRow key={idx} className="hover:bg-slate-50/60 border-b border-slate-100 group transition-all duration-200">
+                                        {/* 1. Purchase */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-amber-500/20">
+                                            {pRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[11px] font-black text-slate-900 uppercase tracking-tighter">{pRows[idx].item}</span>
+                                                        <span className="text-[8px] font-black text-amber-700 bg-amber-100/50 px-1 rounded-sm">{format(new Date(pRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                                                        <span className="text-[7.5px] font-bold text-slate-400">MD:{pRows[idx].details.split('|')[0]}</span>
+                                                        <div className="h-1 w-1 rounded-full bg-slate-200" />
+                                                        <span className="text-[7.5px] font-bold text-purple-600">L:{pRows[idx].laboury}</span>
+                                                        <span className="text-[7.5px] font-bold text-rose-600">K:{pRows[idx].kanta}</span>
+                                                        <span className="text-[7.5px] font-bold text-orange-600">KR:{pRows[idx].kartaAmt}</span>
+                                                    </div>
+                                                </div>
+                                            ) : <div className="text-slate-100">-</div>}
                                         </TableCell>
-                                        <TableCell className="text-center border-r border-white/10 border-b-0 text-white font-black text-[12px]">
-                                            {formatCurrency(reportData.audit360.reduce((s, r) => s + r.debit, 0))}
+                                        <TableCell className="bg-amber-50/20 text-right px-4 text-[11px] font-black border-r border-slate-200 font-mono tracking-tighter">
+                                            {pRows[idx] ? Math.round(pRows[idx].amount).toLocaleString() : ''}
                                         </TableCell>
-                                        <TableCell className="text-center border-r border-white/10 border-b-0 text-white font-black text-[12px]">
-                                            {formatCurrency(reportData.audit360.reduce((s, r) => s + r.credit, 0))}
+
+                                        {/* 2. Sale */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-emerald-500/20">
+                                            {sRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-tighter truncate max-w-[120px]">{sRows[idx].item}</span>
+                                                        <span className="text-[8px] font-bold text-emerald-600 tabular-nums">{format(new Date(sRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <span className="text-[7.5px] text-slate-400 font-bold uppercase truncate">{sRows[idx].details}</span>
+                                                </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="bg-emerald-50/20 text-right px-4 text-[11px] font-black border-r border-slate-200 font-mono tracking-tighter">
+                                            {sRows[idx] ? Math.round(sRows[idx].amount).toLocaleString() : ''}
+                                        </TableCell>
+
+                                        {/* 3. Adjustment */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-rose-500/20">
+                                            {aRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[9px] font-black text-rose-900 uppercase">{aRows[idx].item}</span>
+                                                        <span className="text-[7.5px] font-bold text-rose-400 tabular-nums">{format(new Date(aRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <span className="text-[7.5px] text-slate-500 font-medium truncate">{aRows[idx].details}</span>
+                                                </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="bg-rose-50/20 text-right px-4 text-[11px] font-black border-r border-slate-200 font-mono tracking-tighter text-rose-950">
+                                            {aRows[idx] ? Math.round(aRows[idx].amount).toLocaleString() : ''}
+                                        </TableCell>
+
+                                        {/* 4. Expense */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-slate-400/20">
+                                            {eRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[9px] font-black text-slate-700 uppercase">{eRows[idx].item}</span>
+                                                        <span className="text-[7.5px] font-bold text-slate-400 tabular-nums">{format(new Date(eRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <span className="text-[7.5px] text-slate-400 uppercase font-black">{eRows[idx].details}</span>
+                                                </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="bg-slate-50 text-right px-4 text-[11px] font-black border-r border-slate-200 font-mono tracking-tighter text-slate-600">
+                                            {eRows[idx] ? Math.round(eRows[idx].amount).toLocaleString() : ''}
+                                        </TableCell>
+
+                                        {/* 5. Income */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-indigo-500/20">
+                                            {iRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[9px] font-black text-indigo-900 uppercase">{iRows[idx].item}</span>
+                                                        <span className="text-[7.5px] font-bold text-indigo-400 tabular-nums">{format(new Date(iRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <span className="text-[7.5px] text-slate-400 uppercase font-black">{iRows[idx].details}</span>
+                                                </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="bg-indigo-50/20 text-right px-4 text-[11px] font-black border-r border-slate-200 font-mono tracking-tighter text-indigo-900">
+                                            {iRows[idx] ? Math.round(iRows[idx].amount).toLocaleString() : ''}
+                                        </TableCell>
+
+                                        {/* 6. Internal */}
+                                        <TableCell className="border-r py-1.5 px-3 border-l-4 border-l-cyan-500/20">
+                                            {cRows[idx] ? (
+                                                <div className="flex flex-col">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="text-[8.5px] font-black text-cyan-900 uppercase">{cRows[idx].item}</span>
+                                                        <span className="text-[7.5px] font-black text-cyan-300 tabular-nums">{format(new Date(cRows[idx].date), 'dd/MM')}</span>
+                                                    </div>
+                                                    <span className="text-[7.5px] text-slate-400 lowercase truncate max-w-[140px]">{cRows[idx].details}</span>
+                                                </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="bg-cyan-50/10 text-right px-4 text-[11px] font-black font-mono tracking-tighter text-cyan-950">
+                                            {cRows[idx] ? Math.round(cRows[idx].amount).toLocaleString() : ''}
                                         </TableCell>
                                     </TableRow>
-                                </>
-                            )}
+                                ));
+                            })()}
+                            <TableRow className="!bg-slate-900 text-white font-bold sticky bottom-0 z-20">
+                                <TableCell className="py-2 text-center text-[8px] uppercase tracking-widest border-r border-white/20">TOTAL PURCHASE</TableCell>
+                                <TableCell className="text-right text-amber-400 text-[10px] border-r border-white/20 px-4">
+                                    ₹{Math.round(reportData.audit360Zones.find(z=>z.key==='PROCUREMENT')?.total || 0).toLocaleString()}
+                                </TableCell>
+
+                                <TableCell className="py-2 text-center text-[8px] uppercase tracking-widest border-r border-white/20">TOTAL SETTLEMENTS</TableCell>
+                                <TableCell className="text-right text-blue-300 text-[10px] border-r border-white/20 px-4">
+                                    ₹{Math.round(reportData.audit360Zones.find(z=>z.key==='SETTLEMENTS')?.total || 0).toLocaleString()}
+                                </TableCell>
+
+                                <TableCell className="py-2 text-center text-[8px] uppercase tracking-widest border-r border-white/20">TOTAL REVENUE (REC)</TableCell>
+                                <TableCell className="text-right text-emerald-400 text-[10px] border-r border-white/20 px-4">
+                                    ₹{Math.round(reportData.audit360Zones.find(z=>z.key==='REVENUE')?.total || 0).toLocaleString()}
+                                </TableCell>
+
+                                <TableCell className="py-2 text-center text-[8px] uppercase tracking-widest border-r border-white/20">TOTAL CONTRA</TableCell>
+                                <TableCell className="text-right text-slate-400 text-[10px] px-4">
+                                    ₹{Math.round(reportData.audit360Zones.find(z=>z.key==='CONTRA')?.total || 0).toLocaleString()}
+                                </TableCell>
+                            </TableRow>
                         </TableBody>
                     </Table>
                 </div>

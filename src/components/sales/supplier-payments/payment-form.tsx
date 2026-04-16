@@ -174,18 +174,18 @@ function PaymentFormComponent(props: any) {
 
     return (
         <>
-            <div className="w-full max-w-full flex flex-col h-full rounded-xl border border-border/60 bg-card shadow-sm">
-                    <div className="px-2.5 py-1.5 space-y-1.5 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto">
+            <div className="w-full max-w-full flex flex-col h-full rounded-xl border border-border/60 bg-card/60 shadow-sm overflow-hidden">
+                    <div className="px-2 py-1 space-y-1 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
                           <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                                 {!hideRtgsToggle && (
-                                <div className="flex flex-wrap items-center gap-1.5 rounded-t-xl border-b border-border/60 bg-muted/30 p-0.5 mb-1.5 -mx-2.5 -mt-1.5 px-2.5 pt-1.5">
+                                <div className="flex flex-nowrap items-center gap-1 rounded-t-xl border-b border-border/50 bg-muted/20 p-0.5 mb-1 -mx-2 px-2 pt-1 overflow-x-auto no-scrollbar min-h-[36px]">
                                     {paymentMethods.map((method) => (
                                         <Button
                                             key={method}
                                             type="button"
                                             size="sm"
                                             className={cn(
-                                                "h-6 px-2.5 text-[9px] font-semibold transition-colors border",
+                                                "h-7 px-2 text-[10px] font-bold transition-colors border-0 rounded-lg",
                                                 getPaymentMethodStyles(method, paymentMethod === method)
                                             )}
                                             variant="ghost"
@@ -199,7 +199,7 @@ function PaymentFormComponent(props: any) {
                                                 }
                                             }}
                                         >
-                                            {method === 'Cash' ? 'Cash In Hand' : method}
+                                            {method === 'Cash' ? 'Cash' : method}
                                         </Button>
                                     ))}
                                 </div>
@@ -214,13 +214,13 @@ function PaymentFormComponent(props: any) {
                                             }
                                         }}
                                         className={cn(
-                                            "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-0",
+                                            "relative w-28 h-7 flex items-center rounded-lg p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/50 border border-border/80 overflow-hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/20",
                                             cdAllowed ? "hover:border-primary/30" : "cursor-not-allowed opacity-60"
                                         )}
                                     >
                                         <span
                                             className={cn(
-                                                "absolute left-4 text-[10px] font-semibold transition-colors z-0",
+                                                "absolute left-2.5 text-[10px] font-bold transition-colors z-0",
                                                 !cdEnabled ? "text-muted-foreground/70" : "text-foreground"
                                             )}
                                         >
@@ -228,7 +228,7 @@ function PaymentFormComponent(props: any) {
                                         </span>
                                         <span
                                             className={cn(
-                                                "absolute right-4 text-[10px] font-semibold transition-colors z-0",
+                                                "absolute right-2.5 text-[10px] font-bold transition-colors z-0",
                                                 cdEnabled ? "text-muted-foreground/70" : "text-foreground"
                                             )}
                                         >
@@ -236,8 +236,8 @@ function PaymentFormComponent(props: any) {
                                         </span>
                                         <div
                                             className={cn(
-                                                "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                                                cdEnabled ? "left-[calc(50%+2px)]" : "left-[2px]"
+                                                "absolute w-[calc(50%-3px)] h-[calc(100%-4px)] top-0.5 rounded-lg shadow-sm flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+                                                cdEnabled ? "left-[calc(50%+1.5px)]" : "left-[1.5px]"
                                             )}
                                         >
                                             <span className="text-[10px] font-bold text-primary-foreground">CD</span>
@@ -311,8 +311,8 @@ function PaymentFormComponent(props: any) {
                                           name="checkNo"
                                           value={checkNo}
                                           onChange={e => setCheckNo(e.target.value)}
-                                          onBlur={handleCheckNoBlur}
-                                          className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                          onBlur={handlePaymentIdBlur}
+                                          className="h-7 text-[10px] w-[130px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">
@@ -322,7 +322,7 @@ function PaymentFormComponent(props: any) {
                                         name="notes-ledger"
                                         value={notes || ''}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
                                 </div>
@@ -332,7 +332,7 @@ function PaymentFormComponent(props: any) {
                                         value={selectedAccountId || "__placeholder__"}
                                         onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
                                     >
-                                        <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
+                                        <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
                                             <SelectValue placeholder="Income/Credit ya Expense/Debit isse" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -353,7 +353,7 @@ function PaymentFormComponent(props: any) {
                              {paymentMethod === 'RTGS' && (
                                 <div className="space-y-1">
                                     <Label htmlFor="rtgsSrNo" className="text-[10px] font-semibold text-slate-500">RTGS SR No.</Label>
-                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
+                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15" />
                                 </div>
                             )}
 
@@ -373,7 +373,7 @@ function PaymentFormComponent(props: any) {
                                                 setLocalToBePaid(value);
                                                 queueToBePaidUpdate(value);
                                             }}
-                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -390,7 +390,7 @@ function PaymentFormComponent(props: any) {
                                                 setLocalToBePaid(value);
                                                 queueToBePaidUpdate(value);
                                             }}
-                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                         />
                                     </div>
                                 </div>
@@ -439,7 +439,7 @@ function PaymentFormComponent(props: any) {
                                         name="notes"
                                         value={notes || ''}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
                                   </div>
@@ -456,7 +456,7 @@ function PaymentFormComponent(props: any) {
                                         onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
                                         readOnly={paymentType === 'Partial'}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
                                           paymentType === 'Partial' && 'bg-slate-50'
                                         )}
                                       />
@@ -475,7 +475,7 @@ function PaymentFormComponent(props: any) {
                                         }}
                                         readOnly={paymentType === 'Full'}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
                                           paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
                                         )}
                                       />
@@ -505,8 +505,8 @@ function PaymentFormComponent(props: any) {
                                             setCheckNo(value);
                                           }
                                         }}
-                                        onBlur={!isCash ? handleCheckNoBlur : undefined}
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        onBlur={!isCash ? handlePaymentIdBlur : undefined}
+                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
 
@@ -522,7 +522,7 @@ function PaymentFormComponent(props: any) {
                                         onChange={(e) => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
                                         readOnly={paymentType === "Partial"}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          "h-7 text-[9.5px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15",
                                           paymentType === "Partial" && "bg-slate-50"
                                         )}
                                       />
@@ -544,7 +544,7 @@ function PaymentFormComponent(props: any) {
                                         }}
                                         readOnly={paymentType === "Full"}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
                                           paymentType === "Full" && "bg-slate-50 border-slate-200/80"
                                         )}
                                       />
@@ -560,7 +560,7 @@ function PaymentFormComponent(props: any) {
                                       <Select value={paymentType} onValueChange={setPaymentType}>
                                         <SelectTrigger
                                           id="paymentType"
-                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                          className="h-7 text-[9.5px] border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15"
                                         >
                                           <SelectValue />
                                         </SelectTrigger>
@@ -579,7 +579,7 @@ function PaymentFormComponent(props: any) {
                                         value={selectedAccountId || "__placeholder__"}
                                         onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
                                       >
-                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
+                                        <SelectTrigger className="h-7 text-[9.5px] border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15">
                                           <SelectValue placeholder="Select Account" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -746,23 +746,27 @@ function PaymentFormComponent(props: any) {
                           )}
                         
                     </div>
-                    <div className="px-2.5 pb-2 pt-1 flex items-center justify-end gap-2">
+                    <div className="px-2 pb-1.5 pt-1.5 flex items-center justify-end gap-2 border-t border-border/40">
                         <Button
-                            size="sm"
-                            className="h-7 text-[10px] font-semibold"
                             variant="outline"
-                            onClick={() => (onClearPaymentForm ? onClearPaymentForm() : null)}
-                            disabled={!!isProcessing}
+                            size="sm"
+                            className="h-7 text-[10px] font-bold px-4 py-0 rounded-lg border border-slate-200/80 bg-white/70 hover:bg-white hover:border-slate-300 shadow-sm transition-all"
+                            onClick={onClearPaymentForm}
+                            disabled={isProcessing}
                         >
                             Clear
                         </Button>
                         <Button
                             size="sm"
-                            className="h-7 text-[10px] font-bold"
-                            onClick={() => (onProcessPayment ? onProcessPayment() : null)}
-                            disabled={!!isProcessing}
+                            className="h-7 text-[10px] font-bold px-6 py-0 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 shadow-md shadow-primary/10 transition-all disabled:opacity-50"
+                            onClick={onProcessPayment}
+                            disabled={isProcessing}
                         >
-                            {isProcessing ? "Processing..." : "Finalize"}
+                            {isProcessing ? (
+                                <><Loader2 className="mr-1.5 h-3 w-3 animate-spin"/> Processing...</>
+                            ) : (
+                                "Finalize"
+                            )}
                         </Button>
                     </div>
             </div>

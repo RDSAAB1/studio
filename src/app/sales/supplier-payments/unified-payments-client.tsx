@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -369,8 +370,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     setFilterVariety,
   });
 
-  // Removed automatic Mill Overview selection - let user select manually
-
   // Check for editPaymentData from localStorage (when navigating from detail window)
   useEffect(() => {
     const editData = localStorage.getItem('editPaymentData');
@@ -388,13 +387,10 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
           description: `Loaded payment ${paymentData.paymentId || paymentData.id} for editing.`,
         });
       } catch (error) {
-
         localStorage.removeItem('editPaymentData');
       }
     }
   }, [hook.handleEditPayment]);
-    // Removed toast from dependencies - it's stable from useToast hook
-    // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const handleEditPayment = useCallback((payment: Payment) => {
     handleClearSupplierFilters();
@@ -461,14 +457,6 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       .filter(Boolean);
   }, [selectedSupplierSummary]);
 
-  // Get selected receipt serial numbers from selected entries
-  const selectedReceiptSrNos = useMemo(() => {
-    if (!hook.selectedEntries || hook.selectedEntries.length === 0) return [];
-    return hook.selectedEntries
-      .map((entry: Customer) => (entry.srNo || "").toLowerCase())
-      .filter(Boolean);
-  }, [hook.selectedEntries]);
-
   const normalizedSerialFilter = useMemo(() => {
     const raw = hook.serialNoSearch.trim().toLowerCase();
     if (!raw) return "";
@@ -484,822 +472,345 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       const paidSrNos =
         payment.paidFor?.map((pf) => (pf.srNo || "").toLowerCase()).filter(Boolean) || [];
 
-      const matchesSerial =
-        !normalizedSerialFilter || paidSrNos.includes(normalizedSerialFilter);
-      
-      // If receipts are selected, do NOT filter history by them. 
-      // User wants to see all history for the supplier even when selecting bills to pay.
-      // const matchesReceipts = selectedReceiptSrNos.length === 0 
-      //   ? true // No receipts selected, show all payments for supplier
-      //   : paidSrNos.some((sr) => selectedReceiptSrNos.includes(sr)); // Receipts selected, filter by them
-      
-      const parchiNoRaw = String((payment as any).parchiNo || (payment as any).checkNo || "").trim().toLowerCase();
-      const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map(t => t.trim()).filter(Boolean);
-
       const matchesSupplier =
         !hook.selectedCustomerKey ||
         (payment.supplierId === hook.selectedCustomerKey) ||
         ((payment as any).customerId === hook.selectedCustomerKey) ||
         (selectedSupplierSrNos.length > 0 && (
           paidSrNos.some((sr) => selectedSupplierSrNos.includes(sr)) ||
-          parchiTokens.some((token) => selectedSupplierSrNos.includes(token))
+          String((payment as any).parchiNo || (payment as any).checkNo || "").trim().toLowerCase().split(/[,\s]+/g).some((token) => selectedSupplierSrNos.includes(token))
         ));
 
       const matchesDate = isWithinDateRange(payment.date);
-
-      // We do NOT filter history by serial number search. 
-      // The search box is for finding bills to pay, not filtering history.
-      // If we filter history by serial search, advance payments (which have no bill number) disappear.
       return matchesSupplier && matchesDate;
     },
     [selectedSupplierSrNos, isWithinDateRange, hook.selectedCustomerKey]
   );
 
-  // Helper: normalize payment id for sorting
   const getPaymentIdForSort = (payment: Payment): string => {
     return (payment?.id || payment?.paymentId || '').toString();
   };
 
-  // Helper: parse ID into prefix and numeric part for proper sorting
   const parsePaymentIdForSort = (id: string): { prefix: string; number: number } => {
     if (!id) return { prefix: '', number: 0 };
-    
-    // Extract prefix (letters) and number
     const match = id.match(/^([A-Za-z]*)(\d+)$/);
     if (match) {
       const prefix = match[1] || '';
       const number = parseInt(match[2] || '0', 10);
       return { prefix, number };
     }
-    
-    // Fallback: if no match, treat as string
     return { prefix: id, number: 0 };
   };
 
   const govHistoryRows = useMemo(() => {
-    // Single payments collection - filter by receiptType Gov
-    if (!hook.paymentHistory || hook.paymentHistory.length === 0) {
-      return [];
-    }
-    
-    // Filter payments with receiptType Gov or gov-specific fields
-    const filtered = hook.paymentHistory
-      .filter((payment: Payment) => {
-        // Check 1: receiptType (case-insensitive)
+    if (!hook.paymentHistory || hook.paymentHistory.length === 0) return [];
+    const filtered = hook.paymentHistory.filter((payment: Payment) => {
         const receiptType = (payment.receiptType || "").trim().toLowerCase();
-        if (receiptType === "gov." || receiptType === "gov" || receiptType.startsWith("gov")) {
-          return true;
-        }
-        
-        // Check 2: Gov-specific fields - if ANY gov field exists, show it
-        const hasGovQuantity = (payment as any).govQuantity !== undefined && (payment as any).govQuantity !== null;
-        const hasGovRate = (payment as any).govRate !== undefined && (payment as any).govRate !== null;
-        const hasGovAmount = (payment as any).govAmount !== undefined && (payment as any).govAmount !== null;
-        
-        // If ANY gov-specific field exists, show it
-        if (hasGovQuantity || hasGovRate || hasGovAmount) {
-          return true;
-        }
-        
-        return false;
+        if (receiptType === "gov." || receiptType === "gov" || receiptType.startsWith("gov")) return true;
+        return (payment as any).govQuantity !== undefined || (payment as any).govRate !== undefined || (payment as any).govAmount !== undefined;
       });
-    
-    // Filter by selected supplier if supplier is selected
-    const supplierFiltered = filtered.filter(payment => {
-      // If no supplier selected, show all (or filter based on requirement)
-      if (!hook.selectedCustomerKey) {
-        return true;
-      }
-      // Apply supplier filter using paymentMatchesSelection
-      return paymentMatchesSelection(payment);
-    });
-    
-    // Only apply date filter if dates are selected
-    const dateFiltered = supplierFiltered.filter(payment => {
-      if (!filterStartDate && !filterEndDate) {
-        return true;
-      }
-      return isWithinDateRange(payment.date);
-    });
-    
-    // Sort by ID (descending - high to low)
+    const supplierFiltered = filtered.filter(payment => hook.selectedCustomerKey ? paymentMatchesSelection(payment) : true);
+    const dateFiltered = supplierFiltered.filter(payment => (!filterStartDate && !filterEndDate) ? true : isWithinDateRange(payment.date));
     return [...dateFiltered].sort((a, b) => {
-      const idA = getPaymentIdForSort(a);
-      const idB = getPaymentIdForSort(b);
-      if (!idA && !idB) return 0;
-      if (!idA) return 1;
-      if (!idB) return -1;
-      
-      const parsedA = parsePaymentIdForSort(idA);
-      const parsedB = parsePaymentIdForSort(idB);
-      
-      // First compare prefix (alphabetically)
+      const parsedA = parsePaymentIdForSort(getPaymentIdForSort(a));
+      const parsedB = parsePaymentIdForSort(getPaymentIdForSort(b));
       const prefixCompare = parsedB.prefix.localeCompare(parsedA.prefix);
       if (prefixCompare !== 0) return prefixCompare;
-      
-      // If prefix is same, compare numeric part (descending)
       return parsedB.number - parsedA.number;
     });
   }, [hook.paymentHistory, hook.selectedCustomerKey, isWithinDateRange, filterStartDate, filterEndDate, paymentMatchesSelection]);
 
   const cashHistoryRows = useMemo(() => {
-    const filtered = hook.paymentHistory
-      .filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash")
-      .filter(paymentMatchesSelection);
-    // Sort by ID (descending - high to low)
+    const filtered = hook.paymentHistory.filter((payment: Payment) => (payment.receiptType || "").toLowerCase() === "cash").filter(paymentMatchesSelection);
     return [...filtered].sort((a, b) => {
-      const idA = getPaymentIdForSort(a);
-      const idB = getPaymentIdForSort(b);
-      if (!idA && !idB) return 0;
-      if (!idA) return 1;
-      if (!idB) return -1;
-      
-      const parsedA = parsePaymentIdForSort(idA);
-      const parsedB = parsePaymentIdForSort(idB);
-      
-      // First compare prefix (alphabetically)
+      const parsedA = parsePaymentIdForSort(getPaymentIdForSort(a));
+      const parsedB = parsePaymentIdForSort(getPaymentIdForSort(b));
       const prefixCompare = parsedB.prefix.localeCompare(parsedA.prefix);
       if (prefixCompare !== 0) return prefixCompare;
-      
-      // If prefix is same, compare numeric part (descending)
       return parsedB.number - parsedA.number;
     });
   }, [hook.paymentHistory, paymentMatchesSelection]);
 
   const rtgsHistoryRows = useMemo(() => {
-    const filtered = hook.paymentHistory
-      .filter((payment: Payment) => {
+    const filtered = hook.paymentHistory.filter((payment: Payment) => {
         const isRtgs = (payment.receiptType || "").toLowerCase() === "rtgs";
-        // For outsider, only show payments where customerId === 'OUTSIDER'
-        if (type === 'outsider') {
-          return isRtgs && payment.customerId === 'OUTSIDER';
-        }
+        if (type === 'outsider') return isRtgs && payment.customerId === 'OUTSIDER';
         return isRtgs;
-      })
-      .filter(type === 'outsider' ? () => true : paymentMatchesSelection); // No filtering needed for outsider
-    // Sort by ID (descending - high to low)
+      }).filter(type === 'outsider' ? () => true : paymentMatchesSelection);
     return [...filtered].sort((a, b) => {
-      const idA = getPaymentIdForSort(a);
-      const idB = getPaymentIdForSort(b);
-      if (!idA && !idB) return 0;
-      if (!idA) return 1;
-      if (!idB) return -1;
-      
-      const parsedA = parsePaymentIdForSort(idA);
-      const parsedB = parsePaymentIdForSort(idB);
-      
-      // First compare prefix (alphabetically)
+      const parsedA = parsePaymentIdForSort(getPaymentIdForSort(a));
+      const parsedB = parsePaymentIdForSort(getPaymentIdForSort(b));
       const prefixCompare = parsedB.prefix.localeCompare(parsedA.prefix);
       if (prefixCompare !== 0) return prefixCompare;
-      
-      // If prefix is same, compare numeric part (descending)
       return parsedB.number - parsedA.number;
     });
-  }, [hook.paymentHistory, paymentMatchesSelection]);
+  }, [hook.paymentHistory, paymentMatchesSelection, type]);
 
-  // Get all payments for selected supplier (for compact history table)
   const selectedSupplierPayments = useMemo(() => {
     if (!hook.selectedCustomerKey) return [];
     return hook.paymentHistory.filter(paymentMatchesSelection);
   }, [hook.paymentHistory, hook.selectedCustomerKey, paymentMatchesSelection]);
 
-
-    const { setSelectedEntryIds, setParchiNo, setPaymentMethod } = hook;
-    const handleSelectionChange = useCallback((newSelection: Set<string>) => {
-      if (setSelectedEntryIds) {
-          setSelectedEntryIds(newSelection);
-          // Auto-populate Parchi No if single entry selected
-          if (newSelection.size === 1 && setParchiNo) {
-              const selectedId = Array.from(newSelection)[0];
-              const entry = transactionsForSelectedSupplier?.find(t => t.id === selectedId);
-              if (entry && entry.srNo) {
-                  setParchiNo(entry.srNo);
-              }
-          }
-      }
-    }, [setSelectedEntryIds, setParchiNo, transactionsForSelectedSupplier]);
-
-    const handlePaymentMethodChange = useCallback(
-      (method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
-        // Call the setPaymentMethod directly from the hook
-        // It's already handleSetPaymentMethod which has all the logic
-        if (setPaymentMethod) {
-          setPaymentMethod(method);
+  const { setSelectedEntryIds, setParchiNo, setPaymentMethod } = hook;
+  const handleSelectionChange = useCallback((newSelection: Set<string>) => {
+    if (setSelectedEntryIds) {
+        setSelectedEntryIds(newSelection);
+        if (newSelection.size === 1 && setParchiNo) {
+            const selectedId = Array.from(newSelection)[0];
+            const entry = transactionsForSelectedSupplier?.find(t => t.id === selectedId);
+            if (entry && entry.srNo) setParchiNo(entry.srNo);
         }
-      },
-      [setPaymentMethod]
-    );
-  
-    return (
-        <div className="space-y-2 text-[12px]">
-             <ProcessingOverlay 
-               show={showProcessingOverlay} 
-               isDeleting={isDeleteProcessing} 
-               isSuccess={isSuccess}
-             />
-             {type === 'outsider' ? (
-                // For outsider: No tabs, just show payment content directly
-                <>
-                    <div className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
-                        <div className="w-full px-1.5 sm:px-2.5 py-0.5 flex flex-wrap gap-2 items-center text-[12px]">
-                            <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
-                                <div className="flex items-center gap-2 md:pl-3">
-                                    <Button
-                                      size="sm"
-                                      className="h-7 text-[11px]"
-                                      variant="outline"
-                                      onClick={hook.resetPaymentForm ?? (() => {})}
-                                      disabled={hook.isProcessing ?? false}
-                                    >
-                                      Clear
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      className="h-7 text-[11px]"
-                                      onClick={() => void hook.processPayment?.()}
-                                      disabled={hook.isProcessing ?? false}
-                                    >
-                                        {hook.isProcessing ? (
-                                            <>
-                                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            "Finalize"
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {(() => {
-                        // Get outsider payments (where customerId === 'OUTSIDER')
-                        const outsiderPayments = hook.paymentHistory.filter((payment: Payment) => 
-                          payment.customerId === 'OUTSIDER' && 
-                          (payment.receiptType || "").toLowerCase() === "rtgs"
-                        );
-                        
-                        return (
-                          <div className="w-full max-w-full overflow-hidden space-y-2">
-                            <div className="flex flex-col gap-2">
-                              <div className="w-full">
-                                <RtgsFormOutsider
-                                  bankDetails={hook.bankDetails}
-                                  setBankDetails={hook.setBankDetails}
-                                  setIsBankSettingsOpen={hook.setIsBankSettingsOpen}
-                                  supplierDetails={hook.supplierDetails}
-                                  setSupplierDetails={hook.setSupplierDetails}
-                                  rtgsAmount={hook.rtgsAmount}
-                                  setRtgsAmount={hook.setRtgsAmount}
-                                  handleProcessPayment={() => void hook.processPayment?.()}
-                                  isProcessing={hook.isProcessing ?? false}
-                                  bankAccounts={outsiderData?.bankAccounts || []}
-                                  banks={outsiderData?.banks || []}
-                                  bankBranches={outsiderData?.bankBranches || []}
-                                />
-                              </div>
-                              <div className="w-full h-[310px] overflow-hidden">
-                                <PaymentHistoryCompact
-                                  payments={outsiderPayments}
-                                  onEdit={handleEditPayment}
-                                  onDelete={handleDeletePayment}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                    })()}
-                </>
-             ) : (
-                // For non-outsider: Show payment interface
-                <>
-                    <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
-                        <div className="w-full px-2 md:px-2.5 py-2.5">
-                            <div className="grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[500px_minmax(0,1fr)] gap-2 items-start">
-                                <div className="min-w-0 flex flex-col gap-2">
-                                    <div className="flex items-center gap-1.5 w-full">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSelectedHistoryType('cash');
-                                                setHistoryDialogOpen(true);
-                                            }}
-                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
-                                        >
-                                            <span>Cash History</span>
-                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
-                                                {cashHistoryRows.length}
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSelectedHistoryType('gov');
-                                                setHistoryDialogOpen(true);
-                                            }}
-                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
-                                        >
-                                            <span>Gov History</span>
-                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
-                                                {govHistoryRows.length}
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSelectedHistoryType('rtgs');
-                                                setHistoryDialogOpen(true);
-                                            }}
-                                            className="h-6 text-[10px] font-semibold flex-1 justify-between px-2"
-                                        >
-                                            <span>RTGS History</span>
-                                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[7px] font-semibold">
-                                                {rtgsHistoryRows.length}
-                                            </span>
-                                        </Button>
-                                    </div>
+    }
+  }, [setSelectedEntryIds, setParchiNo, transactionsForSelectedSupplier]);
 
-                                    <PaymentFilters
-                                      searchType={searchType}
-                                      onSearchTypeChange={setSearchType}
-                                      supplierOptions={varietyFilteredSupplierOptions}
-                                      selectedSupplierKey={hook.selectedCustomerKey}
-                                      onSupplierSelect={onSelectSupplierKey}
-                                      serialNoSearch={hook.serialNoSearch}
-                                      onSerialNoSearch={hook.handleSerialNoSearch ?? (() => {})}
-                                      onSerialNoBlur={hook.handleSerialNoBlur ?? (() => {})}
-                                      filterStartDate={filterStartDate}
-                                      filterEndDate={filterEndDate}
-                                      filterVariety={filterVariety}
-                                      varietyOptions={varietyOptions}
-                                      hasActiveFilters={hasActiveSupplierFilters}
-                                      onFilterStartDateChange={setFilterStartDate}
-                                      onFilterEndDateChange={setFilterEndDate}
-                                      onFilterVarietyChange={setFilterVariety}
-                                      onClearFilters={handleClearSupplierFilters}
-                                      extraActions={
-                                        <div className="flex items-center gap-1">
-                                          <Button
-                                            onClick={() => setIsStatementOpen(true)}
-                                            size="sm"
-                                            disabled={!hook.selectedCustomerKey}
-                                            className="h-6 px-2 py-0 text-[9px] font-bold bg-gradient-to-r from-primary via-primary/95 to-primary/90 hover:from-primary/95 hover:via-primary hover:to-primary/95 shadow-md hover:shadow-lg transition-all duration-300 border border-primary/40 hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                                          >
-                                            <FileText className="h-2 w-2 mr-1" />
-                                            Generate Statement
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            className="h-6 px-2 text-[9px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
-                                            disabled={!hook.selectedCustomerKey}
-                                            onClick={() => setIsSummaryOpen(true)}
-                                          >
-                                            Summary
-                                          </Button>
-                                        </div>
-                                      }
-                                    />
+  const handlePaymentMethodChange = useCallback((method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
+    if (setPaymentMethod) setPaymentMethod(method);
+  }, [setPaymentMethod]);
 
-                                    {(hook.selectedCustomerKey || hook.editingPayment) &&
-                                       ((transactionsForSelectedSupplier &&
-                                         Array.isArray(transactionsForSelectedSupplier) &&
-                                         transactionsForSelectedSupplier.length > 0) || hook.editingPayment) && (
-                                        <div className="hidden lg:block w-full h-[300px] overflow-auto">
-                                          <PaymentForm
-                                            {...hook}
-                                            bankAccounts={hook.bankAccounts}
-                                            bankBranches={hook.bankBranches}
-                                            onPaymentMethodChange={handlePaymentMethodChange}
-                                            hideRtgsToggle={false}
-                                            centerName={hook.centerName}
-                                            setCenterName={hook.setCenterName}
-                                            centerNameOptions={hook.centerNameOptions}
-                                            onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
-                                            onProcessPayment={async () => {
-                                                 try {
-                                                     if (hook.processPayment) {
-                                                         await hook.processPayment();
-                                                     } else if ((hook as any).handleProcessPayment) {
-                                                         await (hook as any).handleProcessPayment();
-                                                     }
-                                                 } catch (error: any) {
-                                                     console.error("Payment trigger failed:", error);
-                                                     // Fallback toast in case hook doesn't show one
-                                                     const { toast } = await import('@/hooks/use-toast');
-                                                     toast({ 
-                                                        title: "Critical Error", 
-                                                        description: error.message || "Failed to initiate payment processing.", 
-                                                        variant: "destructive" 
-                                                     });
-                                                 }
-                                             }}
-                                            isProcessing={hook.isProcessing ?? false}
-                                          />
-                                        </div>
-                                      )}
-                                </div>
-
-                                {hook.selectedCustomerKey &&
-                                  ((transactionsForSelectedSupplier &&
-                                    Array.isArray(transactionsForSelectedSupplier) &&
-                                    transactionsForSelectedSupplier.length > 0) || hook.editingPayment) && (
-                                    <div className="hidden lg:flex min-w-0 flex-col gap-2">
-                                      <div className="min-w-0 h-[220px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)]">
-                                        <TransactionTable
-                                          suppliers={transactionsForSelectedSupplier}
-                                          onShowDetails={hook.setDetailsSupplierEntry}
-                                          selectedIds={hook.selectedEntryIds}
-                                          onSelectionChange={handleSelectionChange}
-                                          embed
-                                          compact
-                                          showTabsInHeader
-                                          activeTab={activeTransactionTab}
-                                          onTabChange={setActiveTransactionTab}
-                                          onEditEntry={handleEditEntry}
-                                          type={type}
-                                          highlightEntryId={highlightEntryId}
-                                        />
-                                      </div>
-                                      <div className="w-full h-[170px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08),0_1px_3px_0_rgba(0,0,0,0.06)] mt-1">
-                                        <PaymentHistoryCompact
-                                          payments={selectedSupplierPayments}
-                                          onEdit={handleEditPayment}
-                                          onDelete={handleDeletePayment}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="mt-0.5 px-1 sm:px-1.5 pb-1">
-                            {hook.selectedCustomerKey && (
-                              <div
-                                className={`w-full overflow-hidden mb-2 rounded-xl border border-border/60 bg-card shadow-sm p-3 ${
-                                  ((transactionsForSelectedSupplier &&
-                                     Array.isArray(transactionsForSelectedSupplier) &&
-                                     transactionsForSelectedSupplier.length > 0) || hook.editingPayment)
-                                    ? "lg:hidden"
-                                    : ""
-                                }`}
-                              >
-                                <PaymentForm
-                                  {...hook}
-                                  bankAccounts={hook.bankAccounts}
-                                  bankBranches={hook.bankBranches}
-                                  onPaymentMethodChange={handlePaymentMethodChange}
-                                  hideRtgsToggle={false}
-                                  centerName={hook.centerName}
-                                  setCenterName={hook.setCenterName}
-                                  centerNameOptions={hook.centerNameOptions}
-                                  onClearPaymentForm={hook.resetPaymentForm ?? (() => {})}
-                                  onProcessPayment={async () => {
-                                      try {
-                                          if (hook.processPayment) {
-                                              await hook.processPayment();
-                                          } else if ((hook as any).handleProcessPayment) {
-                                              await (hook as any).handleProcessPayment();
-                                          }
-                                      } catch (error: any) {
-                                          console.error("Payment trigger failed (mobile):", error);
-                                          const { toast } = await import('@/hooks/use-toast');
-                                          toast({ 
-                                             title: "Critical Error", 
-                                             description: error.message || "Failed to initiate payment processing.", 
-                                             variant: "destructive" 
-                                          });
-                                      }
-                                  }}
-                                  isProcessing={hook.isProcessing ?? false}
-                                />
-                              </div>
-                            )}
-                            
-                            {/* TransactionTable - Only for supplier/customer, NOT for outsider - Outstanding entries table removed for outsider */}
-                            {/* DO NOT RENDER TransactionTable for outsider type - it shows outstanding entries which we don't need */}
-                            {/* EXPLICITLY CHECK: Never render this entire grid section for outsider type */}
-                            {/* CRITICAL: This section is INSIDE the IIFE, so it will NOT execute for outsider type */}
-                            {!hook.editingPayment && (!transactionsForSelectedSupplier ||
-                              !Array.isArray(transactionsForSelectedSupplier) ||
-                              transactionsForSelectedSupplier.length === 0) && (
-                              <div className="space-y-2 w-full">
-                                <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
-                                  <CardContent className="p-3">
-                                    <div className="flex items-start gap-3">
-                                      <div className="grid size-9 place-items-center rounded-[12px] bg-violet-50 text-violet-700 ring-1 ring-violet-900/[0.06]">
-                                        <FileText className="h-4 w-4" />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="text-[12px] font-semibold text-slate-900">
-                                          {hook.selectedCustomerKey ? "No entries found" : "Supplier select karein"}
-                                        </div>
-                                        <div className="mt-0.5 text-[11px] text-slate-600">
-                                          {hook.selectedCustomerKey
-                                            ? "Is supplier ke liye abhi outstanding entries nahi hain."
-                                            : "Upar search se supplier choose karte hi form, table aur summary yahin dikh jayegi."}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              </div>
-                            )}
-                            
-                            {/* Bank Details and Generate Options - Full Screen Half-Half (Only for Supplier Payments) */}
-                                {type === 'supplier' && hook.paymentMethod === 'RTGS' && (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-2">
-                                {/* Bank Details Section - Left Half */}
-                                <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
-                                  <CardContent className="p-2.5">
-                                    <RtgsForm
-                                      {...hook}
-                                      editingPayment={hook.editingPayment ?? undefined}
-                                      bankAccounts={supplierBankAccounts}
-                                      banks={banks}
-                                      bankBranches={bankBranches}
-                                    />
-                                  </CardContent>
-                                </Card>
-                                {/* Generate Payment Options Section - Right Half */}
-                                <GeneratePaymentOptions
-                                  rtgsQuantity={hook.rtgsQuantity || 0}
-                                  setRtgsQuantity={hook.setRtgsQuantity || (() => {})}
-                                  rtgsRate={hook.rtgsRate || 0}
-                                  setRtgsRate={hook.setRtgsRate || (() => {})}
-                                  rtgsAmount={hook.rtgsAmount || 0}
-                                  setRtgsAmount={hook.setRtgsAmount || (() => {})}
-                                  minRate={hook.minRate || 0}
-                                  setMinRate={hook.setMinRate || (() => {})}
-                                  maxRate={hook.maxRate || 0}
-                                  setMaxRate={hook.setMaxRate || (() => {})}
-                                  selectPaymentAmount={hook.selectPaymentAmount || (() => {})}
-                                  combination={paymentCombination}
-                                  paymentMethod={hook.paymentMethod || 'RTGS'}
-                                />
-                              </div>
-                                )}
-
-                            {/* Gov. Payment Form - Similar to RTGS but without bank details */}
-                                {type === 'supplier' && hook.paymentMethod === 'Gov.' && (
-                              <div className="space-y-2 mt-2">
-                                {/* Gov Receipt Selector Helper and Gov Details - Single Row */}
-                                {hook.selectedCustomerKey && transactionsForSelectedSupplier && transactionsForSelectedSupplier.length > 0 && (
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                                    {/* Gov Receipt Selector Helper - Left Half */}
-                                    <GovReceiptSelector
-                                      availableReceipts={transactionsForSelectedSupplier}
-                                      govRate={hook.govRate || hook.minRate || 0}
-                                      extraAmountPerQuintal={0}
-                                      onSelectReceipts={(receiptIds) => {
-                                        hook.setSelectedEntryIds(new Set(receiptIds));
-                                      }}
-                                      selectedReceiptIds={hook.selectedEntryIds}
-                                      allowManualRsPerQtl={true}
-                                      allowManualGovRate={true}
-                                      calcTargetAmount={hook.rtgsAmount ?? 0}
-                                      setCalcTargetAmount={hook.setRtgsAmount}
-                                      combination={paymentCombination}
-                                      selectPaymentAmount={hook.selectPaymentAmount}
-                                      onSuggestionsChange={setGovSuggestions}
-                                      onExtraAmountChange={hook.setGovExtraAmount}
-                                    />
-                                    {/* Gov. Details Section - Right Half */}
-                                    <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[20px]">
-                                      <CardContent className="p-2.5">
-                                        <GovForm 
-                                          govQuantity={hook.govQuantity}
-                                          setGovQuantity={hook.setGovQuantity}
-                                          govRate={hook.govRate}
-                                          setGovRate={hook.setGovRate}
-                                          govAmount={hook.govAmount}
-                                          setGovAmount={hook.setGovAmount}
-                                          govExtraAmount={hook.govExtraAmount}
-                                          setGovExtraAmount={hook.setGovExtraAmount}
-                                          targetAmount={hook.rtgsAmount || 0}
-                                          minRate={hook.minRate}
-                                          selectedPaymentOption={hook.selectedPaymentOption}
-                                        />
-                                      </CardContent>
-                                    </Card>
-                                  </div>
-                                )}
-                              </div>
-                                )}
-
-            {/* GOV Suggested Combinations - full width below both helper and details */}
-            {(type === 'supplier' && hook.paymentMethod === 'Gov.' && govSuggestions.length > 0) && (
-              <div className="mt-3 rounded-xl border border-border/70 bg-card shadow-[0_4px_14px_rgba(15,23,42,0.10)] overflow-hidden">
-                <div className="px-3 py-2 bg-muted/70 border-b border-border/80 flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-primary">Suggested Combinations</span>
+  return (
+    <div className="space-y-2 text-[12px]">
+      <ProcessingOverlay 
+        show={showProcessingOverlay} 
+        isDeleting={isDeleteProcessing} 
+        isSuccess={isSuccess}
+      />
+      {type === 'outsider' ? (
+        <>
+          <div className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
+            <div className="w-full px-1.5 sm:px-2.5 py-0.5 flex flex-wrap gap-2 items-center text-[12px]">
+              <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                <div className="flex items-center gap-2 md:pl-3">
+                  <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm ?? (() => {})} disabled={hook.isProcessing ?? false}>Clear</Button>
+                  <Button size="sm" className="h-7 text-[11px]" onClick={() => void hook.processPayment?.()} disabled={hook.isProcessing ?? false}>
+                    {hook.isProcessing ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Processing...</> : "Finalize"}
+                  </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+          <div className="w-full max-w-full overflow-hidden space-y-2">
+            <div className="flex flex-col gap-2">
+              <div className="w-full">
+                <RtgsFormOutsider
+                  bankDetails={hook.bankDetails}
+                  setBankDetails={hook.setBankDetails}
+                  setIsBankSettingsOpen={hook.setIsBankSettingsOpen}
+                  supplierDetails={hook.supplierDetails}
+                  setSupplierDetails={hook.setSupplierDetails}
+                  rtgsAmount={hook.rtgsAmount}
+                  setRtgsAmount={hook.setRtgsAmount}
+                  handleProcessPayment={() => void hook.processPayment?.()}
+                  isProcessing={hook.isProcessing ?? false}
+                  bankAccounts={outsiderData?.bankAccounts || []}
+                  banks={outsiderData?.banks || []}
+                  bankBranches={outsiderData?.bankBranches || []}
+                  from={hook.from}
+                  setFrom={hook.setFrom}
+                  selectedAccountId={hook.selectedAccountId}
+                  setSelectedAccountId={hook.setSelectedAccountId}
+                  internalBankAccounts={globalData.bankAccounts}
+                  financialState={supplierHook.financialState}
+                />
+              </div>
+              <div className="w-full h-[210px] overflow-hidden">
+                <PaymentHistoryCompact payments={hook.paymentHistory.filter(p => p.customerId === 'OUTSIDER' && (p.receiptType || "").toLowerCase() === "rtgs")} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
+            <div className="w-full px-2 md:px-2.5 py-1.5 md:py-2.5">
+              <div className="grid grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] gap-3 items-stretch">
+                <div className="min-w-0 max-w-full lg:max-w-[400px] xl:max-w-[450px] flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedHistoryType('cash'); setHistoryDialogOpen(true); }} className="h-7 text-[10px] font-bold flex-1 justify-between px-2 rounded-md border-slate-200 bg-white/80 transition-all shadow-sm">
+                      <span>Cash History</span>
+                      <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1 py-0.5 rounded-[4px] text-[8.5px] font-bold">{cashHistoryRows.length}</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedHistoryType('gov'); setHistoryDialogOpen(true); }} className="h-7 text-[10px] font-bold flex-1 justify-between px-2 rounded-md border-slate-200 bg-white/80 transition-all shadow-sm">
+                      <span>Gov History</span>
+                      <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1 py-0.5 rounded-[4px] text-[8.5px] font-bold">{govHistoryRows.length}</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedHistoryType('rtgs'); setHistoryDialogOpen(true); }} className="h-7 text-[10px] font-bold flex-1 justify-between px-2 rounded-md border-slate-200 bg-white/80 transition-all shadow-sm">
+                      <span>RTGS History</span>
+                      <span className="bg-slate-100 text-slate-700 border border-slate-200 px-1 py-0.5 rounded-[4px] text-[8.5px] font-bold">{rtgsHistoryRows.length}</span>
+                    </Button>
+                  </div>
+                  <PaymentFilters
+                    searchType={searchType}
+                    onSearchTypeChange={setSearchType}
+                    supplierOptions={varietyFilteredSupplierOptions}
+                    selectedSupplierKey={hook.selectedCustomerKey}
+                    onSupplierSelect={onSelectSupplierKey}
+                    serialNoSearch={hook.serialNoSearch}
+                    onSearchTypeChange={setSearchType}
+                    onSerialNoSearch={hook.handleSerialNoSearch ?? (() => {})}
+                    onSerialNoBlur={hook.handleSerialNoBlur ?? (() => {})}
+                    filterStartDate={filterStartDate}
+                    filterEndDate={filterEndDate}
+                    filterVariety={filterVariety}
+                    varietyOptions={varietyOptions}
+                    hasActiveFilters={hasActiveSupplierFilters}
+                    onFilterStartDateChange={setFilterStartDate}
+                    onFilterEndDateChange={setFilterEndDate}
+                    onFilterVarietyChange={setFilterVariety}
+                    onClearFilters={handleClearSupplierFilters}
+                    extraActions={
+                      <div className="flex items-center gap-1">
+                        <Button onClick={() => setIsStatementOpen(true)} size="sm" disabled={!hook.selectedCustomerKey} className="h-7 px-2 py-0 text-[10px] font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent disabled:opacity-50">
+                          <FileText className="h-3.5 w-3.5 mr-1" />Statement
+                        </Button>
+                        <Button type="button" size="sm" className="h-7 px-2 text-[10px] font-semibold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent disabled:opacity-50 flex items-center" onClick={() => setIsSummaryOpen(true)}>Summary</Button>
+                      </div>
+                    }
+                  />
+                  {(hook.selectedCustomerKey || hook.editingPayment) && (
+                    <div className="hidden lg:block h-full">
+                      <PaymentForm {...hook} bankAccounts={hook.bankAccounts} bankBranches={hook.bankBranches} onPaymentMethodChange={handlePaymentMethodChange} hideRtgsToggle={false} centerName={hook.centerName} setCenterName={hook.setCenterName} centerNameOptions={hook.centerNameOptions} onClearPaymentForm={hook.resetPaymentForm ?? (() => {})} onProcessPayment={async () => {
+                        try {
+                          if (hook.processPayment) await hook.processPayment();
+                          else if ((hook as any).handleProcessPayment) await (hook as any).handleProcessPayment();
+                        } catch (error: any) {
+                          console.error("Payment trigger failed:", error);
+                          const { toast } = await import('@/hooks/use-toast');
+                          toast({ title: "Critical Error", description: error.message || "Failed to initiate payment processing.", variant: "destructive" });
+                        }
+                      }} isProcessing={hook.isProcessing ?? false} />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 h-full">
+                  <div className="hidden lg:flex min-w-0 flex-col gap-1.5 h-[380px] overflow-hidden">
+                    {hook.selectedCustomerKey && (transactionsForSelectedSupplier.length > 0 || hook.editingPayment) ? (
+                      <>
+                        <div className="min-w-0 flex-[3] overflow-hidden rounded-lg border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08)]">
+                          <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} />
+                        </div>
+                        <div className="w-full flex-[2] overflow-hidden rounded-lg border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08)]">
+                          <PaymentHistoryCompact payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full">
+                        <Card className="h-full rounded-lg border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md flex items-center justify-center">
+                          <CardContent className="p-6">
+                            <div className="flex flex-col items-center text-center gap-4">
+                              <div className="grid size-12 place-items-center rounded-[12px] bg-violet-50 text-violet-700 ring-1 ring-violet-900/[0.06] shadow-sm"><FileText className="h-6 w-6" /></div>
+                              <div className="min-w-0">
+                                <div className="text-[14px] font-semibold text-slate-900">{hook.selectedCustomerKey ? "No entries found" : "Supplier select karein"}</div>
+                                <div className="mt-1 text-[12px] text-slate-600 max-w-[300px] leading-relaxed">{hook.selectedCustomerKey ? "Is supplier ke liye abhi outstanding entries nahi hain." : "Upar search se supplier choose karte hi form, table aur summary yahin dikh jayegi."}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                  </div>
+                  <div className="lg:hidden">
+                    <Tabs defaultValue="form" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/50 p-1">
+                        <TabsTrigger value="form" className="text-[10px] py-1">Form</TabsTrigger>
+                        <TabsTrigger value="entries" className="text-[10px] py-1">Entries</TabsTrigger>
+                        <TabsTrigger value="history" className="text-[10px] py-1">History</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="form" className="mt-2 space-y-2">
+                        {hook.selectedCustomerKey && (
+                          <div className="w-full overflow-hidden rounded-xl border border-border/60 bg-card p-3 shadow-sm">
+                            <PaymentForm {...hook} bankAccounts={hook.bankAccounts} bankBranches={hook.bankBranches} onPaymentMethodChange={handlePaymentMethodChange} hideRtgsToggle={false} centerName={hook.centerName} setCenterName={hook.setCenterName} centerNameOptions={hook.centerNameOptions} onClearPaymentForm={hook.resetPaymentForm ?? (() => {})} onProcessPayment={async () => {
+                              try {
+                                if (hook.processPayment) await hook.processPayment();
+                                else if ((hook as any).handleProcessPayment) await (hook as any).handleProcessPayment();
+                              } catch (error: any) {
+                                console.error("Payment mobile failed:", error);
+                                const { toast } = await import('@/hooks/use-toast');
+                                toast({ title: "Critical Error", description: error.message || "Failed to initiate payment processing.", variant: "destructive" });
+                              }
+                            }} isProcessing={hook.isProcessing ?? false} />
+                          </div>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="entries" className="mt-2 text-[10px]">
+                        {hook.selectedCustomerKey && transactionsForSelectedSupplier.length > 0 && (
+                          <div className="min-w-0 h-[250px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+                            <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} />
+                          </div>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="history" className="mt-2">
+                        <div className="w-full h-[250px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+                          <PaymentHistoryCompact payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-0.5 px-1 sm:px-1.5 pb-1">
+            {type === 'supplier' && hook.paymentMethod === 'RTGS' && (
+              <div className="grid grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] gap-3 mt-2">
+                <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-lg h-full max-w-full lg:max-w-[400px] xl:max-w-[450px] rounded-md"><CardContent className="p-2.5 h-full"><RtgsForm {...hook} editingPayment={hook.editingPayment ?? undefined} bankAccounts={supplierBankAccounts} internalBankAccounts={globalData.bankAccounts} financialState={supplierHook.financialState} banks={banks} bankBranches={bankBranches} /></CardContent></Card>
+                <div className="h-full min-w-0">
+                  <GeneratePaymentOptions rtgsQuantity={hook.rtgsQuantity || 0} setRtgsQuantity={hook.setRtgsQuantity || (() => {})} rtgsRate={hook.rtgsRate || 0} setRtgsRate={hook.setRtgsRate || (() => {})} rtgsAmount={hook.rtgsAmount || 0} setRtgsAmount={hook.setRtgsAmount || (() => {})} minRate={hook.minRate || 0} setMinRate={hook.setMinRate || (() => {})} maxRate={hook.maxRate || 0} setMaxRate={hook.setMaxRate || (() => {})} selectPaymentAmount={hook.selectPaymentAmount || (() => {})} combination={paymentCombination} paymentMethod={hook.paymentMethod || 'RTGS'} />
+                </div>
+              </div>
+            )}
+            {type === 'supplier' && hook.paymentMethod === 'Gov.' && (
+              <div className="space-y-2 mt-2">
+                {hook.selectedCustomerKey && transactionsForSelectedSupplier.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] gap-3">
+                    <div className="h-full max-w-full lg:max-w-[400px] xl:max-w-[450px]">
+                      <Card className="text-[10px] border border-slate-200/80 !bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-lg h-full rounded-md"><CardContent className="p-2.5 h-full"><GovForm govQuantity={hook.govQuantity} setGovQuantity={hook.setGovQuantity} govRate={hook.govRate} setGovRate={hook.setGovRate} govAmount={hook.govAmount} setGovAmount={hook.setGovAmount} govExtraAmount={hook.govExtraAmount} setGovExtraAmount={hook.setGovExtraAmount} targetAmount={hook.rtgsAmount || 0} minRate={hook.minRate} selectedPaymentOption={hook.selectedPaymentOption} /></CardContent></Card>
+                    </div>
+                    <GovReceiptSelector availableReceipts={transactionsForSelectedSupplier} govRate={hook.govRate || hook.minRate || 0} extraAmountPerQuintal={0} onSelectReceipts={(ids) => hook.setSelectedEntryIds(new Set(ids))} selectedReceiptIds={hook.selectedEntryIds} allowManualRsPerQtl={true} allowManualGovRate={true} calcTargetAmount={hook.rtgsAmount ?? 0} setCalcTargetAmount={hook.setRtgsAmount} combination={paymentCombination} selectPaymentAmount={hook.selectPaymentAmount} onSuggestionsChange={setGovSuggestions} onExtraAmountChange={hook.setGovExtraAmount} />
+                  </div>
+                )}
+              </div>
+            )}
+            {type === 'supplier' && hook.paymentMethod === 'Gov.' && govSuggestions.length > 0 && (
+              <div className="mt-3 rounded-md border border-border/70 bg-card shadow-lg overflow-hidden">
+                <div className="px-3 py-2 bg-muted/70 border-b border-border/80"><span className="text-[11px] font-semibold text-primary">Suggested Combinations</span></div>
                 <div className="max-h-[320px] overflow-y-auto">
-                  <table className="w-full text-[9px]">
-                    <thead className="bg-muted/50 border-b border-border">
-                      <tr className="h-7">
-                        <th className="px-2 text-left font-bold w-[40px]">Select</th>
-                        <th className="px-2 text-left font-bold w-[60px]">Type</th>
-                        <th className="px-2 text-left font-bold">Entries</th>
-                        <th className="px-2 text-right font-bold w-[70px]">Normal</th>
-                        <th className="px-2 text-right font-bold w-[70px]">Gov Extra</th>
-                        <th className="px-2 text-right font-bold w-[80px]">To Be Paid</th>
-                        <th className="px-2 text-right font-bold w-[80px]">Total Amt</th>
-                        <th className="px-2 text-right font-bold w-[70px]">Excess</th>
+                  <table className="w-full text-[9px]"><thead className="bg-muted/50 border-b"><tr><th className="px-2 text-left w-[40px]">Select</th><th className="px-2 text-left w-[60px]">Type</th><th className="px-2 text-left">Entries</th><th className="px-2 text-right w-[70px]">Normal</th><th className="px-2 text-right w-[70px]">Extra</th><th className="px-2 text-right w-[80px]">To Pay</th><th className="px-2 text-right w-[70px]">Diff</th></tr></thead>
+                    <tbody>{govSuggestions.map((comb, idx) => (
+                      <tr key={idx} className="h-7 border-b border-border/60 hover:bg-muted/30">
+                        <td className="px-2"><input type="checkbox" className="h-3 w-3" checked={Array.isArray(comb.receipts) && comb.receipts.every((r: any) => hook.selectedEntryIds.has(r.id || r.srNo))} onChange={() => { const ids = (comb.receipts || []).map((r: any) => r.id || r.srNo); hook.setSelectedEntryIds(new Set(ids)); hook.setGovAmount?.(comb.totalNormal); hook.setGovExtraAmount?.(comb.totalExtra); }} /></td>
+                        <td className="px-2 font-medium">{comb.type}</td><td className="px-2 truncate max-w-[140px]">{(comb.details || []).map((d: any) => d.srNo).join(", ")}</td>
+                        <td className="px-2 text-right tabular-nums">{formatCurrency(comb.totalNormal)}</td><td className="px-2 text-right text-primary tabular-nums">{formatCurrency(comb.totalExtra)}</td><td className="px-2 text-right font-bold text-primary tabular-nums">{formatCurrency(comb.totalGov)}</td>
+                        <td className={cn("px-2 text-right tabular-nums", (comb.difference ?? 0) > 0 ? "text-primary" : "text-muted-foreground")}>{ (comb.difference ?? 0) > 0 ? `+${formatCurrency(comb.difference)}` : formatCurrency(comb.difference) }</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {govSuggestions.map((comb, idx) => {
-                        const difference = comb.difference ?? 0;
-                        const totalNormal = comb.totalNormal ?? 0;
-                        const totalExtra = comb.totalExtra ?? 0;
-                        const totalGov = comb.totalGov ?? 0;
-                        return (
-                          <tr key={idx} className="h-7 border-b border-border/60 hover:bg-muted/30 transition-colors">
-                            <td className="px-2">
-                              <input
-                                type="checkbox"
-                                className="h-3 w-3"
-                                checked={Array.isArray(comb.receipts) && comb.receipts.every((r: any) => hook.selectedEntryIds.has(r.id || r.srNo))}
-                                onChange={() => {
-                                  const receiptIds = (comb.receipts || []).map((r: any) => r.id || r.srNo);
-                                  hook.setSelectedEntryIds(new Set(receiptIds));
-                                  hook.setGovAmount?.(totalNormal);
-                                  hook.setGovExtraAmount?.(totalExtra);
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 font-medium">{comb.type}</td>
-                            <td className="px-2 truncate max-w-[140px]" title={(comb.details || []).map((d: any) => `${d.srNo}: Norm ${formatCurrency(d.normalAmount || 0)}, Extra ${formatCurrency(d.extraAmount || 0)}`).join(" | ")}>
-                              {(comb.details || []).map((d: any) => d.srNo).join(", ")}
-                            </td>
-                            <td className="px-2 text-right font-semibold tabular-nums">{formatCurrency(totalNormal)}</td>
-                            <td className="px-2 text-right font-semibold tabular-nums text-primary">{formatCurrency(totalExtra)}</td>
-                            <td className="px-2 text-right font-bold text-primary tabular-nums" title="To Be Paid = Normal + Gov Extra (as-is)">{formatCurrency(totalGov)}</td>
-                            <td className="px-2 text-right font-semibold tabular-nums" title="Total = Normal + Gov Extra (for balance)">{formatCurrency(totalGov)}</td>
-                            <td
-                              className={cn(
-                                "px-2 text-right font-semibold tabular-nums",
-                                difference > 0 ? "text-primary" : "text-muted-foreground"
-                              )}
-                            >
-                              {difference > 0 ? `+${formatCurrency(difference)}` : formatCurrency(difference)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
+                    ))}</tbody>
                   </table>
                 </div>
               </div>
             )}
-
-                </div>
-                </>
-             )}
-
-            {(type === 'supplier' && (hook.paymentMethod === 'RTGS' || hook.paymentMethod === 'Gov.') && paymentCombination.sortedPaymentOptions.length > 0) && (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-muted-foreground">Generated Payment Options</h3>
-                  <span className="text-[11px] text-muted-foreground">{paymentCombination.sortedPaymentOptions.length} combinations</span>
-                </div>
-                <PaymentCombinationResults
-                  options={paymentCombination.sortedPaymentOptions}
-                  requestSort={paymentCombination.requestSort}
-                  onSelect={hook.selectPaymentAmount || (() => {})}
-                />
-              </div>
-            )}
-
-            {/* Summary at bottom when Cash or Gov selected – pic wala dashboard layout (supplier + customer) */}
-            {(type === 'supplier' || type === 'customer') && (hook.paymentMethod === 'Cash' || hook.paymentMethod === 'Gov.') && filteredSupplierSummary && (
-              <div className="mt-4 w-full min-w-0">
-                <SupplierSummaryCards summary={filteredSupplierSummary} variant="dashboard" type={type} />
-              </div>
-            )}
-
- 
-            <DetailsDialog
-              isOpen={!!hook.detailsSupplierEntry}
-              onOpenChange={() => (hook.setDetailsSupplierEntry ? hook.setDetailsSupplierEntry(null) : void 0)}
-              customer={hook.detailsSupplierEntry}
-              paymentHistory={hook.paymentHistory}
-              entryType="Supplier"
-            />
-
-            <PaymentDetailsDialog
-              payment={hook.selectedPaymentForDetails}
-              suppliers={hook.suppliers}
-              onOpenChange={() => (hook.setSelectedPaymentForDetails ? hook.setSelectedPaymentForDetails(null) : void 0)}
-              onShowEntryDetails={hook.setDetailsSupplierEntry || (() => {})}
-            />
-            
-           <RTGSReceiptDialog
-                payment={hook.rtgsReceiptData}
-                settings={hook.receiptSettings}
-                onOpenChange={() => hook.setRtgsReceiptData(null)}
-           />
-
-          <BankSettingsDialog
-          isOpen={!!hook.isBankSettingsOpen}
-          onOpenChange={hook.setIsBankSettingsOpen || (() => {})}
-          />
-
-          {/* Outstanding selection dialog removed as requested */}
-          
-          {/* Summary moved next to PaymentForm */}
-
-
-          {type === 'supplier' ? (
-            <SupplierEntryEditDialog
-              open={editEntryDialogOpen && !!selectedEntryForEdit}
-              onOpenChange={handleEditEntryDialogOpenChange}
-              entry={selectedEntryForEdit}
-              onSuccess={async () => {
-                // Highlight and scroll to entry in table
-                if (selectedEntryForEdit?.id) {
-                  setHighlightEntryId(selectedEntryForEdit.id);
-                  setTimeout(() => setHighlightEntryId(null), 3000);
-                }
-                
-                // Force refresh of supplier data and summary
-                setSupplierDataRefreshKey(Date.now());
-                
-                // Wait a bit for the local update to propagate to IndexedDB
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                // Force a recalculation by temporarily clearing and resetting the selected supplier
-                const currentKey = hook.selectedCustomerKey;
-                if (currentKey) {
-                  // Temporarily clear to force summary recalculation
-                  hook.handleCustomerSelect(null);
-                  // Reset immediately to trigger recalculation with updated data
-                  setTimeout(() => {
-                    hook.handleCustomerSelect(currentKey);
-                  }, 50);
-                }
-              }}
-            />
-          ) : (
-            <CustomerEntryEditDialog
-              open={editEntryDialogOpen && !!selectedEntryForEdit}
-              onOpenChange={handleEditEntryDialogOpenChange}
-              entry={selectedEntryForEdit}
-              onSuccess={async () => {
-                // Force immediate refresh of customer data and summary for hand-to-hand update
-                setSupplierDataRefreshKey(Date.now());
-                
-                // Highlight and scroll to entry in table
-                if (selectedEntryForEdit?.id) {
-                  setHighlightEntryId(selectedEntryForEdit.id);
-                  setTimeout(() => setHighlightEntryId(null), 3000);
-                }
-                
-                // Wait for local update to complete and sync to Firestore
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                // Force a recalculation by temporarily clearing and resetting the selected customer
-                const currentKey = hook.selectedCustomerKey;
-                if (currentKey) {
-                  // Temporarily clear to force summary recalculation
-                  hook.handleCustomerSelect(null);
-                  // Reset immediately to trigger recalculation with updated data
-                  setTimeout(() => {
-                    hook.handleCustomerSelect(currentKey);
-                  }, 50);
-                }
-                
-                // If using customer hook, force refresh of customer data
-                if (type === 'customer' && customerHook) {
-                  // The hook will automatically refresh via realtime listeners
-                  // But we can trigger a manual refresh if needed
-
-                }
-              }}
-            />
-          )}
-
-          <PaymentDialogs
-            isStatementOpen={isStatementOpen}
-            setIsStatementOpen={setIsStatementOpen}
-            selectedSupplierSummary={selectedSupplierSummary}
-            filteredSupplierSummary={filteredSupplierSummary}
-            isSummaryOpen={isSummaryOpen}
-            setIsSummaryOpen={setIsSummaryOpen}
-            historyDialogOpen={historyDialogOpen}
-            setHistoryDialogOpen={setHistoryDialogOpen}
-            selectedHistoryType={selectedHistoryType}
-            cashHistoryRows={cashHistoryRows}
-            rtgsHistoryRows={rtgsHistoryRows}
-            govHistoryRows={govHistoryRows}
-            onEditPayment={handleEditPayment}
-            onDeletePayment={hook.handleDeletePayment}
-          />
+          </div>
+        </>
+      )}
+      {type === 'supplier' && (hook.paymentMethod === 'RTGS' || hook.paymentMethod === 'Gov.') && paymentCombination.sortedPaymentOptions.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-muted-foreground">Generated Payment Options</h3><span className="text-[11px] text-muted-foreground">{paymentCombination.sortedPaymentOptions.length} combinations</span></div>
+          <PaymentCombinationResults options={paymentCombination.sortedPaymentOptions} requestSort={paymentCombination.requestSort} onSelect={hook.selectPaymentAmount || (() => {})} />
         </div>
-    );
+      )}
+      {(type === 'supplier' || type === 'customer') && (hook.paymentMethod === 'Cash' || hook.paymentMethod === 'Gov.') && filteredSupplierSummary && (
+        <div className="mt-4 w-full"><SupplierSummaryCards summary={filteredSupplierSummary} variant="dashboard" type={type} /></div>
+      )}
+      <DetailsDialog isOpen={!!hook.detailsSupplierEntry} onOpenChange={() => (hook.setDetailsSupplierEntry ? hook.setDetailsSupplierEntry(null) : void 0)} customer={hook.detailsSupplierEntry} paymentHistory={hook.paymentHistory} entryType="Supplier" />
+      <PaymentDetailsDialog payment={hook.selectedPaymentForDetails} suppliers={hook.suppliers} onOpenChange={() => (hook.setSelectedPaymentForDetails ? hook.setSelectedPaymentForDetails(null) : void 0)} onShowEntryDetails={hook.setDetailsSupplierEntry || (() => {})} />
+      <RTGSReceiptDialog payment={hook.rtgsReceiptData} settings={hook.receiptSettings} onOpenChange={() => hook.setRtgsReceiptData(null)} />
+      <BankSettingsDialog isOpen={!!hook.isBankSettingsOpen} onOpenChange={hook.setIsBankSettingsOpen || (() => {})} />
+      {type === 'supplier' ? (
+        <SupplierEntryEditDialog open={editEntryDialogOpen && !!selectedEntryForEdit} onOpenChange={handleEditEntryDialogOpenChange} entry={selectedEntryForEdit} onSuccess={async () => { if (selectedEntryForEdit?.id) { setHighlightEntryId(selectedEntryForEdit.id); setTimeout(() => setHighlightEntryId(null), 3000); } setSupplierDataRefreshKey(Date.now()); await new Promise(res => setTimeout(res, 300)); const key = hook.selectedCustomerKey; if (key) { hook.handleCustomerSelect(null); setTimeout(() => hook.handleCustomerSelect(key), 50); } }} />
+      ) : (
+        <CustomerEntryEditDialog open={editEntryDialogOpen && !!selectedEntryForEdit} onOpenChange={handleEditEntryDialogOpenChange} entry={selectedEntryForEdit} onSuccess={async () => { setSupplierDataRefreshKey(Date.now()); if (selectedEntryForEdit?.id) { setHighlightEntryId(selectedEntryForEdit.id); setTimeout(() => setHighlightEntryId(null), 3000); } await new Promise(res => setTimeout(res, 300)); const key = hook.selectedCustomerKey; if (key) { hook.handleCustomerSelect(null); setTimeout(() => hook.handleCustomerSelect(key), 50); } }} />
+      )}
+      <PaymentDialogs isStatementOpen={isStatementOpen} setIsStatementOpen={setIsStatementOpen} selectedSupplierSummary={selectedSupplierSummary} filteredSupplierSummary={filteredSupplierSummary} isSummaryOpen={isSummaryOpen} setIsSummaryOpen={setIsSummaryOpen} historyDialogOpen={historyDialogOpen} setHistoryDialogOpen={setHistoryDialogOpen} selectedHistoryType={selectedHistoryType} cashHistoryRows={cashHistoryRows} rtgsHistoryRows={rtgsHistoryRows} govHistoryRows={govHistoryRows} onEditPayment={handleEditPayment} onDeletePayment={hook.handleDeletePayment} />
+    </div>
+  );
 }
 
 export default React.memo(SupplierPaymentsClient);

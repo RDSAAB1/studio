@@ -53,6 +53,7 @@ export const formSchema = z.object({
     baseReport: z.coerce.number().min(0).optional(),
     collectedReport: z.coerce.number().min(0).optional(),
     riceBranGst: z.coerce.number().min(0).optional(),
+    calculatedRate: z.coerce.number().optional().nullable(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -140,6 +141,7 @@ const getInitialFormValues = (lastVariety?: string, lastPaymentType?: string, in
     baseReport: 0,
     collectedReport: 0,
     riceBranGst: 0,
+    calculatedRate: null,
   };
 };
 

@@ -241,21 +241,21 @@ export function ManufacturingCosting() {
     };
 
     return (
-        <Card className="w-full">
-            <CardHeader>
+        <Card className="w-full shadow-none border sm:shadow-sm">
+            <CardHeader className="p-3 sm:p-6 pb-2">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Calculator className="h-5 w-5" />
-                            Manufacturing Costing & Product Analysis
+                        <CardTitle className="flex items-center gap-2 text-base sm:text-xl">
+                            <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
+                            Manufacturing Costing
                         </CardTitle>
-                        <CardDescription>
-                            Calculate costing for multiple products from raw material with percentage breakdown
+                        <CardDescription className="text-[11px] sm:text-sm">
+                            Raw material costing with percentage breakdown
                         </CardDescription>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-6 pt-0">
                 {isLoading && (
                     <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -265,17 +265,14 @@ export function ManufacturingCosting() {
                 {!isLoading && (
                 <>
                 {/* Cost Allocation Method */}
-                <Card className="bg-primary/5 border-primary/20">
-                    <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Settings className="h-4 w-4" />
-                            Cost Allocation Method
+                <Card className="bg-primary/5 border-primary/20 shadow-none">
+                    <CardHeader className="p-3 pb-1 sm:p-6">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                            <Settings className="h-3.5 w-3.5" />
+                            Cost Allocation
                         </CardTitle>
-                        <CardDescription>
-                            Choose how cost should be allocated to products
-                        </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                         <div className="flex items-center gap-4">
                             <Label htmlFor="allocationMethod" className="font-medium">
                                 Allocation Method:
@@ -329,11 +326,11 @@ export function ManufacturingCosting() {
                 </Card>
 
                 {/* Raw Material Input */}
-                <Card className="bg-muted/50">
-                    <CardHeader>
-                        <CardTitle className="text-base">Raw Material Input</CardTitle>
+                <Card className="bg-muted/50 shadow-none border">
+                    <CardHeader className="p-3 pb-1 sm:p-6">
+                        <CardTitle className="text-sm sm:text-base">Raw Material Input</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="buyingRate" className="flex items-center gap-2">

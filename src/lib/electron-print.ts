@@ -45,8 +45,9 @@ export async function printHtmlContent(htmlContent: string, styles: string = '')
       throw new Error(result.error);
     }
   } else {
-    // 🌐 Browser fallback: use iframe trick
-    printViaIframe(fullHtml);
+    // 🌐 Browser fallback: use popup window
+    console.log('[Print] Proceeding with web browser print. Full document:', isFullDocument);
+    printViaIframe(fullHtml, isFullDocument);
   }
 }
 
@@ -57,61 +58,83 @@ export async function printFullHtml(fullHtml: string): Promise<void> {
   return printHtmlContent(fullHtml);
 }
 
-function printViaIframe(fullHtml: string) {
-  // For Web Browsers, the most robust way to print without layout collapsing or Chrome's iframe throtttling
-  // is to open a temporary popup window, inject the precise HTML and styles, print, and auto-close.
-  const printWindow = window.open('', '_blank', 'width=800,height=600,top=100,left=100');
+function printViaIframe(fullHtml: string, isFullDocument: boolean = false) {
+  // Open a temporary popup window
+  const printWindow = window.open('', '_blank', 'width=900,height=700,top=50,left=50');
   
   if (!printWindow) {
-    // If popups are blocked, alert the user (very rare when triggered directly by a click event)
     console.warn("Print popup was blocked by the browser.");
-    alert("Please allow popups for this site to print receipts.");
+    alert("Please allow popups for this site to print. Popup blocker might be preventing the report from opening.");
     return;
   }
 
   const iframeDoc = printWindow.document;
+  
+  // Write the HTML content
   iframeDoc.open();
   iframeDoc.write(fullHtml);
   iframeDoc.close();
 
-  // Copy app styles (Tailwind/CSS) robustly
-  const headElements = document.querySelectorAll('link[rel="stylesheet"], style');
-  headElements.forEach(el => {
-    try {
-      iframeDoc.head.appendChild(el.cloneNode(true));
-    } catch { /* ignore */ }
-  });
+  // CRITICAL: If it's a full document (like our reports), it already has its own <style> block.
+  // Cloning the app's entire Tailwind/Next.js CSS is redundant, slow, and often causes blank pages/errors.
+  if (!isFullDocument) {
+    console.log('[Print] Injecting parent styles for partial content...');
+    // Copy app styles (Tailwind/CSS) robustly
+    const headElements = document.querySelectorAll('link[rel="stylesheet"], style');
+    headElements.forEach(el => {
+      try {
+        iframeDoc.head.appendChild(el.cloneNode(true));
+      } catch { /* ignore */ }
+    });
 
-  // Fallback programmatic style copy (critical for dev environments like Next.js/Vite)
-  Array.from(document.styleSheets).forEach(styleSheet => {
-    try {
-      if (styleSheet.href) return; // Handled by link tag clone
-      const style = iframeDoc.createElement('style');
-      style.textContent = Array.from(styleSheet.cssRules).map(r => r.cssText).join('');
-      iframeDoc.head.appendChild(style);
-    } catch { /* CORS - skip */ }
-  });
+    // Fallback programmatic style copy
+    Array.from(document.styleSheets).forEach(styleSheet => {
+      try {
+        if (styleSheet.href) return; // Handled by link tag clone
+        const style = iframeDoc.createElement('style');
+        style.textContent = Array.from(styleSheet.cssRules).map(r => r.cssText).join('');
+        iframeDoc.head.appendChild(style);
+      } catch { /* CORS - skip */ }
+    });
+  } else {
+    console.log('[Print] Full document detected. Skipping parent style injection.');
+  }
 
   let printed = false;
   const doPrint = () => {
     if (printed) return;
+    
+    // Check if content actually exists
+    if (!iframeDoc.body || iframeDoc.body.innerHTML.trim() === '') {
+      console.warn('[Print] Content body is not ready yet.');
+      return;
+    }
+
     printed = true;
+    console.log('[Print] Triggering native print dialog...');
     
     // Clean up AFTER the print dialog closes
     printWindow.addEventListener('afterprint', () => {
+      console.log('[Print] User closed print dialog. Closing window.');
       printWindow.close();
     });
 
     printWindow.focus();
     printWindow.print();
     
-    // Fallback cleanup if afterprint doesn't fire
+    // Fallback cleanup
     setTimeout(() => {
-      try { printWindow.close(); } catch {}
-    }, 300000);
+      try { if (!printWindow.closed) printWindow.close(); } catch {}
+    }, 60000);
   };
   
-  // Give it time to apply the cloned styles and fetch images
-  printWindow.addEventListener('load', doPrint, { once: true });
-  setTimeout(doPrint, 1500);
+  // Use multiple triggers to ensure print dialog opens
+  printWindow.addEventListener('load', () => {
+    console.log('[Print] Window Load event fired.');
+    doPrint();
+  }, { once: true });
+
+  // Safety timeouts
+  setTimeout(doPrint, 500); 
+  setTimeout(doPrint, 2500); 
 }

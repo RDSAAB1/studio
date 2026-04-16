@@ -14,9 +14,9 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
   );
 
   return (
-    <div className="tab-bar-container h-[44px] flex items-center -mb-px w-full px-1 sm:px-2" style={{ borderRadius: 0 }}>
+    <div className="tab-bar-container h-[32px] sm:h-[44px] flex items-center -mb-px w-full px-1" style={{ borderRadius: 0 }}>
       <div 
-        className="flex items-center w-full gap-1.5"
+        className="flex items-center w-full gap-1 sm:gap-1.5"
       >
         {uniqueTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;

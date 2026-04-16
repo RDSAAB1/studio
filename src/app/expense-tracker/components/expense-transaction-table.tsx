@@ -34,47 +34,47 @@ const TransactionRow = React.memo(({
   onDelete: (t: any) => void;
 }) => (
   <TableRow 
-    className="group border-none odd:bg-slate-50/60 even:bg-white hover:bg-primary/10 transition-colors h-7"
+    className="group border-none odd:bg-slate-50/60 even:bg-white hover:bg-primary/10 transition-colors h-6 sm:h-7"
   >
-    <TableCell className="font-medium text-slate-600 px-2 py-1 text-[11px]">
+    <TableCell className="font-medium text-slate-600 px-1 sm:px-2 py-0.5 sm:py-1 text-[9px] min-[400px]:text-[10px] sm:text-[11px]">
       {index + 1}
     </TableCell>
-    <TableCell className="font-medium whitespace-nowrap px-2 py-1 text-slate-800 text-[11px]">
+    <TableCell className="font-medium whitespace-nowrap px-1 sm:px-2 py-0.5 sm:py-1 text-slate-800 text-[9px] min-[400px]:text-[10px] sm:text-[11px]">
       {format(new Date(transaction.date), "dd MMM yyyy")}
     </TableCell>
-    <TableCell className="font-medium text-slate-600 px-2 py-1 text-[11px]">
+    <TableCell className="font-medium text-slate-600 px-1 sm:px-2 py-0.5 sm:py-1 text-[9px] min-[400px]:text-[10px] sm:text-[11px]">
       {transaction.transactionId}
     </TableCell>
-    <TableCell className="px-2 py-1">
+    <TableCell className="px-1 sm:px-2 py-0.5 sm:py-1">
       <div className="flex flex-col text-slate-900">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-xs truncate">{transaction.payee}</span>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <span className="font-bold text-[10px] sm:text-xs truncate">{transaction.payee}</span>
           {(transaction as any).isInternal && (
-            <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-bold rounded uppercase leading-none border border-violet-200">
+            <span className="px-1 py-0 bg-violet-100 text-violet-700 text-[7px] sm:text-[8px] font-bold rounded uppercase leading-none border border-violet-200">
               Adjust
             </span>
           )}
         </div>
         {transaction.description && (
-          <span className="text-[10px] text-slate-600 mt-0.5 truncate">
+          <span className="text-[9px] sm:text-[10px] text-slate-600 mt-0 sm:mt-0.5 truncate">
             {transaction.description}
           </span>
         )}
       </div>
     </TableCell>
-    <TableCell className="text-right font-bold text-[11px] px-2 py-1 text-primary">
+    <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-primary">
       {transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}
     </TableCell>
-    <TableCell className="text-right font-bold text-[11px] px-2 py-1 text-[#dc2626]">
+    <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-[#dc2626]">
       {transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}
     </TableCell>
     <TableCell className={cn(
-      "text-right font-bold text-[11px] px-2 py-1",
+      "text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1",
       transaction.balance >= 0 ? "text-primary" : "text-rose-700"
     )}>
       {formatCurrency(Math.abs(transaction.balance))}
     </TableCell>
-    <TableCell className="text-right px-2 py-1">
+    <TableCell className="text-right px-1 sm:px-2 py-0.5 sm:py-1">
       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
@@ -150,19 +150,19 @@ export function TransactionTable({
   return (
     <div className="w-full rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] border-b-[3px] border-b-primary/20 overflow-hidden flex flex-col h-full">
       {/* Dark Top Bar */}
-      <div className="bg-primary/20 text-slate-900 px-4 py-2 flex justify-between items-center shrink-0 border-b border-primary/30">
-        <div className="font-bold text-sm">Transaction History</div>
-        <div className="flex gap-6 text-xs font-medium">
+      <div className="bg-primary/20 text-slate-900 px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center shrink-0 border-b border-primary/30">
+        <div className="font-bold text-[11px] sm:text-sm">Transaction History</div>
+        <div className="flex gap-2 sm:gap-6 text-[9.5px] min-[400px]:text-[10px] sm:text-xs font-medium">
             <div className="flex items-center gap-1">
-            <span className="text-slate-600">Showing:</span>
-            <span className="text-slate-900">{visibleTransactions.length} of {transactions.length}</span>
+            <span className="text-slate-600">Show:</span>
+            <span className="text-slate-900">{visibleTransactions.length}/{transactions.length}</span>
             </div>
             <div className="flex items-center gap-1">
-            <span className="text-slate-600">Income:</span>
+            <span className="text-slate-600">In:</span>
             <span className="text-primary">{counts.income}</span>
             </div>
             <div className="flex items-center gap-1">
-            <span className="text-slate-600">Expense:</span>
+            <span className="text-slate-600">Ex:</span>
             <span className="text-rose-600">{counts.expense}</span>
             </div>
         </div>
@@ -182,21 +182,21 @@ export function TransactionTable({
               <col className="w-[6%]" />
             </colgroup>
             <TableHeader className="table-header-compact">
-              <TableRow className="border-none h-7">
-                <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">S.No</TableHead>
-                <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">Date</TableHead>
-                <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">ID</TableHead>
-                <TableHead className="h-7 px-2 py-1 font-bold text-slate-900 text-xs">Payee / Description</TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs text-primary">
-                  {selectedAccount ? 'Credit (+)' : 'Income'}
+              <TableRow className="border-none h-6 sm:h-7">
+                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">S.No</TableHead>
+                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Date</TableHead>
+                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">ID</TableHead>
+                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Payee / Description</TableHead>
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-primary">
+                  {selectedAccount ? 'Credit' : 'Income'}
                 </TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs text-[#dc2626]">
-                  {selectedAccount ? 'Debit (-)' : 'Expense'}
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-[#dc2626]">
+                  {selectedAccount ? 'Debit' : 'Expense'}
                 </TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs">
-                  {selectedAccount ? 'Net Balance' : 'Running Balance'}
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">
+                  {selectedAccount ? 'Net' : 'Running'}
                 </TableHead>
-                <TableHead className="text-right h-7 px-2 py-1 font-bold text-slate-900 text-xs pr-4">Actions</TableHead>
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs pr-2 sm:pr-4 min-w-[50px]">Act</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

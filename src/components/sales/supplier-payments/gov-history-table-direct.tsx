@@ -257,8 +257,8 @@ export const GovHistoryTableDirect: React.FC<GovHistoryTableDirectProps> = ({
                     </div>
                 )}
                 <ScrollArea ref={scrollRef} className="h-96">
-                    <div className="overflow-x-auto">
-                        <Table>
+                    <div className="overflow-x-auto no-scrollbar">
+                        <Table className="min-w-[800px]">
                             <TableHeader>
                                 <TableRow className="bg-primary/20 border-b border-primary/30">
                                     <TableHead className="w-[100px]">ID</TableHead>

@@ -45,6 +45,7 @@ export const useOutsiderPayments = (data: any) => {
         form.setSelectedAccountId(payment.bankAccountId || '');
         form.setUtrNo(payment.utrNo || '');
         form.setCheckNo(payment.checkNo || '');
+        form.setFrom(payment.from || '');
         form.setSixRNo((payment as any).sixRNo || '');
         if ((payment as any).sixRDate) {
             form.setSixRDate(new Date((payment as any).sixRDate));
@@ -175,6 +176,7 @@ export const useOutsiderPayments = (data: any) => {
                 rtgsAmount: form.rtgsAmount,
                 supplierDetails: form.supplierDetails,
                 bankDetails: form.bankDetails,
+                from: form.from,
                 isCustomer: false,
             });
 

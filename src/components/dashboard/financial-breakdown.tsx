@@ -95,51 +95,51 @@ export const FinancialBreakdown = ({
     );
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <PieChartIcon className="h-5 w-5 text-primary"/>
+        <Card className="shadow-none border sm:shadow-sm">
+            <CardHeader className="p-3 sm:p-6 pb-2">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-xl">
+                    <PieChartIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary"/>
                     Financial Breakdown
                 </CardTitle>
-                 <div className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                 <div className="text-[11px] sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-1.5 flex-wrap">
                     {breadcrumbs.map((crumb, index) => (
                         <React.Fragment key={crumb}>
                             <Button
                                 variant="link"
                                 onClick={() => handleBreadcrumbClick(index)}
-                                className="p-0 h-auto text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
+                                className="p-0 h-auto text-[11px] sm:text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
                                 disabled={index === breadcrumbs.length - 1}
                             >
                                 {toTitleCase(crumb)}
                             </Button>
-                            {index < breadcrumbs.length - 1 && <ChevronsRight size={14} />}
+                            {index < breadcrumbs.length - 1 && <ChevronsRight size={12} className="opacity-50" />}
                         </React.Fragment>
                     ))}
                 </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div className="h-[400px]">
+            <CardContent className="p-3 sm:p-6 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-center">
+                <div className="h-[280px] sm:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Tooltip content={<CustomTooltip />} />
-                            <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
+                            <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="35%" stroke="hsl(var(--card))" strokeWidth={2} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
                                 {level1Data.map((entry, index) => ( <Cell key={`cell-0-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                             </Pie>
-                            {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={90} outerRadius={120} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
+                            {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="40%" outerRadius="55%" label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={2} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
                                 {level2Data.map((entry, index) => ( <Cell key={`cell-1-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                             </Pie>}
-                            {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={130} outerRadius={160} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
+                            {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="75%" label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={2} onClick={(data) => setLevel3(data.name)}>
                                 {level3Data.map((entry, index) => ( <Cell key={`cell-2-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                             </Pie>}
-                            {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={170} outerRadius={200} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
+                            {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="80%" outerRadius="95%" label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={2}>
                                 {level4Data.map((entry, index) => ( <Cell key={`cell-3-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                             </Pie>}
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
                 <div>
-                    <ScrollArea className="h-[400px]">
-                        <div className="space-y-1 p-1">
+                    <ScrollArea className="h-[240px] sm:h-[400px]">
+                        <div className="space-y-0.5 sm:space-y-1 p-0.5 sm:p-1">
                             {level1Data.map(l1Item => (
                                 <div key={l1Item.name}>
                                     {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}

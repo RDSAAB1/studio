@@ -106,6 +106,13 @@ export default function RtgsReportClient() {
         return () => unsubscribe();
     }, [toast]);
 
+    // Re-fetch settings when printing/mailing dialogs open to ensure latest data
+    useEffect(() => {
+        if (isPrintPreviewOpen || isTablePrintPreviewOpen || isBankMailFormatOpen) {
+            getRtgsSettings().then(setSettings).catch(() => {});
+        }
+    }, [isPrintPreviewOpen, isTablePrintPreviewOpen, isBankMailFormatOpen]);
+
     useEffect(() => {
         if (settings !== null && payments !== undefined) {
             setLoading(false);

@@ -214,14 +214,14 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 if (collection === 'customerPayments') {
                     const all = await db.customerPayments.toArray();
                     const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setCustomerPayments, sorted);
                     return;
                 }
                 if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
                     const all = await db.payments.toArray();
                     const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setSupplierPayments, sorted as Payment[]);
                     return;
                 }
@@ -426,12 +426,12 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                         }
                         else if (c === 'customerPayments') { 
                             const all = await db.customerPayments.toArray(); 
-                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                             updateState(setCustomerPayments, d); 
                         }
                         else if (c === 'payments') { 
                             const all = await db.payments.toArray(); 
-                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')).slice(0, 1000);
+                            const d = all.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                             updateState(setSupplierPayments, d); 
                         }
                         else if (c === 'banks') { const d = await db.banks.toArray(); updateState(setBanks, d); }

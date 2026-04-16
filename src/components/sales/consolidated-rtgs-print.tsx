@@ -222,12 +222,12 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 <div className="flex justify-between items-start mb-4">
                                     <table className="text-sm">
                                         <tbody>
-                                            <tr><td className="font-bold pr-4 text-black">BANK NAME</td><td className="text-black">- {settings.defaultBank?.bankName}</td></tr>
-                                            <tr><td className="font-bold pr-4 text-black">IFSC CODE</td><td className="text-black">- {settings.defaultBank?.ifscCode}</td></tr>
-                                            <tr><td className="font-bold pr-4 text-black">BRANCH NAME</td><td className="text-black">- {settings.defaultBank?.branchName}</td></tr>
-                                            <tr><td className="font-bold pr-4 text-black">A/C NO.</td><td className="text-black">- '{settings.defaultBank?.accountNumber}</td></tr>
-                                            <tr><td className="font-bold pr-4 text-black">CONTACT NO.</td><td className="text-black">- {settings.contactNo}</td></tr>
-                                            <tr><td className="font-bold pr-4 text-black">GMAIL</td><td className="text-black">- {settings.gmail}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">BANK NAME</td><td className="text-black">- {settings.defaultBank?.bankName || 'NOT SET'}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">IFSC CODE</td><td className="text-black">- {settings.defaultBank?.ifscCode || 'NOT SET'}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">BRANCH NAME</td><td className="text-black">- {settings.defaultBank?.branchName || 'NOT SET'}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">A/C NO.</td><td className="text-black">- '{settings.defaultBank?.accountNumber || 'NOT SET'}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">CONTACT NO.</td><td className="text-black">- {settings.contactNo || 'N/A'}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">GMAIL</td><td className="text-black">- {settings.gmail || 'N/A'}</td></tr>
                                         </tbody>
                                     </table>
                                     <div className="text-left text-sm">

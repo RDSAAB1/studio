@@ -11,19 +11,19 @@ type DashboardFiltersProps = {
 };
 
 export const DashboardFilters = ({ date, setDate }: DashboardFiltersProps) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">Dashboard</CardTitle>
-            <CardDescription>Filter and view your business overview.</CardDescription>
+    <Card className="shadow-none border sm:shadow-sm">
+        <CardHeader className="p-3 sm:p-6 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-xl">Dashboard</CardTitle>
+            <CardDescription className="text-[11px] sm:text-sm">Filter and view your business overview.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row items-center gap-4">
+        <CardContent className="p-3 sm:p-6 pt-0 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
             <DateRangePicker date={date} onDateChange={setDate} />
-            <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
-                <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
-                <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
-                <Button variant="outline" size="sm" onClick={() => setDate({ from: subDays(new Date(), 30), to: new Date() })}>Last 30 Days</Button>
-                <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
+            <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                <Button variant="outline" className="h-8 text-[11px] px-2.5" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
+                <Button variant="outline" className="h-8 text-[11px] px-2.5" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
+                <Button variant="outline" className="h-8 text-[11px] px-2.5" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
+                <Button variant="outline" className="h-8 text-[11px] px-2.5" size="sm" onClick={() => setDate({ from: subDays(new Date(), 30), to: new Date() })}>Last 30 Days</Button>
+                <Button variant="outline" className="h-8 text-[11px] px-2.5" size="sm" onClick={() => setDate({ from: startOfYear(new Date()), to: endOfYear(new Date()) })}>This Year</Button>
             </div>
         </CardContent>
     </Card>

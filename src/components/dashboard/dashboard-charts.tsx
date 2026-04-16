@@ -44,12 +44,12 @@ export function DashboardCharts({
 }: DashboardChartsProps) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="h-64">
-          <CardHeader>
-            <CardTitle>Assets vs. Liabilities</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
+        <Card className="h-56 sm:h-64 shadow-none border sm:shadow-sm">
+          <CardHeader className="p-3 sm:p-6 pb-0 sm:pb-2">
+            <CardTitle className="text-sm sm:text-base">Assets vs. Liabilities</CardTitle>
           </CardHeader>
-          <CardContent className="h-48 grid grid-cols-2 items-center">
+          <CardContent className="h-40 sm:h-48 p-3 sm:p-6 pt-0 grid grid-cols-2 items-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Tooltip content={customTooltip} />
@@ -91,11 +91,11 @@ export function DashboardCharts({
             </div>
           </CardContent>
         </Card>
-        <Card className="h-64">
-          <CardHeader>
-            <CardTitle>Payment Methods</CardTitle>
+        <Card className="h-56 sm:h-64 shadow-none border sm:shadow-sm">
+          <CardHeader className="p-3 sm:p-6 pb-0 sm:pb-2">
+            <CardTitle className="text-sm sm:text-base">Payment Methods</CardTitle>
           </CardHeader>
-          <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
+          <CardContent className="h-40 sm:h-48 p-3 sm:p-6 pt-0 grid grid-cols-2 items-center gap-2 sm:gap-4">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Tooltip content={customTooltip} />
@@ -136,11 +136,11 @@ export function DashboardCharts({
             </div>
           </CardContent>
         </Card>
-        <Card className="h-auto md:col-span-2">
-          <CardHeader>
-            <CardTitle>Fund Sources</CardTitle>
+        <Card className="h-auto md:col-span-2 shadow-none border sm:shadow-sm">
+          <CardHeader className="p-3 sm:p-6 pb-0 sm:pb-2">
+            <CardTitle className="text-sm sm:text-base">Fund Sources</CardTitle>
           </CardHeader>
-          <CardContent className="h-auto grid grid-cols-2 items-center gap-4">
+          <CardContent className="h-auto p-3 sm:p-6 pt-0 grid grid-cols-2 items-center gap-2 sm:gap-4">
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Tooltip content={customTooltip} />
@@ -189,11 +189,11 @@ export function DashboardCharts({
           </CardContent>
         </Card>
       </div>
-      <Card className="col-span-1 lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Income vs. Expense</CardTitle>
+      <Card className="col-span-1 lg:col-span-2 shadow-none border sm:shadow-sm">
+        <CardHeader className="p-3 sm:p-6 pb-1 sm:pb-2">
+          <CardTitle className="text-sm sm:text-base">Income vs. Expense</CardTitle>
         </CardHeader>
-        <CardContent className="h-80">
+        <CardContent className="h-56 sm:h-80 p-3 sm:p-6 pt-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={incomeExpenseChartData}

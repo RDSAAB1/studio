@@ -792,47 +792,74 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       <div className="min-h-screen flex flex-col">
         <div className="sticky top-0 z-50">
           <div className="border-b border-[#24003A] bg-[#2E004F] text-white">
-            <div className="flex h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
+            <div className="flex h-10 lg:h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white lg:hidden"
+                    className="h-8 lg:h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white lg:hidden"
                   >
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 bg-[#2E004F] border-violet-900/30 p-0">
-                  <SheetHeader className="p-4 border-b border-white/10">
-                    <SheetTitle className="text-white text-left">Menu</SheetTitle>
+                <SheetContent side="left" className="w-56 min-[400px]:w-64 bg-gradient-to-br from-[#0F011E] via-[#110125] to-[#0A001A] border-r border-violet-500/10 p-0 text-zinc-100 backdrop-blur-3xl">
+                  <SheetHeader className="p-3.5 min-[400px]:p-4 border-b border-violet-500/10 flex flex-row items-center justify-between bg-white/5">
+                    <div className="flex items-center gap-2 min-[400px]:gap-2.5">
+                       <div className="bg-gradient-to-br from-violet-500 to-indigo-600 p-1 min-[400px]:p-1.5 rounded-lg shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                          <Zap className="h-3 min-[400px]:h-3.5 w-3 min-[400px]:h-3.5 text-white" />
+                        </div>
+                      <div>
+                        <SheetTitle className="text-white text-[12px] min-[400px]:text-[14px] font-extrabold tracking-tight">
+                          JRMD STUDIO
+                        </SheetTitle>
+                        <p className="text-[6.5px] min-[400px]:text-[7px] text-violet-400/70 uppercase tracking-[0.2em] min-[400px]:tracking-[0.3em] font-bold leading-none mt-0.5">Advance ERP</p>
+                      </div>
+                    </div>
                   </SheetHeader>
-                  <div className="flex flex-col py-2">
+                  <div className="flex flex-col py-2 overflow-y-auto h-[calc(100vh-100px)] no-scrollbar">
                     {allMenuItems.map((item) => {
                       if (item.subMenus && item.subMenus.length > 0) {
                         const parentActive = item.subMenus.some(sub => sub.id === effectiveActiveTabId);
                         return (
-                          <div key={item.id} className="px-2">
-                            <p className={cn(
-                              "px-3 py-2 text-xs font-semibold uppercase rounded-md",
-                              parentActive ? "text-white bg-white/12" : "text-white/60"
-                            )}>{item.name}</p>
-                            {item.subMenus.map((sub) => (
-                              <button
-                                key={sub.id}
-                                className={cn(
-                                  "flex w-full items-center gap-3 px-4 py-2.5 text-sm rounded-md",
-                                  sub.id === effectiveActiveTabId ? "bg-white/12 text-white" : "text-white/90 hover:bg-white/10"
-                                )}
-                                onClick={() => {
-                                  handleOpenTab(sub);
-                                  setMobileMenuOpen(false);
-                                }}
-                              >
-                                {sub.icon ? <sub.icon className="h-4 w-4" /> : null}
-                                {sub.name}
-                              </button>
-                            ))}
+                          <div key={item.id} className="mb-4">
+                            <div className="px-4 mb-1.5 mt-2">
+                              <p className={cn(
+                                "text-[7.5px] font-black uppercase tracking-[0.25em] px-1 py-0.5 opacity-40",
+                                parentActive ? "text-violet-400 opacity-100" : "text-zinc-500"
+                              )}>{item.name}</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              {item.subMenus.map((sub) => {
+                                const active = sub.id === effectiveActiveTabId;
+                                return (
+                                  <button
+                                    key={sub.id}
+                                    className={cn(
+                                      "relative flex w-full items-center gap-2 px-3 py-1.5 text-[10.5px] min-[400px]:text-[11px] transition-all duration-150 mx-auto",
+                                      active 
+                                        ? "text-white font-bold bg-white/5" 
+                                        : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                    )}
+                                    onClick={() => {
+                                      handleOpenTab(sub);
+                                      setMobileMenuOpen(false);
+                                    }}
+                                  >
+                                    {active && (
+                                      <div className="absolute left-0 h-full w-0.5 bg-violet-500 shadow-[2px_0_10px_rgba(139,92,246,0.8)]" />
+                                    )}
+                                    <div className={cn(
+                                      "p-1 rounded-md transition-colors shrink-0",
+                                      active ? "bg-violet-500/20 text-violet-300" : "text-zinc-500"
+                                    )}>
+                                      {sub.icon ? <sub.icon className="h-4 w-4" /> : null}
+                                    </div>
+                                    <span className="truncate tracking-wide">{sub.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
                       }
@@ -844,19 +871,40 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                         <button
                           key={item.id}
                           className={cn(
-                            "flex w-full items-center gap-3 px-4 py-2.5 text-sm rounded-md",
-                            active ? "bg-white/12 text-white" : "text-white/90 hover:bg-white/10"
+                            "relative flex w-full items-center gap-2 px-3 py-1.5 text-[10.5px] min-[400px]:text-[11px] transition-all duration-150 mx-auto mb-0.5",
+                            active 
+                              ? "text-white font-bold bg-white/5" 
+                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
                           )}
                           onClick={() => {
                             handleOpenTab(item);
                             setMobileMenuOpen(false);
                           }}
                         >
-                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                          {item.name}
+                          {active && (
+                            <div className="absolute left-0 h-full w-0.5 bg-violet-500 shadow-[2px_0_10px_rgba(139,92,246,0.8)]" />
+                          )}
+                          <div className={cn(
+                            "p-1 rounded-md transition-colors shrink-0",
+                            active ? "bg-violet-500/20 text-violet-300" : "text-zinc-500"
+                          )}>
+                            {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                          </div>
+                          <span className="truncate tracking-wide">{item.name}</span>
                         </button>
                       );
                     })}
+                  </div>
+                  <div className="mt-auto border-t border-violet-500/10 p-3 bg-white/5 backdrop-blur-md">
+                    <div className="flex items-center gap-2">
+                       <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">
+                          JD
+                       </div>
+                       <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] font-bold text-white truncate">JRMD Software</span>
+                          <span className="text-[8px] text-violet-400/60 font-medium">Digital Solution</span>
+                       </div>
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
@@ -918,9 +966,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    className="relative h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
                   >
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-4 w-4 lg:h-5 lg:w-5" />
                     {pendingNotifications.length > 0 && (
                       <span className="absolute top-2 right-2 block h-1.5 w-1.5 rounded-full bg-destructive" />
                     )}
@@ -971,9 +1019,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   onClick={handleGlobalSync}
                   disabled={isProcessing}
                   title="Initiate Delta Sync"
-                  className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
                 >
-                  <Zap className={cn("h-5 w-5", isProcessing && overlayTitle.includes("Sync") && "animate-pulse")} strokeWidth={2.5} />
+                  <Zap className={cn("h-4 w-4 lg:h-5 lg:w-5", isProcessing && overlayTitle.includes("Sync") && "animate-pulse")} strokeWidth={2.5} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -981,9 +1029,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   onClick={handleGlobalUpload}
                   disabled={isProcessing}
                   title="Force Push Records"
-                  className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
                 >
-                  <ArrowUpCircle className="h-5 w-5" strokeWidth={2.5} />
+                  <ArrowUpCircle className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={2.5} />
                 </Button>
               </div>
 
@@ -992,9 +1040,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
                   >
-                    <Calculator className="h-5 w-5" />
+                    <Calculator className="h-4 w-4 lg:h-5 lg:w-5" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent
@@ -1030,8 +1078,10 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           {hasSubnav ? (
             <div className="border-b border-[#24003A] bg-[#F1E6F2] text-slate-900">
               <div className="flex h-10 w-full items-center px-1.5 sm:px-3">
-                <div className="flex-1 overflow-x-auto no-scrollbar">
-                  {subnav}
+                <div className="flex-1 overflow-x-auto no-scrollbar scroll-smooth">
+                  <div className="inline-flex min-w-full items-center">
+                    {subnav}
+                  </div>
                 </div>
               </div>
             </div>

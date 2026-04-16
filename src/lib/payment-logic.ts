@@ -72,6 +72,7 @@ export type ProcessPaymentContext = {
     govAmount?: number;
     govExtraAmount?: number;
     // govRequiredAmount?: number; // Removed
+    from?: string;
     centerName?: string; // Center Name for Gov payments
     // userGovRequiredAmount?: number; // User manually entered govRequiredAmount (Removed)
     cdToDistribute?: number; // Total CD amount to distribute
@@ -134,7 +135,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         editingPayment = null,
         incomingSelectedEntries,
         govQuantity, govRate, govAmount, govExtraAmount,
-        centerName,
+        centerName, from,
         cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = [],
         suppliers = []
     } = context;
@@ -368,6 +369,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 govAmount: govAmount || 0,
                 govExtraAmount: govExtraAmount || 0,
                 centerName: centerName || '',
+                from: from || '',
                 bankAccountId: accountIdForPayment || '',
                 quantity: rtgsQuantity || 0,
                 rate: rtgsRate || 0,
@@ -722,6 +724,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 govAmount: govAmount || 0,
                 govExtraAmount: govExtraAmount || 0,
                 centerName: centerName || '',
+                from: from || '',
                 bankAccountId: accountIdForPayment || '',
                 updatedAt: now, // User requested updatedAt
                 cdApplied: cdEnabled || effectiveCdAmount > 0, // User requested cdApplied

@@ -271,7 +271,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
               type="button"
               onClick={() => handleTabChange(t.value)}
               className={cn(
-                "h-8 flex-1 min-w-0 whitespace-normal break-words leading-tight flex items-center justify-center text-center rounded-[6px] px-1 sm:px-3 text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
+                "h-7 sm:h-8 flex-1 min-w-0 whitespace-normal break-words leading-tight flex items-center justify-center text-center rounded-[5px] px-1 sm:px-3 text-[9px] min-[400px]:text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
                 "text-slate-600 hover:bg-white/40 hover:text-slate-900 border border-transparent",
                 isActive && "bg-white text-slate-950 shadow-sm border-slate-200"
               )}

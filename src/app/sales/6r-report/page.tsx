@@ -355,40 +355,37 @@ export default function SixRReportPage() {
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Filter 6R Reports</CardTitle>
-                    <CardDescription>Search payments by 6R number, name, or date range.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="space-y-1">
-                            <Label htmlFor="search6RNo">Search 6R No.</Label>
-                            <Input id="search6RNo" value={search6RNo} onChange={(e) => setSearch6RNo(e.target.value)} placeholder="Enter 6R No." />
+                {/* Removed Header/Sub-header to save space as requested */}
+                <CardContent className="pt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="search6RNo" className="text-[10px] font-semibold text-slate-500">Search 6R No.</Label>
+                            <Input id="search6RNo" value={search6RNo} onChange={(e) => setSearch6RNo(e.target.value)} placeholder="6R No." className="h-7 text-[10px] rounded-md" />
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="searchName">Search by Name</Label>
-                            <Input id="searchName" value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Enter supplier name" />
+                        <div className="space-y-0.5">
+                            <Label htmlFor="searchName" className="text-[10px] font-semibold text-slate-500">Search by Name</Label>
+                            <Input id="searchName" value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Supplier name" className="h-7 text-[10px] rounded-md" />
                         </div>
-                        <div className="space-y-1">
-                            <Label>Sort by Serial No.</Label>
+                        <div className="space-y-0.5">
+                            <Label className="text-[10px] font-semibold text-slate-500">Sort By</Label>
                             <Select value={sortOrder} onValueChange={(value: 'default' | 'low-to-high' | 'high-to-low') => setSortOrder(value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select sort order" />
+                                <SelectTrigger className="h-7 text-[10px] rounded-md">
+                                    <SelectValue placeholder="Sort order" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="default">Default (Date)</SelectItem>
-                                    <SelectItem value="low-to-high">Low to High</SelectItem>
-                                    <SelectItem value="high-to-low">High to Low</SelectItem>
+                                    <SelectItem value="default" className="text-[10px]">Default (Date)</SelectItem>
+                                    <SelectItem value="low-to-high" className="text-[10px]">Low to High</SelectItem>
+                                    <SelectItem value="high-to-low" className="text-[10px]">High to Low</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1">
-                            <Label>Start Date</Label>
-                            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{startDate ? format(startDate, "PPP") : <span>Start Date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} /></PopoverContent></Popover>
+                        <div className="space-y-0.5">
+                            <Label className="text-[10px] font-semibold text-slate-500">From Date</Label>
+                            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("h-7 w-full justify-start text-left font-normal text-[10px] rounded-md", !startDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{startDate ? format(startDate, "dd-MMM-yy") : <span>From</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent></Popover>
                         </div>
-                        <div className="space-y-1">
-                            <Label>End Date</Label>
-                            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{endDate ? format(endDate, "PPP") : <span>End Date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} /></PopoverContent></Popover>
+                        <div className="space-y-0.5">
+                            <Label className="text-[10px] font-semibold text-slate-500">To Date</Label>
+                            <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("h-7 w-full justify-start text-left font-normal text-[10px] rounded-md", !endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{endDate ? format(endDate, "dd-MMM-yy") : <span>To</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent></Popover>
                         </div>
                     </div>
                 </CardContent>

@@ -357,6 +357,7 @@ export type SupplierPayment = {
     govAmount?: number;
     govExtraAmount?: number;
     centerName?: string;
+    from?: string;
     expenseTransactionId?: string;
     bankAccountId?: string; 
     status?: 'Paid' | 'Pending' | 'Cancelled';

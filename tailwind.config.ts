@@ -129,9 +129,9 @@ export default {
         },
       },
       borderRadius: {
-        lg: '1rem',
-        md: 'calc(1rem - 2px)',
-        sm: 'calc(1rem - 4px)',
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
         'tremor-small': '0.375rem',
         'tremor-default': '0.5rem',
         'tremor-full': '9999px',

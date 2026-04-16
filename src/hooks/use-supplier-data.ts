@@ -596,16 +596,18 @@ export const useSupplierData = () => {
         
         allIncomes.forEach((t: Income | CustomerPayment) => {
             const balanceKey = t.bankAccountId || ((t as Income).paymentMethod === 'Cash' ? 'CashInHand' : '');
-             if (balanceKey && balances.has(balanceKey)) balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+             if (balanceKey && balances.has(balanceKey)) {
+                 const amount = Number(t.amount || 0);
+                 balances.set(balanceKey, Math.round(((balances.get(balanceKey) || 0) + amount) * 100) / 100);
+             }
         });
         
         allExpenses.forEach((t: Expense | Payment) => {
-            // 🚨 CRITICAL FIX: Do NOT deduct Pending RTGS from bank balance
-            if ('receiptType' in t && t.receiptType === 'RTGS' && (t as any).status === 'Pending') {
-                return;
-            }
             const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || ('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
-             if (balanceKey && balances.has(balanceKey)) balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+            if (balanceKey && balances.has(balanceKey)) {
+                const amount = Number(t.amount || 0);
+                balances.set(balanceKey, Math.round(((balances.get(balanceKey) || 0) - amount) * 100) / 100);
+            }
         });
         
         return { balances };

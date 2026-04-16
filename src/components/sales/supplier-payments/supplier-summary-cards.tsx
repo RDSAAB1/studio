@@ -314,11 +314,11 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
 
   // Compact, modern card style – subtle borders, minimal shadow
   const card3d =
-    "rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm";
+    "rounded-md border border-slate-200 bg-white p-2.5 shadow-sm";
 
   if (variant === "dashboard") {
     return (
-      <div className="mt-0.5 w-full min-w-0 overflow-hidden rounded-lg bg-[#f5f5f7] p-2.5 sm:p-3 supplier-summary-dashboard-root">
+      <div className="mt-0.5 w-full min-w-0 overflow-hidden rounded-md bg-[#f5f5f7] p-2.5 sm:p-3 supplier-summary-dashboard-root">
         {action ? <div className="flex items-center justify-end pb-2">{action}</div> : null}
         {/* Top row: 4 cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 supplier-summary-dashboard-top">

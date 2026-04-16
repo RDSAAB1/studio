@@ -367,8 +367,8 @@ export function ErpCompanySelector({
   const subCompanyLabel = selectedSubCompany?.name ?? selection?.subCompanyId ?? "Sub Company";
   const seasonLabel = selectedSeason?.name ?? selection?.seasonKey ?? "Season";
 
-  const dropdownClass = "h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white";
-  const disabledClass = "h-9 w-9 text-white/40 cursor-not-allowed";
+  const dropdownClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white";
+  const disabledClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/40 cursor-not-allowed";
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -541,7 +541,7 @@ export function ErpCompanySelector({
                     className={hasEffectiveCompanies && selectedCompany ? dropdownClass : disabledClass}
                     disabled={!hasEffectiveCompanies || !selectedCompany}
                   >
-                    <Layers className="h-5 w-5" />
+                    <Layers className="h-4 w-4 lg:h-5 lg:w-5" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -590,7 +590,7 @@ export function ErpCompanySelector({
                     className={hasEffectiveCompanies && selectedCompany && selectedSubCompany ? dropdownClass : disabledClass}
                     disabled={!hasEffectiveCompanies || !selectedCompany || !selectedSubCompany}
                   >
-                    <CalendarDays className="h-5 w-5" />
+                    <CalendarDays className="h-4 w-4 lg:h-5 lg:w-5" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>

@@ -68,10 +68,8 @@ export function PaymentFilters({
                 variant="outline"
                 size="icon"
                 className={cn(
-                  "h-6 w-6 border transition-colors flex-shrink-0",
-                  hasActiveFilters 
-                    ? "border-slate-200/80 bg-white text-slate-900 shadow-[0_4px_20px_rgba(99,102,241,0.06)] ring-1 ring-violet-200/60" 
-                    : "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300"
+                  "h-7 w-[26px] rounded-md border border-slate-200 bg-white/80 text-slate-700 transition-all flex-shrink-0 shadow-sm hover:bg-white hover:border-slate-300",
+                  hasActiveFilters && "bg-white ring-1 ring-primary/20 border-primary/30 text-primary"
                 )}
                 title="Filter suppliers"
               >
@@ -137,7 +135,7 @@ export function PaymentFilters({
                   value={filterVariety}
                   onValueChange={onFilterVarietyChange}
                 >
-                  <SelectTrigger id="filterVariety" className="h-7 text-[10px] border border-slate-200/80 bg-white/70">
+                  <SelectTrigger id="filterVariety" className="h-7 text-[10px] border border-slate-200/80 bg-white/70 rounded-md">
                     <SelectValue placeholder="All varieties" />
                   </SelectTrigger>
                   <SelectContent className="z-[60]">
@@ -166,45 +164,47 @@ export function PaymentFilters({
             </PopoverContent>
           </Popover>
 
-          <div className="w-full lg:w-[120px] flex-shrink-0">
-            <Select value={searchType} onValueChange={(value) => onSearchTypeChange(value as typeof searchType)}>
-              <SelectTrigger className="h-6 text-[9px] border border-slate-200/80 bg-white/70 backdrop-blur-[20px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15">
-                <SelectValue placeholder="Name" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="fatherName">Father Name</SelectItem>
-                <SelectItem value="address">Address</SelectItem>
-                <SelectItem value="contact">Contact</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="w-full lg:w-[110px] flex-shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3 w-3 text-slate-500" />
-              <Input
-                placeholder="Serial No..."
-                value={serialNoSearch}
-                onChange={(e) => onSerialNoSearch(e.target.value)}
-                onBlur={onSerialNoBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    onSerialNoBlur();
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="pl-7 h-6 border border-slate-200/80 bg-white/70 backdrop-blur-[20px] text-[9px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15"
-              />
+          <div className="flex flex-wrap items-center gap-1.5 w-full">
+            <div className="w-[100px] flex-shrink-0">
+              <Select value={searchType} onValueChange={(value) => onSearchTypeChange(value as typeof searchType)}>
+                <SelectTrigger className="h-7 rounded-md text-[10px] border border-slate-200 bg-white/80 backdrop-blur-md font-bold text-slate-900 focus:border-slate-300 focus:ring-1 focus:ring-primary/20 py-0 px-2 transition-all shadow-sm">
+                  <SelectValue placeholder="Name" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="fatherName">Father Name</SelectItem>
+                  <SelectItem value="address">Address</SelectItem>
+                  <SelectItem value="contact">Contact</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
 
-          {extraActions ? (
-            <div className="w-full lg:w-auto flex items-center justify-end">
-              {extraActions}
+            <div className="w-[100px] flex-shrink-0">
+              <div className="relative group">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-slate-400 group-focus-within:text-primary transition-colors" />
+                  <Input
+                    placeholder="Serial No..."
+                    value={serialNoSearch}
+                    onChange={(e) => onSerialNoSearch(e.target.value)}
+                    onBlur={onSerialNoBlur}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        onSerialNoBlur();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    className="pl-6 h-7 rounded-md border border-slate-200 bg-white/80 backdrop-blur-md text-[10px] font-bold text-slate-900 focus:border-slate-300 focus:ring-1 focus:ring-primary/20 py-0 transition-all shadow-sm"
+                  />
+              </div>
             </div>
-          ) : null}
+
+            {extraActions && (
+              <div className="flex-1 min-w-0 flex items-center justify-end">
+                {extraActions}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="min-w-0">
@@ -222,7 +222,7 @@ export function PaymentFilters({
             value={selectedSupplierKey}
             onChange={onSupplierSelect}
             placeholder="Search supplier..."
-            inputClassName="h-6 border border-slate-200/80 bg-white/70 backdrop-blur-[20px] text-[9px] font-semibold text-slate-900 focus:border-slate-300 focus:ring-2 focus:ring-violet-500/15"
+            inputClassName="h-7 rounded-md border border-slate-200 bg-white/80 backdrop-blur-md text-[10px] font-bold text-slate-900 focus:border-slate-300 focus:ring-1 focus:ring-primary/20 py-0 px-2 transition-all shadow-sm"
             searchType={searchType}
             onSearchTypeChange={undefined}
           />

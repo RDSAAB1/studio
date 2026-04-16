@@ -102,12 +102,12 @@ export const TransactionTable = React.memo(
         const visibleSuppliers = maxRows ? sortedFilteredSuppliers.slice(0, maxRows) : sortedFilteredSuppliers.slice(0, visibleItems);
 
         const tabButtonBaseClass = compact
-            ? "flex items-center justify-between gap-1.5 px-1 py-0.5 rounded-[10px] transition-colors border flex-1"
-            : "flex items-center justify-between gap-2 px-1.5 py-0.5 rounded-[10px] transition-colors border flex-1";
+            ? "flex items-center justify-between gap-1.5 px-1 py-0.5 rounded-[4px] transition-colors border flex-1"
+            : "flex items-center justify-between gap-2 px-1.5 py-0.5 rounded-[4px] transition-colors border flex-1";
         const tabLabelClass = compact ? "text-[8px] font-bold" : "text-[8px] font-bold";
         const tabCountClass = compact
-            ? "px-1 py-0.5 rounded-md text-[8px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-            : "px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200";
+            ? "px-1 py-0.5 rounded-[4px] text-[8px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+            : "px-1.5 py-0.5 rounded-[4px] text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200";
 
         const isCustomer = type === 'customer';
         const tableColumnGroup = (
@@ -130,11 +130,11 @@ export const TransactionTable = React.memo(
         );
 
         const tableBody = (
-            <div className={`${compact ? "text-[10px]" : "text-[12px]"} rounded-md overflow-hidden flex flex-col flex-1 min-h-0 bg-card`}>
+            <div className={`${compact ? "text-[10px]" : "text-[12px]"} rounded-[4px] overflow-hidden flex flex-col flex-1 min-h-0 bg-card`}>
                 <div className="flex-shrink-0 bg-card border-b border-border rounded-none">
                     {showTabsInHeader && (
                         <div className="px-1 py-1 border-b border-slate-200/70">
-                            <div className="flex items-center gap-1 rounded-md border border-border/50 bg-card p-0.5">
+                            <div className="flex items-center gap-1 rounded-[4px] border border-border/50 bg-card p-0.5">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab("all")}
@@ -200,8 +200,8 @@ export const TransactionTable = React.memo(
                     )}
                 </div>
                 {maxRows ? (
-                    <div className="flex-1 min-h-0 overflow-hidden">
-                        <Table className="w-full table-fixed">
+                    <div className="flex-1 min-h-0 overflow-x-auto border-t border-slate-200/50">
+                        <Table className="w-full min-w-[700px] xl:min-w-0 table-fixed">
                             {tableColumnGroup}
                             {tableHeader}
                             <TableBody>
@@ -270,8 +270,9 @@ export const TransactionTable = React.memo(
                     </Table>
                 </div>
                 ) : (
-                    <ScrollArea ref={scrollRef} className="flex-1 min-h-0">
-                        <Table className="w-full table-fixed">
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                        <div className="w-full overflow-x-auto">
+                            <Table className="w-full min-w-[700px] xl:min-w-0 table-fixed translate-z-0">
                             {tableColumnGroup}
                             {tableHeader}
                             <TableBody>
@@ -341,15 +342,16 @@ export const TransactionTable = React.memo(
                                     </TableRow>
                                 )}
                             </TableBody>
-                        </Table>
-                    </ScrollArea>
+                            </Table>
+                        </div>
+                    </div>
                 )}
             </div>
         );
 
         if (embed) {
             return (
-                <div className="overflow-hidden rounded-md border border-border bg-card flex flex-col h-full">
+                <div className="overflow-x-auto rounded-[4px] border border-border bg-card flex flex-col h-full no-scrollbar">
                     {tableBody}
                 </div>
             );

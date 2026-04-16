@@ -101,34 +101,54 @@ export default function DailySupplierReportClient() {
         return filtered.sort((a, b) => {
             const aNum = parseInt(String(a.srNo).replace(/\D/g, '')) || 0;
             const bNum = parseInt(String(b.srNo).replace(/\D/g, '')) || 0;
-            if (aNum !== bNum) return bNum - aNum;
-            return String(b.srNo).localeCompare(String(a.srNo));
+            if (aNum !== bNum) return aNum - bNum;
+            return String(a.srNo).localeCompare(String(b.srNo));
         });
     }, [suppliers, dateRange, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, afterKartaAmount: 0, cdAmount: 0, finalNet: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, minRate: 0, maxRate: 0, kartaPercentage: 0, totalEntries: 0 };
+        const initialSummary = { 
+            gross: 0, 
+            tier: 0, 
+            total: 0, 
+            kartaWeight: 0, 
+            net: 0, 
+            labour: 0, 
+            kartaAmount: 0, 
+            afterKartaAmount: 0, 
+            cdAmount: 0, 
+            finalNet: 0, 
+            kanta: 0, 
+            amount: 0, 
+            netAmount: 0, 
+            originalNetAmount: 0, 
+            rate: 0, 
+            minRate: 0, 
+            maxRate: 0, 
+            kartaPercentage: 0, 
+            totalEntries: 0 
+        };
         
         if(filteredSuppliers.length === 0) return initialSummary;
         
         const newSummary = filteredSuppliers.reduce((acc, s) => {
-            acc.gross += s.grossWeight;
-            acc.tier += s.teirWeight;
-            acc.total += s.weight;
-            acc.karta += s.kartaWeight;
-            acc.net += s.netWeight;
-            acc.labour += s.labouryAmount;
-            acc.kartaAmount += s.kartaAmount;
-            const afterKarta = s.amount - s.kartaAmount;
+            acc.gross += (Number(s.grossWeight) || 0);
+            acc.tier += (Number(s.teirWeight) || 0);
+            acc.total += (Number(s.weight) || 0);
+            acc.kartaWeight += (Number(s.kartaWeight) || 0);
+            acc.net += (Number(s.netWeight) || 0);
+            acc.labour += (Number(s.labouryAmount) || 0);
+            acc.kartaAmount += (Number(s.kartaAmount) || 0);
+            const afterKarta = (Number(s.amount) || 0) - (Number(s.kartaAmount) || 0);
             const cd = afterKarta * 0.01;
             acc.afterKartaAmount += afterKarta;
             acc.cdAmount += cd;
-            acc.finalNet += (afterKarta - cd - s.labouryAmount - s.kanta);
-            acc.kanta += s.kanta;
-            acc.amount += s.amount;
-            acc.originalNetAmount += s.originalNetAmount;
-            acc.netAmount += Number(s.netAmount);
-            acc.kartaPercentage += s.kartaPercentage;
+            acc.finalNet += (afterKarta - cd - (Number(s.labouryAmount) || 0) - (Number(s.kanta) || 0));
+            acc.kanta += (Number(s.kanta) || 0);
+            acc.amount += (Number(s.amount) || 0);
+            acc.originalNetAmount += (Number(s.originalNetAmount) || 0);
+            acc.netAmount += (Number(s.netAmount) || 0);
+            acc.kartaPercentage += (Number(s.kartaPercentage) || 0);
             return acc;
         }, initialSummary);
 
@@ -173,9 +193,8 @@ export default function DailySupplierReportClient() {
     }, [filteredSuppliers]);
 
     const handlePrint = async () => {
-        const node = printRef.current;
-        if (!node || !settings) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+        if (!settings || !filteredSuppliers.length) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No data to print or settings not loaded.' });
             return;
         }
 
@@ -183,37 +202,175 @@ export default function DailySupplierReportClient() {
             dateRange.to ? `${format(dateRange.from, "dd-MMM-yyyy")} to ${format(dateRange.to, "dd-MMM-yyyy")}` : format(dateRange.from, "dd-MMM-yyyy")
         ) : "";
 
+        const userCompany = globalData.receiptSettings;
+        const companyName = settings?.companyName || userCompany?.name || 'Company Name';
+
+        // Construct professional report HTML
         const printContent = `
-            <div class="printable-area p-4">
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0; font-size: 20px;">${escapeHtml(toTitleCase(settings.companyName))}</h2>
-                    <p style="margin: 5px 0; font-size: 14px;">Supplier Report - ${dateTitle}</p>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Supplier Report - ${dateTitle}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Inter', sans-serif; margin: 0; padding: 15px; color: #000; line-height: 1.2; letter-spacing: -0.01em; }
+                    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border-bottom: 2.5px solid #1a365d; padding-bottom: 8px; }
+                    .header-left { text-align: left; }
+                    .header-left h1 { margin: 0; font-size: 26px; color: #1a365d; letter-spacing: -0.02em; font-weight: 900; line-height: 1; }
+                    .header-left p { margin: 4px 0 0 0; font-size: 10px; color: #444; font-weight: 700; }
+                    .header-right { text-align: right; font-size: 9px; color: #666; font-weight: 500; line-height: 1.3; }
+                    
+                    .summary-section { margin-bottom: 12px; }
+                    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
+                    .summary-box { border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; overflow: hidden; }
+                    .summary-box h4 { margin: 0; font-size: 8px; color: #fff; font-weight: 800; padding: 3px 6px; text-transform: uppercase; background: #1a365d; }
+                    .summary-box-content { padding: 4px 6px; }
+                    .flex-row { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 1px; }
+                    .flex-row span:first-child { color: #555; font-size: 8.5px; font-weight: 600; }
+                    .flex-row span:last-child { font-weight: 800; color: #000; }
+
+                    .main-table { width: 100%; border-collapse: collapse; font-size: 10.5px; border: 1px solid #1e293b; table-layout: fixed; line-height: 1.1; }
+                    .main-table th, .main-table td { border: 0.5px solid #cbd5e1; padding: 3px 2px; text-align: right; overflow: hidden; white-space: nowrap; }
+                    .main-table th { background: #1a365d; color: #fff; text-align: center; font-weight: 700; font-size: 8.5px; border: 0.5px solid #1a365d; vertical-align: middle; }
+                    .main-table td { background: #fff; color: #000; font-weight: 500; }
+                    .main-table td:nth-child(3), .main-table td:nth-child(4) { text-align: left; white-space: normal; }
+                    .main-table td:nth-child(1), .main-table td:nth-child(2) { text-align: center; background: #f8fafc; }
+                    
+                    .cell-stack { display: flex; flex-direction: column; gap: 0px; }
+                    .primary-val { font-weight: 800; color: #111; }
+                    .secondary-val { font-size: 8px; color: #64748b; font-weight: 600; }
+                    .text-financial { color: #15803d; font-weight: 800; }
+                    .text-rate { color: #92400e; font-weight: 800; }
+                    .text-supp { color: #1e40af; font-weight: 900; font-size: 11px; }
+                    .bg-total { background: #cbd5e1 !important; color: #1a365d !important; font-weight: 900 !important; }
+                    .bg-total td { background: #cbd5e1 !important; border-top: 1.5px solid #1a365d !important; }
+                    
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                        @page { size: landscape; margin: 0.5cm; margin-top: 2.0cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="header-left">
+                        <h1>${escapeHtml(companyName)}</h1>
+                        <p>${escapeHtml(toTitleCase(selectedVariety || 'All Varieties'))} Report | ${dateTitle}</p>
+                    </div>
+                    <div class="header-right">
+                        ${userCompany?.address ? `<div>${escapeHtml(userCompany.address)}</div>` : ''}
+                        ${userCompany?.phone ? `<div>Ph: ${escapeHtml(userCompany.phone)}</div>` : ''}
+                        ${userCompany?.email ? `<div>Email: ${escapeHtml(userCompany.email)}</div>` : ''}
+                    </div>
                 </div>
-                <div class="report-content">
-                    ${node.innerHTML}
+
+                <table class="main-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 4%">SR</th>
+                            <th style="width: 6%">Date / T</th>
+                            <th style="width: 11%">Supplier / Father</th>
+                            <th style="width: 8%">Vehicle / Address</th>
+                            <th style="width: 5%">Gr/Tr</th>
+                            <th style="width: 4%">Fn</th>
+                            <th style="width: 3%">Kt</th>
+                            <th style="width: 5.5%">NetWt</th>
+                            <th style="width: 6%">Rate</th>
+                            <th style="width: 6.5%">Amnt</th>
+                            <th style="width: 4%">KtA</th>
+                            <th style="width: 6%">Af.Kt</th>
+                            <th style="width: 3.5%">Lb</th>
+                            <th style="width: 3.5%">Kn</th>
+                            <th style="width: 6.5%">Pay</th>
+                            <th style="width: 4%">CD</th>
+                            <th style="width: 9.5%">Final Net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredSuppliers.map(s => {
+                            const afterKartaAmount = s.amount - s.kartaAmount;
+                            const cdAmount = afterKartaAmount * 0.01;
+                            const finalNet = s.amount - s.kartaAmount - cdAmount - s.labouryAmount - s.kanta;
+                            return `
+                                <tr>
+                                    <td>${s.srNo}</td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="primary-val">${format(new Date(s.date), "dd-MMM")}</span>
+                                            <span class="secondary-val">${s.term}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="text-supp">${escapeHtml(toTitleCase(s.name))}</span>
+                                            <span class="secondary-val">S/O: ${escapeHtml(toTitleCase(s.so || ''))}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="primary-val" style="font-size:9px">${escapeHtml((s.vehicleNo || '').toUpperCase())}</span>
+                                            <span class="secondary-val">${escapeHtml(s.address || '')}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span style="font-weight:700">${s.grossWeight.toFixed(2)}</span>
+                                            <span class="secondary-val">${s.teirWeight.toFixed(2)}</span>
+                                        </div>
+                                    </td>
+                                    <td>${s.weight.toFixed(2)}</td>
+                                    <td>${s.kartaWeight.toFixed(2)}</td>
+                                    <td style="font-weight:900; color:#000">${s.netWeight.toFixed(2)}</td>
+                                    <td class="text-rate">${Math.round(s.rate)}</td>
+                                    <td class="text-rate">${Math.round(s.amount).toLocaleString()}</td>
+                                    <td>${Math.round(s.kartaAmount)}</td>
+                                    <td>${Math.round(afterKartaAmount).toLocaleString()}</td>
+                                    <td>${Math.round(s.labouryAmount)}</td>
+                                    <td>${Math.round(s.kanta)}</td>
+                                    <td class="text-financial">${Math.round(Number(s.netAmount)).toLocaleString()}</td>
+                                    <td>${Math.round(cdAmount)}</td>
+                                    <td class="text-financial" style="font-weight:900; font-size:11.5px">₹${Math.round(finalNet).toLocaleString()}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                         <tr class="bg-total">
+                                    <td colspan="4" style="text-align:center; font-size: 12px;">TOTALS (${summary.totalEntries} Entries)</td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span>${summary.gross.toFixed(2)}</span>
+                                            <span class="secondary-val">${summary.tier.toFixed(2)}</span>
+                                        </div>
+                                    </td>
+                                    <td>${summary.total.toFixed(2)}</td>
+                                    <td>${summary.kartaWeight.toFixed(2)}</td>
+                                    <td style="color:#000">${summary.net.toFixed(2)}</td>
+                                    <td>
+                                        <div class="cell-stack text-rate" style="font-size:8.5px">
+                                            <span>Avg: ₹${Math.round(summary.rate)}</span>
+                                            <span class="secondary-val">R: ${Math.round(summary.minRate)}-${Math.round(summary.maxRate)}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-rate">₹${Math.round(summary.amount).toLocaleString()}</td>
+                                    <td>₹${Math.round(summary.kartaAmount).toLocaleString()}</td>
+                                    <td>₹${Math.round(summary.amount - summary.kartaAmount).toLocaleString()}</td>
+                                    <td>₹${Math.round(summary.labour).toLocaleString()}</td>
+                                    <td>₹${Math.round(summary.kanta).toLocaleString()}</td>
+                                    <td class="text-financial">₹${Math.round(summary.netAmount).toLocaleString()}</td>
+                                    <td>₹${Math.round(summary.cdAmount).toLocaleString()}</td>
+                                    <td class="text-financial" style="font-size: 12.5px;">₹${Math.round(summary.finalNet).toLocaleString()}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                
+                <div style="margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 10px; font-size: 10px; color: #888; text-align: center;">
+                    Daily Supplier Report - Generated on ${new Date().toLocaleString()}
                 </div>
-            </div>
+            </body>
+            </html>
         `;
 
-        const printStyles = `
-            @page { size: landscape; margin: 10mm; }
-            .no-print { display: none !important; }
-            .print-summary-container { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; margin-bottom: 20px !important; }
-            .print-summary-container > div { flex: 1 !important; min-width: 150px !important; border: 1px solid #ccc !important; padding: 8px !important; border-radius: 4px !important; }
-            table { width: 100%; border-collapse: collapse; font-size: 10px; }
-            th, td { border: 1px solid #eee; padding: 4px; text-align: left; background: transparent !important; }
-            th { background-color: #f7f7f7 !important; font-weight: bold; }
-            .text-right { text-align: right; }
-            .font-bold { font-weight: bold; }
-            .max-h-\\[600px\\] { max-height: none !important; height: auto !important; overflow: visible !important; }
-            .sticky { position: static !important; }
-            .border { border: 1px solid #eee !important; }
-            .rounded-lg { border-radius: 8px !important; }
-            .bg-card\\/60 { background-color: transparent !important; }
-            .shadow-md { box-shadow: none !important; }
-        `;
-
-        await printHtmlContent(printContent, printStyles);
+        await printHtmlContent(printContent);
     };
 
 
@@ -238,7 +395,7 @@ export default function DailySupplierReportClient() {
                            ]}/>
                            <CategorySummaryCard title="Final & Net Wt." icon={<Scale size={16}/>} data={[
                                 { label: 'Final Wt.', value: `${summary.total.toFixed(2)}`, isHighlighted: true },
-                                { label: 'Karta Wt.', value: `-${summary.karta.toFixed(2)}` },
+                                { label: 'Karta Wt.', value: `-${summary.kartaWeight.toFixed(2)}` },
                                 { label: 'Net Wt.', value: `${summary.net.toFixed(2)}`, isHighlighted: true },
                            ]}/>
                            <CategorySummaryCard title="Rate & Amount" icon={<TrendingUp size={16}/>} data={[
