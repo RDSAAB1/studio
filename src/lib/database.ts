@@ -327,7 +327,13 @@ class HybridTable<T> {
 
     try {
         if (checkIsElectron()) {
-            const options = { skipLog: source === 'sync' };
+            const erp = getErpSelection();
+            const options = { 
+                skipLog: source === 'sync',
+                _company_id: erp?.companyId,
+                _sub_company_id: erp?.subCompanyId,
+                _year: erp?.seasonKey
+            };
             const res = await (window as any).electron.sqliteBulkDelete(this.tableName, stringIds, options);
             if (!res?.success) throw new Error(res?.error || 'SQLite bulkDelete failed');
         } else if (this.dexieTable) {
@@ -368,7 +374,13 @@ class HybridTable<T> {
     if (!trimmedId) return;
 
     if (checkIsElectron()) {
-      const res = await (window as any).electron.sqliteDelete(this.tableName, trimmedId);
+      const erp = getErpSelection();
+      const options = { 
+          _company_id: erp?.companyId,
+          _sub_company_id: erp?.subCompanyId,
+          _year: erp?.seasonKey
+      };
+      const res = await (window as any).electron.sqliteDelete(this.tableName, trimmedId, options);
       if (!res?.success) throw new Error(res?.error || 'SQLite delete failed');
     } else if (this.dexieTable) {
       // Using a transaction to ensure both delete and log happen together

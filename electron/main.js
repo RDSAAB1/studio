@@ -1364,7 +1364,7 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows, options = {}) =
     `);
 
     // Shared log statement for implicit changes in other tables
-    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`);
+    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     for (let i = 0; i < items.length; i += CHUNK_SIZE) {
       const chunk = items.slice(i, i + CHUNK_SIZE);
@@ -1401,7 +1401,12 @@ ipcMain.handle('sqlite:bulkPut', async (_event, tableName, rows, options = {}) =
             }
             
             if (!skipLog && !tableName.startsWith('_sync_')) {
-              logStmt.run(`${tableName}:${key}`, tableName, key, 'upsert', JSON.stringify(row), now);
+              logStmt.run(
+                `${tableName}:${key}`, tableName, key, 'upsert', JSON.stringify(row), now,
+                row._company_id || options._company_id || null,
+                row._sub_company_id || options._sub_company_id || null,
+                row._year || options._year || null
+              );
             }
           }
           inserted++;
@@ -1453,13 +1458,16 @@ ipcMain.handle('sqlite:put', async (_event, tableName, row, options = {}) => {
       
       if (!skipLog && !tableName.startsWith('_sync_')) {
         const syncId = `${tableName}:${id}`;
-        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           syncId, 
           tableName, 
           id, 
           'upsert', 
           JSON.stringify(row), 
-          Date.now()
+          Date.now(),
+          row._company_id || options._company_id || null,
+          row._sub_company_id || options._sub_company_id || null,
+          row._year || options._year || null
         );
       }
     });
@@ -1547,7 +1555,7 @@ ipcMain.handle('sqlite:bulkDelete', async (_event, tableName, ids, options = {})
     const now = Date.now();
     
     const delStmt = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`);
-    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`);
+    const logStmt = db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
       const chunk = ids.slice(i, i + CHUNK_SIZE);
@@ -1562,7 +1570,12 @@ ipcMain.handle('sqlite:bulkDelete', async (_event, tableName, ids, options = {})
           if (info.changes > 0) {
             deleted++;
             if (!skipLog && !tableName.startsWith('_sync_')) {
-              logStmt.run(`${tableName}:${finalId}`, tableName, finalId, 'delete', null, now);
+              logStmt.run(
+                `${tableName}:${finalId}`, tableName, finalId, 'delete', null, now,
+                options._company_id || null,
+                options._sub_company_id || null,
+                options._year || null
+              );
             }
           }
         }
@@ -1595,13 +1608,16 @@ ipcMain.handle('sqlite:delete', async (_event, tableName, id, options = {}) => {
       const info = db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(finalId);
       
       if (info.changes > 0 && !skipLog && !tableName.startsWith('_sync_')) {
-        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp) VALUES (?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT OR REPLACE INTO _sync_log (id, collection, docId, operation, data, timestamp, _company_id, _sub_company_id, _year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           `${tableName}:${finalId}`,
           tableName,
           finalId,
           'delete',
           null,
-          Date.now()
+          Date.now(),
+          options._company_id || null,
+          options._sub_company_id || null,
+          options._year || null
         );
       }
     });

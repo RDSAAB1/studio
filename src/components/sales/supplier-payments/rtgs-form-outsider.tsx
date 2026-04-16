@@ -238,6 +238,28 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
         }
     };
 
+    // Global Shortcuts (Alt+S, Alt+C)
+    React.useEffect(() => {
+        const onSave = () => {
+            if (!isProcessing && rtgsAmount > 0 && supplierDetails?.name) {
+                handleProcessPayment();
+            }
+        };
+        const onClear = () => {
+            setBankDetails({ bank: '', branch: '', ifscCode: '', acNo: '' });
+            setSupplierDetails?.({ name: '' });
+            setRtgsAmount?.(0);
+        };
+
+        window.addEventListener('app:save-entry', onSave);
+        window.addEventListener('app:clear-form', onClear);
+
+        return () => {
+            window.removeEventListener('app:save-entry', onSave);
+            window.removeEventListener('app:clear-form', onClear);
+        };
+    }, [handleProcessPayment, isProcessing, rtgsAmount, supplierDetails?.name]);
+
     return (
         <div className="space-y-2 text-[10px]">
             <Card className="rounded-md border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
@@ -333,7 +355,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                     </div>
                     {/* From field for RTGS Source identification using internal accounts */}
                     <div className="space-y-0.5">
-                        <Label htmlFor="rtgsFrom" className="text-[10px]">From (Internal Account)</Label>
+                        <Label htmlFor="rtgsFrom" className="text-[10px]">Payment Method</Label>
                         <CustomDropdown
                             id="rtgsFrom"
                             options={paymentFromOptions}

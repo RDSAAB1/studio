@@ -14,7 +14,7 @@ import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { electronNavigate } from '@/lib/electron-navigate';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 import { bankNames } from '@/lib/data';
@@ -141,11 +141,11 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
 
 
 type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
-export default function SettingsPage({ searchParams: searchParamsProp }: PageProps) {
+export default function SettingsPage({ searchParams: searchParamsProp, activeTabOverride }: { searchParams?: PageProps["searchParams"], activeTabOverride?: string }) {
   const erp = useErpSelection();
   const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
   const searchParams = useSearchParams();
-  const tabFromUrl = (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
+  const tabFromUrl = activeTabOverride ?? (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
   const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
   const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
@@ -578,26 +578,35 @@ export default function SettingsPage({ searchParams: searchParamsProp }: PagePro
     const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
 
 
+    const pathname = usePathname();
+    const isSubmenuMode = pathname.startsWith('/sales');
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <Tabs value={activeTab} onValueChange={(v) => { const p = new URLSearchParams(searchParams.toString()); p.set("tab", v); router.replace(`/settings?${p.toString()}`); }} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9 h-auto">
-                    <TabsTrigger value="company" className="flex items-center gap-1.5 py-2"><Building className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Company</span></TabsTrigger>
-                    <TabsTrigger value="email" className="flex items-center gap-1.5 py-2"><Mail className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Email</span></TabsTrigger>
-                    <TabsTrigger value="team" className="flex items-center gap-1.5 py-2"><Users2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Team</span></TabsTrigger>
-                    <TabsTrigger value="security" className="flex items-center gap-1.5 py-2"><ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span></TabsTrigger>
-                    <TabsTrigger value="general" className="flex items-center gap-1.5 py-2"><Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">General</span></TabsTrigger>
-                    <TabsTrigger value="banks" className="flex items-center gap-1.5 py-2"><Landmark className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Banks</span></TabsTrigger>
-                    <TabsTrigger value="receipts" className="flex items-center gap-1.5 py-2"><FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Receipts</span></TabsTrigger>
-                    <TabsTrigger value="formats" className="flex items-center gap-1.5 py-2"><List className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Formats</span></TabsTrigger>
-                    <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
-                </TabsList>
-                <TabsContent value="company" className="mt-6">
+        <div className={cn("space-y-8", isSubmenuMode && "space-y-2")}>
+            {!isSubmenuMode && <h1 className="text-3xl font-bold">Settings</h1>}
+            <Tabs value={activeTab} onValueChange={(v) => { 
+                const p = new URLSearchParams(searchParams.toString()); 
+                p.set("tab", v); 
+                router.replace(`${isSubmenuMode ? '/sales?menu=settings&tab=settings-' + v : '/settings?' + p.toString()}`); 
+            }} className="w-full">
+                {!isSubmenuMode && (
+                    <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9 h-auto">
+                        <TabsTrigger value="company" className="flex items-center gap-1.5 py-2"><Building className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Company</span></TabsTrigger>
+                        <TabsTrigger value="email" className="flex items-center gap-1.5 py-2"><Mail className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Email</span></TabsTrigger>
+                        <TabsTrigger value="team" className="flex items-center gap-1.5 py-2"><Users2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Team</span></TabsTrigger>
+                        <TabsTrigger value="security" className="flex items-center gap-1.5 py-2"><ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span></TabsTrigger>
+                        <TabsTrigger value="general" className="flex items-center gap-1.5 py-2"><Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">General</span></TabsTrigger>
+                        <TabsTrigger value="banks" className="flex items-center gap-1.5 py-2"><Landmark className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Banks</span></TabsTrigger>
+                        <TabsTrigger value="receipts" className="flex items-center gap-1.5 py-2"><FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Receipts</span></TabsTrigger>
+                        <TabsTrigger value="formats" className="flex items-center gap-1.5 py-2"><List className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Formats</span></TabsTrigger>
+                        <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
+                    </TabsList>
+                )}
+                <TabsContent value="company" className={cn("mt-6", isSubmenuMode && "mt-0")}>
                     <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
                         <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

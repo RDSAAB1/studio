@@ -164,6 +164,27 @@ function PaymentFormComponent(props: any) {
         }
     }, [paymentMethod, finalAmountToBePaid, editingPayment, setRtgsAmount]);
 
+    // Handle Global Shortcuts (Alt+S, Alt+C)
+    useEffect(() => {
+        const onSave = (e: any) => {
+            // Check if this component is "visible" or the active one
+            // In this specific layout, multiple payment forms might exist, 
+            // but we assume the one that is currently rendered is the one to save.
+            onProcessPayment();
+        };
+        const onClear = (e: any) => {
+            onClearPaymentForm();
+        };
+
+        window.addEventListener('app:save-entry', onSave);
+        window.addEventListener('app:clear-form', onClear);
+
+        return () => {
+            window.removeEventListener('app:save-entry', onSave);
+            window.removeEventListener('app:clear-form', onClear);
+        };
+    }, [onProcessPayment, onClearPaymentForm]);
+
     // Memoize the buttons list to avoid recreating on every render
     const paymentMethods = useMemo(() => ['Cash', 'Online', 'Ledger', 'RTGS', 'Gov.'] as const, []);
 
@@ -327,7 +348,7 @@ function PaymentFormComponent(props: any) {
                                     </div>
                                 </div>
                                 <div className="col-span-full space-y-1">
-                                    <Label htmlFor="ledger-paymentFrom" className="text-[10px] font-semibold text-slate-500">Payment From</Label>
+                                    <Label htmlFor="ledger-paymentFrom" className="text-[10px] font-semibold text-slate-500">Payment Method</Label>
                                     <Select
                                         value={selectedAccountId || "__placeholder__"}
                                         onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
@@ -453,11 +474,11 @@ function PaymentFormComponent(props: any) {
                                         name="settle-amount"
                                         type="number"
                                         value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        onChange={e => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
-                                        readOnly={paymentType === 'Partial'}
+                                        readOnly={true}
+                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
                                         className={cn(
                                           "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
-                                          paymentType === 'Partial' && 'bg-slate-50'
+                                          'bg-slate-50'
                                         )}
                                       />
                                     </div>
@@ -474,6 +495,7 @@ function PaymentFormComponent(props: any) {
                                           queueToBePaidUpdate(value);
                                         }}
                                         readOnly={paymentType === 'Full'}
+                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
                                         className={cn(
                                           "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
                                           paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
@@ -519,11 +541,11 @@ function PaymentFormComponent(props: any) {
                                         name="settle-amount"
                                         type="number"
                                         value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        onChange={(e) => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
-                                        readOnly={paymentType === "Partial"}
+                                        readOnly={true}
+                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
                                         className={cn(
                                           "h-7 text-[9.5px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15",
-                                          paymentType === "Partial" && "bg-slate-50"
+                                          "bg-slate-50"
                                         )}
                                       />
                                     </div>
@@ -543,6 +565,7 @@ function PaymentFormComponent(props: any) {
                                           queueToBePaidUpdate(value);
                                         }}
                                         readOnly={paymentType === "Full"}
+                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
                                         className={cn(
                                           "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
                                           paymentType === "Full" && "bg-slate-50 border-slate-200/80"
@@ -573,7 +596,7 @@ function PaymentFormComponent(props: any) {
 
                                     <div className="space-y-1">
                                       <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
-                                        From
+                                        Payment Method
                                       </Label>
                                       <Select
                                         value={selectedAccountId || "__placeholder__"}
@@ -625,7 +648,7 @@ function PaymentFormComponent(props: any) {
 
                                     <div className="space-y-1">
                                       <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
-                                        From
+                                        Payment Method
                                       </Label>
                                       <Select
                                         value={selectedAccountId || "__placeholder__"}
@@ -663,11 +686,11 @@ function PaymentFormComponent(props: any) {
                                         name="settle-amount"
                                         type="number"
                                         value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        onChange={(e) => handleSettleAmountChange(parseFloat(e.target.value) || 0)}
-                                        readOnly={paymentType === "Partial"}
+                                        readOnly={true}
+                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
                                         className={cn(
                                           "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                          paymentType === "Partial" && "bg-slate-50"
+                                          "bg-slate-50"
                                         )}
                                       />
                                     </div>
@@ -687,6 +710,7 @@ function PaymentFormComponent(props: any) {
                                           queueToBePaidUpdate(value);
                                         }}
                                         readOnly={paymentType === "Full"}
+                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
                                         className={cn(
                                           "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
                                           paymentType === "Full" && "bg-slate-50 border-slate-200/80"
@@ -754,7 +778,7 @@ function PaymentFormComponent(props: any) {
                             onClick={onClearPaymentForm}
                             disabled={isProcessing}
                         >
-                            Clear
+                            Clear (Alt+C)
                         </Button>
                         <Button
                             size="sm"
@@ -765,7 +789,7 @@ function PaymentFormComponent(props: any) {
                             {isProcessing ? (
                                 <><Loader2 className="mr-1.5 h-3 w-3 animate-spin"/> Processing...</>
                             ) : (
-                                "Finalize"
+                                "Finalize (Alt+S)"
                             )}
                         </Button>
                     </div>

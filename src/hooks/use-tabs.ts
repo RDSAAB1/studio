@@ -27,6 +27,12 @@ import {
   Calculator,
   Warehouse,
   Package,
+  Building,
+  Mail,
+  ShieldCheck,
+  List,
+  UserCircle,
+  Star,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -41,12 +47,12 @@ export type MenuItem = {
 export const allMenuItems: MenuItem[] = [
   {
     id: "dashboard-overview",
-    name: "Dashboard",
+    name: "Dashboard (Alt+D)",
     icon: LayoutDashboard,
   },
   {
     id: "sales-entry",
-    name: "Entry",
+    name: "Entry (Alt+E)",
     icon: FilePlus,
     subMenus: [
       { id: "supplier-entry", name: "Supplier Entry", icon: FilePlus, href: "/sales?menu=entry&tab=supplier-entry" },
@@ -57,7 +63,7 @@ export const allMenuItems: MenuItem[] = [
   },
   {
     id: "sales-payments",
-    name: "Payments",
+    name: "Payments (Alt+P)",
     icon: Wallet,
     subMenus: [
       { id: "supplier-payments", name: "Supplier Payments", icon: Wallet, href: "/sales?menu=payments&tab=supplier-payments" },
@@ -69,7 +75,7 @@ export const allMenuItems: MenuItem[] = [
   },
   {
     id: "cash-bank",
-    name: "Cash & Bank",
+    name: "Cash & Bank (Alt+B)",
     icon: Landmark,
     subMenus: [
       { id: "cash-bank-management", name: "Cash & Bank", icon: Landmark, href: "/sales?menu=cash-bank&tab=cash-bank-management" },
@@ -79,7 +85,7 @@ export const allMenuItems: MenuItem[] = [
   },
   {
     id: "sales-reports",
-    name: "Reports",
+    name: "Reports (Alt+R)",
     icon: PieChart,
     subMenus: [
       { id: "daily-business-report", name: "360° Business Report", icon: PieChart, href: "/sales?menu=reports&tab=daily-business-report" },
@@ -105,18 +111,34 @@ export const allMenuItems: MenuItem[] = [
   },
   {
     id: "settings", 
-    name: "Settings", 
+    name: "Settings (Alt+T)", 
     icon: Settings,
-    // Route Settings through unified /sales SPA for single-page feel
-    href: "/settings",
+    subMenus: [
+      { id: "settings-company", name: "Company", icon: Building, href: "/sales?menu=settings&tab=settings-company" },
+      { id: "settings-email", name: "Email", icon: Mail, href: "/sales?menu=settings&tab=settings-email" },
+      { id: "settings-team", name: "Team", icon: Users2, href: "/sales?menu=settings&tab=settings-team" },
+      { id: "settings-security", name: "Security", icon: ShieldCheck, href: "/sales?menu=settings&tab=settings-security" },
+      { id: "settings-general", name: "General", icon: Settings, href: "/sales?menu=settings&tab=settings-general" },
+      { id: "settings-banks", name: "Banks", icon: Landmark, href: "/sales?menu=settings&tab=settings-banks" },
+      { id: "settings-receipts", name: "Receipts", icon: FileText, href: "/sales?menu=settings&tab=settings-receipts" },
+      { id: "settings-formats", name: "Formats", icon: List, href: "/sales?menu=settings&tab=settings-formats" },
+      { id: "settings-account", name: "Account", icon: UserCircle, href: "/sales?menu=settings&tab=settings-account" },
+    ],
   },
   {
     id: "admin",
-    name: "Admin Tools",
+    name: "Admin (Alt+A)",
     icon: Wrench,
     subMenus: [
         // All admin tools now live inside unified /sales SPA (single route)
         { id: "admin/migrations", name: "Data Migration", icon: Database, href: "/sales?menu=admin&tab=admin-local-hub" },
     ]
+  },
+  {
+    id: "fav",
+    name: "Fav (Alt+F)",
+    icon: Star,
+    href: "/sales?menu=fav",
+    subMenus: [], // This will be dynamic in the UI
   },
 ];

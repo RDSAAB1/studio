@@ -731,6 +731,65 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     };
   }, [isDraggingCalculator]);
 
+  // Global Keyboard Shortcuts (Alt+Key)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        const key = e.key.toLowerCase();
+        
+        // Navigation Shortcuts
+        const navMap: Record<string, string> = {
+          'd': 'dashboard-overview',
+          'e': 'sales-entry',
+          'p': 'sales-payments',
+          'b': 'cash-bank',
+          'r': 'sales-reports',
+          'a': 'admin',
+          't': 'settings',
+          'f': 'fav'
+        };
+
+        if (navMap[key]) {
+          e.preventDefault();
+          const menuItem = allMenuItems.find(item => item.id === navMap[key]);
+          if (menuItem) {
+            handleOpenTab(menuItem);
+            return;
+          }
+        }
+
+        // Action Shortcuts
+        if (key === 's') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('app:save-entry'));
+          return;
+        }
+
+        if (key === 'c') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('app:clear-form'));
+          return;
+        }
+
+        // Tab selection (Alt + 1-9)
+        if (/^[1-9]$/.test(key)) {
+          e.preventDefault();
+          const index = parseInt(key) - 1;
+          
+          if (pathname.startsWith('/sales')) {
+            // For Sales SPA, we dispatch an event that the SPA can listen to
+            window.dispatchEvent(new CustomEvent('app:switch-sub-tab', { detail: { index } }));
+          } else if (openTabs[index]) {
+            handleTabSelect(openTabs[index].id);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [openTabs, activeTabId]); // Re-bind when openTabs or activeTabId changes
+
   // Use URL params when on /sales so highlight updates immediately (no wait for effect)
   const isSalesPath = pathname === "/sales" || pathname === "/sales/" || pathname.startsWith("/sales/");
   const menuParam = isSalesPath ? searchParams.get("menu") : null;
@@ -926,7 +985,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                           title={item.name}
                           onClick={() => handleOpenTab(item)}
                         >
-                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                            {/* Extract shortcut letter from name like "Entry (Alt+E)" */}
+                            <span className="text-[7px] font-bold opacity-60 leading-none tracking-tighter">
+                              {item.name.includes('Alt+') ? item.name.split('Alt+')[1].replace(')', '') : ''}
+                            </span>
+                          </div>
                         </Button>
                       );
                     }
@@ -943,7 +1008,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                         title={item.name}
                         onClick={() => handleOpenTab(item)}
                       >
-                        {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                          <span className="text-[7px] font-bold opacity-60 leading-none tracking-tighter">
+                             {item.name.includes('Alt+') ? item.name.split('Alt+')[1].replace(')', '') : ''}
+                          </span>
+                        </div>
                       </Button>
                     );
                   })}

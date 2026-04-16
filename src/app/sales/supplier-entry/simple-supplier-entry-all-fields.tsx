@@ -378,6 +378,26 @@ export default function SimpleSupplierEntryAllFields() {
             }
         }
     }, [isClient, handleEditSupplier, toast]);
+    
+    // Global Shortcuts (Alt+S, Alt+C)
+    useEffect(() => {
+        const onSave = () => {
+            if (!hookIsSubmitting) {
+                form.handleSubmit(onSubmit)();
+            }
+        };
+        const onClear = () => {
+            handleNewEntry();
+        };
+
+        window.addEventListener('app:save-entry', onSave);
+        window.addEventListener('app:clear-form', onClear);
+
+        return () => {
+            window.removeEventListener('app:save-entry', onSave);
+            window.removeEventListener('app:clear-form', onClear);
+        };
+    }, [form, onSubmit, handleNewEntry, hookIsSubmitting]);
 
 
     // Memoized data view for ultra fast rendering - always show table layout
@@ -535,11 +555,11 @@ export default function SimpleSupplierEntryAllFields() {
                                         <div className="space-y-2">
                                             <div className="grid grid-cols-2 gap-2">
                                                 <Button variant="outline" onClick={handleNewEntry} size="sm" className="h-8">
-                                                    <Plus className="mr-2 h-4 w-4" /> Clear Form
+                                                    <Plus className="mr-2 h-4 w-4" /> Clear (Alt+C)
                                                 </Button>
-                                                <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8">
+                                                <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold">
                                                     {hookIsSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                                    {isEditing ? 'Update' : 'Save'}
+                                                    {isEditing ? 'Update (Alt+S)' : 'Save (Alt+S)'}
                                                 </Button>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">

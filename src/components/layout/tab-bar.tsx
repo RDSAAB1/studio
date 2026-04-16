@@ -18,7 +18,7 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
       <div 
         className="flex items-center w-full gap-1 sm:gap-1.5"
       >
-        {uniqueTabs.map((tab: any) => {
+        {uniqueTabs.map((tab: any, index: number) => {
             const isActive = tab.id === activeTabId;
             let iconElement = null;
             
@@ -54,7 +54,7 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
               <Tab
                 key={tab.id}
                 icon={iconElement}
-                title={tab.name}
+                title={`${index + 1}. ${tab.name}`}
                 isActive={isActive}
                 onClick={() => {
                    setActiveTabId(tab.id);

@@ -284,13 +284,13 @@ export const CalculatedSummary = ({
                             </Button>
                         )}
 
-                        <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
-                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>)}
+                        <Button onClick={onSave} size="sm" className="h-8 rounded-md font-bold" disabled={isLoading} type="button">
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update (Alt+S)</> : <><Save className="mr-2 h-4 w-4" /> Save (Alt+S)</>)}
                         </Button>
 
                         {onClear && (
                             <Button onClick={onClear} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
-                                <X className="mr-2 h-4 w-4" /> Clear
+                                <X className="mr-2 h-4 w-4" /> Clear (Alt+C)
                             </Button>
                         )}
                     </div>

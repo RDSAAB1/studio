@@ -543,6 +543,24 @@ export default function CustomerEntryClient() {
     };
   }, [handleKeyboardShortcuts]);
 
+  // Global Shortcuts (Alt+S, Alt+C)
+  useEffect(() => {
+    const onSave = () => {
+        form.handleSubmit(() => onSubmit())();
+    };
+    const onClear = () => {
+        handleNew();
+    };
+
+    window.addEventListener('app:save-entry', onSave);
+    window.addEventListener('app:clear-form', onClear);
+
+    return () => {
+        window.removeEventListener('app:save-entry', onSave);
+        window.removeEventListener('app:clear-form', onClear);
+    };
+  }, [form, onSubmit, handleNew]);
+
   // Global Enter key handler to work as Tab everywhere
   useEffect(() => {
     const handleGlobalEnterKey = (event: KeyboardEvent) => {

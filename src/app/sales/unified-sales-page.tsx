@@ -6,7 +6,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { electronNavigate } from "@/lib/electron-navigate";
 import { cn } from "@/lib/utils";
 import { useLayoutSubnav } from "@/components/layout/app-layout";
+import { allMenuItems } from "@/hooks/use-tabs";
+import { useToast } from "@/hooks/use-toast";
 
+import { Star, Check, X, AlertCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 // Core components - Static imports for instant access
 import SimpleSupplierEntryAllFields from "./supplier-entry/simple-supplier-entry-all-fields";
 import CustomerEntryClient from "@/components/sales/customer-entry/customer-entry-client";
@@ -43,6 +56,7 @@ const BankManagementPage = dynamic(() => import("@/app/settings/bank-management/
 const ErpMigrationPage = dynamic(() => import("@/app/settings/erp-migration/page"));
 // Admin Modules (moved into Unified Sales SPA)
 const AdminMigrationsPage = dynamic(() => import("@/app/admin/migrations/page"));
+const SettingsPage = dynamic(() => import("../settings/page"), { ssr: false });
 import ActivityHistoryPage from "@/app/activity-history/page";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -54,9 +68,10 @@ type SalesTab =
   | "inventory-management" | "inventory-add"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
-  | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync";
+  | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync"
+  | "settings-company" | "settings-email" | "settings-team" | "settings-security" | "settings-general" | "settings-banks" | "settings-receipts" | "settings-formats" | "settings-account";
 
-type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin";
+type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin" | "fav";
 
 const TAB_LABELS: Record<SalesTab, string> = {
   "dashboard": "Dashboard Overview",
@@ -97,6 +112,17 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "admin-erp-migrate": "ERP Migrate",
   "admin-secure-vault": "Secure Vault",
   "admin-collection-sync": "Collection Sync",
+  
+  // Settings
+  "settings-company": "Company",
+  "settings-email": "Email",
+  "settings-team": "Team",
+  "settings-security": "Security",
+  "settings-general": "General",
+  "settings-banks": "Banks",
+  "settings-receipts": "Receipts",
+  "settings-formats": "Formats",
+  "settings-account": "Account",
 };
 
 export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu = "dashboard" }: { defaultTab?: SalesTab; defaultMenu?: MenuType }) {
@@ -106,6 +132,41 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   const [activeTab, setActiveTab] = useState<SalesTab>(defaultTab);
   const [menuType, setMenuType] = useState<MenuType>(defaultMenu);
   const [mountedTabs, setMountedTabs] = useState<SalesTab[]>([defaultTab]);
+  const { toast } = useToast();
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isFavLoaded, setIsFavLoaded] = useState(false);
+  const [confirmFav, setConfirmFav] = useState<{ id: string, label: string, isFav: boolean } | null>(null);
+
+  // Load favorites from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('erp_favorites');
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load favorites", e);
+      }
+    }
+    setIsFavLoaded(true);
+  }, []);
+
+  // Save favorites to localStorage
+  useEffect(() => {
+    if (isFavLoaded) {
+      localStorage.setItem('erp_favorites', JSON.stringify(favorites));
+    }
+  }, [favorites, isFavLoaded]);
+
+  const toggleFavorite = (tabId: string) => {
+    const isAdding = !favorites.includes(tabId);
+    setFavorites(prev => 
+      isAdding ? [...prev, tabId] : prev.filter(id => id !== tabId)
+    );
+    toast({
+      title: isAdding ? "Added to Favorites" : "Removed from Favorites",
+      description: `${TAB_LABELS[tabId as SalesTab]} has been ${isAdding ? 'added to' : 'removed from'} your Fav menu.`,
+    });
+  };
   
   // Get menu type from URL or use default
   useEffect(() => {
@@ -195,11 +256,13 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     // Determine menu type based on tab (for top bar highlighting)
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
+    else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
     else if (['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'].includes(value)) newMenuType = 'entry';
     else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor', 'reports-data-audit'].includes(value)) newMenuType = 'reports';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
     else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
+    else if (value.startsWith('settings-')) newMenuType = 'settings';
     else newMenuType = 'payments';
     
     setMenuType(newMenuType);
@@ -209,7 +272,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     params.set('tab', value);
     params.set('menu', newMenuType);
     electronNavigate(`/sales?${params.toString()}`, router, { method: 'push' });
-  }, [router, searchParams]);
+  }, [router, searchParams, menuType]);
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
@@ -241,7 +304,17 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       ];
     }
     if (menuType === "settings") {
-      return [];
+      return [
+        { value: "settings-company" as const, label: TAB_LABELS["settings-company"] },
+        { value: "settings-email" as const, label: TAB_LABELS["settings-email"] },
+        { value: "settings-team" as const, label: TAB_LABELS["settings-team"] },
+        { value: "settings-security" as const, label: TAB_LABELS["settings-security"] },
+        { value: "settings-general" as const, label: TAB_LABELS["settings-general"] },
+        { value: "settings-banks" as const, label: TAB_LABELS["settings-banks"] },
+        { value: "settings-receipts" as const, label: TAB_LABELS["settings-receipts"] },
+        { value: "settings-formats" as const, label: TAB_LABELS["settings-formats"] },
+        { value: "settings-account" as const, label: TAB_LABELS["settings-account"] },
+      ];
     }
     if (menuType === "admin") {
       return [
@@ -251,6 +324,19 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "admin-collection-sync" as const, label: TAB_LABELS["admin-collection-sync"] },
       ];
     }
+    if (menuType === "fav") {
+      // Collect all possible sub-menu items from all top-level menus
+      const allSubMenuOptions = allMenuItems.flatMap(m => m.subMenus || []).filter(sub => sub.href);
+      return allSubMenuOptions
+        .filter(sub => favorites.includes(sub.id))
+        .map(sub => {
+          // Robust extraction of tab param without needing URL constructor
+          const tabParamMatch = sub.href!.match(/[?&]tab=([^&]+)/);
+          const tabVal = (tabParamMatch ? tabParamMatch[1] : sub.id) as SalesTab;
+          return { value: tabVal, label: sub.name };
+        });
+    }
+
     return [
       { value: "supplier-payments" as const, label: TAB_LABELS["supplier-payments"] },
       { value: "customer-payments" as const, label: TAB_LABELS["customer-payments"] },
@@ -258,26 +344,43 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       { value: "income-expense" as const, label: TAB_LABELS["income-expense"] },
       { value: "ledger" as const, label: TAB_LABELS["ledger"] },
     ];
-  }, [menuType]);
+  }, [menuType, favorites]);
 
   useEffect(() => {
     setSubnav(
       <div className="flex items-center gap-1 w-full pb-1 sm:pb-0 px-1">
-        {subTabs.map((t) => {
-          const isActive = activeTab === t.value;
+        {subTabs.map((t, index) => {
+          const active = activeTab === t.value;
+          const isFav = favorites.includes(t.value);
+
           return (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => handleTabChange(t.value)}
-              className={cn(
-                "h-7 sm:h-8 flex-1 min-w-0 whitespace-normal break-words leading-tight flex items-center justify-center text-center rounded-[5px] px-1 sm:px-3 text-[9px] min-[400px]:text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
-                "text-slate-600 hover:bg-white/40 hover:text-slate-900 border border-transparent",
-                isActive && "bg-white text-slate-950 shadow-sm border-slate-200"
-              )}
-            >
-              {t.label}
-            </button>
+            <div key={t.value} className="relative group flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => handleTabChange(t.value)}
+                className={cn(
+                  "h-7 sm:h-8 w-full flex items-center justify-center text-center rounded-[5px] px-1 sm:px-3 text-[9px] min-[400px]:text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
+                  "text-slate-600 hover:bg-white/40 hover:text-slate-900 border border-transparent",
+                  active && "bg-white text-slate-950 shadow-sm border-slate-200"
+                )}
+              >
+                <span className="truncate">{index + 1}. {t.label}</span>
+              </button>
+
+              <button
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setConfirmFav({ id: t.value, label: t.label, isFav: favorites.includes(t.value) });
+                }}
+                className={cn(
+                  "absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-white shadow-sm border transition-all",
+                  "opacity-0 group-hover:opacity-100",
+                  isFav ? "text-violet-600 border-violet-200 shadow-violet-100" : "text-slate-400 hover:text-violet-400"
+                )}
+              >
+                <Star className={cn("h-2.5 w-2.5", isFav && "fill-violet-600")} />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -285,6 +388,18 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
 
     return () => setSubnav(null);
   }, [activeTab, handleTabChange, setSubnav, subTabs]);
+
+  // Keyboard Shortcut Listener for Sub-Tabs (Alt + 1-9)
+  useEffect(() => {
+    const handleSwitchSubTab = (e: any) => {
+      const { index } = e.detail;
+      if (subTabs[index]) {
+        handleTabChange(subTabs[index].value);
+      }
+    };
+    window.addEventListener('app:switch-sub-tab', handleSwitchSubTab);
+    return () => window.removeEventListener('app:switch-sub-tab', handleSwitchSubTab);
+  }, [subTabs, handleTabChange]);
 
   const renderTabContent = useMemo(
     () => (tab: SalesTab) => {
@@ -353,6 +468,18 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <AdminMigrationsPage activeTab="backups" />;
         case "admin-collection-sync":
           return <AdminMigrationsPage activeTab="collection-sync" />;
+        // Settings
+        case "settings-company":
+        case "settings-email":
+        case "settings-team":
+        case "settings-security":
+        case "settings-general":
+        case "settings-banks":
+        case "settings-receipts":
+        case "settings-formats":
+        case "settings-account":
+          const settingsCategory = tab.replace('settings-', '');
+          return <SettingsPage searchParams={Promise.resolve({ tab: settingsCategory })} />;
         default:
           return null;
       }
@@ -360,15 +487,57 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     []
   );
 
+  const isSettingsActive = activeTab.startsWith('settings-');
+
   return (
     <div className="w-full">
       <div>
-        {mountedTabs.map((tab) => (
-          <div key={tab} className={activeTab === tab ? "block" : "hidden"}>
-            {renderTabContent(tab)}
+        {/* General Tabs */}
+        {mountedTabs
+          .filter((tab) => !tab.startsWith("settings-"))
+          .map((tab) => (
+            <div key={tab} className={activeTab === tab ? "block" : "hidden"}>
+              {renderTabContent(tab)}
+            </div>
+          ))}
+
+        {/* Unified Settings Root (Prevents multiple instances/state conflicts) */}
+        {mountedTabs.some((tab) => tab.startsWith("settings-")) && (
+          <div className={isSettingsActive ? "block" : "hidden"}>
+             <SettingsPage 
+               activeTabOverride={activeTab.startsWith('settings-') ? activeTab.replace('settings-', '') : 'company'}
+             />
           </div>
-        ))}
+        )}
       </div>
+
+      <AlertDialog open={confirmFav !== null} onOpenChange={(open) => !open && setConfirmFav(null)}>
+        <AlertDialogContent className="w-[90vw] max-w-sm rounded-[10px]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 text-violet-600 mb-2">
+              <AlertCircle className="h-5 w-5" />
+              <AlertDialogTitle>Confirmation</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-slate-900 text-sm font-medium">
+              Are you sure you want to {confirmFav?.isFav ? 'REMOVE' : 'ADD'} <span className="font-bold text-violet-700">"{confirmFav?.label}"</span> {confirmFav?.isFav ? 'from' : 'to'} your Favorites menu?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 mt-4">
+            <AlertDialogCancel className="flex-1 mt-0 border-slate-200 hover:bg-slate-50 rounded-[8px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (confirmFav) {
+                  toggleFavorite(confirmFav.id);
+                  setConfirmFav(null);
+                }
+              }}
+              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white rounded-[8px]"
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
