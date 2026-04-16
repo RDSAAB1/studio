@@ -498,7 +498,7 @@ export async function listErpCompanies(): Promise<
     const auth = getFirebaseAuth();
     const userId = auth?.currentUser?.uid || "test-user-123";
     
-    const res = await fetch('/api/d1-proxy', {
+    const res = await fetch('/api/d1-proxy/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -542,7 +542,7 @@ export async function addErpSubCompany(
   const auth = getFirebaseAuth();
   const userId = auth?.currentUser?.uid || "test-user-123";
 
-  const res = await fetch('/api/d1-proxy', {
+  const res = await fetch('/api/d1-proxy/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -574,7 +574,7 @@ export async function addErpSeason(
   const auth = getFirebaseAuth();
   const userId = auth?.currentUser?.uid || "test-user-123";
 
-  const res = await fetch('/api/d1-proxy', {
+  const res = await fetch('/api/d1-proxy/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

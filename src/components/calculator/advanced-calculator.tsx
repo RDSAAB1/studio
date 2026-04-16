@@ -61,8 +61,9 @@ const ScientificCalculator = () => {
                 .replace(/π/g, 'Math.PI')
                 .replace(/e/g, 'Math.E');
 
-            // Avoid octal literals
-            evalString = evalString.replace(/\b0+(?![.eE])/g, '');
+            // Avoid octal literals safely - only remove leading zeros from the start of numbers
+            // but not if they are part of a decimal (after a dot)
+            evalString = evalString.replace(/(?<!\.)\b0+(?=[0-9])/g, '');
             
             // Very basic security check for allowed characters
             if (/[^0-9\s.()+\-*/%MathPIEsqrtpowcossintanlog10]/.test(evalString)) {
@@ -70,7 +71,7 @@ const ScientificCalculator = () => {
             }
 
             const result = new Function('return ' + evalString)();
-            if (isNaN(result) || !isFinite(result)) {
+            if (result === undefined || result === null || isNaN(result) || !isFinite(result)) {
                 return null;
             }
             return String(result);
@@ -127,8 +128,9 @@ const ScientificCalculator = () => {
     }
 
      const displayValue = useMemo(() => {
+        if (input === '0' || input === '') return '0';
         const currentResult = evaluateExpression(input);
-        if (currentResult !== null && currentResult !== input) {
+        if (currentResult !== null) {
             const numResult = parseFloat(currentResult);
             if (!isNaN(numResult) && currentResult.includes('.') && currentResult.split('.')[1].length > 8) {
                 return numResult.toPrecision(8);
@@ -140,8 +142,14 @@ const ScientificCalculator = () => {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            event.preventDefault();
+            // Don't intercept if user is typing in an input field elsewhere
+            const target = event.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                return;
+            }
+
             const { key } = event;
+            let handled = true;
 
             if (/[0-9]/.test(key)) {
                 handleInput(key);
@@ -165,6 +173,12 @@ const ScientificCalculator = () => {
                 handleInput('(');
             } else if (key === ')') {
                 handleInput(')');
+            } else {
+                handled = false;
+            }
+
+            if (handled) {
+                event.preventDefault();
             }
         };
         

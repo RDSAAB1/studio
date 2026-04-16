@@ -15,7 +15,7 @@ import { addBank, getOptionsRealtime, addOption, updateOption, deleteOption } fr
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import type { OptionItem } from '@/lib/definitions';
-import { Settings } from 'lucide-react';
+import { Settings, Loader2 } from 'lucide-react';
 import { OptionsManagerDialog } from '@/components/sales/options-manager-dialog';
 import {
     Dialog,

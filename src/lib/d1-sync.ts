@@ -96,7 +96,7 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
     console.log(`[D1 Sync] Request: ${collection || 'global'} | Company: ${headers['X-Company-Id']} | Year: ${headers['X-Year']}`);
 
     try {
-        const response = await fetch('/api/d1-proxy', {
+        const response = await fetch('/api/d1-proxy/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
