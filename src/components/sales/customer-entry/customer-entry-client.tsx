@@ -48,6 +48,7 @@ export default function CustomerEntryClient() {
   const debouncedSearchTerm = useDebounce(searchTerm, 10);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Import/Export hook
   const {
@@ -546,18 +547,29 @@ export default function CustomerEntryClient() {
   // Global Shortcuts (Alt+S, Alt+C)
   useEffect(() => {
     const onSave = () => {
+        // Only execute if this component is visible in the DOM
+        if (containerRef.current?.closest('.hidden')) return;
         form.handleSubmit(() => onSubmit())();
     };
     const onClear = () => {
+        // Only execute if this component is visible in the DOM
+        if (containerRef.current?.closest('.hidden')) return;
         handleNew();
+    };
+
+    const onPrint = () => {
+        if (containerRef.current?.closest('.hidden')) return;
+        handleSaveAndPrint('tax-invoice');
     };
 
     window.addEventListener('app:save-entry', onSave);
     window.addEventListener('app:clear-form', onClear);
+    window.addEventListener('app:print-entry', onPrint);
 
     return () => {
         window.removeEventListener('app:save-entry', onSave);
         window.removeEventListener('app:clear-form', onClear);
+        window.removeEventListener('app:print-entry', onPrint);
     };
   }, [form, onSubmit, handleNew]);
 
@@ -720,7 +732,7 @@ export default function CustomerEntryClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={containerRef} className="space-y-4">
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
             <CustomerForm 

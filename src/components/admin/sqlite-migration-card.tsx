@@ -39,9 +39,6 @@ export function SqliteMigrationCard() {
   const [loading, setLoading] = useState(true);
 
   // States for Select Folder Flow
-  const [isSelectFolderDialogOpen, setIsSelectFolderDialogOpen] = useState(false);
-  const [selectFolderFlowStep, setSelectFolderFlowStep] = useState<"initial" | "synced" | "cleared">("initial");
-  const [syncStats, setSyncStats] = useState<{ total: number; error: string }>({ total: 0, error: "" });
   const [isFlowSyncing, setIsFlowSyncing] = useState(false);
 
   const [dbSize, setDbSize] = useState<number | null>(null);
@@ -64,100 +61,96 @@ export function SqliteMigrationCard() {
     setLoading(false);
   }, []);
 
-  const onClickSelectSqliteFolder = () => {
-    setIsSelectFolderDialogOpen(true);
-    setSelectFolderFlowStep("initial");
-    setSyncStats({ total: 0, error: "" });
-  };
-
-  const handleFlowSyncData = async () => {
+  const onClickSelectSqliteFolder = async () => {
     const electron = typeof window !== "undefined"
-      ? (window as unknown as { electron?: { sqliteSetFolder?: (p: string) => Promise<{ success?: boolean; folder?: string; error?: string }> } }).electron
+      ? (window as any).electron
       : undefined;
 
-    if (!electron?.sqliteSetFolder) {
+    if (!electron?.sqliteSetFolder || !electron?.selectFolder) {
       toast({ title: "Electron required", description: "Run: npm run electron:dev", variant: "destructive" });
       return;
     }
 
-    const folderPath = sqliteFolderPath || getSqliteFolderPath();
-    if (!folderPath) {
-      toast({ title: "No current folder", description: "Koi SQLite folder active nahi hai. Aap direct switch kar sakte hain.", variant: "default" });
-      setSelectFolderFlowStep("synced");
-      return;
-    }
-
     setIsFlowSyncing(true);
+
     try {
-      const res = await electron.sqliteSetFolder(folderPath);
-      if (!res?.success) {
-        toast({ title: "Failed", description: res?.error || "Could not set SQLite folder.", variant: "destructive" });
+      const currentFolderPath = sqliteFolderPath || getSqliteFolderPath();
+
+      // Step 1: Read Master Data from Current DB before leaving
+      // This ensures we can populate the new directory if it's empty
+      const masterCollections = [
+        'companies', 'settings', 'options', 'banks', 'bankAccounts', 
+        'incomeCategories', 'expenseCategories', 'ledgerAccounts', 'expenseTemplates'
+      ];
+      const masterData: Record<string, any[]> = {};
+      
+      if (currentFolderPath) {
+        toast({ title: "Syncing Data", description: "Please wait while data is synced..." });
+        const res = await electron.sqliteSetFolder(currentFolderPath);
+        if (res?.success) {
+          const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
+          await importDexieToSqlite();
+          
+          // Push any pending changes to D1 cloud before unmounting this folder
+          try {
+             const { performFullSync } = await import("@/lib/d1-sync");
+             await performFullSync('all', true);
+             toast({ title: "Cloud Synced", description: "Data successfully backed up to cloud." });
+          } catch (e) {
+             console.warn("D1 Cloud sync skipped / offline:", e);
+          }
+          
+          for (const table of masterCollections) {
+            try {
+               masterData[table] = await electron.sqliteAll(table) || [];
+            } catch {
+               masterData[table] = [];
+            }
+          }
+        }
+      }
+
+      // Step 2: Select and Mount Folder
+      const folderPath = await electron.selectFolder();
+      if (!folderPath) {
+        setIsFlowSyncing(false);
         return;
       }
 
-      const { importDexieToSqlite } = await import("@/lib/sqlite-migration");
-      const out = await importDexieToSqlite();
-      const tableRows = Object.entries(out.details || {}).map(([table, d]) => ({
-        table,
-        fromDexie: d.sourceCount,
-        toSqlite: d.sqliteCount,
-        error: d.error ?? "",
-      }));
-      const total = tableRows.reduce((sum, r) => sum + (r.toSqlite || 0), 0);
-      const hasError = tableRows.some((r) => !!r.error || r.fromDexie !== r.toSqlite);
+      const mountRes = await switchToSqliteFolder(folderPath);
+      if (mountRes?.success) {
+        const effective = mountRes.folder || folderPath;
+        
+        // Step 3: Inject Master Data if New Directory is Empty
+        try {
+           const existingCompanies = await electron.sqliteAll('companies');
+           if (!existingCompanies || existingCompanies.length === 0) {
+               // DB is empty, inject master data
+               for (const table of masterCollections) {
+                   if (masterData[table] && masterData[table].length > 0) {
+                       await electron.sqliteImportTable(table, masterData[table], { clear: false });
+                   }
+               }
+               toast({ title: "Master Data Cloned", description: `Cloned settings and companies to new directory.` });
+           }
+        } catch (e) {
+           console.warn("Failed to inject master data:", e);
+        }
 
-      if (out.success && !hasError) {
-        setSyncStats({ total, error: "" });
-        setSelectFolderFlowStep("synced");
-      } else {
-        const firstErr = tableRows.find((r) => r.error)?.error;
-        setSyncStats({ total, error: firstErr || "Kuch tables migrate nahi ho paye." });
-        setSelectFolderFlowStep("synced");
-      }
-    } catch (e) {
-      setSyncStats({ total: 0, error: e instanceof Error ? e.message : "Error syncing." });
-      setSelectFolderFlowStep("synced");
-    } finally {
-      setIsFlowSyncing(false);
-    }
-  };
-
-  const handleFlowClearDexie = async () => {
-    try {
-      await clearAllLocalData();
-      toast({ title: "Data cleared", description: "Dexie data clear ho gaya.", variant: "default" });
-      setSelectFolderFlowStep("cleared");
-    } catch (e) {
-      toast({ title: "Failed", description: "Could not clear Dexie data", variant: "destructive" });
-    }
-  };
-
-  const handleFlowSelectFolder = async () => {
-    const electron = typeof window !== "undefined" ? (window as unknown as { electron?: { selectFolder?: () => Promise<string | null> } }).electron : undefined;
-    if (!electron?.selectFolder) return;
-    
-    const folderPath = await electron.selectFolder();
-    if (!folderPath) return;
-
-    try {
-      const res = await switchToSqliteFolder(folderPath);
-      if (res?.success) {
-        const effective = res.folder || folderPath;
         setSqliteFolderPathState(effective);
         setSqliteFolderPath(effective);
         setSqliteMode(true);
         setSqliteModeActive(true);
         
-        setIsSelectFolderDialogOpen(false);
-        toast({ title: "Folder set", description: `SQLite DB: ${effective}. Loaded records from it.` });
-        
-        // Reload page to ensure clean state with new DB
+        toast({ title: "Folder set", description: `SQLite DB Mounted: ${effective}` });
         window.location.reload();
       } else {
-        toast({ title: "Failed", description: res?.error || "Could not set folder.", variant: "destructive" });
+        toast({ title: "Failed", description: mountRes?.error || "Could not mount folder.", variant: "destructive" });
       }
     } catch (e) {
-      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+      toast({ title: "Error", description: e instanceof Error ? e.message : "An error occurred", variant: "destructive" });
+    } finally {
+      setIsFlowSyncing(false);
     }
   };
 
@@ -507,12 +500,13 @@ export function SqliteMigrationCard() {
             <div className="flex gap-1.5">
                 <Button
                     onClick={onClickSelectSqliteFolder}
+                    disabled={isFlowSyncing}
                     variant="outline"
                     size="sm"
                     className="h-8 px-3 rounded-[4px] text-[10px] font-bold uppercase tracking-wider"
                 >
-                    <FolderOpen className="h-3.5 w-3.5 mr-2" />
-                    Change Directory
+                    {isFlowSyncing ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5 mr-2" />}
+                    {isFlowSyncing ? 'Processing...' : 'Change Directory'}
                 </Button>
                 {!sqliteModeActive ? (
                   <Button
@@ -633,66 +627,7 @@ export function SqliteMigrationCard() {
           )}
         </div>
 
-        {/* Select SQLite Folder Popup Dialog */}
-        <Dialog open={isSelectFolderDialogOpen} onOpenChange={setIsSelectFolderDialogOpen}>
-          <DialogContent className="sm:max-w-md bg-white border-slate-200 text-slate-900 rounded-3xl shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-black uppercase tracking-widest text-sm flex items-center gap-2">
-                 <FolderOpen className="h-5 w-5 text-indigo-600" />
-                 Switch Memory Hub
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {selectFolderFlowStep === "initial" && (
-                <div className="space-y-4">
-                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-                    <p className="text-xs text-amber-800 font-bold leading-relaxed">
-                      ⚠️ Data Safety Protocol: Ensure current session data is synchronized to Local Storage before switching directories. Unsaved cache may be lost.
-                    </p>
-                  </div>
-                  <Button onClick={handleFlowSyncData} disabled={isFlowSyncing} className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-indigo-600/20">
-                    {isFlowSyncing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRightLeft className="mr-2 h-5 w-5" />}
-                    {isFlowSyncing ? "Syncing Logic..." : "Sync & Proceed"}
-                  </Button>
-                </div>
-              )}
 
-              {selectFolderFlowStep === "synced" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-emerald-700 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
-                    <CheckCircle2 className="h-6 w-6" />
-                    <div>
-                        <p className="text-sm font-black uppercase tracking-tight">System Synced</p>
-                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{syncStats.total} Records safely moved.</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 font-bold leading-relaxed text-center px-4">
-                    Dynamic cache (Dexie) can now be safely evacuated to restore baseline performance.
-                  </p>
-                  <Button onClick={handleFlowClearDexie} className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-slate-900/20">
-                    Clear Engine Cache
-                  </Button>
-                </div>
-              )}
-
-              {selectFolderFlowStep === "cleared" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-indigo-700 bg-indigo-50 px-4 py-3 rounded-2xl border border-indigo-100">
-                    <CheckCircle2 className="h-6 w-6" />
-                    <p className="text-sm font-black uppercase tracking-tight">Cache Evacuated</p>
-                  </div>
-                  <Button onClick={handleFlowSelectFolder} className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[12px] shadow-lg shadow-indigo-600/20 shadow-indigo-600/20">
-                    <FolderOpen className="mr-2 h-5 w-5 font-bold" />
-                    Mount New Directory
-                  </Button>
-                </div>
-              )}
-            </div>
-            <DialogFooter className="sm:justify-center border-t border-slate-50 pt-4">
-               <Button type="button" variant="ghost" onClick={() => setIsSelectFolderDialogOpen(false)} className="text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest text-[11px] transition-colors">Abort Switch</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
     </div>
   );
 }

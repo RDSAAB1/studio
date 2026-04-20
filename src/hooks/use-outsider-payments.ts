@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { Payment, BankAccount } from "@/lib/definitions";
 import { useSupplierPaymentsForm } from './use-supplier-payments-form';
@@ -25,6 +25,25 @@ export const useOutsiderPayments = (data: any) => {
         data?.bankAccounts || [], 
         handleConflict
     );
+
+    const defaultAccountId = data?.receiptSettings?.defaultBankAccountId || data?.receiptSettings?.defaultOutsiderRtgsAccount || '';
+    const hasInitializedAccountRef = useRef(false);
+
+    // Lock paymentMethod to RTGS for outsiders so it strictly generates RT-prefixed IDs natively
+    useEffect(() => {
+        if (form.paymentMethod !== 'RTGS') {
+            form.setPaymentMethod('RTGS');
+        }
+        if (form.selectedCustomerKey !== 'OUTSIDER') {
+            form.setSelectedCustomerKey('OUTSIDER');
+        }
+        
+        // Ensure default bank account is forced on initial settings load
+        if (defaultAccountId && !hasInitializedAccountRef.current) {
+            form.setSelectedAccountId(defaultAccountId);
+            hasInitializedAccountRef.current = true;
+        }
+    }, [form.paymentMethod, form.setPaymentMethod, form.selectedCustomerKey, form.setSelectedCustomerKey, defaultAccountId, form.setSelectedAccountId]);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
@@ -181,11 +200,22 @@ export const useOutsiderPayments = (data: any) => {
             });
 
             if (result.success) {
+                // Immediately push to state so the table updates without waiting for liveQuery
+                if (result.payment && data?.addOrUpdatePaymentInState) {
+                    data.addOrUpdatePaymentInState(result.payment);
+                }
+
                 toast({
                     title: "Payment Processed",
                     description: `RTGS payment ${form.rtgsSrNo || form.paymentId} has been ${form.editingPayment ? 'updated' : 'created'}.`,
                 });
                 form.resetPaymentForm();
+                
+                // Re-enforce default bank account immediately after reset
+                if (defaultAccountId) {
+                    form.setSelectedAccountId(defaultAccountId);
+                }
+
                 form.setEditingPayment(null);
                 form.setIsBeingEdited(false);
             } else {

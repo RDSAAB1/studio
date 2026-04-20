@@ -69,40 +69,11 @@ function CloudSvg({ className, width, id }: { className?: string; width: number;
 export function FlyingPlanes() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      {/* Clouds */}
-      {clouds.map((c, i) => (
-        <div
-          key={`cloud-${i}`}
-          className={`absolute text-white/20 ${c.drift}`}
-          style={{
-            left: c.left,
-            top: c.top,
-            animationDelay: `${c.delay}s`,
-          }}
-        >
-          <CloudSvg width={c.width} id={`cloud-${i}`} />
-        </div>
-      ))}
-      {/* Glowing stars */}
-      {stars.map((s, i) => (
-        <div
-          key={`star-${i}`}
-          className="absolute rounded-full auth-star-glow"
-          style={{
-            left: s.left,
-            top: s.top,
-            width: `${s.size}px`,
-            height: `${s.size}px`,
-            animationDelay: `${s.delay}s`,
-            animationDuration: `${s.duration}s`,
-          }}
-        />
-      ))}
-      {/* Particles - violet/navy tint for mesh gradient feel */}
+      {/* Subtle Particles - violet/navy tint for mesh gradient feel */}
       {particles.map((p, i) => (
         <div
           key={`p-${i}`}
-          className="absolute rounded-full bg-violet-400/25 auth-particle-float"
+          className="absolute rounded-full bg-violet-400/10 auth-particle-float"
           style={{
             left: p.left,
             top: p.top,

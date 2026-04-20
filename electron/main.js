@@ -1504,7 +1504,7 @@ ipcMain.handle('sqlite:clearAllTables', async (_event, options = {}) => {
       tablesToClear = Array.from(SQLITE_ALLOWED_TABLES).filter(t => !keep.has(t));
     }
     
-    db.transaction(() => {
+    const clearData = db.transaction(() => {
       for (const t of tablesToClear) {
         db.prepare(`DELETE FROM ${t}`).run();
       }
@@ -1518,8 +1518,10 @@ ipcMain.handle('sqlite:clearAllTables', async (_event, options = {}) => {
           db.prepare(`DELETE FROM _sync_meta WHERE id LIKE ?`).run(`${t}:%`);
         }
       }
-      db.prepare("VACUUM").run();
-    })();
+    });
+    
+    clearData();
+    db.prepare("VACUUM").run();
 
     console.log(`[SQLite] Tables cleared for ${mode} switch.`);
     return { success: true };

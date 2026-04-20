@@ -183,6 +183,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
     const emailForm = useForm<EmailFormValues>();
     
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
     
     const gstinValue = companyForm.watch("companyGstin");
     
@@ -337,6 +338,45 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
         });
     }
 
+    // Global Shortcuts (Alt+S, Alt+C)
+    useEffect(() => {
+        const onSave = () => {
+            // Only execute if this component is visible in the DOM
+            if (containerRef.current?.closest('.hidden')) return;
+
+            if (activeTab === 'company') {
+                companyForm.handleSubmit(onCompanySubmit)();
+            } else if (activeTab === 'email') {
+                emailForm.handleSubmit(onEmailSubmit)();
+            } else if (activeTab === 'receipts') {
+                handleReceiptFieldsSave();
+            } else if (activeTab === 'banks' && isBankAccountDialogOpen) {
+                handleBankAccountSave();
+            }
+        };
+
+        const onClear = () => {
+            // Only execute if this component is visible in the DOM
+            if (containerRef.current?.closest('.hidden')) return;
+
+            if (activeTab === 'company') {
+                companyForm.reset();
+            } else if (activeTab === 'email') {
+                emailForm.reset({ email: user?.email || '', appPassword: '' });
+            } else if (activeTab === 'banks' && isBankAccountDialogOpen) {
+                setCurrentBankAccount({});
+            }
+        };
+
+        window.addEventListener('app:save-entry', onSave);
+        window.addEventListener('app:clear-form', onClear);
+
+        return () => {
+            window.removeEventListener('app:save-entry', onSave);
+            window.removeEventListener('app:clear-form', onClear);
+        };
+    }, [activeTab, companyForm, emailForm, user, receiptSettings, isBankAccountDialogOpen, formatSettings]);
+
     const onCompanySubmit = async (data: CompanyFormValues) => {
         setSaving(true);
         try {
@@ -354,6 +394,46 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
             toast({ title: "Email settings connected successfully", variant: "success" });
         } catch(e) { toast({ title: "Failed to connect email", variant: "destructive" }); }
         finally { setSaving(false); }
+    };
+
+    const onTestEmail = async () => {
+        if (!user) return;
+        const appPassword = emailForm.getValues('appPassword');
+        if (!appPassword) {
+            toast({ title: "App Password Required", description: "Please enter an App Password to test the connection.", variant: "destructive" });
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const auth = getFirebaseAuth();
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    to: emailForm.getValues('email'),
+                    subject: "Test Connection - ERP System",
+                    body: "This is a test email to verify your Gmail connection settings. If you are reading this, your settings are correct!",
+                    attachments: [],
+                    userId: user.uid,
+                    erp,
+                }),
+            });
+            const result = await res.json();
+            if (result.success) {
+                toast({ title: "Test Email Sent!", description: "Check your inbox (and spam folder) for a verification mail.", variant: "success" });
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (e: any) {
+            toast({ title: "Test Failed", description: e.message, variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleEmailDisconnect = async () => {
@@ -586,7 +666,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
     }
 
     return (
-        <div className={cn("space-y-8", isSubmenuMode && "space-y-2")}>
+        <div ref={containerRef} className={cn("space-y-8", isSubmenuMode && "space-y-2")}>
             {!isSubmenuMode && <h1 className="text-3xl font-bold">Settings</h1>}
             <Tabs value={activeTab} onValueChange={(v) => { 
                 const p = new URLSearchParams(searchParams.toString()); 
@@ -647,7 +727,22 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                 </TabsContent>
                 <TabsContent value="email" className="mt-6">
                     <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
-                        <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
+                        <SettingsCard 
+                            title="Email Configuration" 
+                            description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." 
+                            footer={
+                                <div className="flex gap-2">
+                                    <Button type="button" variant="outline" onClick={onTestEmail} disabled={saving}>
+                                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                        Test Connection
+                                    </Button>
+                                    <Button type="submit" disabled={saving}>
+                                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Save Email Settings
+                                    </Button>
+                                </div>
+                            }
+                        >
                             <div className="space-y-4">
                                 <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
                                 <div className="space-y-1"><Label>Google App Password</Label>

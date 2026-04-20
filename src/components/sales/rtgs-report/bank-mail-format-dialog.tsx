@@ -34,6 +34,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     });
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isPreview, setIsPreview] = useState(true);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const generateExcelBuffer = (): Attachment | null => {
         if (payments.length === 0) return null;
@@ -76,6 +77,31 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         };
     };
+
+    useEffect(() => {
+        const handleSave = (e: any) => {
+            if (!isOpen) return;
+            // Check if dialog is visible (not covered by another dialog or hidden)
+            // Since this is a Dialog, we can just check isOpen
+            if (isPreview) {
+                setIsPreview(false);
+            } else {
+                handleSendMail();
+            }
+        };
+
+        const handlePrint = (e: any) => {
+            if (!isOpen) return;
+            handleDownloadExcel();
+        };
+
+        window.addEventListener('app:save-entry', handleSave);
+        window.addEventListener('app:print-entry', handlePrint);
+        return () => {
+            window.removeEventListener('app:save-entry', handleSave);
+            window.removeEventListener('app:print-entry', handlePrint);
+        }
+    }, [isOpen, isPreview, emailData, attachments]);
 
     useEffect(() => {
         if (isOpen && settings) {
@@ -179,7 +205,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     if (isPreview) {
         return (
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-5xl">
+                <DialogContent className="max-w-5xl" ref={containerRef}>
                     <DialogHeader>
                         <DialogTitle>RTGS Data Preview</DialogTitle>
                         <DialogDescription>Review the data that will be included in the Excel file.</DialogDescription>
@@ -228,7 +254,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="h-full w-full max-h-full max-w-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl p-0 flex flex-col">
+            <DialogContent className="h-full w-full max-h-full max-w-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl p-0 flex flex-col" ref={containerRef}>
                 <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
                     <DialogTitle className="text-base font-normal">New Message</DialogTitle>
                 </DialogHeader>

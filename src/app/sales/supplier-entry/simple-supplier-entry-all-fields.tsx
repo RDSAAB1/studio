@@ -382,20 +382,29 @@ export default function SimpleSupplierEntryAllFields() {
     // Global Shortcuts (Alt+S, Alt+C)
     useEffect(() => {
         const onSave = () => {
-            if (!hookIsSubmitting) {
-                form.handleSubmit(onSubmit)();
-            }
+            // Only execute if this component is visible in the DOM
+            if (formRef.current?.closest('.hidden') || hookIsSubmitting) return;
+            form.handleSubmit(onSubmit)();
         };
         const onClear = () => {
+            // Only execute if this component is visible in the DOM
+            if (formRef.current?.closest('.hidden')) return;
             handleNewEntry();
+        };
+
+        const onPrint = () => {
+            if (formRef.current?.closest('.hidden')) return;
+            handlePrintCurrent();
         };
 
         window.addEventListener('app:save-entry', onSave);
         window.addEventListener('app:clear-form', onClear);
+        window.addEventListener('app:print-entry', onPrint);
 
         return () => {
             window.removeEventListener('app:save-entry', onSave);
             window.removeEventListener('app:clear-form', onClear);
+            window.removeEventListener('app:print-entry', onPrint);
         };
     }, [form, onSubmit, handleNewEntry, hookIsSubmitting]);
 

@@ -17,6 +17,7 @@ import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
+import { BankMailFormatDialog2 } from '@/components/sales/rtgs-report/bank-mail-format-2';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -66,6 +67,7 @@ export default function RtgsReportClient() {
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
     const [isTablePrintPreviewOpen, setIsTablePrintPreviewOpen] = useState(false);
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
+    const [isBankMailFormat2Open, setIsBankMailFormat2Open] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
 
     // State for multi-select
@@ -106,12 +108,21 @@ export default function RtgsReportClient() {
         return () => unsubscribe();
     }, [toast]);
 
+    useEffect(() => {
+        const onPrint = () => {
+             // In reports page, Alt+I opens the consolidated RTGS format preview
+             setIsPrintPreviewOpen(true);
+        };
+        window.addEventListener('app:print-entry', onPrint);
+        return () => window.removeEventListener('app:print-entry', onPrint);
+    }, []);
+
     // Re-fetch settings when printing/mailing dialogs open to ensure latest data
     useEffect(() => {
-        if (isPrintPreviewOpen || isTablePrintPreviewOpen || isBankMailFormatOpen) {
+        if (isPrintPreviewOpen || isTablePrintPreviewOpen || isBankMailFormatOpen || isBankMailFormat2Open) {
             getRtgsSettings().then(setSettings).catch(() => {});
         }
-    }, [isPrintPreviewOpen, isTablePrintPreviewOpen, isBankMailFormatOpen]);
+    }, [isPrintPreviewOpen, isTablePrintPreviewOpen, isBankMailFormatOpen, isBankMailFormat2Open]);
 
     useEffect(() => {
         if (settings !== null && payments !== undefined) {
@@ -351,7 +362,10 @@ export default function RtgsReportClient() {
                      {filteredReportRows.length > 0 && settings && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
-                                <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
+                                <Mail className="mr-2 h-4 w-4" /> Bank Mail (Format 1)
+                            </Button>
+                            <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                                <Mail className="mr-2 h-4 w-4" /> Bank Mail (Format 2)
                             </Button>
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
@@ -524,6 +538,13 @@ export default function RtgsReportClient() {
             <BankMailFormatDialog 
                 isOpen={isBankMailFormatOpen}
                 onOpenChange={setIsBankMailFormatOpen}
+                payments={selectedPayments}
+                settings={settings}
+            />
+
+            <BankMailFormatDialog2 
+                isOpen={isBankMailFormat2Open}
+                onOpenChange={setIsBankMailFormat2Open}
                 payments={selectedPayments}
                 settings={settings}
             />

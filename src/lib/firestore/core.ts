@@ -32,7 +32,14 @@ export function createLocalSubscription<T>(
   };
 
   const handler = (e: any) => {
-    if (e.detail === "all" || e.detail === tableName) {
+    const detail = e.detail;
+    const shouldRefresh = 
+      detail === "all" || 
+      detail === tableName || 
+      (detail && Array.isArray(detail.tables) && (detail.tables.includes(tableName) || detail.tables.includes("all"))) ||
+      (detail && detail.table === tableName);
+
+    if (shouldRefresh) {
       refresh();
     }
   };

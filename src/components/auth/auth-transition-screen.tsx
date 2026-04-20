@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Loader2 } from "lucide-react";
 import { FlyingPlanes } from "./flying-planes";
 
 const darkBg =
@@ -27,21 +28,9 @@ export function AuthTransitionScreen() {
       />
       {/* Center pulse */}
       <div className="relative z-10 flex flex-col items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/80 to-indigo-600/80 flex items-center justify-center auth-transition-pulse shadow-[0_0_40px_rgba(99,102,241,0.4)]">
-          <svg
-            className="w-7 h-7 text-white"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-            />
-          </svg>
-        </div>
+         <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_0_40px_rgba(0,0,0,0.2)]">
+           <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+         </div>
       </div>
     </div>
   );

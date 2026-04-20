@@ -163,18 +163,17 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const isOutsider = selectedCustomerKey === 'OUTSIDER';
-            const prefix = isOutsider ? 'RO' : 'R';
+            const prefix = isOutsider ? 'RT' : 'R';
             
             const lastNum = rtgsPayments.reduce((max, p) => {
-                const roMatch = p.rtgsSrNo?.match(/^RO(\d+)$/);
                 const rtMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
                 const rMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
                 
                 let num = 0;
                 if (isOutsider) {
-                    num = roMatch ? parseInt(roMatch[1], 10) : 0;
+                    num = rtMatch ? parseInt(rtMatch[1], 10) : 0;
                 } else {
-                    num = rtMatch ? parseInt(rtMatch[1], 10) : (rMatch ? parseInt(rMatch[1], 10) : 0);
+                    num = rMatch ? parseInt(rMatch[1], 10) : (rtMatch ? parseInt(rtMatch[1], 10) : 0);
                 }
                 return num > max ? num : max;
             }, 0);
@@ -233,7 +232,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
         const num = parseInt(numericPartStr, 10);
         const isOutsider = selectedCustomerKey === 'OUTSIDER';
-        const formattedId = (isOutsider ? 'RO' : 'R') + String(num).padStart(5, '0');
+        const formattedId = (isOutsider ? 'RT' : 'R') + String(num).padStart(5, '0');
         setRtgsSrNo(formattedId);
         setPaymentId(formattedId); // Keep primary ID in sync for RTGS
 

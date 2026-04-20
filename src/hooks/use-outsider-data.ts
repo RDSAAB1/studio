@@ -15,13 +15,34 @@ export const useOutsiderData = () => {
     const [loading, setLoading] = useState(true);
     const [isClient, setIsClient] = useState(false);
 
-    // Function to remove a payment from state immediately (for immediate UI feedback)
+    // Function to immediately remove a payment from state (for instant UI feedback)
     const removePaymentFromState = useCallback((paymentId: string) => {
         setPaymentHistory(prev => prev.filter(p => 
             p.id !== paymentId && 
             p.paymentId !== paymentId && 
             (p as any).rtgsSrNo !== paymentId
         ));
+    }, []);
+
+    // Function to immediately add/update a payment in state (for instant UI feedback)
+    const addOrUpdatePaymentInState = useCallback((payment: Payment) => {
+        // Only keep outsider RTGS payments
+        if (payment.customerId !== 'OUTSIDER' || (payment.receiptType || '').toLowerCase() !== 'rtgs') return;
+
+        setPaymentHistory(prev => {
+            const existingIndex = prev.findIndex(p => 
+                (p.id && p.id === payment.id) || 
+                (p.paymentId && p.paymentId === payment.paymentId) || 
+                (p as any).rtgsSrNo && (p as any).rtgsSrNo === (payment as any).rtgsSrNo
+            );
+
+            if (existingIndex >= 0) {
+                const next = [...prev];
+                next[existingIndex] = payment;
+                return next;
+            }
+            return [payment, ...prev];
+        });
     }, []);
     
     useEffect(() => {
@@ -115,6 +136,7 @@ export const useOutsiderData = () => {
         suppliers: [], // Empty for outsider
         customerSummaryMap: new Map(), // Empty for outsider
         removePaymentFromState, // Function to immediately remove payment from state
+        addOrUpdatePaymentInState, // Function to immediately update state
     };
 };
 

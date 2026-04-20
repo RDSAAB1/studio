@@ -734,6 +734,38 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   // Global Keyboard Shortcuts (Alt+Key)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check if any dialog is open
+      const openDialog = document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+      
+      if (openDialog) {
+        const isTyping = e.target instanceof HTMLInputElement || 
+                         e.target instanceof HTMLTextAreaElement || 
+                         (e.target as HTMLElement).isContentEditable;
+
+        const isModifier = e.ctrlKey || e.altKey || e.shiftKey || e.metaKey;
+        const isNavigation = ['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key);
+
+        if (!isTyping && !isModifier && !isNavigation) {
+          // If a dialog is open and we're not typing, any key should close it
+          // We trigger Escape key behavior which is natively handled by Radix/Shadcn
+          const escEvent = new KeyboardEvent('keydown', {
+            key: 'Escape',
+            code: 'Escape',
+            keyCode: 27,
+            which: 27,
+            bubbles: true,
+            cancelable: true
+          });
+          document.dispatchEvent(escEvent);
+          
+          // Also try to find and click a close or cancel button as a fallback
+          const closeBtn = openDialog.querySelector('button[aria-label="Close"], button.absolute.right-4') as HTMLElement;
+          if (closeBtn) closeBtn.click();
+          
+          return;
+        }
+      }
+
       if (e.altKey) {
         const key = e.key.toLowerCase();
         
@@ -768,6 +800,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         if (key === 'c') {
           e.preventDefault();
           window.dispatchEvent(new CustomEvent('app:clear-form'));
+          return;
+        }
+
+        if (key === 'i') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('app:print-entry'));
           return;
         }
 

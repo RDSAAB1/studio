@@ -83,6 +83,7 @@ function PaymentFormComponent(props: any) {
     
     // Center Name management dialog state
     const [isCenterNameDialogOpen, setIsCenterNameDialogOpen] = useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
     // Sync local state when prop changes (e.g., from external updates)
@@ -167,12 +168,13 @@ function PaymentFormComponent(props: any) {
     // Handle Global Shortcuts (Alt+S, Alt+C)
     useEffect(() => {
         const onSave = (e: any) => {
-            // Check if this component is "visible" or the active one
-            // In this specific layout, multiple payment forms might exist, 
-            // but we assume the one that is currently rendered is the one to save.
+            // Check if this component is "visible" in the SPA
+            if (containerRef.current?.closest('.hidden')) return;
             onProcessPayment();
         };
         const onClear = (e: any) => {
+            // Check if this component is "visible" in the SPA
+            if (containerRef.current?.closest('.hidden')) return;
             onClearPaymentForm();
         };
 
@@ -195,7 +197,7 @@ function PaymentFormComponent(props: any) {
 
     return (
         <>
-            <div className="w-full max-w-full flex flex-col h-full rounded-xl border border-border/60 bg-card/60 shadow-sm overflow-hidden">
+            <div ref={containerRef} className="w-full max-w-full flex flex-col h-full rounded-xl border border-border/60 bg-card/60 shadow-sm overflow-hidden">
                     <div className="px-2 py-1 space-y-1 text-[10px] overflow-hidden w-full max-w-full flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
                           <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                                 {!hideRtgsToggle && (

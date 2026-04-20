@@ -118,6 +118,29 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
     };
 
     useEffect(() => {
+        const handleSave = (e: any) => {
+            if (!isOpen) return;
+            if (isPreview) {
+                setIsPreview(false);
+            } else {
+                handleSendMail();
+            }
+        };
+
+        const handlePrint = (e: any) => {
+            if (!isOpen) return;
+            handlePrintAction();
+        };
+
+        window.addEventListener('app:save-entry', handleSave);
+        window.addEventListener('app:print-entry', handlePrint);
+        return () => {
+            window.removeEventListener('app:save-entry', handleSave);
+            window.removeEventListener('app:print-entry', handlePrint);
+        }
+    }, [isOpen, isPreview, emailData, attachments]);
+
+    useEffect(() => {
         if (isOpen) {
             setIsPreview(true); // Reset to preview mode every time dialog opens
             if (settings && payments) {
@@ -152,7 +175,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         toast({ title: "Excel file downloading...", variant: "success" });
     };
     
-     const handlePrint = async () => {
+    const handlePrintAction = async () => {
          const node = printRef.current;
          if (!node) {
              toast({ variant: 'destructive', title: 'Error', description: 'No data to print.' });
@@ -281,7 +304,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+            <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0" ref={printRef as any}>
                  <DialogHeader className="p-4 border-b">
                      <DialogTitle>Bank Mail Format 2</DialogTitle>
                      <DialogDescription>
@@ -353,7 +376,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                          <DialogFooter className="p-4 border-t flex justify-end gap-2">
                              <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                              <Button variant="secondary" onClick={handleDownloadExcel}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
-                             <Button variant="secondary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+                             <Button variant="secondary" onClick={handlePrintAction}><Printer className="mr-2 h-4 w-4" /> Print</Button>
                              <Button onClick={() => setIsPreview(false)}><Mail className="mr-2 h-4 w-4" /> Compose Mail</Button>
                          </DialogFooter>
                      </>

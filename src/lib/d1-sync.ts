@@ -114,7 +114,11 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
         
         return response;
     } catch (error: any) {
-        console.error('[D1 Sync] Proxy Fetch Error:', error);
+        if (error.message?.includes('fetch failed')) {
+            console.warn('[D1 Sync] Proxy Fetch Warning: Network unreachable or offline (fetch failed).');
+        } else {
+            console.warn('[D1 Sync] Proxy Fetch Error:', error.message);
+        }
         throw error;
     }
 }
@@ -230,7 +234,7 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
 
         return { success: true, pushed: totalPushedAcrossBatches };
     } catch (error: any) {
-        console.error('[D1 Sync] Push Error:', error);
+        console.warn('[D1 Sync] Push Error (Handled):', error.message);
         return { success: false, error: error.message };
     }
 }
@@ -339,12 +343,100 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                 await new Promise(r => setTimeout(r, 0));
             }
 
+            // -------------------------------------------------------------
+            // PULL 2: Master Common Data (where _year = 'COMMON')
+            // -------------------------------------------------------------
+            console.log(`[D1 Sync] Pulling Master (COMMON) Changes...`);
+            const commonMetaId = `GLOBAL_SYNC:${bizId}:${subBizId}:COMMON`;
+            const commonMeta = await db._sync_meta.get(commonMetaId);
+            let commonSince = (targetCollection === 'FORCE_ALL') ? 0 : (commonMeta?.last_sync_timestamp || 0);
+            
+            let hasMoreCommon = true;
+            let safetyCommon = 0;
+
+            while (hasMoreCommon && safetyCommon < 100) {
+                safetyCommon++;
+                const rawUrl = config.workerUrl || '';
+                let baseUrl = rawUrl.trim();
+                if (!baseUrl) break;
+                if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
+                if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                
+                const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?since=${commonSince}`;
+                
+                // CRUCIAL: Pass 'COMMON' as forceSeason parameter
+                const response = await fetchWithTenancy(workerUrl, 'all', {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${config.syncToken}` }
+                }, 'COMMON');
+
+                if (!response.ok) break;
+                const { results } = await response.json();
+
+                if (!results || results.length === 0) {
+                    hasMoreCommon = false;
+                    break;
+                }
+
+                const collectionChangesMap: Record<string, { puts: any[], deletes: string[] }> = {};
+                let maxTs = commonSince;
+
+                for (const r of results) {
+                    const col = r.collection;
+                    const docId = String(r.id);
+                    const ts = Number(r.updated_at);
+                    if (ts > maxTs) maxTs = ts;
+
+                    if (!collectionChangesMap[col]) collectionChangesMap[col] = { puts: [], deletes: [] };
+
+                    const isDirty = await db._sync_log.where('[collection+docId]')
+                        .equals([col, docId])
+                        .first();
+                    if (isDirty) continue;
+
+                    if (r.operation === 'delete') {
+                        collectionChangesMap[col].deletes.push(docId);
+                    } else {
+                        try {
+                            const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                            collectionChangesMap[col].puts.push({ 
+                                ...parsed, 
+                                id: docId, 
+                                updated_at: ts,
+                                _company_id: r._company_id,
+                                _sub_company_id: r._sub_company_id,
+                                _year: r._year
+                            });
+                        } catch (e) {
+                            console.warn(`[D1 Sync] JSON Parse error for ${col}:${docId}`);
+                        }
+                    }
+                }
+
+                for (const [col, ops] of Object.entries(collectionChangesMap)) {
+                    if (!(db as any)[col]) continue;
+                    if (ops.puts.length > 0) await (db as any)[col].bulkPut(ops.puts, 'sync');
+                    if (ops.deletes.length > 0) await (db as any)[col].bulkDelete(ops.deletes, 'sync');
+                    totalPulled += (ops.puts.length + ops.deletes.length);
+                    notifyChange(col, 'sync');
+                }
+
+                if (maxTs > commonSince) {
+                    await db._sync_meta.put({ id: commonMetaId, last_sync_timestamp: maxTs });
+                    commonSince = maxTs;
+                }
+
+                if (results.length < 500) hasMoreCommon = false;
+                // Yield to main thread between batches
+                await new Promise(r => setTimeout(r, 0));
+            }
+
             return { success: true, pulled: totalPulled };
         } else {
             return { success: true, pulled: 0 }; 
         }
     } catch (err: any) {
-        console.error('[D1 Sync] Global Pull error:', err);
+        console.warn('[D1 Sync] Global Pull error (Handled):', err.message);
         return { success: false, error: err.message };
     }
 }
@@ -384,8 +476,8 @@ export async function performFullSync(target: 'all' | string = 'all', force = fa
         }
 
         return summary;
-    } catch (e) {
-        console.error('[D1 Sync] Full Sync Cycle Failed:', e);
+    } catch (e: any) {
+        console.warn('[D1 Sync] Full Sync Cycle Failed (Handled):', e.message);
         return null;
     } finally {
         isSyncingGlobal = false;

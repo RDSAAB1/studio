@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -16,8 +17,8 @@ interface RtgsFormOutsiderProps {
     bankDetails: { bank?: string; branch?: string; ifscCode?: string; acNo?: string };
     setBankDetails: React.Dispatch<React.SetStateAction<{ bank?: string; branch?: string; ifscCode?: string; acNo?: string }>>;
     setIsBankSettingsOpen?: (open: boolean) => void;
-    supplierDetails?: { name?: string; [key: string]: unknown };
-    setSupplierDetails?: (details: { name?: string; [key: string]: unknown }) => void;
+    supplierDetails?: { name?: string;[key: string]: unknown };
+    setSupplierDetails?: (details: { name?: string;[key: string]: unknown }) => void;
     rtgsAmount?: number;
     setRtgsAmount?: (amount: number) => void;
     handleProcessPayment: () => void;
@@ -50,10 +51,12 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
         internalBankAccounts = [],
         financialState,
     } = props;
-    
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
     const banks = propsBanks !== undefined ? (Array.isArray(propsBanks) ? propsBanks : []) : [];
     const bankBranches = propsBankBranches !== undefined ? (Array.isArray(propsBankBranches) ? propsBankBranches : []) : [];
-    
+
     const bankOptions = React.useMemo(() => {
         if (!Array.isArray(banks)) return [];
         return banks
@@ -122,21 +125,21 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
         matchingBranches.forEach((branch: BankBranch) => {
             const branchName = branch.branchName?.trim();
             if (branchName && !uniqueBranches.has(branchName)) {
-                uniqueBranches.set(branchName, { 
-                    value: branchName, 
-                    label: toTitleCase(branchName) 
+                uniqueBranches.set(branchName, {
+                    value: branchName,
+                    label: toTitleCase(branchName)
                 });
             }
         });
         return Array.from(uniqueBranches.values());
     }, [bankDetails.bank, bankBranches]);
-    
+
     // Internal Bank Account Options (From)
     const paymentFromOptions = React.useMemo(() => {
         const balances = financialState?.balances || new Map();
         const safeBankAccounts = Array.isArray(internalBankAccounts) ? internalBankAccounts : [];
-        const bankOptions = safeBankAccounts.map((acc: any) => ({ 
-            value: acc.id, 
+        const bankOptions = safeBankAccounts.map((acc: any) => ({
+            value: acc.id,
             label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (₹${(balances.get(acc.id) || 0).toLocaleString('en-IN')})`,
             displayValue: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)})`,
             name: acc.accountHolderName
@@ -154,7 +157,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
     const filteredBankAccounts = React.useMemo(() => {
         if (!Array.isArray(bankAccounts)) return [];
         let filtered = bankAccounts;
-        
+
         if (bankDetails.bank) {
             const selectedBank = bankDetails.bank.trim().toLowerCase().replace(/\s+/g, ' ');
             filtered = filtered.filter((acc: BankAccount) => {
@@ -162,7 +165,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                 return accBankName === selectedBank;
             });
         }
-        
+
         if (bankDetails.branch) {
             const selectedBranch = bankDetails.branch.trim().toLowerCase().replace(/\s+/g, ' ');
             filtered = filtered.filter((acc: BankAccount) => {
@@ -170,7 +173,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                 return accBranchName === selectedBranch;
             });
         }
-        
+
         return filtered;
     }, [bankAccounts, bankDetails.bank, bankDetails.branch]);
 
@@ -193,10 +196,10 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
             acNo: ''
         }));
     };
-    
+
     const handleIfscBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         const ifsc = e.target.value.toUpperCase();
-        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({...prev, ifscCode: ifsc}));
+        setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({ ...prev, ifscCode: ifsc }));
         const matchingBranch = bankBranches.find((b: BankBranch) => b.ifscCode === ifsc);
         if (matchingBranch) {
             setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
@@ -206,7 +209,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
             }));
         }
     };
-    
+
     const handleAddBranch = async (newBranchName: string) => {
         if (!bankDetails.bank) {
             toast({ title: "Please select a bank first.", variant: 'destructive' });
@@ -241,11 +244,15 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
     // Global Shortcuts (Alt+S, Alt+C)
     React.useEffect(() => {
         const onSave = () => {
+            // Check if this component is "visible" in the SPA
+            if (containerRef.current?.closest('.hidden')) return;
             if (!isProcessing && rtgsAmount > 0 && supplierDetails?.name) {
                 handleProcessPayment();
             }
         };
         const onClear = () => {
+            // Check if this component is "visible" in the SPA
+            if (containerRef.current?.closest('.hidden')) return;
             setBankDetails({ bank: '', branch: '', ifscCode: '', acNo: '' });
             setSupplierDetails?.({ name: '' });
             setRtgsAmount?.(0);
@@ -261,7 +268,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
     }, [handleProcessPayment, isProcessing, rtgsAmount, supplierDetails?.name]);
 
     return (
-        <div className="space-y-2 text-[10px]">
+        <div ref={containerRef} className="space-y-2 text-[10px]">
             <Card className="rounded-md border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                 <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
@@ -319,9 +326,9 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                                         }
                                     } else {
                                         setSupplierDetails?.({ ...supplierDetails, name: '' });
-                                }
-                            }}
-                            placeholder="Select or enter name"
+                                    }
+                                }}
+                                placeholder="Select or enter name"
                                 inputClassName="h-7 rounded-md text-[10px]"
                             />
                         </div>
@@ -388,36 +395,36 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                                 placeholder="Enter IFSC code"
                             />
                         </div>
-                    <div className="space-y-0.5">
-                        <Label htmlFor="rtgsOutsiderAccountNumber" className="text-[10px]">A/C No.</Label>
-                        <CustomDropdown
-                            id="rtgsOutsiderAccountNumber"
-                            options={React.useMemo(() => {
-                                if (!Array.isArray(filteredBankAccounts)) return [];
-                                return filteredBankAccounts.map((acc: BankAccount) => ({
-                                    value: acc.accountNumber,
-                                    label: acc.accountNumber
-                                }));
-                            }, [filteredBankAccounts])}
-                            value={bankDetails.acNo || ''}
-                            onChange={handleAccountSelect}
-                            placeholder="Select or enter account number"
-                            inputClassName="h-7 rounded-md text-[10px]"
-                        />
-                    </div>
-                    <div className="space-y-0.5">
-                        <Label htmlFor="rtgsOutsiderAmount" className="text-[10px]">Amount</Label>
-                        <Input
-                            id="rtgsOutsiderAmount"
-                            name="rtgsOutsiderAmount"
-                            type="number"
-                            value={rtgsAmount || ''}
-                            onChange={(e) => setRtgsAmount?.(Number(e.target.value) || 0)}
-                            placeholder="Enter amount"
-                            className="h-7 text-[10px] rounded-md border-slate-200/80"
-                            min="0"
-                            step="0.01"
-                        />
+                        <div className="space-y-0.5">
+                            <Label htmlFor="rtgsOutsiderAccountNumber" className="text-[10px]">A/C No.</Label>
+                            <CustomDropdown
+                                id="rtgsOutsiderAccountNumber"
+                                options={React.useMemo(() => {
+                                    if (!Array.isArray(filteredBankAccounts)) return [];
+                                    return filteredBankAccounts.map((acc: BankAccount) => ({
+                                        value: acc.accountNumber,
+                                        label: acc.accountNumber
+                                    }));
+                                }, [filteredBankAccounts])}
+                                value={bankDetails.acNo || ''}
+                                onChange={handleAccountSelect}
+                                placeholder="Select or enter account number"
+                                inputClassName="h-7 rounded-md text-[10px]"
+                            />
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label htmlFor="rtgsOutsiderAmount" className="text-[10px]">Amount</Label>
+                            <Input
+                                id="rtgsOutsiderAmount"
+                                name="rtgsOutsiderAmount"
+                                type="number"
+                                value={rtgsAmount || ''}
+                                onChange={(e) => setRtgsAmount?.(Number(e.target.value) || 0)}
+                                placeholder="Enter amount"
+                                className="h-7 text-[10px] rounded-md border-slate-200/80"
+                                min="0"
+                                step="0.01"
+                            />
                         </div>
                     </div>
                     {/* Row 5: Finalize Button */}
