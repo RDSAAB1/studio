@@ -50,6 +50,7 @@ import { GovHistoryTableDirect } from '@/components/sales/supplier-payments/gov-
 import { usePaymentFilters } from "./hooks/use-payment-filters";
 import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
 import { ProcessingOverlay } from "@/components/ui/processing-overlay";
+import { generateBulkStatementHtml, type BulkStatementProgress } from "../supplier-profile/utils/bulk-statement-printer";
 
 
 // Helper functions for formatting
@@ -162,6 +163,14 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const [isDeleteProcessing, setIsDeleteProcessing] = useState(false);
   const [showProcessingOverlay, setShowProcessingOverlay] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<BulkStatementProgress | null>(null);
+  
+  // Statement Options state
+  const [isStatementOptionsOpen, setIsStatementOptionsOpen] = useState(false);
+  const [printScope, setPrintScope] = useState<'selected' | 'all'>('selected');
+  const [sortOrder, setSortOrder] = useState<'name' | 'outstanding' | 'netAmount'>('name');
+
   const processingStartRef = React.useRef<number | null>(null);
   const MIN_PROCESS_OVERLAY_MS = 1000;
   const { toast } = useToast();
@@ -342,7 +351,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
   const [filterVariety, setFilterVariety] = useState<string>("all");
 
-  const { filteredSupplierOptions } = useSupplierFiltering(
+  const { filteredSupplierOptions: rawOptions } = useSupplierFiltering(
     type === 'outsider' ? new Map() : supplierSummaryMap,
     hook.selectedCustomerKey as string | null,
     onSelectSupplierKey as (key: string | null) => void,
@@ -350,6 +359,15 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     filterEndDate,
     type === 'outsider' ? undefined : MILL_OVERVIEW_KEY
   );
+
+  const filteredSupplierOptions = useMemo(() => {
+    return rawOptions.map(opt => {
+      if (opt.value === MILL_OVERVIEW_KEY && type === 'customer') {
+        return { ...opt, label: 'Total Customer Overview' };
+      }
+      return opt;
+    });
+  }, [rawOptions, type, MILL_OVERVIEW_KEY]);
 
   // Get filter logic from hook
   const {
@@ -567,13 +585,209 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     if (setPaymentMethod) setPaymentMethod(method);
   }, [setPaymentMethod]);
 
+  // ── Global ← / → keyboard navigation across supplier list ──────────────────
+  // Works from anywhere on the page as long as focus is NOT inside an
+  // input / textarea / select element.
+  useEffect(() => {
+    if (type === 'outsider') return; // outsider tab has no supplier list
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      // Also ignore if a dialog/modal is open (skip navigation inside dialogs)
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+
+      e.preventDefault();
+      const options = varietyFilteredSupplierOptions;
+      if (!options || options.length === 0) return;
+
+      const currentIdx = hook.selectedCustomerKey
+        ? options.findIndex((o: any) => o.value === hook.selectedCustomerKey)
+        : -1;
+
+      let nextIdx: number;
+      if (currentIdx === -1) {
+        nextIdx = e.key === 'ArrowRight' ? 0 : options.length - 1;
+      } else {
+        nextIdx =
+          e.key === 'ArrowRight'
+            ? (currentIdx + 1) % options.length
+            : (currentIdx - 1 + options.length) % options.length;
+      }
+      const next = options[nextIdx];
+      if (next) onSelectSupplierKey(next.value);
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [type, varietyFilteredSupplierOptions, hook.selectedCustomerKey, onSelectSupplierKey]);
+
+  const handleBulkPrint = useCallback(async (customSortOrder?: 'name' | 'outstanding' | 'netAmount') => {
+    const currentSortOrder = customSortOrder || sortOrder;
+    
+    if (!varietyFilteredSupplierOptions || varietyFilteredSupplierOptions.length === 0) {
+      toast({
+        title: "No suppliers",
+        description: "There are no suppliers in the current filtered list to print.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsBulkGenerating(true);
+      setIsStatementOptionsOpen(false);
+      
+      // Filter out Mill Overview and get the summaries
+      const suppliersToPrint = varietyFilteredSupplierOptions
+        .filter(opt => opt.label !== 'Mill (Total Overview)' && opt.label !== 'Total Customer Overview' && opt.value !== MILL_OVERVIEW_KEY)
+        .map(opt => supplierSummaryMap.get(opt.value))
+        .filter(Boolean) as CustomerSummary[];
+
+      // Sort the list based on user preference
+      const sortedSuppliers = [...suppliersToPrint].sort((a, b) => {
+        if (currentSortOrder === 'name') {
+          return (a.name || '').localeCompare(b.name || '');
+        } else if (currentSortOrder === 'outstanding') {
+          return (b.totalOutstanding || 0) - (a.totalOutstanding || 0); // Highest outstanding first
+        } else if (currentSortOrder === 'netAmount') {
+          return (b.totalAmount || 0) - (a.totalAmount || 0); // Highest net amount first
+        }
+        return 0;
+      });
+
+      const html = await generateBulkStatementHtml(sortedSuppliers, (progress) => {
+        setBulkProgress(progress);
+      }, type as any);
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } else {
+        toast({
+          title: "Pop-up Blocked",
+          description: "Please allow pop-ups to view the bulk statements.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Bulk print error:", error);
+      toast({
+        title: "Print Failed",
+        description: "An error occurred while generating bulk statements.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsBulkGenerating(false);
+      setBulkProgress(null);
+    }
+  }, [varietyFilteredSupplierOptions, supplierSummaryMap, toast, sortOrder, MILL_OVERVIEW_KEY]);
+
+  const handleStatementClick = () => {
+    setIsStatementOptionsOpen(true);
+  };
+
+  const handleExecutePrint = () => {
+    if (printScope === 'selected') {
+      setIsStatementOptionsOpen(false);
+      setIsStatementOpen(true);
+    } else {
+      handleBulkPrint();
+    }
+  };
+
   return (
     <div className="space-y-2 text-[12px]">
       <ProcessingOverlay 
-        show={showProcessingOverlay} 
+        show={showProcessingOverlay || isBulkGenerating} 
         isDeleting={isDeleteProcessing} 
         isSuccess={isSuccess}
+        title={isBulkGenerating ? "Generating Statements" : undefined}
+        description={isBulkGenerating ? `Processing ${bulkProgress?.current || 0} of ${bulkProgress?.total || 0}: ${bulkProgress?.supplierName || ''}` : undefined}
       />
+
+      <Dialog open={isStatementOptionsOpen} onOpenChange={setIsStatementOptionsOpen}>
+        <DialogContent className="max-w-md bg-card border-slate-200">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Statement Print Options</DialogTitle>
+            <DialogDescription className="text-xs">
+              Select which statements to print and how to organize them.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase text-slate-500">Print Scope</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant={printScope === 'selected' ? 'default' : 'outline'} 
+                  onClick={() => setPrintScope('selected')}
+                  disabled={!hook.selectedCustomerKey}
+                  className="h-10 text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+                >
+                  <User className="h-4 w-4" />
+                  Selected {type === 'customer' ? 'Customer' : 'Supplier'}
+                </Button>
+                <Button 
+                  variant={printScope === 'all' ? 'default' : 'outline'} 
+                  onClick={() => setPrintScope('all')}
+                  className="h-10 text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+                >
+                  <UserCircle className="h-4 w-4" />
+                  All {type === 'customer' ? 'Customers' : 'Suppliers'}
+                </Button>
+              </div>
+              {printScope === 'all' && (
+                <p className="text-[9px] text-muted-foreground italic px-1">
+                  * {type === 'customer' ? 'Total Customer' : 'Mill'} Overview is excluded from individual statement stacks.
+                </p>
+              )}
+            </div>
+
+            {printScope === 'all' && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <Label className="text-[10px] font-bold uppercase text-slate-500">Sort Order (Bulk Only)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button 
+                    variant={sortOrder === 'name' ? 'secondary' : 'outline'} 
+                    onClick={() => setSortOrder('name')}
+                    className={cn("h-14 text-[10px] font-bold flex flex-col gap-1 px-1", sortOrder === 'name' && "bg-primary/10 border-primary text-primary")}
+                  >
+                    Name
+                  </Button>
+                  <Button 
+                    variant={sortOrder === 'outstanding' ? 'secondary' : 'outline'} 
+                    onClick={() => setSortOrder('outstanding')}
+                    className={cn("h-14 text-[10px] font-bold flex flex-col gap-1 px-1", sortOrder === 'outstanding' && "bg-primary/10 border-primary text-primary")}
+                  >
+                    Outstanding
+                  </Button>
+                  <Button 
+                    variant={sortOrder === 'netAmount' ? 'secondary' : 'outline'} 
+                    onClick={() => setSortOrder('netAmount')}
+                    className={cn("h-14 text-[10px] font-bold flex flex-col gap-1 px-1", sortOrder === 'netAmount' && "bg-primary/10 border-primary text-primary")}
+                  >
+                    Net Amount
+                  </Button>
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-1">Note: Mill Overview is excluded from bulk print.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setIsStatementOptionsOpen(false)} className="h-8 text-[11px] font-bold">Cancel</Button>
+            <Button onClick={handleExecutePrint} className="h-8 text-[11px] font-bold px-6">
+              {printScope === 'selected' ? 'Generate Preview' : 'Start Bulk Print'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {type === 'outsider' ? (
         <>
           <div className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
@@ -659,12 +873,13 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                     onClearFilters={handleClearSupplierFilters}
                     extraActions={
                       <div className="flex items-center gap-1">
-                        <Button onClick={() => setIsStatementOpen(true)} size="sm" disabled={!hook.selectedCustomerKey} className="h-7 px-2 py-0 text-[10px] font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent disabled:opacity-50">
+                        <Button onClick={handleStatementClick} size="sm" className="h-7 px-2 py-0 text-[10px] font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent">
                           <FileText className="h-3.5 w-3.5 mr-1" />Statement
                         </Button>
                         <Button type="button" size="sm" className="h-7 px-2 text-[10px] font-semibold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent disabled:opacity-50 flex items-center" onClick={() => setIsSummaryOpen(true)}>Summary</Button>
                       </div>
                     }
+                    type={type as any}
                   />
                   {(hook.selectedCustomerKey || hook.editingPayment) && (
                     <div className="hidden lg:block h-full">

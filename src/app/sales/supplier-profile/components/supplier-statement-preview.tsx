@@ -8,15 +8,21 @@ import type { CustomerSummary } from "@/lib/definitions";
 
 import { formatCurrency } from "@/lib/utils";
 import { format, parse } from 'date-fns';
-
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User, MapPin, Phone, Calendar, Hash, FileText } from 'lucide-react';
 import { generateStatement, generateStatementAsync, type StatementData } from '../utils/statement-generator';
 import { SupplierSummaryCards } from '@/components/sales/supplier-payments/supplier-summary-cards';
+import { POPUP_FEATURES } from "@/lib/constants";
+import { formatDisplayDate } from "@/lib/utils";
 
 
 
-export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+interface SupplierStatementPreviewProps {
+    data: CustomerSummary | null;
+    type?: 'supplier' | 'customer';
+}
+
+export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierStatementPreviewProps) => {
 
     const { toast } = useToast();
     const deferredData = useDeferredValue(data);
@@ -134,13 +140,18 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
                         .preview-toolbar button.secondary:hover { background-color: #d1d5db; opacity: 1; }
                         @media print {
                             .preview-toolbar { display: none !important; }
-                            th, td { border: 1px solid #999 !important; font-size: 14px !important; padding: 3px 5px !important; line-height: 1.25 !important; color: #222222 !important; }
-                            table { border: 1px solid #999 !important; }
-                            .statement-table th, .statement-table td { font-size: 13px !important; padding: 3px 5px !important; line-height: 1.25 !important; border: 1px solid #999 !important; }
-                            .particulars-column { width: 30% !important; font-size: 13px !important; line-height: 1.25 !important; }
-                            .hidden-table-container td { font-size: 13px !important; line-height: 1.25 !important; }
-                            .amount-columns { width: 17.5% !important; font-size: 13px !important; }
-                            .date-column { width: 17.5% !important; font-size: 13px !important; }
+                            th, td { border: 1px solid #cbd5e1 !important; font-size: 14px !important; padding: 4px 6px !important; line-height: 1.3 !important; }
+                            table { border: 1px solid #cbd5e1 !important; color: #475569; }
+                            .statement-table th, .statement-table td { font-size: 13px !important; padding: 4px 6px !important; line-height: 1.3 !important; border: 1px solid #cbd5e1 !important; }
+                            .receipts-table th, .receipts-table td { font-size: 10px !important; color: #64748b !important; padding: 2px 4px !important; line-height: 1.2 !important; font-weight: 500; }
+                            .receipts-table th { font-weight: 600 !important; color: #475569 !important; }
+                            .receipts-table tfoot td { font-size: 11px !important; font-weight: 700 !important; color: #475569 !important; }
+                            .particulars-column { width: 43% !important; font-size: 12px !important; line-height: 1.3 !important; color: #475569 !important; }
+                            .hidden-table-container td { font-size: 12px !important; line-height: 1.3 !important; color: #000 !important; }
+                            .amount-columns { width: 12% !important; font-size: 11px !important; }
+                            .cd-column { width: 8% !important; font-size: 11px !important; }
+                            .balance-column { width: 13% !important; font-size: 12px !important; }
+                            .date-column { width: 12% !important; font-size: 11px !important; }
                             .grid { display: grid !important; }
                             .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
                             .gap-4 { gap: 1rem !important; }
@@ -164,15 +175,19 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
                             .text-blue-800 { color: #1e40af !important; }
                             .text-red-800 { color: #991b1b !important; }
                             .text-green-800 { color: #166534 !important; }
-                            .text-red-600 { color: #dc2626 !important; }
-                            .text-red-400 { color: #f87171 !important; }
-                            .text-green-600 { color: #16a34a !important; }
-                            .text-blue-600 { color: #2563eb !important; }
-                            .text-blue-400 { color: #60a5fa !important; }
-                            .text-green-400 { color: #4ade80 !important; }
-                            .text-foreground { color: #000 !important; }
-                            .bg-muted { background-color: #e5e5e5 !important; }
-                            .font-semibold { font-weight: 600 !important; }
+                            .text-red-600 { color: #ef4444 !important; }
+                            .text-red-400 { color: #ef4444 !important; font-weight: 500 !important; }
+                            .text-green-600 { color: #22c55e !important; }
+                            .text-blue-600 { color: #3b82f6 !important; }
+                            .text-blue-400 { color: #3b82f6 !important; font-weight: 500 !important; }
+                            .text-green-400 { color: #22c55e !important; font-weight: 500 !important; }
+                            .text-purple-400 { color: #a855f7 !important; font-weight: 500 !important; }
+                            .text-orange-400 { color: #f97316 !important; font-weight: 500 !important; }
+                            .text-foreground { color: #475569 !important; }
+                            .text-slate-600 { color: #475569 !important; }
+                            .text-slate-500 { color: #64748b !important; }
+                            .bg-muted { background-color: transparent !important; color: #475569 !important; }
+                            .font-semibold { font-weight: 500 !important; }
                             .font-medium { font-weight: 500 !important; }
                             .font-bold { font-weight: 700 !important; }
                             .mb-1\.5 { margin-bottom: 0.375rem !important; }
@@ -375,7 +390,7 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
     }
 
     return (
-
+        <>
         <div className="p-6 bg-card text-card-foreground">
 
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -560,26 +575,163 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
 
                 `}</style>
 
-                <div className="header mb-4 text-left">
-                    <h1 className="text-2xl font-bold text-left">Account Statement</h1>
-                    <p className="text-lg text-left">Customer: {deferredData?.name || ''}</p>
-                    <p className="text-left">Contact: {deferredData?.contact || 'N/A'}</p>
-                    <p className="text-left">Address: {deferredData?.address || 'N/A'}</p>
+                <div className="header mb-4 pb-2 print:mb-2">
+                    <div className="flex items-start mb-2 print:mb-2">
+                        <div className="text-[9px] font-medium text-slate-400">
+                            {format(new Date(), 'dd MMM yyyy HH:mm')}
+                        </div>
+                    </div>
                 </div>
 
-                {/* New dashboard-style summary (same as Unified Payments screen) */}
+                {/* Professional Boxed Header */}
+                <div style={{ border: '1px solid #cbd5e1', padding: '12px', marginBottom: '20px', borderRadius: '4px' }} className="print:mb-4">
+                    <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px', marginBottom: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Account Holder</div>
+                            <div style={{ fontSize: '18px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>{deferredData?.name || ''}</div>
+                        </div>
+                        <div style={{ flex: 1, borderLeft: '1px solid #e5e7eb', paddingLeft: '20px' }}>
+                            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Father Name (S/O)</div>
+                            <div style={{ fontSize: '18px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>{deferredData?.so || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Contact Details</div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#64748b' }}>{deferredData?.contact || 'N/A'}</div>
+                        </div>
+                        <div style={{ flex: 1, borderLeft: '1px solid #e5e7eb', paddingLeft: '20px' }}>
+                            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Registered Address</div>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>{deferredData?.address || 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Professional 3-Column Summary Block */}
                 {deferredData && (
-                    <div className="mb-6">
-                        <SupplierSummaryCards
-                            summary={deferredData as any}
-                            variant="dashboard"
-                            type="supplier"
-                        />
+                    <div style={{ border: '1px solid #cbd5e1', padding: '15px', marginBottom: '20px', borderRadius: '4px', background: 'transparent' }} className="print:mb-4">
+                        <div style={{ display: 'flex', gap: '30px' }}>
+                            {/* Column 1: Bill & Rate Info */}
+                            <div style={{ flex: 1.2, borderRight: '1px solid #e2e8f0', paddingRight: '20px' }}>
+                                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    1. Purchase Details
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                        <span className="text-slate-500">Total Net Weight:</span>
+                                        <span className="font-medium text-slate-600">{(deferredData.totalNetWeight || 0).toFixed(2)} kg</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                        <span className="text-slate-500">Average Rate:</span>
+                                        <span className="font-medium text-slate-600">{formatCurrency(deferredData.averageRate || 0)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '6px' }}>
+                                        <span className="font-medium text-slate-600">Gross Bill Amount:</span>
+                                        <span className="font-semibold text-slate-600">{formatCurrency(deferredData.totalAmount || 0)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Column 2: Deduction Breakdown */}
+                            <div style={{ flex: 1.2, borderRight: '1px solid #e2e8f0', paddingRight: '20px' }}>
+                                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    2. Deduction Breakdown
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                        <span className="text-slate-500">Karta & Laboury:</span>
+                                        <span className="font-medium text-slate-600">{formatCurrency((deferredData.totalKartaAmount || 0) + (deferredData.totalLabouryAmount || 0))}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                        <span className="text-slate-500">Kanta & Others:</span>
+                                        <span className="font-medium text-slate-600">{formatCurrency((deferredData.totalKanta || 0) + (deferredData.totalOtherCharges || 0))}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '6px' }}>
+                                        <span className="font-medium text-slate-600">Total Deductions:</span>
+                                        <span className="font-semibold text-red-600">-{formatCurrency(deferredData.totalDeductions || 0)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Column 3: Final Account Status */}
+                            <div style={{ flex: 1.5 }}>
+                                <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    3. Final Account Status
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                        <span className="text-slate-500 font-medium">Net Payable:</span>
+                                        <span className="font-semibold text-slate-600">{formatCurrency(deferredData.totalOriginalAmount || 0)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#16a34a' }}>
+                                        <span className="font-medium">Total Paid To Date:</span>
+                                        <span className="font-semibold">{formatCurrency(deferredData.totalPaid || 0)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', borderTop: '1px solid #cbd5e1', paddingTop: '8px', marginTop: '8px', color: '#dc2626' }}>
+                                        <span className="font-semibold uppercase tracking-tighter">Outstanding:</span>
+                                        <span className="font-semibold">{formatCurrency(statementOutstanding)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
-
-
+                {/* Detailed Receipts Table */}
+                {deferredData && deferredData.allTransactions && deferredData.allTransactions.length > 0 && (
+                    <div className="mb-6 page-break-inside-avoid w-full overflow-x-auto">
+                        <table className="receipts-table w-full border-collapse border-2 border-border text-[8px] leading-tight text-foreground">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-700 leading-tight">
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">SR No.</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">Date</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">Variety</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">Vehicle</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Term</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Rate</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Gross Wt.</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Teir Wt.</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Weight</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">K.Wt.</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Net Wt.</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Amount</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">Net Amt.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {deferredData.allTransactions.map((tx, idx) => (
+                                    <tr key={idx} className="hover:bg-muted/50 text-slate-700 leading-tight">
+                                        <td className="border-2 border-border px-[2px] py-[1px]">{tx.srNo}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] whitespace-nowrap">{format(new Date(tx.date), 'dd-MMM-yy')}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px]">{tx.variety}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px]">{tx.vehicleNo}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.term}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.rate?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.grossWeight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.teirWeight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.weight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.kartaWeight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.netWeight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(tx.amount)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">{formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot>
+                                <tr className="bg-slate-100 font-bold text-slate-800 leading-tight">
+                                    <td colSpan={6} className="border-2 border-border px-[2px] py-[1px] text-right uppercase tracking-wider font-extrabold text-[9px]">GRAND TOTAL</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalGrossWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalTeirWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalFinalWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalKartaWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalNetWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(deferredData.totalAmount)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right font-extrabold text-[9px]">{formatCurrency(deferredData.totalOriginalAmount)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                )}
                 <div className="w-full">
                 <div className="max-h-[600px] overflow-auto">
                 <table className="statement-table min-w-[1100px] border-collapse border-2 border-border text-sm leading-tight text-foreground">
@@ -589,17 +741,11 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
                         <tr className="bg-muted leading-tight">
 
                             <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[12%]">Date</th>
-
                             <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[40%]">Particulars</th>
-
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Debit</th>
-
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Paid</th>
-
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">CD</th>
-
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-foreground text-xs leading-tight">Balance</th>
-
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-red-400 text-xs leading-tight amount-columns">Debit</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-green-400 text-xs leading-tight amount-columns">Paid</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-purple-400 text-xs leading-tight cd-column">CD</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-orange-400 text-xs leading-tight balance-column">Balance</th>
                         </tr>
 
                     </thead>
@@ -654,13 +800,13 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-purple-400 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight cd-column text-purple-400 font-bold">
 
                                         {transaction.creditCd > 0 ? formatCurrency(transaction.creditCd) : '-'}
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-bold amount-columns text-orange-400">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-bold balance-column text-orange-400">
 
                                         {formatCurrency(balance)}
 
@@ -677,37 +823,21 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
                     <tfoot>
 
                         <tr className="bg-muted font-bold">
-
                             <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight text-foreground font-extrabold" colSpan={2}>
-
                                 TOTALS
-
                             </td>
-
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold text-red-400">
-
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-red-400">
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))}
-
                             </td>
-
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
-
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-green-400">
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}
-
                             </td>
-
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
-
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-purple-400">
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}
-
                             </td>
-
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight text-foreground font-extrabold">
-
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-orange-400">
                                 {formatCurrency(statementOutstanding)}
-
                             </td>
-
                         </tr>
 
                     </tfoot>
@@ -721,7 +851,7 @@ export const SupplierStatementPreview = ({ data }: { data: CustomerSummary | nul
             </div>
 
         </div>
-
+        </>
     );
 
 };

@@ -18,11 +18,18 @@ const PIE_COLORS = [
 
 const customTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (!active || !payload || payload.length === 0) return null;
-  const item = payload[0];
   return (
-    <div className="rounded border bg-background px-2 py-1 text-xs shadow">
-      <div className="font-medium">{item.name || String(label || "")}</div>
-      <div className="font-mono">{formatCurrency(Number(item.value || 0))}</div>
+    <div className="rounded border bg-background px-3 py-2 text-xs shadow-lg space-y-1.5 min-w-[120px]">
+      <div className="font-bold border-b pb-1 mb-1">{String(label || "")}</div>
+      {payload.map((item, idx) => (
+        <div key={idx} className="flex justify-between items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">{item.name}:</span>
+          </div>
+          <span className="font-mono font-bold">{formatCurrency(Number(item.value || 0))}</span>
+        </div>
+      ))}
     </div>
   );
 };
@@ -207,6 +214,7 @@ export function DashboardCharts({
               <Area
                 type="monotone"
                 dataKey="income"
+                name="Income"
                 stackId="1"
                 stroke="#22c55e"
                 fill="#22c55e"
@@ -215,6 +223,7 @@ export function DashboardCharts({
               <Area
                 type="monotone"
                 dataKey="expense"
+                name="Expense"
                 stackId="2"
                 stroke="#ef4444"
                 fill="#ef4444"

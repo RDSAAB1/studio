@@ -255,13 +255,17 @@ export default function DashboardClient() {
         []
     );
 
-     const financialState = useMemo(() => {
+    const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
 
-        filteredData.filteredFundTransactions.forEach(t => {
+        const intervalEnd = toEndOfDay(date?.to || date?.from || new Date());
+        const isUpToDate = (d: string) => new Date(d) <= intervalEnd;
+
+        // Use UNFILTERED data but only up to the selected end date for cumulative balance
+        fundTransactions.filter(t => isUpToDate(t.date)).forEach(t => {
             if (balances.has(t.source)) {
                 balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             }
@@ -270,14 +274,16 @@ export default function DashboardClient() {
             }
         });
         
-        allIncomes.forEach(t => {
+        const allIncomesUnfiltered = [...incomes, ...customerPayments];
+        allIncomesUnfiltered.filter(t => isUpToDate(t.date)).forEach(t => {
             const balanceKey = t.bankAccountId || (('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
             }
         });
         
-        allExpenses.forEach(t => {
+        const allExpensesUnfiltered = [...expenses, ...supplierPayments];
+        allExpensesUnfiltered.filter(t => isUpToDate(t.date)).forEach(t => {
              const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || ('paymentMethod' in t && t.paymentMethod === 'Cash') ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
                  balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
@@ -290,7 +296,7 @@ export default function DashboardClient() {
         const workingCapital = totalAssets - totalLiabilities;
         
         return { balances, totalAssets, totalLiabilities, workingCapital };
-    }, [filteredData, allIncomes, allExpenses, bankAccounts, totalSupplierDues]);
+    }, [date, incomes, expenses, supplierPayments, customerPayments, fundTransactions, bankAccounts, totalSupplierDues, filteredData.filteredLoans]);
 
     // --- Chart Data Calculation ---
     const level1Data = useMemo(() => {
@@ -337,23 +343,30 @@ export default function DashboardClient() {
     
     const incomeExpenseChartData = useMemo(() => {
         try {
-            const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
-                const dayDate = toStartOfDay(t.date);
+            const grouped: Record<string, { dayTs: number; date: string; income: number; expense: number }> = {};
+            
+            // Helper to get day key and initialize if needed
+            const getGroup = (dateStr: string) => {
+                const dayDate = toStartOfDay(dateStr);
                 const dayTs = dayDate.getTime();
                 const dayKey = String(dayTs);
-
-                if (!acc[dayKey]) acc[dayKey] = { dayTs, date: format(dayDate, 'MMM dd'), income: 0, expense: 0 };
-
-                const isIncomeEntry = 'transactionType' in t && t.transactionType === 'Income';
-                const isCustomerPayment = 'customerId' in t && 'paymentId' in t && t.paymentId.startsWith('CP');
-                if (isIncomeEntry || isCustomerPayment) {
-                    acc[dayKey].income += t.amount;
-                } else {
-                    acc[dayKey].expense += t.amount;
+                if (!grouped[dayKey]) {
+                    grouped[dayKey] = { dayTs, date: format(dayDate, 'MMM dd'), income: 0, expense: 0 };
                 }
+                return grouped[dayKey];
+            };
 
-                return acc;
-            }, {} as Record<string, { dayTs: number; date: string; income: number; expense: number }>);
+            // Process incomes
+            allIncomes.forEach(t => {
+                const group = getGroup(t.date);
+                group.income += t.amount;
+            });
+
+            // Process expenses
+            allExpenses.forEach(t => {
+                const group = getGroup(t.date);
+                group.expense += t.amount;
+            });
 
             return Object.values(grouped)
                 .sort((a, b) => a.dayTs - b.dayTs)
@@ -391,7 +404,7 @@ export default function DashboardClient() {
                     name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
                 }
                 return { name, value };
-            }).filter(item => item.value > 0);
+            }); // Removed filter(item => item.value > 0) to show all sources
         } catch (error) {
             logError(error, "dashboard-client: fundSourcesData", "medium");
             return [];

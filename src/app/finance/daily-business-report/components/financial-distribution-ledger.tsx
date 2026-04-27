@@ -18,11 +18,11 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
 
     return (
         <Card className="shadow-md border-none bg-white p-0 overflow-hidden">
-            <CardHeader className="bg-[#5c3e7b] border-b py-3 text-white">
+            <CardHeader className="bg-slate-900 border-b py-3 text-white">
                 <div className="flex justify-between items-center w-full">
                     <div>
                         <CardTitle className="text-xs font-black uppercase tracking-widest leading-none">Daily Financial Distribution Ledger</CardTitle>
-                        <CardDescription className="text-[10px] mt-1 text-purple-200 uppercase tracking-tighter">Detailed performance breakdown per day</CardDescription>
+                        <CardDescription className="text-[10px] mt-1 text-slate-400 uppercase tracking-tighter">Detailed performance breakdown per day</CardDescription>
                     </div>
                     <div className="text-[10px] bg-white/20 px-2 py-1 rounded font-bold uppercase">
                         {isSameDay(startDate, endDate) ? 'Single Day View' : 'Multi-Day View'}
@@ -41,24 +41,28 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200">Expenses</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200">Income</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-purple-700 uppercase text-right px-3 border-r border-slate-200">S/E Cash</TableHead>
-                            <TableHead className="text-[11px] font-black h-11 text-white bg-[#5c3e7b] uppercase text-right px-4">Net Total</TableHead>
+                            <TableHead className="text-[11px] font-black h-11 text-white bg-slate-900 uppercase text-right px-4">Net Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.dayWise.map((d: any, i: number) => (
-                            <TableRow key={i} className="hover:bg-white border-b border-slate-100 transition-colors">
-                                <TableCell className="font-bold text-slate-700 py-3 text-[11px] whitespace-nowrap text-center border-r border-slate-100">{d.date}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-100">{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-mono font-bold text-slate-900 border-r border-slate-100">{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-bold text-red-600 border-r border-slate-100">{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-bold text-emerald-600 border-r border-slate-100">{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[11px] font-bold text-purple-700 border-r border-slate-100">{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                <TableCell className="text-right py-3 text-[12px] font-mono font-black text-slate-900">{d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            </TableRow>
-                        ))}
-                        <TableRow className="bg-[#5c3e7b] text-white hover:bg-purple-800 font-bold border-t-2 border-white/20">
+                        {reportData.dayWise.map((d: any, i: number) => {
+                            const isAlt = i % 2 !== 0;
+                            const bgClass = isAlt ? '!bg-slate-100' : '!bg-white';
+                            return (
+                                <TableRow key={i} className={`hover:bg-indigo-50 transition-colors border-b border-slate-200 ${bgClass}`}>
+                                    <TableCell className={`font-bold text-slate-700 py-3 text-[11px] whitespace-nowrap text-center border-r border-slate-200/50 ${bgClass}`}>{d.date}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-slate-900 border-r border-slate-200/50 ${bgClass}`}>{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-bold text-red-600 border-r border-slate-200/50 ${bgClass}`}>{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-bold text-emerald-600 border-r border-slate-200/50 ${bgClass}`}>{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-bold text-purple-700 border-r border-slate-200/50 ${bgClass}`}>{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[12px] font-mono font-black text-slate-900 ${bgClass}`}>{d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                                </TableRow>
+                            );
+                        })}
+                        <TableRow className="bg-slate-900 text-white hover:bg-slate-800 font-bold border-t-2 border-white/20">
                             <TableCell className="font-black uppercase py-4 text-center text-[11px] px-3">Total Period Distribution</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>

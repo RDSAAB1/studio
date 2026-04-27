@@ -151,32 +151,13 @@ export const RtgsForm = (props: RtgsFormProps) => {
     }, [bankAccounts, bankDetails.bank, bankDetails.branch]);
 
     // Options for Name dropdown (showing Name and Account No.)
-    // Filter by Bank and Branch if selected, show all accounts otherwise
+    // Always show ALL accounts as suggestions - no bank/branch filtering here.
+    // This ensures that typing a name always surfaces all matching names regardless
+    // of which bank or account number is currently selected.
     const nameOptions = React.useMemo(() => {
         if (!Array.isArray(bankAccounts)) return [];
         
-        // Filter accounts based on selected Bank and Branch (same logic as filteredBankAccounts)
-        let filtered = bankAccounts;
-        
-        // Filter by bank if selected (case-insensitive comparison with normalization)
-        if (bankDetails.bank) {
-            const selectedBank = bankDetails.bank.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: BankAccount) => {
-                const accBankName = (acc.bankName || '').trim().toLowerCase().replace(/\s+/g, ' ');
-                return accBankName === selectedBank;
-            });
-        }
-        
-        // Filter by branch if selected (case-insensitive comparison with normalization)
-        if (bankDetails.branch) {
-            const selectedBranch = bankDetails.branch.trim().toLowerCase().replace(/\s+/g, ' ');
-            filtered = filtered.filter((acc: BankAccount) => {
-                const accBranchName = (acc.branchName || '').trim().toLowerCase().replace(/\s+/g, ' ');
-                return accBranchName === selectedBranch;
-            });
-        }
-        
-        return filtered.map((acc: BankAccount) => {
+        return bankAccounts.map((acc: BankAccount) => {
             const name = acc.accountHolderName || '';
             return {
                 value: `${name}__${acc.accountNumber}`, // Use combined key to handle duplicate names
@@ -186,7 +167,7 @@ export const RtgsForm = (props: RtgsFormProps) => {
                 name: name
             };
         });
-    }, [bankAccounts, bankDetails.bank, bankDetails.branch]);
+    }, [bankAccounts]);
 
     const handleBankSelect = (bankName: string | null) => {
         setBankDetails({

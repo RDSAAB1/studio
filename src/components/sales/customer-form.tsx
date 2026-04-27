@@ -10,6 +10,7 @@ import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 
 
 import { Input } from "@/components/ui/input";
+import { SuggestionInput } from "@/components/ui/suggestion-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -67,6 +68,21 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
             displayValue: customer.name, // Only show name in input field, not address
             data: customer // Store full customer data for auto-fill
         }));
+    }, [allCustomers]);
+
+    const nameSuggestions = useMemo(() => {
+        const uniqueNames = Array.from(new Set(allCustomers.map(c => c.name).filter(Boolean)));
+        return uniqueNames.map(n => n); // SuggestionInput handles case if needed, but we store title case
+    }, [allCustomers]);
+
+    const contactSuggestions = useMemo(() => {
+        const uniqueContacts = Array.from(new Set(allCustomers.map(c => c.contact).filter(Boolean)));
+        return uniqueContacts;
+    }, [allCustomers]);
+
+    const vehicleSuggestions = useMemo(() => {
+        const uniqueVehicles = Array.from(new Set(allCustomers.map(c => c.vehicleNo).filter(Boolean)));
+        return uniqueVehicles.map(v => String(v).toUpperCase());
     }, [allCustomers]);
 
     const handleNameChange = (value: string | null) => {
@@ -206,9 +222,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
 
     // Auto-calculate CD% when CD Amount is entered
     useEffect(() => {
-        if (cdInputMode === 'amount' && cdAmount && calculated.amount && calculated.amount > 0) {
+        if (cdInputMode === 'amount' && typeof cdAmount === 'number' && calculated.amount && calculated.amount > 0) {
             const calculatedCdRate = (cdAmount / calculated.amount) * 100;
-            const currentCd = form.getValues('cd') || 0;
+            const currentCd = form.getValues('cd') ?? 0;
             // Only update if the calculated value is significantly different (avoid infinite loops)
             if (Math.abs(currentCd - calculatedCdRate) > 0.01) {
                 form.setValue('cd', calculatedCdRate, { shouldValidate: false, shouldDirty: false });
@@ -218,9 +234,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
 
     // Auto-calculate CD Amount when CD% is entered
     useEffect(() => {
-        if (cdInputMode === 'percentage' && cd && calculated.amount && calculated.amount > 0) {
+        if (cdInputMode === 'percentage' && typeof cd === 'number' && calculated.amount && calculated.amount > 0) {
             const calculatedCdAmount = (calculated.amount * cd) / 100;
-            const currentCdAmount = form.getValues('cdAmount') || 0;
+            const currentCdAmount = form.getValues('cdAmount') ?? 0;
             // Only update if the calculated value is significantly different (avoid infinite loops)
             if (Math.abs(currentCdAmount - calculatedCdAmount) > 0.01) {
                 form.setValue('cdAmount', calculatedCdAmount, { shouldValidate: false, shouldDirty: false });
@@ -446,15 +462,17 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     name="name"
                                     control={form.control}
                                     render={({ field }) => (
-                                      <Input
+                                      <SuggestionInput
                                         id="name"
                                         {...field}
+                                        suggestions={nameSuggestions}
+                                        onSuggestionSelect={(val) => {
+                                            field.onChange(toTitleCase(val));
+                                            handleNameSelect(val);
+                                        }}
+                                        transformValue={toTitleCase}
                                         placeholder="Enter customer name..."
                                         className={cn("h-7 text-xs pl-9", form.formState.errors.name && "border-destructive")}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          field.onChange(toTitleCase(val));
-                                        }}
                                         onBlur={(e) => {
                                           const raw = e.target.value.trim();
                                           if (!raw) return;
@@ -475,7 +493,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                             <div className="space-y-0.5">
                                 <Label htmlFor="contact" className="text-xs">Contact No.</Label>
                                 <InputWithIcon icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                   <Controller name="contact" control={form.control} render={({ field }) => ( <Input id="contact" {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                   <Controller name="contact" control={form.control} render={({ field }) => ( <SuggestionInput id="contact" {...field} suggestions={contactSuggestions} onSuggestionSelect={(val) => { field.onChange(val); handleContactBlur(val); }} type="tel" maxLength={10} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); field.onChange(val); }} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -492,7 +510,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                             <div className="space-y-0.5">
                                 <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                                 <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input id="vehicleNo" {...field} onChange={handleCapitalizeOnChange} className="h-7 text-xs pl-9" /> )}/>
+                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <SuggestionInput id="vehicleNo" {...field} suggestions={vehicleSuggestions} onSuggestionSelect={(val) => field.onChange(val.toUpperCase())} transformValue={(v) => v.toUpperCase()} className="h-7 text-xs pl-9" /> )}/>
                                 </InputWithIcon>
                             </div>
                              <Controller name="paymentType" control={form.control} render={({ field }) => (

@@ -161,6 +161,7 @@ export const useSupplierSummary = (
           totalLabouryAmount: groupTotalLabouryAmount,
           totalKanta: groupTotalKanta,
           totalOtherCharges: groupTotalOtherCharges,
+          totalDeductions: groupTotalKartaAmount + groupTotalLabouryAmount + groupTotalKanta + groupTotalOtherCharges,
           allTransactions: groupData.suppliers,
           paymentHistory: [],
           isStub: true
@@ -231,6 +232,7 @@ export const useSupplierSummary = (
           totalLabouryAmount: groupTotalLabouryAmount,
           totalKanta: groupTotalKanta,
           totalOtherCharges: groupTotalOtherCharges,
+          totalDeductions: groupTotalKartaAmount + groupTotalLabouryAmount + groupTotalKanta + groupTotalOtherCharges + processed.reduce((sum, s) => sum + toNumber(s.brokerageAmount || 0), 0),
           allTransactions: processed,
           allPayments: allGroupPayments,
           paymentHistory: allGroupPayments,
@@ -257,6 +259,7 @@ export const useSupplierSummary = (
       mill.totalLabouryAmount += (summary as any).totalLabouryAmount || 0;
       mill.totalKanta += (summary as any).totalKanta || 0;
       mill.totalOtherCharges += (summary as any).totalOtherCharges || 0;
+      mill.totalDeductions = (mill.totalDeductions || 0) + (summary.totalDeductions || 0);
       mill.totalTransactions += (summary.allTransactions || []).length;
       if (summary.outstandingEntryIds && summary.outstandingEntryIds.length > 0) {
         mill.totalOutstandingTransactions += summary.outstandingEntryIds.length;

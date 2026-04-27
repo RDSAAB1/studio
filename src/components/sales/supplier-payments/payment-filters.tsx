@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { Search, Filter, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ interface PaymentFiltersProps {
   onFilterVarietyChange: (value: string) => void;
   onClearFilters: () => void;
   extraActions?: ReactNode;
+  type?: 'supplier' | 'customer' | 'outsider';
 }
 
 export function PaymentFilters({
@@ -57,9 +59,47 @@ export function PaymentFilters({
   onFilterVarietyChange,
   onClearFilters,
   extraActions,
+  type = 'supplier',
 }: PaymentFiltersProps) {
+  // Arrow-key navigation helpers
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
+
+  const currentIndex = selectedSupplierKey
+    ? supplierOptions.findIndex((o) => o.value === selectedSupplierKey)
+    : -1;
+  const totalCount = supplierOptions.length;
+
+  const navigateSupplier = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (totalCount === 0) return;
+      let nextIdx: number;
+      if (currentIndex === -1) {
+        nextIdx = direction === 'next' ? 0 : totalCount - 1;
+      } else {
+        nextIdx =
+          direction === 'next'
+            ? (currentIndex + 1) % totalCount
+            : (currentIndex - 1 + totalCount) % totalCount;
+      }
+      const next = supplierOptions[nextIdx];
+      if (next) onSupplierSelect(next.value);
+    },
+    [currentIndex, totalCount, supplierOptions, onSupplierSelect]
+  );
+
+  // Local arrow-key handler (only when no input/textarea is focused)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); navigateSupplier('next'); }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); navigateSupplier('prev'); }
+    },
+    [navigateSupplier]
+  );
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" ref={supplierDropdownRef} onKeyDown={handleKeyDown} tabIndex={-1}>
       <div className="flex flex-col gap-2">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2">
           <Popover>
@@ -207,25 +247,60 @@ export function PaymentFilters({
           </div>
         </div>
 
-        <div className="min-w-0">
-          <CustomDropdown
-            options={supplierOptions.map(({ value, data, label }) => {
-              if (label) {
-                return { value, label, data: data || {} };
-              }
-              return {
-                value,
-                label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim(),
-                data: data || {}
-              };
-            })}
-            value={selectedSupplierKey}
-            onChange={onSupplierSelect}
-            placeholder="Search supplier..."
-            inputClassName="h-7 rounded-md border border-slate-200 bg-white/80 backdrop-blur-md text-[10px] font-bold text-slate-900 focus:border-slate-300 focus:ring-1 focus:ring-primary/20 py-0 px-2 transition-all shadow-sm"
-            searchType={searchType}
-            onSearchTypeChange={undefined}
-          />
+        <div className="min-w-0 flex items-center gap-1.5">
+          <div className="flex-1 min-w-0">
+            <CustomDropdown
+              options={supplierOptions.map(({ value, data, label }) => {
+                if (label) {
+                  return { value, label, data: data || {} };
+                }
+                return {
+                  value,
+                  label: `${toTitleCase(data.name || '')} | F:${toTitleCase(data.fatherName || data.so || '')} | ${toTitleCase(data.address || '')} | ${data.contact || ''}`.trim(),
+                  data: data || {}
+                };
+              })}
+              value={selectedSupplierKey}
+              onChange={onSupplierSelect}
+              placeholder="Search supplier..."
+              inputClassName="h-7 rounded-md border border-slate-200 bg-white/80 backdrop-blur-md text-[10px] font-bold text-slate-900 focus:border-slate-300 focus:ring-1 focus:ring-primary/20 py-0 px-2 transition-all shadow-sm"
+              searchType={searchType}
+              onSearchTypeChange={undefined}
+            />
+          </div>
+
+          {/* Arrow navigation buttons + position counter */}
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => navigateSupplier('prev')}
+              disabled={totalCount === 0}
+              title={`Previous ${type === 'customer' ? 'customer' : 'supplier'} (←)`}
+              className="h-7 w-6 flex items-center justify-center rounded-l-md border border-r-0 border-slate-200 bg-white/80 text-slate-600 hover:bg-violet-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            >
+              <ChevronLeft className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateSupplier('next')}
+              disabled={totalCount === 0}
+              title={`Next ${type === 'customer' ? 'customer' : 'supplier'} (→)`}
+              className="h-7 w-6 flex items-center justify-center rounded-r-md border border-slate-200 bg-white/80 text-slate-600 hover:bg-violet-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            >
+              <ChevronRight className="h-3 w-3" />
+            </button>
+            <span
+              className={cn(
+                "ml-0.5 h-7 min-w-[46px] flex items-center justify-center rounded-md border text-[9.5px] font-bold tabular-nums px-1.5 transition-all shadow-sm",
+                currentIndex >= 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-white/80 border-slate-200 text-slate-500"
+              )}
+              title={currentIndex >= 0 ? `Supplier ${currentIndex + 1} of ${totalCount}` : `${totalCount} suppliers`}
+            >
+              {currentIndex >= 0 ? `${currentIndex + 1}/${totalCount}` : `0/${totalCount}`}
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -310,7 +310,7 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
         : (customerState.cd && customerState.amount && customerState.amount > 0 
           ? (customerState.cd / customerState.amount) * 100 
           : 0),
-      cdAmount: customerState.cdAmount || (customerState.cd || 0),
+      cdAmount: customerState.cdAmount ?? customerState.cd ?? 0,
       brokerage: customerState.brokerageRate !== undefined && customerState.brokerageRate !== null
         ? customerState.brokerageRate
         : (customerState.brokerage && customerState.netWeight && customerState.netWeight > 0
@@ -326,9 +326,9 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
       grNo: customerState.grNo || '',
       grDate: customerState.grDate || '',
       transport: customerState.transport || '',
-      transportationRate: customerState.transportationRate || 0,
-      bagWeightKg: customerState.bagWeightKg || 0,
-      bagRate: customerState.bagRate || 0,
+      transportationRate: customerState.transportationRate ?? 0,
+      bagWeightKg: customerState.bagWeightKg ?? 0,
+      bagRate: customerState.bagRate ?? 0,
       shippingName: customerState.shippingName || '',
       shippingCompanyName: customerState.shippingCompanyName || '',
       shippingAddress: customerState.shippingAddress || '',
@@ -336,9 +336,9 @@ export function useCustomerEntryForm({ isClient, paymentHistory, safeCustomers }
       shippingGstin: customerState.shippingGstin || '',
       shippingStateName: customerState.shippingStateName || '',
       shippingStateCode: customerState.shippingStateCode || '',
-      baseReport: customerState.baseReport || 0,
-      collectedReport: customerState.collectedReport || 0,
-      riceBranGst: customerState.riceBranGst || 0,
+      baseReport: customerState.baseReport ?? 0,
+      collectedReport: customerState.collectedReport ?? 0,
+      riceBranGst: customerState.riceBranGst ?? 0,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);

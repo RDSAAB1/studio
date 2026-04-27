@@ -123,7 +123,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                 <TableHead className="px-3 py-2 text-xs">Name</TableHead>
                                 <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
                                 <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
-                                <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
+                                <TableHead className="text-right px-3 py-2 text-xs">Total Amount</TableHead>
                                 <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -149,7 +149,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.name)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{toTitleCase(entry.variety)}</TableCell>
                                     <TableCell className="px-3 py-1 text-sm">{Number(entry.netWeight).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.netAmount))}</TableCell>
+                                    <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.originalNetAmount))}</TableCell>
                                     <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)} aria-label="View entry details">

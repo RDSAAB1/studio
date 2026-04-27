@@ -9,6 +9,17 @@
 export async function printHtmlContent(htmlContent: string, styles: string = ''): Promise<void> {
   const electron = typeof window !== 'undefined' ? (window as any).electron : undefined;
 
+  // Global IBM Plex Sans font link and style override
+  const fontLink = '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">';
+  const globalStyleOverride = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+      * { font-family: 'IBM Plex Sans', sans-serif !important; }
+      body { font-family: 'IBM Plex Sans', sans-serif !important; font-weight: 400 !important; }
+      h1, h2, h3, h4, h5, h6, th, b, strong { font-weight: 600 !important; }
+    </style>
+  `;
+
   // Check if htmlContent is already a full HTML document
   const isFullDocument = htmlContent.trim().toLowerCase().startsWith('<!doctype') || 
                          htmlContent.trim().toLowerCase().startsWith('<html');
@@ -19,8 +30,17 @@ export async function printHtmlContent(htmlContent: string, styles: string = '')
       <html>
         <head>
           <meta charset="utf-8" />
+          ${fontLink}
+          ${globalStyleOverride}
           <style>
-            html, body { margin: 0; padding: 0; background: white !important; color: black !important; font-family: Arial, sans-serif; }
+            html, body { 
+              margin: 0; 
+              padding: 0; 
+              background: white !important; 
+              color: #334155 !important; 
+              font-family: 'IBM Plex Sans', sans-serif !important; 
+              font-weight: 400;
+            }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             ${styles}
           </style>
@@ -35,6 +55,13 @@ export async function printHtmlContent(htmlContent: string, styles: string = '')
         </body>
       </html>
     `;
+  } else {
+    // If it is a full document, inject the font and style into the <head>
+    if (fullHtml.includes('</head>')) {
+      fullHtml = fullHtml.replace('</head>', `${fontLink}${globalStyleOverride}</head>`);
+    } else if (fullHtml.includes('<body>')) {
+      fullHtml = fullHtml.replace('<body>', `<head>${fontLink}${globalStyleOverride}</head><body>`);
+    }
   }
 
   if (electron?.printHtml) {

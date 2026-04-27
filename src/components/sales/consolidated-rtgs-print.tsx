@@ -200,8 +200,19 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef}>
                     {paymentChunks.map((chunk, pageIndex) => {
-                        const firstDate = chunk.length > 0 ? format(new Date(chunk[0].date), 'yyyy-MM-dd') : '';
-                        const isSameDate = chunk.every(p => format(new Date(p.date), 'yyyy-MM-dd') === firstDate);
+                        const safeFormat = (d: any, fmt: string) => {
+                            if (!d) return '';
+                            try {
+                                const dateObj = new Date(d);
+                                if (isNaN(dateObj.getTime())) return '';
+                                return format(dateObj, fmt);
+                            } catch (e) {
+                                return '';
+                            }
+                        };
+
+                        const firstDate = chunk.length > 0 ? safeFormat(chunk[0].date, 'yyyy-MM-dd') : '';
+                        const isSameDate = chunk.every(p => safeFormat(p.date, 'yyyy-MM-dd') === firstDate);
                         const firstCheckNo = chunk.length > 0 ? String(chunk[0].checkNo || '').trim() : '';
                         const isSameCheckNo = chunk.every(p => String(p.checkNo || '').trim() === firstCheckNo);
                         const pageTotalAmount = chunk.reduce((sum, p) => sum + p.amount, 0);
@@ -233,7 +244,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     <div className="text-left text-sm">
                                         <div className="flex">
                                             <span className="font-bold w-24 text-black">DATE</span>
-                                            <span className="text-black">{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
+                                            <span className="text-black">{isSameDate && firstDate ? format(new Date(firstDate), "dd MMMM yyyy") : isSameDate && !firstDate ? '-' : 'Multiple'}</span>
                                         </div>
                                         <div className="flex">
                                             <span className="font-bold w-24 text-black">CHECK NO.</span>

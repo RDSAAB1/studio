@@ -289,24 +289,24 @@ export default function CustomerEntryClient() {
         grNo: formValues.grNo || '',
         grDate: formValues.grDate || '',
         transport: formValues.transport || '',
-        transportationRate: formValues.transportationRate || 0,
-        cdRate: formValues.cd || 0, // Save CD percentage as cdRate
-        cd: currentCustomer.cd || 0, // Save calculated CD amount
-        cdAmount: formValues.cdAmount || 0, // Save CD amount if entered directly
-        brokerageRate: formValues.brokerage || 0, // Save brokerage percentage as brokerageRate
+        transportationRate: formValues.transportationRate ?? 0,
+        cdRate: formValues.cd ?? 0, // Save CD percentage as cdRate
+        cd: currentCustomer.cd ?? 0, // Save calculated CD amount
+        cdAmount: formValues.cdAmount ?? 0, // Save CD amount if entered directly
+        brokerageRate: formValues.brokerage ?? 0, // Save brokerage percentage as brokerageRate
         so: '',
-        kartaPercentage: formValues.kartaPercentage || 0,
-        kartaWeight: currentCustomer.kartaWeight || 0, // Use calculated value
-        kartaAmount: currentCustomer.kartaAmount || 0, // Use calculated value
-        bagWeightDeductionAmount: currentCustomer.bagWeightDeductionAmount || 0, // Bag Weight deduction amount
-        transportAmount: currentCustomer.transportAmount || 0, // Transport Amount = Transportation Rate × Final Weight
+        kartaPercentage: formValues.kartaPercentage ?? 0,
+        kartaWeight: currentCustomer.kartaWeight ?? 0, // Use calculated value
+        kartaAmount: currentCustomer.kartaAmount ?? 0, // Use calculated value
+        bagWeightDeductionAmount: currentCustomer.bagWeightDeductionAmount ?? 0, // Bag Weight deduction amount
+        transportAmount: currentCustomer.transportAmount ?? 0, // Transport Amount = Transportation Rate × Final Weight
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
         receiptType: 'Cash',
-        baseReport: formValues.baseReport || 0,
-        collectedReport: formValues.collectedReport || 0,
-        riceBranGst: formValues.riceBranGst || 0,
+        baseReport: formValues.baseReport ?? 0,
+        collectedReport: formValues.collectedReport ?? 0,
+        riceBranGst: formValues.riceBranGst ?? 0,
         ...(currentCustomer.calculatedRate != null && { calculatedRate: currentCustomer.calculatedRate }),
     };
     

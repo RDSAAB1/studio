@@ -10,11 +10,11 @@ interface StockAvailabilityTableProps {
 export const StockAvailabilityTable: React.FC<StockAvailabilityTableProps> = ({ reportData }) => {
     return (
         <Card className="shadow-sm border-none bg-white overflow-hidden">
-            <CardHeader className="bg-[#5c3e7b] border-b py-3 text-white">
+            <CardHeader className="bg-slate-900 border-b py-3 text-white">
                 <CardTitle className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
                     <Warehouse size={14} /> Current Stock Availability
                 </CardTitle>
-                <CardDescription className="text-[10px] text-purple-200">Real-time balance based on total history (Purchased - Sold)</CardDescription>
+                <CardDescription className="text-[10px] text-slate-400">Real-time balance based on total history (Purchased - Sold)</CardDescription>
             </CardHeader>
             <Table>
                 <TableHeader>

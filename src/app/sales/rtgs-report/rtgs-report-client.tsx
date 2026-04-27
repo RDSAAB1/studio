@@ -96,6 +96,7 @@ export default function RtgsReportClient() {
     const [searchName, setSearchName] = useState('');
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
+    const [activeTab, setActiveTab] = useState('completed');
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -234,9 +235,11 @@ export default function RtgsReportClient() {
     }, [filteredReportRows]);
 
     const selectedPayments = useMemo(() => {
-        if (selectedPaymentIds.size === 0) return completedRows;
+        if (selectedPaymentIds.size === 0) {
+            return activeTab === 'completed' ? completedRows : pendingRows;
+        }
         return filteredReportRows.filter(row => selectedPaymentIds.has(row.id));
-    }, [selectedPaymentIds, completedRows, filteredReportRows]);
+    }, [selectedPaymentIds, completedRows, pendingRows, filteredReportRows, activeTab]);
     
     const handlePrint = async (_printRef: React.RefObject<HTMLDivElement>) => {
         if (!settings) {
@@ -285,10 +288,20 @@ export default function RtgsReportClient() {
                             }
                             return lines.join('<br/>' );
                         })();
+                        const safeFormatDate = (d: any, fmt: string) => {
+                            if (!d) return 'N/A';
+                            try {
+                                const dateObj = new Date(d);
+                                if (isNaN(dateObj.getTime())) return 'N/A';
+                                return format(dateObj, fmt);
+                            } catch (e) {
+                                return 'N/A';
+                            }
+                        };
                         return `
                             <tr style="background-color: #ffffff !important;">
                                 <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${sixRDetails}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${format(new Date(row.date), 'dd-MMM-yy')}<br/>${row.srNo}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${safeFormatDate(row.date, 'dd-MMM-yy')}<br/>${row.srNo}</td>
                                 <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${checkUtrDetails}</td>
                                 <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${payeeDetails}</td>
                                 <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${accountMobileDetails}</td>
@@ -316,9 +329,9 @@ export default function RtgsReportClient() {
 
         const printStyles = `
             @page { size: landscape; margin: 10mm; }
-            body { font-family: sans-serif; background-color: #ffffff !important; color: #000000 !important; }
+            body { font-family: 'IBM Plex Sans', sans-serif !important; background-color: #ffffff !important; color: #334155 !important; font-weight: 400; }
             table { width: 100%; border-collapse: collapse; font-size: 10px; background-color: #ffffff !important; }
-            th, td { border: 1px solid #000000 !important; padding: 6px !important; text-align: left; background-color: #ffffff !important; color: #000000 !important; vertical-align: top; }
+            th, td { border: 1px solid #000000 !important; padding: 6px !important; text-align: left; background-color: #ffffff !important; color: #334155 !important; vertical-align: top; }
             th { background-color: #f2f2f2 !important; font-weight: bold !important; }
             .text-right { text-align: right; }
             .whitespace-nowrap { white-space: nowrap; }
@@ -567,7 +580,7 @@ export default function RtgsReportClient() {
             <Card>
                 {/* Removed Header/Sub-header to save space - Clean Mode */}
                 <CardContent className="pt-4">
-                    <Tabs defaultValue="completed" className="w-full">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="completed">
                                 Completed ({completedRows.length})
@@ -709,10 +722,26 @@ export default function RtgsReportClient() {
                         {/* Pending Payments Tab */}
                         <TabsContent value="pending" className="mt-4 space-y-4">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                {pendingRows.length > 0 && selectedPaymentIds.size > 0 && (
-                                    <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
-                                        <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
-                                    </Button>
+                                {pendingRows.length > 0 && settings && (
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full justify-end">
+                                        {selectedPaymentIds.size > 0 && (
+                                            <Button onClick={handleOpenUpdateDialog} size="sm" variant="default">
+                                                <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
+                                            </Button>
+                                        )}
+                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
+                                            <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
+                                        </Button>
+                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline">
+                                            <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
+                                        </Button>
+                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
+                                            <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
+                                        </Button>
+                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
+                                            <Printer className="mr-2 h-4 w-4" /> Print Table
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                             <div className="overflow-auto h-[50vh] border rounded-md">

@@ -28,6 +28,7 @@ interface PaymentDialogsProps {
   govHistoryRows: Payment[];
   onEditPayment?: (payment: Payment) => void;
   onDeletePayment?: (payment: Payment) => void;
+  type?: 'supplier' | 'customer';
 }
 
 export function PaymentDialogs({
@@ -45,6 +46,7 @@ export function PaymentDialogs({
   govHistoryRows,
   onEditPayment,
   onDeletePayment,
+  type = 'supplier',
 }: PaymentDialogsProps) {
   return (
     <>
@@ -56,7 +58,7 @@ export function PaymentDialogs({
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-background">
             {selectedSupplierSummary ? (
-              <SupplierStatementPreview data={filteredSupplierSummary} />
+              <SupplierStatementPreview data={filteredSupplierSummary} type={type} />
             ) : (
               <div className="p-4 text-center text-muted-foreground">No supplier selected</div>
             )}

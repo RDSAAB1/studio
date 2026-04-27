@@ -19,6 +19,10 @@ import { type DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const escapeHtml = (value?: string | null) => {
   if (!value) return "";
@@ -55,7 +59,9 @@ export default function DailySupplierReportClient() {
     const globalData = useGlobalData();
     const suppliers = globalData.suppliers;
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
+    const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+    const [toDate, setToDate] = useState<Date | undefined>(new Date());
+    const [isDetailedMode, setIsDetailedMode] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedVariety, setSelectedVariety] = useState<string | null>('all');
     const { toast } = useToast();
@@ -71,26 +77,26 @@ export default function DailySupplierReportClient() {
     }, []);
     
     const varietyOptions = useMemo(() => {
-        if (!suppliers || !dateRange?.from) return [{ value: 'all', label: 'All Varieties' }];
+        if (!suppliers || !fromDate) return [{ value: 'all', label: 'All Varieties' }];
         
         const varieties = new Set(suppliers.filter(s => {
             const rowDate = new Date(s.date);
-            const start = startOfDay(dateRange.from!);
-            const end = endOfDay(dateRange.to || dateRange.from!);
+            const start = startOfDay(fromDate);
+            const end = endOfDay(toDate || fromDate);
             return isWithinInterval(rowDate, { start, end });
         }).map(s => toTitleCase(s.variety)));
         
         const sortedVarieties = Array.from(varieties).sort();
         return [{ value: 'all', label: 'All Varieties' }, ...sortedVarieties.map(v => ({ value: v, label: v }))];
-    }, [suppliers, dateRange]);
+    }, [suppliers, fromDate, toDate]);
 
     const filteredSuppliers = useMemo(() => {
-        if (!suppliers || !dateRange?.from) return [];
+        if (!suppliers || !fromDate) return [];
         
         const filtered = suppliers.filter(s => {
             const rowDate = new Date(s.date);
-            const start = startOfDay(dateRange.from!);
-            const end = endOfDay(dateRange.to || dateRange.from!);
+            const start = startOfDay(fromDate);
+            const end = endOfDay(toDate || fromDate);
             
             const dateMatch = isWithinInterval(rowDate, { start, end });
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -99,12 +105,71 @@ export default function DailySupplierReportClient() {
         });
         
         return filtered.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            if (dateA !== dateB) return dateA - dateB;
+            
             const aNum = parseInt(String(a.srNo).replace(/\D/g, '')) || 0;
             const bNum = parseInt(String(b.srNo).replace(/\D/g, '')) || 0;
             if (aNum !== bNum) return aNum - bNum;
             return String(a.srNo).localeCompare(String(b.srNo));
         });
-    }, [suppliers, dateRange, searchTerm, selectedVariety]);
+    }, [suppliers, fromDate, toDate, searchTerm, selectedVariety]);
+
+    const displayRows = useMemo(() => {
+        if (isDetailedMode) return filteredSuppliers;
+        
+        const grouped: { [key: string]: any } = {};
+        filteredSuppliers.forEach(s => {
+            const dateKey = format(new Date(s.date), "yyyy-MM-dd");
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = {
+                    id: dateKey,
+                    date: s.date,
+                    srNo: 'Σ',
+                    term: '-',
+                    name: ``,
+                    so: '-',
+                    vehicleNo: '-',
+                    address: '-',
+                    grossWeight: 0,
+                    teirWeight: 0,
+                    weight: 0,
+                    kartaWeight: 0,
+                    netWeight: 0,
+                    rate: 0,
+                    amount: 0,
+                    kartaAmount: 0,
+                    netAmount: 0,
+                    labouryAmount: 0,
+                    kanta: 0,
+                    originalNetAmount: 0,
+                    count: 0,
+                    isGrouped: true
+                };
+            }
+            grouped[dateKey].grossWeight += (Number(s.grossWeight) || 0);
+            grouped[dateKey].teirWeight += (Number(s.teirWeight) || 0);
+            grouped[dateKey].weight += (Number(s.weight) || 0);
+            grouped[dateKey].kartaWeight += (Number(s.kartaWeight) || 0);
+            grouped[dateKey].netWeight += (Number(s.netWeight) || 0);
+            grouped[dateKey].amount += (Number(s.amount) || 0);
+            grouped[dateKey].kartaAmount += (Number(s.kartaAmount) || 0);
+            grouped[dateKey].netAmount += (Number(s.netAmount) || 0);
+            grouped[dateKey].labouryAmount += (Number(s.labouryAmount) || 0);
+            grouped[dateKey].kanta += (Number(s.kanta) || 0);
+            grouped[dateKey].originalNetAmount += (Number(s.originalNetAmount) || 0);
+            grouped[dateKey].count += 1;
+        });
+        
+        return Object.values(grouped).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((row: any) => {
+            if (row.weight > 0) {
+                row.rate = row.amount / row.weight;
+            }
+            row.name = `${row.count} Entries`;
+            return row;
+        });
+    }, [filteredSuppliers, isDetailedMode]);
 
     const summary = useMemo(() => {
         const initialSummary = { 
@@ -198,8 +263,8 @@ export default function DailySupplierReportClient() {
             return;
         }
 
-        const dateTitle = dateRange?.from ? (
-            dateRange.to ? `${format(dateRange.from, "dd-MMM-yyyy")} to ${format(dateRange.to, "dd-MMM-yyyy")}` : format(dateRange.from, "dd-MMM-yyyy")
+        const dateTitle = fromDate ? (
+            toDate ? `${format(fromDate, "dd-MMM-yyyy")} to ${format(toDate, "dd-MMM-yyyy")}` : format(fromDate, "dd-MMM-yyyy")
         ) : "";
 
         const userCompany = globalData.receiptSettings;
@@ -211,39 +276,39 @@ export default function DailySupplierReportClient() {
             <html>
             <head>
                 <title>Supplier Report - ${dateTitle}</title>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+                <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
                 <style>
-                    body { font-family: 'Inter', sans-serif; margin: 0; padding: 15px; color: #000; line-height: 1.2; letter-spacing: -0.01em; }
-                    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border-bottom: 2.5px solid #1a365d; padding-bottom: 8px; }
+                    body { font-family: 'IBM Plex Sans', sans-serif !important; margin: 0; padding: 15px; color: #334155; line-height: 1.2; letter-spacing: -0.01em; font-weight: 400; }
+                    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border-bottom: 2px solid #475569; padding-bottom: 8px; }
                     .header-left { text-align: left; }
-                    .header-left h1 { margin: 0; font-size: 26px; color: #1a365d; letter-spacing: -0.02em; font-weight: 900; line-height: 1; }
-                    .header-left p { margin: 4px 0 0 0; font-size: 10px; color: #444; font-weight: 700; }
-                    .header-right { text-align: right; font-size: 9px; color: #666; font-weight: 500; line-height: 1.3; }
+                    .header-left h1 { margin: 0; font-size: 24px; color: #1e293b; letter-spacing: -0.02em; font-weight: 700; line-height: 1; }
+                    .header-left p { margin: 4px 0 0 0; font-size: 10px; color: #64748b; font-weight: 600; }
+                    .header-right { text-align: right; font-size: 9px; color: #64748b; font-weight: 500; line-height: 1.3; }
                     
                     .summary-section { margin-bottom: 12px; }
                     .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
                     .summary-box { border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; overflow: hidden; }
-                    .summary-box h4 { margin: 0; font-size: 8px; color: #fff; font-weight: 800; padding: 3px 6px; text-transform: uppercase; background: #1a365d; }
+                    .summary-box h4 { margin: 0; font-size: 8.5px; color: #1e293b; font-weight: 700; padding: 3px 6px; text-transform: uppercase; background: #e2e8f0; border-bottom: 1px solid #cbd5e1; }
                     .summary-box-content { padding: 4px 6px; }
                     .flex-row { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 1px; }
-                    .flex-row span:first-child { color: #555; font-size: 8.5px; font-weight: 600; }
-                    .flex-row span:last-child { font-weight: 800; color: #000; }
+                    .flex-row span:first-child { color: #64748b; font-size: 8.5px; font-weight: 500; }
+                    .flex-row span:last-child { font-weight: 600; color: #0f172a; }
 
-                    .main-table { width: 100%; border-collapse: collapse; font-size: 10.5px; border: 1px solid #1e293b; table-layout: fixed; line-height: 1.1; }
+                    .main-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 0.5px solid #94a3b8; table-layout: fixed; line-height: 1.1; }
                     .main-table th, .main-table td { border: 0.5px solid #cbd5e1; padding: 3px 2px; text-align: right; overflow: hidden; white-space: nowrap; }
-                    .main-table th { background: #1a365d; color: #fff; text-align: center; font-weight: 700; font-size: 8.5px; border: 0.5px solid #1a365d; vertical-align: middle; }
-                    .main-table td { background: #fff; color: #000; font-weight: 500; }
-                    .main-table td:nth-child(3), .main-table td:nth-child(4) { text-align: left; white-space: normal; }
-                    .main-table td:nth-child(1), .main-table td:nth-child(2) { text-align: center; background: #f8fafc; }
+                    .main-table th { background: #f1f5f9; color: #1e293b; text-align: center; font-weight: 600; font-size: 9.5px; border: 0.5px solid #94a3b8; vertical-align: middle; }
+                    .main-table td { background: #fff; color: #334155; font-weight: 400; }
+                    .main-table td:nth-child(${isDetailedMode ? '3' : '3'}), .main-table td:nth-child(${isDetailedMode ? '4' : '4'}) { text-align: left; white-space: normal; }
+                    .main-table td:nth-child(1), .main-table td:nth-child(2) { text-align: center; }
                     
                     .cell-stack { display: flex; flex-direction: column; gap: 0px; }
-                    .primary-val { font-weight: 800; color: #111; }
-                    .secondary-val { font-size: 8px; color: #64748b; font-weight: 600; }
-                    .text-financial { color: #15803d; font-weight: 800; }
-                    .text-rate { color: #92400e; font-weight: 800; }
-                    .text-supp { color: #1e40af; font-weight: 900; font-size: 11px; }
-                    .bg-total { background: #cbd5e1 !important; color: #1a365d !important; font-weight: 900 !important; }
-                    .bg-total td { background: #cbd5e1 !important; border-top: 1.5px solid #1a365d !important; }
+                    .primary-val { font-weight: 400; color: #0f172a; }
+                    .secondary-val { font-size: 8px; color: #64748b; font-weight: 400; }
+                    .text-financial { color: #166534; font-weight: 600; }
+                    .text-rate { color: #92400e; font-weight: 600; }
+                    .text-supp { color: #1e3a8a; font-weight: 400; font-size: 10.5px; }
+                    .bg-total { background: #f1f5f9 !important; color: #1e293b !important; font-weight: 600 !important; }
+                    .bg-total td { background: #f1f5f9 !important; border-top: 1.5px solid #475569 !important; }
                     
                     @media print {
                         body { padding: 0; }
@@ -269,26 +334,28 @@ export default function DailySupplierReportClient() {
                     <thead>
                         <tr>
                             <th style="width: 4%">SR</th>
-                            <th style="width: 6%">Date / T</th>
-                            <th style="width: 11%">Supplier / Father</th>
-                            <th style="width: 8%">Vehicle / Address</th>
-                            <th style="width: 5%">Gr/Tr</th>
-                            <th style="width: 4%">Fn</th>
-                            <th style="width: 3%">Kt</th>
-                            <th style="width: 5.5%">NetWt</th>
-                            <th style="width: 6%">Rate</th>
-                            <th style="width: 6.5%">Amnt</th>
-                            <th style="width: 4%">KtA</th>
-                            <th style="width: 6%">Af.Kt</th>
-                            <th style="width: 3.5%">Lb</th>
-                            <th style="width: 3.5%">Kn</th>
-                            <th style="width: 6.5%">Pay</th>
-                            <th style="width: 4%">CD</th>
-                            <th style="width: 9.5%">Final Net</th>
+                            <th style="width: 7%">${isDetailedMode ? 'Date / T' : 'Date'}</th>
+                            <th style="width: ${isDetailedMode ? '14%' : '18%'}">${isDetailedMode ? 'Supplier / Father' : 'Entries'}</th>
+                            ${isDetailedMode ? `
+                            <th style="width: 10%">Vehicle / Address</th>
+                            <th style="width: 6%">Gr/Tr</th>
+                            ` : ''}
+                            <th style="width: 6%">Fn</th>
+                            <th style="width: 4%">Kt</th>
+                            <th style="width: 7%">NetWt</th>
+                            <th style="width: 7%">Rate</th>
+                            <th style="width: 8%">Amnt</th>
+                            <th style="width: 5%">KtA</th>
+                            <th style="width: 8%">Af.Kt</th>
+                            <th style="width: 5%">Lb</th>
+                            <th style="width: 5%">Kn</th>
+                            <th style="width: 8%">Pay</th>
+                            <th style="width: 5%">CD</th>
+                            <th style="width: 11%">Final Net</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${filteredSuppliers.map(s => {
+                        ${displayRows.map(s => {
                             const afterKartaAmount = s.amount - s.kartaAmount;
                             const cdAmount = afterKartaAmount * 0.01;
                             const finalNet = s.amount - s.kartaAmount - cdAmount - s.labouryAmount - s.kanta;
@@ -297,16 +364,17 @@ export default function DailySupplierReportClient() {
                                     <td>${s.srNo}</td>
                                     <td>
                                         <div class="cell-stack">
-                                            <span class="primary-val">${format(new Date(s.date), "dd-MMM")}</span>
-                                            <span class="secondary-val">${s.term}</span>
+                                            <span class="primary-val" style="font-weight: 400 !important;">${format(new Date(s.date), "dd-MMM")}</span>
+                                            ${isDetailedMode ? `<span class="secondary-val">${s.term}</span>` : ''}
                                         </div>
                                     </td>
                                     <td>
                                         <div class="cell-stack">
-                                            <span class="text-supp">${escapeHtml(toTitleCase(s.name))}</span>
-                                            <span class="secondary-val">S/O: ${escapeHtml(toTitleCase(s.so || ''))}</span>
+                                            <span class="text-supp" style="font-weight: 400 !important;">${escapeHtml(toTitleCase(s.name))}</span>
+                                            <span class="secondary-val">${s.isGrouped ? '' : `S/O: ${escapeHtml(toTitleCase(s.so || ''))}`}</span>
                                         </div>
                                     </td>
+                                    ${isDetailedMode ? `
                                     <td>
                                         <div class="cell-stack">
                                             <span class="primary-val" style="font-size:9px">${escapeHtml((s.vehicleNo || '').toUpperCase())}</span>
@@ -319,46 +387,49 @@ export default function DailySupplierReportClient() {
                                             <span class="secondary-val">${s.teirWeight.toFixed(2)}</span>
                                         </div>
                                     </td>
+                                    ` : ''}
                                     <td>${s.weight.toFixed(2)}</td>
                                     <td>${s.kartaWeight.toFixed(2)}</td>
-                                    <td style="font-weight:900; color:#000">${s.netWeight.toFixed(2)}</td>
-                                    <td class="text-rate">${Math.round(s.rate)}</td>
-                                    <td class="text-rate">${Math.round(s.amount).toLocaleString()}</td>
-                                    <td>${Math.round(s.kartaAmount)}</td>
-                                    <td>${Math.round(afterKartaAmount).toLocaleString()}</td>
-                                    <td>${Math.round(s.labouryAmount)}</td>
-                                    <td>${Math.round(s.kanta)}</td>
-                                    <td class="text-financial">${Math.round(Number(s.netAmount)).toLocaleString()}</td>
-                                    <td>${Math.round(cdAmount)}</td>
-                                    <td class="text-financial" style="font-weight:900; font-size:11.5px">₹${Math.round(finalNet).toLocaleString()}</td>
+                                    <td style="font-weight:700; color:#1e293b">${s.netWeight.toFixed(2)}</td>
+                                    <td class="text-rate">${Math.round(s.rate).toLocaleString('en-IN')}</td>
+                                    <td class="text-rate">${Math.round(s.amount).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(s.kartaAmount).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(afterKartaAmount).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(s.labouryAmount).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(s.kanta).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial">${Math.round(Number(s.netAmount)).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(cdAmount).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial" style="font-weight:700; font-size: 11px">₹${Math.round(finalNet).toLocaleString('en-IN')}</td>
                                 </tr>
                             `;
                         }).join('')}
                          <tr class="bg-total">
-                                    <td colspan="4" style="text-align:center; font-size: 12px;">TOTALS (${summary.totalEntries} Entries)</td>
+                                    <td colspan="${isDetailedMode ? '4' : '3'}" style="text-align:center; font-size: 11px;">TOTALS (${summary.totalEntries.toLocaleString('en-IN')} Entries)</td>
+                                    ${isDetailedMode ? `
                                     <td>
                                         <div class="cell-stack">
-                                            <span>${summary.gross.toFixed(2)}</span>
-                                            <span class="secondary-val">${summary.tier.toFixed(2)}</span>
+                                            <span>${summary.gross.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                                            <span class="secondary-val">${summary.tier.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
                                         </div>
                                     </td>
-                                    <td>${summary.total.toFixed(2)}</td>
-                                    <td>${summary.kartaWeight.toFixed(2)}</td>
-                                    <td style="color:#000">${summary.net.toFixed(2)}</td>
+                                    ` : ''}
+                                    <td>${summary.total.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td>${summary.kartaWeight.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td style="color:#1e293b; font-weight:700">${summary.net.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td>
                                         <div class="cell-stack text-rate" style="font-size:8.5px">
-                                            <span>Avg: ₹${Math.round(summary.rate)}</span>
-                                            <span class="secondary-val">R: ${Math.round(summary.minRate)}-${Math.round(summary.maxRate)}</span>
+                                            <span>Avg: ₹${Math.round(summary.rate).toLocaleString('en-IN')}</span>
+                                            <span class="secondary-val">R: ${Math.round(summary.minRate).toLocaleString('en-IN')}-${Math.round(summary.maxRate).toLocaleString('en-IN')}</span>
                                         </div>
                                     </td>
-                                    <td class="text-rate">₹${Math.round(summary.amount).toLocaleString()}</td>
-                                    <td>₹${Math.round(summary.kartaAmount).toLocaleString()}</td>
-                                    <td>₹${Math.round(summary.amount - summary.kartaAmount).toLocaleString()}</td>
-                                    <td>₹${Math.round(summary.labour).toLocaleString()}</td>
-                                    <td>₹${Math.round(summary.kanta).toLocaleString()}</td>
-                                    <td class="text-financial">₹${Math.round(summary.netAmount).toLocaleString()}</td>
-                                    <td>₹${Math.round(summary.cdAmount).toLocaleString()}</td>
-                                    <td class="text-financial" style="font-size: 12.5px;">₹${Math.round(summary.finalNet).toLocaleString()}</td>
+                                    <td class="text-rate">₹${Math.round(summary.amount).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(summary.kartaAmount).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(summary.amount - summary.kartaAmount).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(summary.labour).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(summary.kanta).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial">₹${Math.round(summary.netAmount).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(summary.cdAmount).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial" style="font-size: 12.5px; font-weight: 700;">₹${Math.round(summary.finalNet).toLocaleString('en-IN')}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -379,10 +450,57 @@ export default function DailySupplierReportClient() {
              <div ref={printRef}>
                 <Card className="print-no-border">
                     <CardContent className="p-4 flex flex-col gap-0">
-                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center no-print mb-4">
-                            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-                             <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
-                             <CustomDropdown options={varietyOptions} value={selectedVariety} onChange={setSelectedVariety} placeholder="Filter by variety..." />
+                        <div className="flex flex-wrap gap-2 items-end no-print mb-4 bg-slate-50/50 p-2 rounded-lg border border-slate-200/60">
+                            <div className="space-y-0.5">
+                                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">From Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("h-7 w-[120px] justify-start text-left font-normal text-[10px] px-2", !fromDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-1 h-3 w-3" />
+                                            {fromDate ? format(fromDate, "dd-MMM-yyyy") : <span>From</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="space-y-0.5">
+                                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">To Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("h-7 w-[120px] justify-start text-left font-normal text-[10px] px-2", !toDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-1 h-3 w-3" />
+                                            {toDate ? format(toDate, "dd-MMM-yyyy") : <span>To</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={toDate} onSelect={setToDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                             <div className="space-y-0.5">
+                                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Search Name</Label>
+                                <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-[240px] h-7 text-[10px]" />
+                             </div>
+
+                             <div className="space-y-0.5">
+                                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Variety</Label>
+                                <CustomDropdown options={varietyOptions} value={selectedVariety} onChange={setSelectedVariety} placeholder="Variety" />
+                             </div>
+
+                             <div className="flex items-center space-x-2 h-7 mb-0.5 px-2 bg-white border rounded-md shadow-sm">
+                                <Switch id="detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
+                                <Label htmlFor="detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
+                             </div>
+
+                             <div className="flex-grow"></div>
+
+                             <Button onClick={handlePrint} size="sm" className="h-7 text-[10px] font-bold uppercase tracking-tight px-3 bg-indigo-600 hover:bg-indigo-700">
+                                <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
+                             </Button>
                         </div>
                         
                          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-2 print:flex print-summary-container mb-4">
@@ -453,12 +571,16 @@ export default function DailySupplierReportClient() {
                                     <tr className="text-primary bg-muted">
                                         <th className="p-2 text-left border-b border-r bg-muted">SR</th>
                                         <th className="p-2 text-left border-b border-r bg-muted">Date</th>
-                                        <th className="p-2 text-left border-b border-r bg-muted">Term</th>
-                                        <th className="p-2 text-left border-b border-r bg-muted">Name</th>
-                                        <th className="p-2 text-left border-b border-r bg-muted">S/O</th>
-                                        <th className="p-2 text-left border-b border-r bg-muted">Vehicle</th>
-                                        <th className="p-2 text-right border-b border-r bg-muted">Gross</th>
-                                        <th className="p-2 text-right border-b border-r bg-muted">Teir</th>
+                                        {isDetailedMode && <th className="p-2 text-left border-b border-r bg-muted">Term</th>}
+                                        <th className="p-2 text-left border-b border-r bg-muted">{isDetailedMode ? 'Name' : 'Entries'}</th>
+                                        {isDetailedMode && (
+                                            <>
+                                                <th className="p-2 text-left border-b border-r bg-muted">S/O</th>
+                                                <th className="p-2 text-left border-b border-r bg-muted">Vehicle</th>
+                                                <th className="p-2 text-right border-b border-r bg-muted">Gross</th>
+                                                <th className="p-2 text-right border-b border-r bg-muted">Teir</th>
+                                            </>
+                                        )}
                                         <th className="p-2 text-right border-b border-r bg-muted">Final</th>
                                         <th className="p-2 text-right border-b border-r bg-muted">Karta</th>
                                         <th className="p-2 text-right border-b border-r bg-muted">Net</th>
@@ -474,20 +596,24 @@ export default function DailySupplierReportClient() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredSuppliers.map((s) => {
+                                    {displayRows.map((s, index) => {
                                         const afterKartaAmount = s.amount - s.kartaAmount;
                                         const cdAmount = afterKartaAmount * 0.01;
                                         const finalNet = s.amount - s.kartaAmount - cdAmount - s.labouryAmount - s.kanta;
                                         return (
-                                        <tr key={s.id} className="hover:bg-muted/50 whitespace-nowrap h-[29px] border-b">
+                                        <tr key={s.id || index} className={cn("hover:bg-muted/50 whitespace-nowrap h-[29px] border-b", s.isGrouped && "bg-slate-50/50 font-medium")}>
                                             <td className="p-2 border-r font-bold">{s.srNo}</td>
                                             <td className="p-2 border-r">{format(new Date(s.date), "dd-MMM")}</td>
-                                            <td className="p-2 border-r text-center">{s.term}</td>
-                                            <td className="p-2 border-r">{toTitleCase(s.name)}</td>
-                                            <td className="p-2 border-r">{toTitleCase(s.so)}</td>
-                                            <td className="p-2 border-r">{s.vehicleNo.toUpperCase()}</td>
-                                            <td className="p-2 border-r text-right">{s.grossWeight.toFixed(2)}</td>
-                                            <td className="p-2 border-r text-right">{s.teirWeight.toFixed(2)}</td>
+                                            {isDetailedMode && <td className="p-2 border-r text-center">{s.term}</td>}
+                                            <td className={cn("p-2 border-r", s.isGrouped && "text-blue-700 font-bold")}>{toTitleCase(s.name)}</td>
+                                            {isDetailedMode && (
+                                                <>
+                                                    <td className="p-2 border-r">{toTitleCase(s.so || '-')}</td>
+                                                    <td className="p-2 border-r">{s.vehicleNo.toUpperCase()}</td>
+                                                    <td className="p-2 border-r text-right">{s.grossWeight.toFixed(2)}</td>
+                                                    <td className="p-2 border-r text-right">{s.teirWeight.toFixed(2)}</td>
+                                                </>
+                                            )}
                                             <td className="p-2 border-r text-right font-semibold">{s.weight.toFixed(2)}</td>
                                             <td className="p-2 border-r text-right">{s.kartaWeight.toFixed(2)}</td>
                                             <td className="p-2 border-r text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
@@ -507,9 +633,6 @@ export default function DailySupplierReportClient() {
                         </div>
                     </CardContent>
                 </Card>
-             </div>
-             <div className="flex justify-end mt-4 no-print">
-                 <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print Report</Button>
              </div>
         </div>
     );
