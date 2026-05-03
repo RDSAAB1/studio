@@ -62,7 +62,7 @@ export default function InventoryManagementPage() {
 
         if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
             e.preventDefault();
-            formElements[currentElementIndex + 1].focus();
+            formElements[currentElementIndex + 1]?.focus();
         } else if (currentElementIndex === formElements.length - 1) {
              e.preventDefault();
              handleSaveItem();

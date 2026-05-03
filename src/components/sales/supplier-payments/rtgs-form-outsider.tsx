@@ -59,14 +59,23 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
 
     const bankOptions = React.useMemo(() => {
         if (!Array.isArray(banks)) return [];
+        // ✅ Deduplicate by name - same name ke do banks honge to ek hi dikhega
+        const seen = new Set<string>();
         return banks
             .filter(bank => bank && (bank.name || bank.id))
+            .filter(bank => {
+                const key = (bank.name || bank.id || '').trim().toUpperCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
             .map((bank: Bank) => ({
-                value: bank.name || bank.id || '',
+                value: (bank.name || bank.id || '').trim().toUpperCase(),
                 label: toTitleCase(bank.name || bank.id || '')
             }))
             .filter(opt => opt.value && opt.label);
     }, [banks]);
+
 
     // Build name options from supplier bank accounts (same style as supplier RTGS)
     const nameOptions = React.useMemo(() => {
@@ -188,7 +197,12 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
     };
 
     const handleBranchSelect = (branchName: string | null) => {
-        const selectedBranch = bankBranches.find((b: BankBranch) => b.bankName === bankDetails.bank && b.branchName === branchName);
+        // ✅ Case-insensitive match for bankName so IFSC auto-fills correctly
+        const selectedBank = (bankDetails.bank || '').trim().toUpperCase();
+        const selectedBranch = bankBranches.find((b: BankBranch) =>
+            b.bankName?.trim().toUpperCase() === selectedBank &&
+            b.branchName?.trim().toUpperCase() === (branchName || '').trim().toUpperCase()
+        );
         setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
             ...prev,
             branch: branchName || '',

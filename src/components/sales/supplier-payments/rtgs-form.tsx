@@ -62,19 +62,28 @@ export const RtgsForm = (props: RtgsFormProps) => {
         if (banks.length === 0) {
 
         }
+        // ✅ Deduplicate by name - same name ke do banks honge to ek hi dikhega
+        const seen = new Set<string>();
         const options = banks
-            .filter(bank => bank && (bank.name || bank.id)) // Filter out invalid banks
+            .filter(bank => bank && (bank.name || bank.id))
+            .filter(bank => {
+                const key = (bank.name || bank.id || '').trim().toUpperCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
             .map((bank: Bank) => ({
-                value: bank.name || bank.id || '',
+                value: (bank.name || bank.id || '').trim().toUpperCase(),
                 label: (bank.name || bank.id || '').toUpperCase()
             }))
-            .filter(opt => opt.value && opt.label); // Filter out invalid options
+            .filter(opt => opt.value && opt.label);
 
         if (options.length === 0 && banks.length > 0) {
 
         }
         return options;
     }, [banks]);
+
 
     const availableBranchOptions = React.useMemo(() => {
         if (!bankDetails.bank || !bankDetails.bank.trim()) return [];
@@ -179,7 +188,12 @@ export const RtgsForm = (props: RtgsFormProps) => {
     };
 
     const handleBranchSelect = (branchName: string | null) => {
-        const selectedBranch = bankBranches.find((b: BankBranch) => b.bankName === bankDetails.bank && b.branchName === branchName);
+        // ✅ Case-insensitive match for bankName so IFSC auto-fills correctly
+        const selectedBank = (bankDetails.bank || '').trim().toUpperCase();
+        const selectedBranch = bankBranches.find((b: BankBranch) => 
+            b.bankName?.trim().toUpperCase() === selectedBank && 
+            b.branchName?.trim().toUpperCase() === (branchName || '').trim().toUpperCase()
+        );
         setBankDetails((prev: { bank?: string; branch?: string; ifscCode?: string; acNo?: string }) => ({
             ...prev,
             branch: branchName || '',

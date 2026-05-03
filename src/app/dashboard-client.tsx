@@ -9,7 +9,7 @@ import { formatCurrency, toTitleCase, getUserFriendlyErrorMessage } from "@/lib/
 import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ManufacturingCosting } from '@/components/dashboard/manufacturing-costing';
-import { TrendingUp, TrendingDown, DollarSign, Users, HandCoins, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, HandCoins, Loader2, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import { AreaChart, Area, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
@@ -23,7 +23,9 @@ import { StatCard } from '@/components/dashboard/stat-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { FinancialBreakdown } from '@/components/dashboard/financial-breakdown';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
+import { ForensicAccountLedger, LedgerEntry } from '@/components/dashboard/forensic-account-ledger';
 import { useToast } from '@/hooks/use-toast';
+
 import { retry } from '@/lib/retry-utils';
 import { Button } from '@/components/ui/button';
 import { useSupplierData } from '@/hooks/use-supplier-data';
@@ -59,6 +61,7 @@ export default function DashboardClient() {
     const [level1, setLevel1] = useState<string | null>(null);
     const [level2, setLevel2] = useState<string | null>(null);
     const [level3, setLevel3] = useState<string | null>(null);
+    const [activeForensicView, setActiveForensicView] = useState<string | null>(null);
     
     // ✅ OPTIMIZED: Only sync when data actually changes
     const prevDataRef = React.useRef({
@@ -156,8 +159,27 @@ export default function DashboardClient() {
     }, [date, incomes, expenses, supplierPayments, customerPayments, fundTransactions, loans, suppliers, customers]);
 
 
-    const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
-    const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
+    const allExpenses = useMemo(() => {
+        const base = [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments];
+        // Add CD Given as a virtual expense for chart consistency
+        const cdGivens = filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({
+            ...p,
+            amount: Number(p.cdAmount) || 0,
+            particulars: 'CD Given'
+        }));
+        return [...base, ...cdGivens];
+    }, [filteredData]);
+
+    const allIncomes = useMemo(() => {
+        const base = [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments];
+        // Add CD Received as a virtual income for chart consistency
+        const cdReceiveds = filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({
+            ...p,
+            amount: Number(p.cdAmount) || 0,
+            particulars: 'CD Received'
+        }));
+        return [...base, ...cdReceiveds];
+    }, [filteredData]);
     
     const { customerSummaryMap: supplierSummaryMap } = useSupplierData();
     const { customerSummaryMap: customerSummaryMap } = useCustomerData();
@@ -178,7 +200,7 @@ export default function DashboardClient() {
         return total;
     }, [supplierSummaryMap]);
 
-    const { totalIncome, totalExpense, netProfit, totalCdReceived, expenseBreakdown, incomeBreakdown } = useMemo(() => {
+    const { totalIncome, totalExpense, netProfit, totalCdReceived, totalCdGiven, expenseBreakdown, incomeBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
         // Calculate CD received - use SAME logic as CD Granted (unified-payments): paidFor.cdAmount first, else proportional from payment.cdAmount
@@ -202,23 +224,44 @@ export default function DashboardClient() {
         
         const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
         
+        // Calculate CD Given to Customers
+        const cdGiven = filteredData.filteredCustomerPayments.reduce((sum, payment) => {
+            let paymentCd = 0;
+            if (payment.paidFor && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
+                const totalPaidForInPayment = payment.paidFor.reduce((s: number, pf: PaidFor) => s + Number(pf.amount || 0), 0);
+                payment.paidFor.forEach((pf: PaidFor) => {
+                    if ('cdAmount' in pf && pf.cdAmount !== undefined && pf.cdAmount !== null) {
+                        paymentCd += Number(pf.cdAmount || 0);
+                    } else if (payment.cdAmount && totalPaidForInPayment > 0) {
+                        const proportion = Number(pf.amount || 0) / totalPaidForInPayment;
+                        paymentCd += Math.round(Number(payment.cdAmount || 0) * proportion * 100) / 100;
+                    }
+                });
+            } else if (payment.cdAmount) {
+                paymentCd = Number(payment.cdAmount || 0);
+            }
+            return sum + paymentCd;
+        }, 0);
+        
         // Breakdown supplier payments by type
         const supplierPaymentRegular = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor !== 'Outsider').reduce((sum, item) => sum + item.amount, 0);
         const outsiderRTGS = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor === 'Outsider').reduce((sum, item) => sum + item.amount, 0);
         const expenseForSuppliers = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
         
         const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
-        const currentTotalExpense = expenseFromEntries + expenseForSuppliers;
+        const currentTotalExpense = expenseFromEntries + expenseForSuppliers + cdGiven;
 
         return {
             totalIncome: currentTotalIncome,
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
             totalCdReceived: cdReceived,
+            totalCdGiven: cdGiven,
             expenseBreakdown: {
                 supplierPayment: supplierPaymentRegular,
                 expenses: expenseFromEntries,
                 outsiderRTGS: outsiderRTGS,
+                cdGiven: cdGiven,
             },
             incomeBreakdown: {
                 incomeEntries: incomeFromEntries,
@@ -309,13 +352,21 @@ export default function DashboardClient() {
             const permanent = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
             const seasonal = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
             const supplier = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
-            return [{ name: 'Permanent', value: permanent }, { name: 'Seasonal', value: seasonal }, { name: 'Supplier Payments', value: supplier }];
+            return [
+                { name: 'Permanent', value: permanent }, 
+                { name: 'Seasonal', value: seasonal }, 
+                { name: 'Supplier Payments', value: supplier },
+                { name: 'CD Given', value: totalCdGiven }
+            ];
         }
         if (level1 === 'Income') {
              const fromSales = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
              const byCategory = groupDataByField(filteredData.filteredIncomes, 'category');
-             const salesData = { name: 'From Sales', value: fromSales };
-             return [salesData, ...byCategory];
+             return [
+                 { name: 'From Sales', value: fromSales }, 
+                 { name: 'CD Received', value: totalCdReceived },
+                 ...byCategory
+             ];
         }
         return [];
     }, [level1, filteredData, groupDataByField]);
@@ -443,32 +494,189 @@ export default function DashboardClient() {
         return crumbs;
     }, [level1, level2, level3]);
     
+    const forensicData = useMemo(() => {
+        if (!activeForensicView) return null;
+
+        let title = "";
+        let data: LedgerEntry[] = [];
+        let icon = <Activity size={24} />;
+        let summary = { inLabel: 'Credit', outLabel: 'Debit', netLabel: 'Balance' };
+
+        if (activeForensicView === 'INCOME') {
+            title = "Total Income";
+            icon = <TrendingUp size={24} />;
+            summary = { inLabel: 'Total Income', outLabel: 'Reversals', netLabel: 'Net Income' };
+            data = [
+                ...filteredData.filteredIncomes.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: 0, credit: t.amount, type: 'Income Entry' })),
+                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
+                ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD from ${p.supplierName}`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD Received' }))
+            ];
+        } else if (activeForensicView === 'EXPENSE') {
+            title = "Total Expense";
+            icon = <TrendingDown size={24} />;
+            summary = { inLabel: 'Refunds', outLabel: 'Total Expense', netLabel: 'Net Expense' };
+            data = [
+                ...filteredData.filteredExpenses.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: t.amount, credit: 0, type: 'Expense Entry' })),
+                ...filteredData.filteredSupplierPayments.map(p => ({ date: p.date, particulars: `Payment to ${p.supplierName}`, id: p.paymentId || 'SP', debit: p.amount, credit: 0, type: 'Supplier Payment' })),
+                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${p.customerName}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
+            ];
+        } else if (activeForensicView === 'PROFIT') {
+            title = "Net Profit/Loss";
+            icon = <DollarSign size={24} />;
+            summary = { inLabel: 'Total Income', outLabel: 'Total Expense', netLabel: 'Net Profit' };
+            const incomeData = [
+                ...filteredData.filteredIncomes.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: 0, credit: t.amount, type: 'Income' })),
+                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
+                ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD Received`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD' }))
+            ];
+            const expenseData = [
+                ...filteredData.filteredExpenses.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: t.amount, credit: 0, type: 'Expense' })),
+                ...filteredData.filteredSupplierPayments.map(p => ({ date: p.date, particulars: `Payment to ${p.supplierName}`, id: p.paymentId || 'SP', debit: p.amount, credit: 0, type: 'Supplier Payment' })),
+                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD Given`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD' }))
+            ];
+            data = [...incomeData, ...expenseData];
+        } else if (activeForensicView === 'CD') {
+            title = "Cash Discount (CD)";
+            icon = <HandCoins size={24} />;
+            summary = { inLabel: 'CD Received', outLabel: 'CD Given', netLabel: 'Net CD' };
+            data = [
+                ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD from ${p.supplierName}`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD Received' })),
+                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${p.customerName}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
+            ];
+        } else if (activeForensicView === 'DUES') {
+            title = "Supplier Dues Ledger";
+            icon = <Users size={24} />;
+            summary = { inLabel: 'Dues Paid', outLabel: 'Dues Created', netLabel: 'Outstanding' };
+            // For Dues, we want a ledger of all historical outstanding events
+            data = [
+                ...filteredData.filteredSupplierPayments.map(p => ({ date: p.date, particulars: `Payment to ${p.supplierName}`, id: p.paymentId || 'SP', debit: 0, credit: p.amount + (Number(p.cdAmount) || 0), type: 'Settlement' })),
+                // We need the bills or balance creators here. 
+                // Since this is a dashboard, we'll use a simplified version: entries that created dues
+                ...globalData.suppliers.flatMap(s => (s.entries || [])).filter(e => e.date >= date.from.toISOString() && e.date <= date.to.toISOString()).map(e => ({ 
+                    date: e.date, particulars: `Purchase from ${e.supplierName}`, id: e.id, debit: e.netTotal || 0, credit: 0, type: 'Bill Created' 
+                }))
+            ];
+        } else if (activeForensicView === 'RECEIVABLES') {
+            title = "Customer Receivables Ledger";
+            icon = <Users size={24} />;
+            summary = { inLabel: 'Collected', outLabel: 'Sales Created', netLabel: 'Outstanding' };
+            data = [
+                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Collection from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount + (Number(p.cdAmount) || 0), type: 'Collection' })),
+                ...globalData.customers.flatMap(c => (c.entries || [])).filter(e => e.date >= date.from.toISOString() && e.date <= date.to.toISOString()).map(e => ({ 
+                    date: e.date, particulars: `Sale to ${e.customerName}`, id: e.id, debit: e.netTotal || 0, credit: 0, type: 'Sale Created' 
+                }))
+            ];
+        }
+
+        return { title, data, icon, summary };
+    }, [activeForensicView, filteredData, globalData, date]);
+
+    if (activeForensicView && forensicData) {
+        return (
+            <div className="p-4 sm:p-6">
+                <ForensicAccountLedger 
+                    title={forensicData.title}
+                    icon={forensicData.icon}
+                    data={forensicData.data}
+                    summary={forensicData.summary}
+                    onBack={() => setActiveForensicView(null)}
+                />
+            </div>
+        );
+    }
+
     return (
         <ErrorBoundary>
             <div className="space-y-6">
                 <DashboardFilters date={date} setDate={setDate} />
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <StatCard 
-                    title="Total Income" 
-                    value={formatCurrency(totalIncome)} 
-                    icon={<TrendingUp />} 
-                    colorClass="text-green-500" 
-                    isLoading={isLoading}
-                    description={`Income Entries: ${formatCurrency(incomeBreakdown.incomeEntries)} | Customer Payments: ${formatCurrency(incomeBreakdown.customerPayments)} | CD Received: ${formatCurrency(incomeBreakdown.cdReceived)}`}
-                />
-                <StatCard 
-                    title="Total Expense" 
-                    value={formatCurrency(totalExpense)} 
-                    icon={<TrendingDown />} 
-                    colorClass="text-red-500" 
-                    isLoading={isLoading}
-                    description={`Supplier: ${formatCurrency(expenseBreakdown.supplierPayment)} | Expense: ${formatCurrency(expenseBreakdown.expenses)} | Outsider: ${formatCurrency(expenseBreakdown.outsiderRTGS)}`}
-                />
-                <StatCard title="Net Profit/Loss" value={formatCurrency(netProfit)} icon={<DollarSign />} colorClass={netProfit >= 0 ? "text-green-500" : "text-red-500"} isLoading={isLoading}/>
-                <StatCard title="Total CD Received" value={formatCurrency(totalCdReceived)} icon={<HandCoins />} colorClass="text-blue-500" isLoading={isLoading}/>
-                <StatCard title="Supplier Dues" value={formatCurrency(totalSupplierDues)} icon={<Users />} colorClass="text-amber-500" isLoading={isLoading}/>
-                <StatCard title="Customer Receivables" value={formatCurrency(totalCustomerReceivables)} icon={<Users />} colorClass="text-blue-500" isLoading={isLoading}/>
+            <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                <div 
+                    onClick={() => setActiveForensicView('INCOME')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Total Income" 
+                        value={formatCurrency(totalIncome)} 
+                        icon={<TrendingUp />} 
+                        colorClass="text-green-500" 
+                        isLoading={isLoading}
+                        description={`Entries: ${formatCurrency(incomeBreakdown.incomeEntries)} | Payments: ${formatCurrency(incomeBreakdown.customerPayments)} | CD: ${formatCurrency(incomeBreakdown.cdReceived)}`}
+                    />
+                </div>
+
+                <div 
+                    onClick={() => setActiveForensicView('EXPENSE')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Total Expense" 
+                        value={formatCurrency(totalExpense)} 
+                        icon={<TrendingDown />} 
+                        colorClass="text-red-500" 
+                        isLoading={isLoading}
+                        description={`Supplier: ${formatCurrency(expenseBreakdown.supplierPayment)} | Expense: ${formatCurrency(expenseBreakdown.expenses)} | CD: ${formatCurrency(expenseBreakdown.cdGiven)}`}
+                    />
+                </div>
+
+                <div 
+                    onClick={() => setActiveForensicView('PROFIT')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Net Profit/Loss" 
+                        value={formatCurrency(netProfit)} 
+                        icon={<DollarSign />} 
+                        colorClass={netProfit >= 0 ? "text-green-500" : "text-red-500"} 
+                        isLoading={isLoading}
+                    />
+                </div>
+
+                <div 
+                    onClick={() => setActiveForensicView('CD')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Net Cash Discount" 
+                        value={formatCurrency(totalCdReceived - totalCdGiven)} 
+                        icon={<HandCoins />} 
+                        colorClass={(totalCdReceived - totalCdGiven) >= 0 ? "text-emerald-500" : "text-red-500"} 
+                        isLoading={isLoading}
+                        description={`Rec: ${formatCurrency(totalCdReceived)} | Giv: ${formatCurrency(totalCdGiven)}`}
+                    />
+                </div>
+
+                <div 
+                    onClick={() => setActiveForensicView('DUES')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Supplier Dues" 
+                        value={formatCurrency(totalSupplierDues)} 
+                        icon={<Users />} 
+                        colorClass="text-amber-500" 
+                        isLoading={isLoading}
+                    />
+                </div>
+
+                <div 
+                    onClick={() => setActiveForensicView('RECEIVABLES')}
+                    className="min-w-0 h-full flex items-stretch cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <StatCard 
+                        className="w-full h-full"
+                        title="Customer Receivables" 
+                        value={formatCurrency(totalCustomerReceivables)} 
+                        icon={<Users />} 
+                        colorClass="text-blue-500" 
+                        isLoading={isLoading}
+                    />
+                </div>
             </div>
 
             <DashboardCharts

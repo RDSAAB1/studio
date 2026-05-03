@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { printHtmlContent } from "@/lib/electron-print";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowLeftRight } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import { useReportCalculations } from './hooks/use-report-calculations';
 import { generateReportHtml } from './utils/print-utils';
@@ -19,10 +20,14 @@ import { LiquidityAuditTable } from './components/liquidity-audit-table';
 import { FinancialDistributionLedger } from './components/financial-distribution-ledger';
 import { ExecutiveOverviewDashboard } from './components/executive-overview-dashboard';
 import { TransactionTrail, ViewMode } from './components/transaction-trail';
+import { CashContraTrail } from './components/cash-contra-trail';
 import { ParallelAuditLedger } from './components/parallel-audit-ledger';
 import { NetResultSection } from './components/internal-cards';
 import { VarietyBreakdownTable } from './components/variety-breakdown-table';
+import { VarietySalesTable } from './components/variety-sales-table';
+import { StockAvailabilityTable } from './components/stock-availability-table';
 import { ProcessingOverlay } from '@/components/ui/processing-overlay';
+import { AccountLedgerView } from './components/account-ledger-view';
 
 export default function DailyBusinessReport() {
     const globalData = useGlobalData();
@@ -30,6 +35,7 @@ export default function DailyBusinessReport() {
     const [endDate, setEndDate] = useState<Date>(new Date());
     const [loans, setLoans] = useState<Loan[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('DATE_WISE');
+    const [contraViewMode, setContraViewMode] = useState<ViewMode>('DATE_WISE');
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, () => {});
@@ -37,7 +43,24 @@ export default function DailyBusinessReport() {
     }, []);
 
     const [isCalculating, setIsCalculating] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<{ id: string, name: string, accountNumber?: string } | null>(null);
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const reportData = useReportCalculations(startDate, endDate, globalData, loans);
+
+    // Auto-select account from URL (e.g., from Dashboard CD card)
+    useEffect(() => {
+        const accountId = searchParams.get('account');
+        if (accountId === 'CD' && !selectedAccount) {
+            setSelectedAccount({ id: 'CD', name: 'CD (Discounts)' });
+            
+            // Optional: Clean up URL after picking up the parameter
+            const newParams = new URLSearchParams(searchParams.toString());
+            newParams.delete('account');
+            const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, [searchParams, selectedAccount]);
 
     // Trigger loading effect when dates change
     useEffect(() => {
@@ -105,6 +128,7 @@ export default function DailyBusinessReport() {
         }
     };
 
+
     if (!reportData) return (
         <div className="h-screen flex items-center justify-center bg-slate-50">
             <div className="flex flex-col items-center gap-4">
@@ -114,8 +138,47 @@ export default function DailyBusinessReport() {
         </div>
     );
 
+    if (selectedAccount) {
+        return (
+            <div className="p-6 w-full max-w-[98%] mx-auto space-y-6 animate-in slide-in-from-right-4 duration-500">
+                <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl text-white shadow-xl">
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setSelectedAccount(null)}
+                            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                        >
+                            <ArrowLeftRight className="rotate-180" />
+                        </button>
+                        <div>
+                            <h2 className="text-xl font-black uppercase tracking-tight leading-none">
+                                {selectedAccount.name}
+                                {selectedAccount.accountNumber && <span className="ml-3 text-indigo-400 font-mono text-sm opacity-80">[{selectedAccount.accountNumber}]</span>}
+                            </h2>
+                            <p className="text-slate-400 text-xs mt-1 font-bold">DETAILED TRANSACTION AUDIT LEDGER</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                         <button 
+                            onClick={() => setSelectedAccount(null)}
+                            className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-black transition-all border border-white/5"
+                        >
+                            RETURN TO DASHBOARD
+                        </button>
+                    </div>
+                </div>
+
+                <AccountLedgerView 
+                    accountName={selectedAccount.name} 
+                    accountNumber={selectedAccount.accountNumber}
+                    ledgerData={reportData.accountLedgers[selectedAccount.id] || []} 
+                    onBack={() => setSelectedAccount(null)}
+                />
+            </div>
+        );
+    }
+
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20 relative">
+        <div className="p-6 w-full max-w-[98%] mx-auto space-y-8 animate-in fade-in duration-500 pb-20 relative">
             <ProcessingOverlay 
                 show={isCalculating} 
                 title="360° Audit Engine"
@@ -128,14 +191,24 @@ export default function DailyBusinessReport() {
                 setIsCalculating={setIsCalculating}
             />
 
-            <LiquidityAuditTable reportData={reportData} globalData={globalData} />
+            <LiquidityAuditTable 
+                reportData={reportData} 
+                globalData={globalData} 
+                onAccountSelect={setSelectedAccount}
+            />
 
             <FinancialDistributionLedger reportData={reportData} startDate={startDate} endDate={endDate} />
             
+            <StockAvailabilityTable reportData={reportData} />
+
             <VarietyBreakdownTable reportData={reportData} />
+
+            <VarietySalesTable reportData={reportData} />
 
 
             <TransactionTrail reportData={reportData} viewMode={viewMode} setViewMode={setViewMode} />
+            
+            <CashContraTrail reportData={reportData} viewMode={contraViewMode} setViewMode={setContraViewMode} />
 
             <ParallelAuditLedger reportData={reportData} />
 

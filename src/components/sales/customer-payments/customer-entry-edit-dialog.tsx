@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FormProvider } from "react-hook-form";
@@ -543,7 +543,10 @@ export const CustomerEntryEditDialog: React.FC<CustomerEntryEditDialogProps> = (
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] flex flex-col p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">

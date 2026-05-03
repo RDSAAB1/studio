@@ -651,7 +651,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
         } else if (currentSortOrder === 'outstanding') {
           return (b.totalOutstanding || 0) - (a.totalOutstanding || 0); // Highest outstanding first
         } else if (currentSortOrder === 'netAmount') {
-          return (b.totalAmount || 0) - (a.totalAmount || 0); // Highest net amount first
+          return (b.totalOriginalAmount || 0) - (a.totalOriginalAmount || 0); // Highest net amount first
         }
         return 0;
       });
@@ -664,7 +664,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
       if (printWindow) {
         printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.focus();
+        printWindow?.focus();
         setTimeout(() => {
           printWindow.print();
         }, 500);

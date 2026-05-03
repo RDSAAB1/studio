@@ -343,7 +343,7 @@ export default function SimpleSupplierEntryAllFields() {
         setTimeout(() => {
             // Try to focus the first input field
             if (firstInputRef.current) {
-                firstInputRef.current.focus();
+                firstInputRef.current?.focus();
                 firstInputRef.current.select(); // Select text for easy editing
                 firstInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } else if (formRef.current) {
@@ -477,7 +477,8 @@ export default function SimpleSupplierEntryAllFields() {
                                                 ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement | HTMLSelectElement)[];
                                                 const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
                                                 if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-                                                    formElements[currentElementIndex + 1].focus();
+                                                    const nextEl = formElements[currentElementIndex + 1];
+                                                    nextEl?.focus();
                                                 }
                                             }
                                         }}

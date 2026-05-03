@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface StatCardProps {
     title: string;
@@ -9,10 +10,12 @@ interface StatCardProps {
     colorClass?: string;
     isLoading?: boolean;
     description?: string;
+    className?: string;
 }
 
-export const StatCard = ({ title, value, icon, colorClass, isLoading, description }: StatCardProps) => (
-    <Card className="shadow-none border sm:shadow-sm transition-all duration-300">
+export const StatCard = ({ title, value, icon, colorClass, isLoading, description, className }: StatCardProps) => (
+    <Card className={cn("shadow-none border sm:shadow-sm transition-all duration-300 flex flex-col", className)}>
+
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2.5 min-[400px]:p-3 sm:px-6 sm:pt-6 pb-1 sm:pb-2">
             <CardTitle className="text-[10px] min-[400px]:text-xs sm:text-sm font-bold sm:font-medium tracking-tight truncate flex-1">{title}</CardTitle>
             <div className="text-muted-foreground scale-[0.65] min-[400px]:scale-[0.8] sm:scale-100 flex-shrink-0 ml-1">

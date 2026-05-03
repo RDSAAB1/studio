@@ -70,10 +70,16 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
                         <div className="p-4 hover:bg-slate-50 transition-colors flex flex-col justify-between">
                             <span className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><TrendingDown size={10} className="text-red-500"/> Expenses</span>
                             <span className="text-base font-black text-red-600">{formatCurrency(reportData.distribution.expenses)}</span>
+                            {reportData.outflow.cdGiven > 0 && (
+                                <span className="text-[9px] font-medium text-slate-400 mt-1">Incl. CD: {formatCurrency(reportData.outflow.cdGiven)}</span>
+                            )}
                         </div>
                         <div className="p-4 hover:bg-slate-50 transition-colors flex flex-col justify-between">
                             <span className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><TrendingUp size={10} className="text-emerald-500"/> Incomes</span>
                             <span className="text-base font-black text-emerald-600">{formatCurrency(reportData.distribution.incomes)}</span>
+                            {reportData.inflow.cdReceived > 0 && (
+                                <span className="text-[9px] font-medium text-slate-400 mt-1">Incl. CD: {formatCurrency(reportData.inflow.cdReceived)}</span>
+                            )}
                         </div>
                         <div className="p-4 hover:bg-slate-50 transition-colors flex flex-col justify-between bg-slate-50/50">
                             <span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Gov Distribution</span>

@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { addBank, addBankBranch, deleteBankBranch, updateBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
 import { Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -22,14 +22,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import SupplierBankAccountsPage from '@/app/sales/supplier-bank-accounts/page';
 import { toTitleCase } from '@/lib/utils';
+import { memo } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useGlobalData } from '@/contexts/global-data-context';
 
 
 export default function BankManagementPage() {
     const { toast } = useToast();
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [branches, setBranches] = useState<BankBranch[]>([]);
-    const [loading, setLoading] = useState(true);
-
+    const globalData = useGlobalData();
+    const banks = globalData.banks;
+    const branches = globalData.bankBranches;
+    
     const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
     const [newBankName, setNewBankName] = useState('');
 
@@ -38,37 +41,72 @@ export default function BankManagementPage() {
     
     const [filterBank, setFilterBank] = useState<string | null>('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-    useEffect(() => {
-        const unsubBanks = getBanksRealtime(setBanks, () => {});
-        const unsubBranches = getBankBranchesRealtime(setBranches, () => {});
-
-        return () => {
-            unsubBanks();
-            unsubBranches();
-        }
-    }, []);
-
-    useEffect(() => {
-        if(banks !== undefined && branches !== undefined) {
-            setLoading(false);
-        }
-    }, [banks, branches]);
+    // No local loading state needed, handled by global context availability
+    const loading = false;
 
     const bankOptions = useMemo(() => [
         { value: 'all', label: 'All Banks' },
-        ...Array.from(new Set(banks.map(bank => bank.name || ''))).filter(Boolean).map(name => ({ value: name, label: name }))
+        // Deduplicate by name - same name ke do banks honge to ek hi dikhega
+        ...Array.from(new Map(banks.map(bank => [bank.name?.trim().toUpperCase() || '', bank])).values())
+            .filter(bank => bank.name)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(bank => ({ value: bank.name.trim().toUpperCase(), label: bank.name }))
     ], [banks]);
+
+    const bankOptionsForSelection = useMemo(() => 
+        Array.from(new Map(banks.map(bank => [bank.name?.trim().toUpperCase() || '', bank])).values())
+            .filter(bank => bank.name)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(bank => ({ value: bank.name.trim().toUpperCase(), label: bank.name })),
+    [banks]);
+
+    // Detect duplicate bank names (same name, different ID) - for warning
+    const duplicateBankNames = useMemo(() => {
+        const nameCount = new Map<string, number>();
+        banks.forEach(b => {
+            const n = b.name?.trim().toUpperCase() || '';
+            if (n) nameCount.set(n, (nameCount.get(n) || 0) + 1);
+        });
+        return Array.from(nameCount.entries()).filter(([, count]) => count > 1).map(([name]) => name);
+    }, [banks]);
 
     const filteredBranches = useMemo(() => {
         return branches.filter(branch => {
-            const bankMatch = !filterBank || filterBank === 'all' || branch.bankName === filterBank;
-            const searchMatch = !searchTerm || 
-                branch.branchName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                branch.ifscCode.toLowerCase().includes(searchTerm.toLowerCase());
+            // ✅ Case-insensitive bank match - purani entries (case/space mismatch) bhi dikhein
+            const filterBankUpper = filterBank?.trim().toUpperCase();
+            const branchBankUpper = branch.bankName?.trim().toUpperCase();
+            const bankMatch = !filterBank || filterBank === 'all' || branchBankUpper === filterBankUpper;
+            const searchMatch = !debouncedSearchTerm || 
+                branch.branchName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || 
+                branch.ifscCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
             return bankMatch && searchMatch;
         });
-    }, [branches, filterBank, searchTerm]);
+    }, [branches, filterBank, debouncedSearchTerm]);
+
+    const BranchTableRow = memo(({ branch, onEdit, onDelete }: { 
+        branch: BankBranch, 
+        onEdit: (branch: BankBranch) => void, 
+        onDelete: (id: string) => void 
+    }) => (
+        <TableRow key={branch.id}>
+            <TableCell className="truncate">{branch.bankName}</TableCell>
+            <TableCell className="truncate">{branch.branchName}</TableCell>
+            <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
+            <TableCell className="text-right">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(branch)} aria-label={`Edit branch ${branch.branchName}`}><Edit className="h-4 w-4" /></Button>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Delete branch ${branch.branchName}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </TableCell>
+        </TableRow>
+    ));
+    BranchTableRow.displayName = 'BranchTableRow';
 
     const handleAddBank = async () => {
         if (!newBankName.trim()) return;
@@ -285,21 +323,12 @@ export default function BankManagementPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {filteredBranches.map(branch => (
-                                            <TableRow key={branch.id}>
-                                                <TableCell className="truncate">{branch.bankName}</TableCell>
-                                                <TableCell className="truncate">{branch.branchName}</TableCell>
-                                                <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }} aria-label={`Edit branch ${branch.branchName}`}><Edit className="h-4 w-4" /></Button>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Delete branch ${branch.branchName}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
-                                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </TableCell>
-                                            </TableRow>
+                                            <BranchTableRow 
+                                                key={branch.id} 
+                                                branch={branch} 
+                                                onEdit={(b) => { setCurrentBranch(b); setIsBranchDialogOpen(true); }}
+                                                onDelete={handleDeleteBranch}
+                                            />
                                         ))}
                                     </TableBody>
                                 </Table>
@@ -315,7 +344,7 @@ export default function BankManagementPage() {
             </Tabs>
             
             <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader><DialogTitle>Add New Bank</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-2">
                         <Label>Bank Name</Label>
@@ -335,29 +364,23 @@ export default function BankManagementPage() {
             </Dialog>
 
             <Dialog open={isBranchDialogOpen} onOpenChange={setIsBranchDialogOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader><DialogTitle>{currentBranch.id ? 'Edit' : 'Add'} Branch</DialogTitle></DialogHeader>
                      <div className="py-4 space-y-4">
                         <div className="space-y-1">
                             <Label>Bank</Label>
-                            <Select
-                                value={currentBranch.bankName || '__placeholder__'}
-                                onValueChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value === '__placeholder__' ? '' : value}))}
-                            >
-                                <SelectTrigger className="h-9 w-full">
-                                    <SelectValue placeholder="Select a bank" />
-                                </SelectTrigger>
-                                <SelectContent sideOffset={4}>
-                                    <SelectItem value="__placeholder__">Select a bank</SelectItem>
-                                    {banks.map(bank => (
-                                        <SelectItem key={bank.id} value={bank.name}>
-                                            {bank.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <CustomDropdown
+                                options={bankOptionsForSelection}
+                                value={currentBranch.bankName?.trim().toUpperCase() || ''}
+                                onChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value || ''}))}
+                                placeholder="Select a bank"
+                                inputClassName="h-9 w-full"
+                            />
                             {banks.length === 0 && (
                                 <p className="text-xs text-muted-foreground">Add a bank first from &quot;Add Bank&quot; button.</p>
+                            )}
+                            {duplicateBankNames.length > 0 && currentBranch.bankName && duplicateBankNames.includes(currentBranch.bankName.trim().toUpperCase()) && (
+                                <p className="text-xs text-amber-500">⚠️ Multiple entries found for this bank name. Branch will be saved under the first matching entry.</p>
                             )}
                         </div>
                         <div className="space-y-1">

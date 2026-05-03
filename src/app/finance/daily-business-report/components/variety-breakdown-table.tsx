@@ -33,22 +33,22 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
 
     return (
         <Card className="border-none shadow-lg bg-white overflow-hidden rounded-lg">
-            <CardHeader className="bg-[#1e293b] py-1.5 px-3 text-white">
+            <CardHeader className="bg-[#1e293b] py-3 px-6 text-white">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                        <Package size={12} className="text-indigo-400" /> B: Variety Audit Ledger
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-3">
+                        <Package size={18} className="text-indigo-400" /> B: VARIETY AUDIT LEDGER
                     </CardTitle>
-                    <span className="text-[8px] font-black opacity-50 uppercase bg-white/10 px-1.5 py-0.5 rounded">Compact Mode</span>
+                    <span className="text-[10px] font-black opacity-60 uppercase bg-white/10 px-3 py-1 rounded-full italic tracking-wider">Purchase Audit</span>
                 </div>
             </CardHeader>
-            <div className="overflow-x-auto no-scrollbar">
-                <Table className="border-collapse">
-                    <TableHeader className="bg-slate-100 border-b border-slate-300">
-                        <TableRow className="h-6 min-h-0 border-none">
-                            <TableHead className="w-[80px] text-[8px] font-black text-slate-500 uppercase border-r border-slate-200 sticky left-0 z-30 bg-slate-100 text-center p-0 h-6 min-h-0">Var.</TableHead>
-                            <TableHead className="w-[85px] text-[8px] font-black text-slate-500 uppercase border-r border-slate-200 sticky left-[80px] z-30 bg-slate-100 text-center p-0 h-6 min-h-0">Date</TableHead>
+            <div className="overflow-x-auto overflow-y-auto no-scrollbar max-h-[350px] scroll-smooth relative">
+                <Table className="border-collapse relative">
+                    <TableHeader className="bg-slate-100 border-b border-slate-300 sticky top-0 z-[60] shadow-sm">
+                        <TableRow className="h-10 min-h-0 border-none">
+                            <TableHead className="w-[80px] text-[10px] font-black text-slate-500 uppercase border-r border-slate-200 sticky left-0 z-30 bg-slate-100 text-center p-0 h-10">Var.</TableHead>
+                            <TableHead className="w-[85px] text-[10px] font-black text-slate-500 uppercase border-r border-slate-200 sticky left-[80px] z-30 bg-slate-100 text-center p-0 h-10">Date</TableHead>
                             {METRICS.map(m => (
-                                <TableHead key={m.key} className="text-center text-[8px] font-black text-slate-700 border-r border-slate-200 uppercase px-1 whitespace-nowrap h-6 min-h-0">
+                                <TableHead key={m.key} className="text-center text-[10px] font-black text-slate-700 border-r border-slate-200 uppercase px-2 whitespace-nowrap h-10">
                                     {m.label}
                                 </TableHead>
                             ))}
@@ -87,23 +87,23 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
                                         const isAlt = dIdx % 2 !== 0;
                                         const bgClass = isAlt ? '!bg-slate-100' : '!bg-white';
                                         return (
-                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-indigo-50/50 transition-colors h-6 min-h-0 border-b border-slate-200 ${bgClass}`}>
+                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-indigo-50/50 transition-colors h-8 min-h-0 border-b border-slate-200 ${bgClass}`}>
                                             {dIdx === 0 && (
                                                 <TableCell 
                                                     rowSpan={sortedDays.length + 1} 
-                                                    className="sticky left-0 z-20 !bg-white border-r border-slate-300 font-black text-[8px] text-slate-800 uppercase p-0 text-center align-middle h-auto"
+                                                    className="sticky left-0 z-20 !bg-white border-r border-slate-300 font-black text-[10px] text-slate-800 uppercase p-0 text-center align-middle h-auto"
                                                 >
-                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-1 border-l-2 border-indigo-500 inline-block leading-none">
+                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-2 border-l-2 border-indigo-500 inline-block leading-none">
                                                         {variety}
                                                     </div>
                                                 </TableCell>
                                             )}
-                                            <TableCell className={`sticky left-[80px] z-20 border-r border-slate-200 text-[8px] font-bold text-slate-400 uppercase px-1 whitespace-nowrap text-center p-0 leading-none h-6 min-h-0 ${bgClass}`}>
+                                            <TableCell className={`sticky left-[80px] z-20 border-r border-slate-200 text-[10px] font-bold text-slate-400 uppercase px-2 whitespace-nowrap text-center p-0 leading-none h-8 min-h-0 ${bgClass}`}>
                                                 {format(new Date(day.date), 'dd MMM')}
                                             </TableCell>
                                             {METRICS.map(m => (
                                                 <TableCell key={m.key} className={cn(
-                                                    `text-center text-[9px] font-mono border-r border-slate-200/40 p-0 whitespace-nowrap leading-none h-6 min-h-0 ${bgClass}`,
+                                                    `text-center text-[11px] font-mono border-r border-slate-200/40 p-0 whitespace-nowrap leading-none h-8 min-h-0 ${bgClass}`,
                                                     m.color,
                                                     m.bold && `font-black ${isAlt ? '!bg-slate-200/80' : '!bg-slate-50'}`
                                                 )}>
@@ -112,13 +112,13 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
                                             ))}
                                         </TableRow>
                                     )})}
-                                    <TableRow className="bg-slate-200 hover:bg-slate-300 transition-colors h-7 min-h-0 border-b border-slate-400">
-                                        <TableCell className="sticky left-[80px] z-20 bg-slate-200 border-r border-slate-400 text-[10px] font-black text-indigo-900 uppercase px-1 text-center p-0 leading-none h-7 min-h-0">
+                                    <TableRow className="bg-slate-200 hover:bg-slate-300 transition-colors h-9 min-h-0 border-b border-slate-400">
+                                        <TableCell className="sticky left-[80px] z-20 bg-slate-200 border-r border-slate-400 text-[11px] font-black text-indigo-900 uppercase px-2 text-center p-0 leading-none h-9 min-h-0">
                                             TOT
                                         </TableCell>
                                         {METRICS.map(m => (
                                             <TableCell key={m.key} className={cn(
-                                                "text-center text-[10px] font-black font-mono border-r border-slate-300 p-0 whitespace-nowrap leading-none h-7 min-h-0",
+                                                "text-center text-[12px] font-black font-mono border-r border-slate-300 p-0 whitespace-nowrap leading-none h-9 min-h-0",
                                                 m.bold ? "text-indigo-950 bg-slate-300/50" : "text-slate-800"
                                             )}>
                                                 {m.format(total[m.key], total)}

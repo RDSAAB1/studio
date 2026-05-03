@@ -13,7 +13,7 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange }: BankSettingsDialogP
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="w-full max-w-5xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className="w-full max-w-5xl max-h-[85vh] flex flex-col p-0 overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
                 {/* Visually minimal header just to satisfy accessibility requirements */}
                 <DialogHeader className="sr-only">
                     <DialogTitle>Bank & Branch Management</DialogTitle>

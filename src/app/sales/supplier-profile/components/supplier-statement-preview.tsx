@@ -306,7 +306,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
             targetDocument.open();
             targetDocument.write(htmlContent);
             targetDocument.close();
-            targetWindow.focus();
+            targetWindow?.focus();
 
             if (autoPrint) {
                 targetWindow.print();

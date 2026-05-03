@@ -96,10 +96,24 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             const opening = getBalancesAtDate(subDays(day, 1));
             const closing = getBalancesAtDate(day);
 
-            const accounts = ['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map((a: any) => a.id)];
+            const accounts = ['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map((a: any) => a.id), 'CD'];
             const metrics: Record<string, any> = {};
 
             accounts.forEach(id => {
+                if (id === 'CD') {
+                    const dayCdGiven = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && !p.isDeleted).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
+                    const dayCdReceived = globalData.supplierPayments.filter((p: any) => isDay(p.date, day) && !p.isDeleted).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
+                    
+                    // CD account doesn't have a "balance" in the traditional sense, but we can show it as a flow
+                    metrics[id] = { 
+                        opening: 0, 
+                        closing: 0, 
+                        income: Math.round(dayCdReceived), 
+                        expense: Math.round(dayCdGiven) 
+                    };
+                    return;
+                }
+
                 const op = id === 'CashInHand' ? opening.cashInHand : id === 'CashAtHome' ? opening.cashAtHome : opening.bankBalances.get(id) || 0;
                 const cl = id === 'CashInHand' ? closing.cashInHand : id === 'CashAtHome' ? closing.cashAtHome : closing.bankBalances.get(id) || 0;
 
@@ -160,14 +174,24 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             const sCash = sPmts.filter((p: any) => p.receiptType === 'Cash').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
             const sRtgs = sPmts.filter((p: any) => p.receiptType === 'RTGS').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
             const gDist = sPmts.filter((p: any) => p.receiptType === 'Gov Dist').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
-            const cPmts = globalData.customerPayments.filter((p: any) => isDay(p.date) && !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
-            const exps = globalData.expenses.filter((e: any) => isDay(e.date) && !e.isInternal && !e.isDeleted).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
-            const incs = globalData.incomes.filter((i: any) => isDay(i.date) && !i.isInternal && !i.isDeleted).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+            
+            const sCdTotal = sPmts.filter((p: any) => !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0);
+            
+            const cPayments = globalData.customerPayments.filter((p: any) => isDay(p.date) && !p.isDeleted);
+            const cPmts = cPayments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
+            const cCdTotal = cPayments.reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0);
+            
+            const expsRaw = globalData.expenses.filter((e: any) => isDay(e.date) && !e.isInternal && !e.isDeleted).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
+            const incsRaw = globalData.incomes.filter((i: any) => isDay(i.date) && !i.isInternal && !i.isDeleted).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+            
+            const exps = expsRaw + cCdTotal; // Customer CD is an expense
+            const incs = incsRaw + sCdTotal; // Supplier CD is an income
+            
             const totalIncomes = incs + cPmts;
             const totalPayments = sCash + sRtgs + gDist;
             const seCash = sCash + exps;
             const netTotal = (totalPayments + exps) - totalIncomes;
-            return { date: format(day, 'dd MMM'), supplierCash: Math.round(sCash), supplierRtgs: Math.round(sRtgs), govDist: Math.round(gDist), totalPayments: Math.round(totalPayments), expenses: Math.round(exps), incomes: Math.round(totalIncomes), seCash: Math.round(seCash), netTotal: Math.round(netTotal) };
+            return { date: format(day, 'dd MMM'), supplierCash: Math.round(sCash), supplierRtgs: Math.round(sRtgs), govDist: Math.round(gDist), expenses: Math.round(exps), incomes: Math.round(totalIncomes), seCash: Math.round(seCash), netTotal: Math.round(netTotal), totalPayments: Math.round(totalPayments) };
         });
 
         const varietyDayData: Record<string, any[]> = {};
@@ -246,252 +270,333 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     const dStr = format(dDate, 'yyyy-MM-dd');
                     const daySupps = globalData.suppliers.filter((s: any) => isDay(s.date, dDate));
                     if (daySupps.length > 0) {
-                        const dTotalWt = daySupps.reduce((sum: number, p: any) => sum + (Number(p.netWeight) || 0), 0);
-                        const dTotalBags = daySupps.reduce((sum: number, p: any) => sum + (Number((p as any).bags) || 1), 0);
+                        const varietyPurchases = new Map<string, any[]>();
+                        daySupps.forEach((s: any) => {
+                            const v = s.variety || 'Unknown';
+                            if (!varietyPurchases.has(v)) varietyPurchases.set(v, []);
+                            varietyPurchases.get(v)!.push(s);
+                        });
+
+                        // OUTFLOW: Variety Account (Stock coming in / Consolidated)
+                        varietyPurchases.forEach((purchList, vName) => {
+                            const vTotalAmt = purchList.reduce((sum, s) => {
+                                return sum + (Number(s.netWeight) * Number(s.rate));
+                            }, 0);
+                            const vTotalWt = purchList.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0);
+                            const vAvgRate = vTotalWt > 0 ? (purchList.reduce((sum, s) => sum + (Number(s.netWeight) * Number(s.rate)), 0) / vTotalWt).toFixed(0) : 0;
+                            const vLab = purchList.reduce((sum, s) => sum + (Number(s.labouryAmount) || 0), 0);
+                            const vKan = purchList.reduce((sum, s) => sum + (Number(s.kanta) || 0), 0);
+
+                            if (vTotalAmt > 0) {
+                                resultArr.push({
+                                    date: dStr,
+                                    particulars: `${vName} Account | ${vTotalWt.toFixed(2)} QTL @ ₹${vAvgRate} | Lab: ₹${vLab} | Kan: ₹${vKan}`,
+                                    id: `PURCH-OUT-${vName}`,
+                                    debit: Math.round(vTotalAmt),
+                                    credit: 0,
+                                    type: `PURCH`,
+                                    priority: 2
+                                });
+                            }
+                        });
+
+                        // INFLOW: Individual Supplier Accounts (Detailed)
+                        daySupps.forEach((s: any) => {
+                            const amt = Number(s.netAmount) || (Number(s.netWeight) * Number(s.rate) - Number(s.labouryAmount) - Number(s.kanta));
+                            
+                            const sName = s.companyName || s.name || s.partyName || s.supplierName || 'Supplier';
+                            const sFatherVal = s.so || s.fatherName || s.supplierFatherName;
+                            const sAddrVal = s.address || s.parchiAddress || s.supplierAddress;
+                            const sFather = sFatherVal ? ` S/o ${sFatherVal}` : '';
+                            const sAddr = sAddrVal ? ` | ${sAddrVal}` : '';
+                            
+                            if (amt > 0) {
+                                resultArr.push({
+                                    date: dStr,
+                                    particulars: `${sName}${sFather}${sAddr} | ${Number(s.netWeight || 0).toFixed(2)} QTL @ ₹${s.rate}`,
+                                    id: `PURCH-IN-${s.id || Math.random()}`,
+                                    debit: 0,
+                                    credit: Math.round(amt),
+                                    type: `PURCH`,
+                                    priority: 2
+                                });
+                            }
+                        });
                         const dLab = daySupps.reduce((sum: number, p: any) => sum + (Number(p.labouryAmount) || 0), 0);
                         const dKan = daySupps.reduce((sum: number, p: any) => sum + (Number(p.kanta) || 0), 0);
-                        const dNetGross = daySupps.reduce((sum: number, p: any) => sum + ((Number(p.netWeight) || 0) * (Number(p.rate) || 0)), 0);
-                        const dPayableTotal = daySupps.reduce((sum: number, p: any) => sum + (Number(p.netAmount) || 0), 0);
-                        const dAvgRate = dTotalWt > 0 ? (dNetGross / dTotalWt) : 0;
-                        
-                        // Net Purchase for the ledger = Gross - Labour - Kanta
-                        const dNetPurchase = dNetGross - dLab - dKan;
-                        // Other Adjustments (CD, Karta, etc) = dNetPurchase - Actual Payable
-                        const dOtherAdj = dNetPurchase - dPayableTotal;
-
-                        daySupps.forEach((s: any) => {
-                            const qty    = Number(s.netWeight) || 0;
-                            const bags   = Number((s as any).bags) || 1;
-                            const rate   = Number(s.rate) || 0;
-                            const gross  = qty * rate;
-                            const vNameRaw = (s.variety || 'Generic').toUpperCase().trim();
-                            const supplierInfo = `${s.name} S/O ${s.fatherName || s.so || ''}${s.address ? ', ' + s.address : ''}`;
-                            
-                            resultArr.push({
-                                date: dStr,
-                                particulars: `[${s.srNo}] ${supplierInfo}::${vNameRaw} | ${qty.toFixed(2)} QTL @ ₹${rate} | Lab: ₹${s.labouryAmount || 0} | Kan: ₹${s.kanta || 0}`,
-                                id: s.id.slice(-6).toUpperCase(),
-                                debit: Math.round(gross),
-                                credit: 0,
-                                type: 'Purchase'
-                            });
+                        if (dLab > 0) resultArr.push({
+                            date: dStr, particulars: 'Sales Labour', id: 'LABR', debit: 0, credit: Math.round(dLab), type: 'Labour'
                         });
-
-                        if (dNetPurchase > 0) resultArr.push({
-                            date: dStr,
-                            particulars: `${dTotalBags} Receipts | ${dTotalWt.toFixed(2)} QTL @ ₹${dAvgRate.toFixed(2)}`,
-                            id: 'PURCH', debit: 0, credit: Math.round(dNetPurchase), type: 'Purchase',
-                            count: dTotalBags
-                        });
-
-                        if (dLab > 0) {
-                            const labList = daySupps.filter((s: any) => (Number(s.labouryAmount) || 0) > 0);
-                            let labCountTotal = 0;
-                            const labGroups = labList.reduce((acc: any, s: any) => {
-                                const amt = Number(s.labouryAmount);
-                                const wt = Number(s.netWeight) || 0;
-                                const rate = Number(s.labouryRate) || (wt > 0 ? (amt / wt) : 0);
-                                const rKey = rate.toFixed(2); 
-                                if (!acc[rKey]) acc[rKey] = { weight: 0, rate: rate, bags: 0 };
-                                acc[rKey].weight += wt;
-                                acc[rKey].bags += (Number((s as any).bags) || 1);
-                                labCountTotal += (Number((s as any).bags) || 1);
-                                return acc;
-                            }, {});
-                            const labParts = Object.values(labGroups).map((g: any) => `${g.weight.toFixed(2)} QTL @ ₹${g.rate.toFixed(2)}`);
-                            resultArr.push({
-                                date: dStr,
-                                particulars: labParts.join(' | '),
-                                id: 'LABR', debit: 0, credit: Math.round(dLab), type: 'Labour',
-                                count: labCountTotal
-                            });
-                        }
-
-                        if (dKan > 0) {
-                            const kanList = daySupps.filter((s: any) => (Number(s.kanta) || 0) > 0);
-                            let kanCountTotal = 0;
-                            const kanGroups = kanList.reduce((acc: any, s: any) => {
-                                const amt = Number(s.kanta);
-                                const bags = Number((s as any).bags) || 1;
-                                const rate = amt / bags;
-                                const rKey = rate.toFixed(0);
-                                if (!acc[rKey]) acc[rKey] = { count: 0, rate: rate };
-                                acc[rKey].count += bags;
-                                kanCountTotal += bags;
-                                return acc;
-                            }, {});
-                            const kanParts = Object.values(kanGroups).map((g: any) => `PARCHI-${g.count}@${g.rate.toFixed(0)}`);
-                            resultArr.push({
-                                date: dStr,
-                                particulars: kanParts.join(' | '),
-                                id: 'KANTA', debit: 0, credit: Math.round(dKan), type: 'Kanta',
-                                count: kanCountTotal
-                            });
-                        }
-
-                        if (Math.abs(dOtherAdj) > 1) resultArr.push({
-                            date: dStr,
-                            particulars: `P ADJUSTMENT (Deductions: CD, Karta, Rounding)`,
-                            id: 'PADJ', 
-                            debit: dOtherAdj < 0 ? Math.round(Math.abs(dOtherAdj)) : 0,
-                            credit: dOtherAdj > 0 ? Math.round(dOtherAdj) : 0, 
-                            type: 'Adjustment'
+                        if (dKan > 0) resultArr.push({
+                            date: dStr, particulars: 'Kanta Charges', id: 'KANTA', debit: 0, credit: Math.round(dKan), type: 'Kanta'
                         });
                     }
 
                     const daySales = globalData.customers.filter((c: any) => isDay(c.date, dDate));
-                    const dSalesNet = daySales.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
-                    const dSalesParchiCount = daySales.length;
                     
-                    const vLab   = daySales.reduce((s: number, p: any) => s + (Number(p.labouryAmount) || 0), 0);
-                    const vKanta = daySales.reduce((s: number, p: any) => s + (Number(p.kanta) || 0), 0);
-                    const vBagAm = daySales.reduce((s: number, p: any) => s + (Number((p as any).bagAmount || 0)), 0);
-                    const vTrans = daySales.reduce((s: number, p: any) => s + (Number((p as any).transportAmount || 0)), 0);
-                    const vOther = daySales.reduce((s: number, p: any) => s + (Number((p as any).otherCharges || 0)), 0);
-                    const vBagWt = daySales.reduce((s: number, p: any) => s + (Number((p as any).bagWeightDeductionAmount || 0)), 0);
-
-                    const dSalesNetBase = dSalesNet - (vLab + vKanta + vBagAm + vTrans + vOther + vBagWt);
-
-                    const tBags = daySales.reduce((s: number, p: any) => s + (Number((p as any).bags) || 0), 0);
-                    const tBagKgTotal = daySales.reduce((s: number, p: any) => s + ((Number((p as any).bags) || 0) * (Number((p as any).bagWeightKg) || 0)), 0);
-                    const avgBagWt = tBags > 0 ? (tBagKgTotal / tBags).toFixed(2) : '0';
-                    const tBagWtQtl = (tBagKgTotal / 100).toFixed(2);
-
-                    const dSalesWtTotal = daySales.reduce((sum: number, s: any) => sum + (Number(s.netWeight) || 0), 0);
-                    const dSalesAvgRate = dSalesWtTotal > 0 ? (dSalesNetBase / dSalesWtTotal) : 0;
-
-                    if (dSalesNetBase > 0) resultArr.push({
-                        date: dStr,
-                        particulars: `ADJUSTMENT (S Net Sales Base | ${dSalesParchiCount} parchi | ${dSalesWtTotal.toFixed(2)} QTL @ ₹${dSalesAvgRate.toFixed(2)} | Total Bags: ${tBags})`,
-                        id: 'SADJ', debit: Math.round(dSalesNetBase), credit: 0, type: 'Adjustment',
-                        count: dSalesParchiCount
-                    });
-
-                    daySales.forEach((c: any) => {
-                        const namePart = [c.name, c.companyName, c.address].filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map(x => x.trim()).join(', ');
-                        const vName = (c.variety || 'Generic').toUpperCase().trim();
-                        const qty = Number(c.netWeight) || 0;
-                        const rate = Number(c.rate) || 0;
-
-                        resultArr.push({
-                            date: c.date,
-                            particulars: `${namePart.split(',')[0]}::${vName} | ${qty.toFixed(2)} QTL @ ₹${rate}`,
-                            id: c.id.slice(-6).toUpperCase(), debit: 0, credit: Number(c.amount) || 0, type: 'Sale'
-                        });
-                    });
-
-                    const transMap = new Map<number, number>();
+                    // OUTFLOW side: Consolidated by variety
+                    const varietySales = new Map<string, any[]>();
                     daySales.forEach((s: any) => {
-                        const tr = Number((s as any).transportationRate) || 0;
-                        const wt = Number(s.weight) || 0;
-                        if (tr > 0 && wt > 0) transMap.set(tr, (transMap.get(tr) || 0) + wt);
-                    });
-                    const transDetail = Array.from(transMap.entries()).map(([r, w]) => `${w.toFixed(2)} QTL @ ₹${r}`).join(' + ');
-
-                    if (Math.round(vLab) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Labour for ${tBags} Bags)`, id: 'SLE-LAB', debit: Math.round(vLab), credit: 0, type: 'Adjustment'
-                    });
-                    if (Math.round(vKanta) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Kanta Charges)`, id: 'SLE-KN', debit: Math.round(vKanta), credit: 0, type: 'Adjustment'
-                    });
-                    if (Math.round(vBagWt) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Bag Weight Adj | ${tBags} Bags @ ~${avgBagWt}kg | Total ${tBagWtQtl} QTL reduced)`, id: 'SLE-BW', debit: Math.round(vBagWt), credit: 0, type: 'Adjustment'
-                    });
-                    if (Math.round(vBagAm) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Bag Charges | ${tBags} Bags)`, id: 'SLE-BG', debit: Math.round(vBagAm), credit: 0, type: 'Adjustment'
-                    });
-                    if (Math.round(vTrans) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Transport/Freight | ${transDetail})`, id: 'SLE-TR', debit: Math.round(vTrans), credit: 0, type: 'Adjustment'
-                    });
-                    if (Math.round(vOther) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Misc Income)`, id: 'SLE-OT', debit: Math.round(vOther), credit: 0, type: 'Adjustment'
+                        const v = s.variety || 'Unknown';
+                        if (!varietySales.has(v)) varietySales.set(v, []);
+                        varietySales.get(v)!.push(s);
                     });
 
-                    const totalDebitTracked = dSalesNetBase + vLab + vKanta + vBagAm + vTrans + vOther + vBagWt;
-                    const diff = dSalesNet - totalDebitTracked;
-                    if (Math.round(diff) > 1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Rounding Surplus)`, id: 'SLE-RS', debit: Math.round(diff), credit: 0, type: 'Adjustment'
+                    varietySales.forEach((salesList, vName) => {
+                        // Variety outflow = Gross (netWeight × rate) — stock leaving at base price
+                        const vTotalAmt = salesList.reduce((sum, s) => sum + (Number(s.netWeight) * Number(s.rate)), 0);
+                        const vTotalWt = salesList.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0);
+                        const vAvgRate = vTotalWt > 0 ? (vTotalAmt / vTotalWt).toFixed(0) : 0;
+                        if (vTotalAmt > 0) {
+                            resultArr.push({
+                                date: dStr,
+                                particulars: `${vName} Account | ${vTotalWt.toFixed(2)} QTL @ ₹${vAvgRate}`,
+                                id: `SALE-OUT-${vName}`,
+                                debit: Math.round(vTotalAmt),
+                                credit: 0,
+                                type: `Sale`,
+                                priority: 2
+                            });
+                        }
                     });
-                    else if (Math.round(diff) < -1) resultArr.push({
-                        date: dStr, particulars: `ADJUSTMENT (Sales Rounding Loss)`, id: 'SLE-RL', debit: 0, credit: Math.round(Math.abs(diff)), type: 'Adjustment'
+
+                    // INFLOW side: Individual by customer — use netWeight × rate (matches particulars)
+                    daySales.forEach((s: any) => {
+                        const netWt = Number(s.netWeight) || 0;
+                        const rate  = Number(s.rate) || 0;
+                        const amt   = Math.round(netWt * rate);
+                        const cName = s.companyName || s.name || 'Customer';
+                        const cFather = s.so ? ` S/o ${s.so}` : '';
+                        const cAddr = s.address ? ` | ${s.address}` : '';
+                        if (amt > 0) {
+                            resultArr.push({
+                                date: dStr,
+                                particulars: `${cName}${cFather}${cAddr} | ${netWt.toFixed(2)} QTL @ ₹${rate}`,
+                                id: `SALE-IN-${s.id || Math.random()}`,
+                                debit: 0,
+                                credit: amt,
+                                type: `Sale`,
+                                priority: 2
+                            });
+                        }
                     });
                 });
                 return resultArr;
             })(),
             ...globalData.supplierPayments.filter((p: any) => periodScope(p.date)).map((p: any) => {
-                const method = p.receiptType || p.paymentMethod || 'Cash';
-                const ref = p.utrNo || p.checkNo ? ` | Ref: ${p.utrNo || p.checkNo}` : '';
-                const LinkedParchi = (p.paidFor as any[] || []).map((pf: any) => pf.srNo).filter(Boolean).join(', ') || p.parchiNo || '';
-                const linked = LinkedParchi ? `[${LinkedParchi}] ` : '';
-                       // Lookup supplier details (Father Name & Address) using Parchi Number primarily
-                const pNameNorm = (p.supplierName || '').trim().toUpperCase();
-                const parchiList = (p.paidFor as any[] || []).map((pf: any) => pf.srNo).filter(Boolean);
-                const firstParchi = parchiList[0] || p.parchiNo;
-
-                const sMatch = (globalData.suppliers || []).find((s: any) => 
-                    (firstParchi && String(s.srNo) === String(firstParchi)) ||
-                    (s.id && p.supplierId && s.id === p.supplierId) || 
-                    ((s.name || '').trim().toUpperCase() === pNameNorm)
-                ) || (globalData.vendors || []).find((v: any) => 
-                    (v.id && p.supplierId && v.id === p.supplierId) || 
-                    ((v.name || '').trim().toUpperCase() === pNameNorm)
+                const supplier = globalData.suppliers.find((s: any) => 
+                    String(s.id) === String(p.supplierId) || 
+                    String(s.srNo) === String(p.supplierId) ||
+                    (p.parchiNo && (String(s.srNo) === String(p.parchiNo) || String(s.parchiNo) === String(p.parchiNo)))
                 );
                 
-                const sDetails = sMatch ? ` S/O ${sMatch.fatherName || sMatch.so || ''}${sMatch.address ? ', ' + sMatch.address : ''}` : '';
+                const sName = supplier?.companyName || supplier?.name || p.supplierName || p.partyName || p.payee || 'Supplier';
+                const sFatherVal = supplier?.so || supplier?.fatherName || p.supplierFatherName || p.fatherName;
+                const sAddrVal = supplier?.address || supplier?.parchiAddress || p.supplierAddress || p.address;
+                const sFather = sFatherVal ? ` S/o ${sFatherVal}` : '';
+                const sAddr = sAddrVal ? ` | ${sAddrVal}` : '';
+                
+                const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === p.bankAccountId);
+                const methodStr = bankMatch ? bankMatch.bankName : (p.receiptType || 'Cash');
+                
+                const refParts = [];
+                if (p.paymentId) refParts.push(`ID: ${p.paymentId}`);
+                if (p.parchiNo) refParts.push(`Parchi: ${p.parchiNo}`);
+                if (p.utrNo) refParts.push(`UTR: ${p.utrNo}`);
+                
+                const shortMethod = methodStr.split(' ')[0].toUpperCase();
                 
                 return {
                     date: p.date,
-                    particulars: `${linked}${sMatch?.name || p.supplierName || 'Supplier'}${sDetails}${ref}`,
-                    id: p.paymentId || 'PAY', debit: Number(p.amount) || 0, credit: 0, type: `Supplier Payment::${resolveMethod(method)}`
+                    particulars: `${sName}${sFather}${sAddr}${refParts.length > 0 ? ' | ' + refParts.join(' | ') : ''}`,
+                    id: p.paymentId || 'PAY', debit: Number(p.amount) || 0, credit: 0, 
+                    type: `SP-${shortMethod || 'CASH'}`,
+                    priority: 3,
+                    accountId: p.bankAccountId || (p.receiptType === 'Cash' ? 'CashInHand' : null),
+                    checkNo: p.checkNo
                 };
             }),
             ...globalData.customerPayments.filter((p: any) => periodScope(p.date)).map((p: any) => {
-                const method = p.receiptType || p.paymentMethod || 'Cash';
-                const ref = (p as any).utrNo || (p as any).checkNo ? ` | Ref: ${(p as any).utrNo || (p as any).checkNo}` : '';
-                const customer = globalData.customers.find((c: any) => c.id === p.customerId);
-                const cName = customer ? (customer.companyName || customer.name || 'Customer') : 'Customer';
+                // Find the linked sales parchi to get the actual customer name
+                const refNo = p.receiptNo || p.parchiNo || (p.paidFor?.[0]?.srNo);
+                
+                // Handle comma-separated multiple parchi numbers (e.g., "C001, C002")
+                const refArray = typeof refNo === 'string' 
+                    ? refNo.split(',').map(s => s.trim()).filter(Boolean) 
+                    : (refNo ? [String(refNo)] : []);
+
+                const linkedParchi = globalData.customers.find((c: any) => 
+                    refArray.some(ref => String(c.srNo) === String(ref) || String(c.parchiNo) === String(ref)) || 
+                    (p.customerId && c.id === p.customerId)
+                );
+                
+                // Get the most descriptive name possible
+                const cName = linkedParchi 
+                    ? (linkedParchi.companyName || linkedParchi.name || 'Customer') 
+                    : (p.customerName || p.name || p.payee || 'Customer');
+                
+                const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === p.bankAccountId);
+                const methodStr = bankMatch ? bankMatch.bankName : (p.paymentMethod || 'Cash');
+                const shortMethod = methodStr.split(' ')[0].toUpperCase();
+
                 return {
                     date: p.date,
-                    particulars: `${cName}${ref}`,
-                    id: p.paymentId || 'REC', debit: 0, credit: Number(p.amount) || 0, type: `Customer Receipt::${resolveMethod(method)}`
+                    particulars: `${cName}${refNo ? ' | Parchi: ' + refNo : ''}`,
+                    id: p.paymentId || 'REC', debit: 0, credit: Number(p.amount) || 0, 
+                    type: `CR-${shortMethod || 'CASH'}`,
+                    priority: 4,
+                    accountId: p.bankAccountId || (p.paymentMethod === 'Cash' ? 'CashInHand' : null),
+                    checkNo: p.checkNo
                 };
             }),
-            ...globalData.incomes.filter((i: any) => periodScope(i.date) && !i.isInternal).map((i: any) => ({
-                date: i.date,
-                particulars: `[${i.transactionId || 'N/A'}] ${i.payee.trim()}::${(i.category || '').trim()}${i.subCategory ? ' | ' + i.subCategory.trim() : ''}`,
-                id: i.transactionId || 'INC', debit: 0, credit: Number(i.amount) || 0, type: `Income::${resolveMethod(i.paymentMethod || i.bankAccountId)}`
-            })),
-            ...globalData.expenses.filter((e: any) => periodScope(e.date) && !e.isInternal).map((e: any) => ({
-                date: e.date,
-                particulars: `[${e.transactionId || 'N/A'}] ${e.payee.trim()}::${(e.category || '').trim()}${e.subCategory ? ' | ' + e.subCategory.trim() : ''}`,
-                id: e.transactionId || 'EXP', debit: Number(e.amount) || 0, credit: 0, type: `Expense::${resolveMethod(e.paymentMethod || e.bankAccountId)}`
-            })),
-            ...((globalData as any).loans || []).filter((l: any) => l.startDate && periodScope(l.startDate) && l.loanType !== 'OwnerCapital').map((l: any) => ({
-                date: l.startDate,
-                particulars: `${l.loanName || l.lenderName || 'Lender'} (${l.loanType})`,
-                id: l.id?.slice(-6).toUpperCase() || 'LOAN',
-                debit: 0,
-                credit: Number(l.totalAmount) || 0,
-                type: 'Loan'
-            })),
+            ...globalData.incomes.filter((i: any) => periodScope(i.date) && !i.isInternal).map((i: any) => {
+                const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === i.bankAccountId);
+                const methodStr = bankMatch ? bankMatch.bankName : (i.paymentMethod || 'Cash');
+                const shortMethod = methodStr.split(' ')[0].toUpperCase();
+                return {
+                    date: i.date,
+                    particulars: `${i.payee} | ${i.category}`,
+                    id: i.transactionId || 'INC', debit: 0, credit: Number(i.amount) || 0, 
+                    type: `INC-${shortMethod || 'CASH'}`,
+                    priority: 5,
+                    accountId: i.bankAccountId || (i.paymentMethod === 'Cash' ? 'CashInHand' : null)
+                };
+            }),
+            ...globalData.expenses.filter((e: any) => periodScope(e.date) && !e.isInternal).map((e: any) => {
+                const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === e.bankAccountId);
+                const methodStr = bankMatch ? bankMatch.bankName : (e.paymentMethod || 'Cash');
+                const shortMethod = methodStr.split(' ')[0].toUpperCase();
+                return {
+                    date: e.date,
+                    particulars: `${e.payee} | ${e.category}`,
+                    id: e.transactionId || 'EXP', debit: Number(e.amount) || 0, credit: 0, 
+                    type: `EXP-${shortMethod || 'CASH'}`,
+                    priority: 6,
+                    accountId: e.bankAccountId || (e.paymentMethod === 'Cash' ? 'CashInHand' : null)
+                };
+            }),
             ...globalData.fundTransactions.filter((t: any) => periodScope(t.date)).flatMap((t: any) => {
                 const amt = Number(t.amount) || 0;
-                const isLiquidSrc = t.source === 'CashInHand' || t.source === 'CashAtHome' || globalData.bankAccounts.some((b: any) => b.id === t.source);
-                const isLiquidDst = t.destination === 'CashInHand' || t.destination === 'CashAtHome' || globalData.bankAccounts.some((b: any) => b.id === t.destination);
-                
-                const srcLabel = t.source === 'CashInHand' ? 'Cash in Hand' : t.source === 'CashAtHome' ? 'Cash at Home' : (globalData.bankAccounts.find((b: any)=>b.id===t.source)?.bankName || t.source);
-                const dstLabel = t.destination === 'CashInHand' ? 'Cash in Hand' : t.destination === 'CashAtHome' ? 'Cash at Home' : (globalData.bankAccounts.find((b: any)=>b.id===t.destination)?.bankName || t.destination);
-                
-                const results = [];
-                if (isLiquidSrc) {
-                    results.push({ date: t.date, particulars: `${srcLabel} → ${dstLabel}${t.description ? ' | ' + t.description : ''}`, id: t.id?.slice(-6).toUpperCase() || 'TRF', debit: amt, credit: 0, type: 'Transfer Out' });
-                }
-                if (isLiquidDst) {
-                    results.push({ date: t.date, particulars: `${dstLabel} ← ${srcLabel}${t.description ? ' | ' + t.description : ''}`, id: t.id?.slice(-6).toUpperCase() || 'TRF', debit: 0, credit: amt, type: 'Transfer In' });
-                }
-                return results;
+                return [
+                    { date: t.date, particulars: `Transfer to ${t.destination}`, id: 'AMT-OUT', debit: amt, credit: 0, type: 'Internal Transfer', accountId: t.source, transferSource: t.source, transferDest: t.destination },
+                    { date: t.date, particulars: `Transfer from ${t.source}`, id: 'AMT-IN', debit: 0, credit: amt, type: 'Internal Transfer', accountId: t.destination, transferSource: t.source, transferDest: t.destination }
+                ];
             }),
-        ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            ...(() => {
+                const dayCdGroups = new Map<string, any[]>();
+                globalData.supplierPayments.filter((p: any) => periodScope(p.date) && (Number(p.cdAmount) || 0) > 0).forEach((p: any) => {
+                    const d = format(new Date(p.date), 'yyyy-MM-dd');
+                    if (!dayCdGroups.has(d)) dayCdGroups.set(d, []);
+                    dayCdGroups.get(d)!.push(p);
+                });
+
+                const result: any[] = [];
+                dayCdGroups.forEach((payments, dStr) => {
+                    const dayTotal = payments.reduce((sum, p) => sum + (Number(p.cdAmount) || 0), 0);
+                    // INFLOW Side: Consolidated
+                    result.push({
+                        date: dStr,
+                        particulars: `CD Received Account`,
+                        id: `CD-REC-IN-${dStr}`,
+                        debit: 0,
+                        credit: Math.round(dayTotal),
+                        type: 'CD Received',
+                        priority: 1
+                    });
+
+                    // OUTFLOW Side: Detailed per Supplier
+                    payments.forEach(p => {
+                        const supplier = globalData.suppliers.find((s: any) => 
+                            String(s.id) === String(p.supplierId) || 
+                            String(s.srNo) === String(p.supplierId) ||
+                            (p.parchiNo && (String(s.srNo) === String(p.parchiNo) || String(s.parchiNo) === String(p.parchiNo)))
+                        );
+                        
+                        const sName = supplier?.companyName || supplier?.name || p.supplierName || p.partyName || p.payee || 'Supplier';
+                        const sFatherVal = supplier?.so || supplier?.fatherName || p.supplierFatherName || p.fatherName;
+                        const sAddrVal = supplier?.address || supplier?.parchiAddress || p.supplierAddress || p.address;
+                        const sFather = sFatherVal ? ` S/o ${sFatherVal}` : '';
+                        const sAddr = sAddrVal ? ` | ${sAddrVal}` : '';
+                        
+                        result.push({
+                            date: p.date,
+                            particulars: `${sName}${sFather}${sAddr}`,
+                            id: `CD-REC-OUT-${p.paymentId || Math.random()}`,
+                            debit: Math.round(Number(p.cdAmount) || 0),
+                            credit: 0,
+                            type: 'CD Received',
+                            priority: 1
+                        });
+                    });
+                });
+                return result;
+            })(),
+            ...globalData.customerPayments.filter((p: any) => periodScope(p.date) && (Number(p.cdAmount) || 0) > 0).map((p: any) => {
+                const refNo = p.receiptNo || p.parchiNo || (p.paidFor?.[0]?.srNo);
+                const refArray = typeof refNo === 'string' ? refNo.split(',').map(s => s.trim()).filter(Boolean) : (refNo ? [String(refNo)] : []);
+                const linkedParchi = globalData.customers.find((c: any) => 
+                    refArray.some(ref => String(c.srNo) === String(ref) || String(c.parchiNo) === String(ref)) || 
+                    (p.customerId && c.id === p.customerId)
+                );
+                const cName = linkedParchi ? (linkedParchi.companyName || linkedParchi.name || 'Customer') : (p.customerName || p.name || 'Customer');
+                return {
+                    date: p.date,
+                    particulars: `CD Given: ${cName}`,
+                    id: p.paymentId ? `CD-${p.paymentId}` : 'CD-C', debit: Number(p.cdAmount) || 0, credit: 0, type: 'CD Given',
+                    accountId: 'CD'
+                };
+            }),
+        ].sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            
+            // 1. Compare by day first (ignore time)
+            const dayA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate()).getTime();
+            const dayB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate()).getTime();
+            
+            if (dayA !== dayB) return dayA - dayB;
+            
+            // 2. Same day: Internal Transfers always first
+            if (a.id === 'AMT-IN' && b.id !== 'AMT-IN') return -1;
+            if (b.id === 'AMT-IN' && a.id !== 'AMT-IN') return 1;
+            
+            // 3. Same day: Sort by TYPE PRIORITY (CD=1, PURCH=2, SP=3, CR=4, INC=5, EXP=6)
+            const pA = a.priority ?? 99;
+            const pB = b.priority ?? 99;
+            if (pA !== pB) return pA - pB;
+            
+            // 4. Same priority: Sort by ID to keep sequential order (EX001, EX002...)
+            const idDiff = a.id.localeCompare(b.id);
+            if (idDiff !== 0) return idDiff;
+            
+            // 5. Final tie-breaker: Original time
+            return dateA.getTime() - dateB.getTime();
+        });
+
+        const accountLedgers: Record<string, any[]> = {};
+        const allAccountIds = ['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map((a: any) => a.id), 'CD'];
+        const openingSnapshot = getBalancesAtDate(subDays(filterDate, 1));
+        
+        allAccountIds.forEach(accId => {
+            const accOpening = accId === 'CashInHand' ? openingSnapshot.cashInHand : accId === 'CashAtHome' ? openingSnapshot.cashAtHome : openingSnapshot.bankBalances.get(accId) || 0;
+            const ledger: any[] = [{
+                date: startDate.toISOString(),
+                particulars: 'OPENING BALANCE',
+                id: 'OP',
+                debit: 0,
+                credit: 0,
+                balance: accOpening,
+                type: 'System'
+            }];
+            
+            let runningBal = accOpening;
+            consolidatedLedger.filter(t => t.accountId === accId).forEach(t => {
+                runningBal += (t.credit - t.debit);
+                ledger.push({ ...t, balance: runningBal });
+            });
+            
+            accountLedgers[accId] = ledger;
+        });
 
         const totalInflow = dayWiseFlows.reduce((s,d) => s + d.incomes, 0);
         const totalOutflow = dayWiseFlows.reduce((s,d) => s + d.totalPayments + d.expenses, 0);
@@ -499,6 +604,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         return {
             liquid: liquidSnapshot,
             dayWiseLiquidity,
+            accountLedgers,
             purchases: Array.from(pMap.values()),
             sales: Array.from(sMap.values()),
             varietyStock: Array.from(stockMap.entries()).map(([variety, qty]) => ({ variety, qty })).sort((a,b) => b.qty - a.qty),
@@ -514,9 +620,52 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             },
             dayWise: dayWiseFlows,
             varietyDayData,
+            varietySaleDayData: (() => {
+                const vsdd: Record<string, any[]> = {};
+                globalData.customers.filter((c: any) => periodScope(c.date)).forEach((c: any) => {
+                    const v = normalizeVariety(c.variety || '');
+                    if (!vsdd[v]) vsdd[v] = [];
+                    const dayStr = format(offsetDate(c.date), 'dd MMM yy');
+                    let dEntry = vsdd[v].find(de => de.date === dayStr);
+                    if (!dEntry) {
+                        dEntry = { 
+                            date: dayStr, 
+                            finalWt: 0, 
+                            netWt: 0, 
+                            grossAmt: 0, 
+                            netAmt: 0, 
+                            count: 0, 
+                            totalRate: 0,
+                            avgRate: 0 
+                        };
+                        vsdd[v].push(dEntry);
+                    }
+                    dEntry.finalWt += Number(c.weight) || 0;
+                    dEntry.netWt += Number(c.netWeight) || 0;
+                    dEntry.grossAmt += Number(c.amount) || 0;
+                    dEntry.netAmt += Number(c.originalNetAmount) || 0;
+                    dEntry.totalRate += Number(c.rate) || 0;
+                    dEntry.count += 1;
+                });
+                Object.values(vsdd).forEach(days => {
+                    days.forEach(d => d.avgRate = d.count > 0 ? d.totalRate / d.count : 0);
+                    days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                });
+                return vsdd;
+            })(),
             consolidatedLedger,
-            outflow: { supplier: dayWiseFlows.reduce((s,d) => s + d.totalPayments, 0), expenses: dayWiseFlows.reduce((s,d) => s + d.expenses, 0), cdReceived: 0, totalOutflow },
-            inflow: { customer: 0, other: dayWiseFlows.reduce((s,d) => s + d.incomes, 0), cdGiven: 0, totalInflow },
+            outflow: { 
+                supplier: dayWiseFlows.reduce((s,d) => s + d.totalPayments, 0), 
+                expenses: dayWiseFlows.reduce((s,d) => s + d.expenses, 0), 
+                cdGiven: globalData.customerPayments.filter((p: any) => periodScope(p.date) && !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
+                totalOutflow 
+            },
+            inflow: { 
+                customer: dayWiseFlows.reduce((s,d) => s + d.incomes - (globalData.incomes.filter((i: any) => isDay(i.date, addDays(filterDate, dayWiseFlows.indexOf(d))) && !i.isInternal && !i.isDeleted).reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0)), 0), 
+                other: dayWiseFlows.reduce((s,d) => s + d.incomes, 0), 
+                cdReceived: globalData.supplierPayments.filter((p: any) => periodScope(p.date) && !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
+                totalInflow 
+            },
             result: { netFlow: totalInflow - totalOutflow, stockDelta: 0 },
             urgentEMIs: (loans || [])?.filter(l => l.nextEmiDueDate && subDays(new Date(l.nextEmiDueDate), 2) <= new Date() && new Date(l.nextEmiDueDate) >= new Date()) || [],
             audit360: (() => {

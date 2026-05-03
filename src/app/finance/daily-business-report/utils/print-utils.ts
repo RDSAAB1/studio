@@ -330,6 +330,30 @@ export const generateReportHtml = (
                     </tbody>
                 </table>
             </div>
+            
+            <!-- SECTION B-I: STOCK AVAILABILITY -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span>B-I: Current Stock Availability</span>
+                    <span>Purchased - Sold Balance</span>
+                </div>
+                <table style="width: 50%;">
+                    <thead>
+                        <tr>
+                            <th>Variety Name</th>
+                            <th class="text-right">Stock Quantity (QTL)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${reportData.varietyStock.map((v: any) => `
+                            <tr>
+                                <td class="font-black">${escapeHtml(v.variety)}</td>
+                                <td class="text-right font-mono ${v.qty < 0 ? 'liq-expense' : 'liq-income'}">${v.qty.toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
 
             <!-- SECTION B-II: VARIETY AUDIT Ledger -->
             <div class="page-break"></div>
@@ -423,6 +447,65 @@ export const generateReportHtml = (
                     </tbody>
                 </table>
             </div>
+
+            <!-- SECTION B-III: VARIETY SALES AUDIT -->
+            <div class="page-break"></div>
+            <div class="section-card">
+                <div class="section-header">
+                    <span>B-III: Variety Sales Audit (Day-wise Breakdown)</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Variety</th>
+                            <th style="width: 70px;">Date</th>
+                            <th class="text-center">Count</th>
+                            <th class="text-right">Final Wt</th>
+                            <th class="text-right">Net Wt</th>
+                            <th class="text-right">Avg Rate</th>
+                            <th class="text-right">Gross Amt</th>
+                            <th class="text-right">Net Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(reportData.varietySaleDayData || {}).map(([variety, days]: [string, any]) => {
+                            const total = days.reduce((acc: any, d: any) => ({
+                                finalWt: acc.finalWt + d.finalWt,
+                                netWt: acc.netWt + d.netWt,
+                                grossAmt: acc.grossAmt + d.grossAmt,
+                                netAmt: acc.netAmt + d.netAmt,
+                                count: acc.count + d.count,
+                                totalRate: acc.totalRate + d.totalRate
+                            }), { finalWt: 0, netWt: 0, grossAmt: 0, netAmt: 0, count: 0, totalRate: 0 });
+
+                            return `
+                                ${days.map((day: any, dIdx: number) => `
+                                    <tr style="background: #fff !important;">
+                                        ${dIdx === 0 ? `<td rowspan="${days.length + 1}" class="text-center font-black" style="border-right: 2px solid #e2e8f0; font-size: 9.5px;">${variety}</td>` : ''}
+                                        <td class="text-center font-bold text-slate-400">${day.date}</td>
+                                        <td class="text-center font-mono">${day.count}</td>
+                                        <td class="text-right font-mono">${day.finalWt.toFixed(2)}</td>
+                                        <td class="text-right font-mono font-black" style="color: #4338ca;">${day.netWt.toFixed(2)}</td>
+                                        <td class="text-right font-mono">₹${Math.round(day.avgRate).toLocaleString()}</td>
+                                        <td class="text-right font-mono">₹${Math.round(day.grossAmt).toLocaleString()}</td>
+                                        <td class="text-right font-mono font-black">₹${Math.round(day.netAmt).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                                <tr style="background: #f1f5f9 !important; font-weight: 900; font-size: 10.5px;">
+                                    <td class="text-center" style="color: #1e1b4b; border-top: 1px solid #e2e8f0;">TOT</td>
+                                    <td class="text-center" style="border-top: 1px solid #e2e8f0;">${total.count}</td>
+                                    <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0;">${total.finalWt.toFixed(2)}</td>
+                                    <td class="text-right font-mono font-black" style="border-top: 1px solid #e2e8f0; color: #1e1b4b;">${total.netWt.toFixed(2)}</td>
+                                    <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0;">₹${Math.round(total.totalRate / (total.count || 1)).toLocaleString()}</td>
+                                    <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0;">₹${Math.round(total.grossAmt).toLocaleString()}</td>
+                                    <td class="text-right font-mono font-black" style="border-top: 1px solid #e2e8f0; color: #1e1b4b; background: #e2e8f0 !important;">₹${Math.round(total.netAmt).toLocaleString()}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
             <div class="page-break"></div>
             <div class="section-card" style="break-inside: auto;">
                 <div class="section-header">
@@ -538,12 +621,15 @@ export const generateReportHtml = (
                     const allRows = expZone?.rows || [];
                     const isNumeric = (m: string) => /^\d{10,}$/.test(m || '');
                     
+                    const sortById = (a: any, b: any) =>
+                        String(a.transactionId || '').localeCompare(String(b.transactionId || ''), undefined, { numeric: true, sensitivity: 'base' });
+
                     const groups = {
-                        'Cash':   { rows: allRows.filter((r: any) => (r.paymentMethod === 'Cash' || !r.paymentMethod) && !isNumeric(r.paymentMethod)), label: '💵 Cash Expense', hBg: '#fff7ed', hTxt: '#ea580c', shDate: '#9a3412', shPart: '#c2410c', dBg: '#ffedd5', dTxt: '#c2410c', aBg: '#fff7ed', nTxt: '#7c2d12' },
-                        'RTGS':   { rows: allRows.filter((r: any) => r.paymentMethod === 'RTGS'), label: '🏦 RTGS', hBg: '#eff6ff', hTxt: '#2563eb', shDate: '#1e40af', shPart: '#1d4ed8', dBg: '#dbeafe', dTxt: '#1d4ed8', aBg: '#eff6ff', nTxt: '#1e3a8a' },
-                        'Gov':    { rows: allRows.filter((r: any) => r.paymentMethod === 'Cheque' || r.paymentMethod === 'Gov Dist'), label: '🏛️ Gov / Cheque', hBg: '#faf5ff', hTxt: '#9333ea', shDate: '#6b21a8', shPart: '#7e22ce', dBg: '#f3e8ff', dTxt: '#7e22ce', aBg: '#faf5ff', nTxt: '#581c87' },
-                        'Online': { rows: allRows.filter((r: any) => r.paymentMethod === 'Online' || r.paymentMethod === 'Transfer'), label: '📱 Online', hBg: '#ecfeff', hTxt: '#0891b2', shDate: '#155e75', shPart: '#0e7490', dBg: '#cffafe', dTxt: '#0e7490', aBg: '#ecfeff', nTxt: '#164e63' },
-                        'Other':  { rows: allRows.filter((r: any) => r.paymentMethod === 'Other' || isNumeric(r.paymentMethod)), label: '🔀 Other', hBg: '#fef2f2', hTxt: '#dc2626', shDate: '#9f1239', shPart: '#b91c1c', dBg: '#ffe4e6', dTxt: '#b91c1c', aBg: '#fef2f2', nTxt: '#7f1d1d' }
+                        'Cash':   { rows: allRows.filter((r: any) => (r.paymentMethod === 'Cash' || !r.paymentMethod) && !isNumeric(r.paymentMethod)).sort(sortById), label: '💵 Cash Expense', hBg: '#fff7ed', hTxt: '#ea580c', shDate: '#9a3412', shPart: '#c2410c', dBg: '#ffedd5', dTxt: '#c2410c', aBg: '#fff7ed', nTxt: '#7c2d12' },
+                        'RTGS':   { rows: allRows.filter((r: any) => r.paymentMethod === 'RTGS').sort(sortById), label: '🏦 RTGS', hBg: '#eff6ff', hTxt: '#2563eb', shDate: '#1e40af', shPart: '#1d4ed8', dBg: '#dbeafe', dTxt: '#1d4ed8', aBg: '#eff6ff', nTxt: '#1e3a8a' },
+                        'Gov':    { rows: allRows.filter((r: any) => r.paymentMethod === 'Cheque' || r.paymentMethod === 'Gov Dist').sort(sortById), label: '🏛️ Gov / Cheque', hBg: '#faf5ff', hTxt: '#9333ea', shDate: '#6b21a8', shPart: '#7e22ce', dBg: '#f3e8ff', dTxt: '#7e22ce', aBg: '#faf5ff', nTxt: '#581c87' },
+                        'Online': { rows: allRows.filter((r: any) => r.paymentMethod === 'Online' || r.paymentMethod === 'Transfer').sort(sortById), label: '📱 Online', hBg: '#ecfeff', hTxt: '#0891b2', shDate: '#155e75', shPart: '#0e7490', dBg: '#cffafe', dTxt: '#0e7490', aBg: '#ecfeff', nTxt: '#164e63' },
+                        'Other':  { rows: allRows.filter((r: any) => r.paymentMethod === 'Other' || isNumeric(r.paymentMethod)).sort(sortById), label: '🔀 Other', hBg: '#fef2f2', hTxt: '#dc2626', shDate: '#9f1239', shPart: '#b91c1c', dBg: '#ffe4e6', dTxt: '#b91c1c', aBg: '#fef2f2', nTxt: '#7f1d1d' }
                     };
 
                     const renderHeader = (group: any) => `

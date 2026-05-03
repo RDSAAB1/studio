@@ -148,9 +148,10 @@ interface CustomDropdownProps {
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
         }
+        // Faster debounce for better responsiveness
         debounceTimerRef.current = setTimeout(() => {
             setDebouncedSearchTerm(searchTerm);
-        }, 150); // 150ms debounce
+        }, 100); 
 
         return () => {
             if (debounceTimerRef.current) {
@@ -219,190 +220,70 @@ interface CustomDropdownProps {
     
     // Optimized filtering with early exit for large datasets
     const filteredItems = useMemo(() => {
-        // If no search term, show all options
-        if (!debouncedSearchTerm || debouncedSearchTerm.trim() === '') {
-            // Return all options, sorted alphabetically by label
-            return [...options].sort((a, b) => {
-                // Sort Cash In Hand first, then alphabetically
+        const trimmedSearch = debouncedSearchTerm?.trim().toLowerCase();
+        
+        // If no search term, show all options (limited to maxResults for initial view)
+        if (!trimmedSearch) {
+            return options.slice(0, 500).sort((a, b) => {
                 if (a.value === 'CashInHand') return -1;
                 if (b.value === 'CashInHand') return 1;
-                const labelA = a.label || '';
-                const labelB = b.label || '';
-                return labelA.localeCompare(labelB);
+                return (a.label || '').localeCompare(b.label || '');
             });
         }
         
-        // If search term matches selected item exactly, show all options
-        if (selectedItem && debouncedSearchTerm === selectedItem.label) {
-            return [...options].sort((a, b) => {
-                if (a.value === 'CashInHand') return -1;
-                if (b.value === 'CashInHand') return 1;
-                const labelA = a.label || '';
-                const labelB = b.label || '';
-                return labelA.localeCompare(labelB);
-            });
-        }
+        const lowercasedSearchTerm = trimmedSearch.replace(/\s+/g, ' ');
+        const maxResults = 150; 
         
-        // Normalize search term: trim and lowercase, normalize whitespace
-        const normalizeText = (text: string): string => {
-            return text.toLowerCase().trim().replace(/\s+/g, ' ');
-        };
-        const lowercasedSearchTerm = normalizeText(debouncedSearchTerm);
-        const maxResults = 200; // Limit results for performance
-        
-        // Helper function to get search text based on search type
-        const getSearchText = (item: CustomDropdownOption): string => {
-            // Extract field from data based on search type
-            const data = item.data || {};
-            let searchText = '';
-            
-            switch (currentSearchType) {
-                case 'all':
-                    // Concatenate all search fields for a comprehensive search
-                    const name = data.name || item.label || '';
-                    const so = data.fatherName || data.so || '';
-                    const addr = data.address || '';
-                    const ph = data.contact || '';
-                    searchText = normalizeText(`${name} ${so} ${addr} ${ph}`);
-                    break;
-                case 'name':
-                    // If data.name exists and is not empty, use it; otherwise fall back to label
-                    const nameValue = data.name?.trim();
-                    searchText = normalizeText(nameValue ? String(nameValue) : (item.label || ''));
-                    break;
-                case 'fatherName':
-                    searchText = normalizeText(String(data.fatherName || data.so || ''));
-                    break;
-                case 'address':
-                    searchText = normalizeText(String(data.address || ''));
-                    break;
-                case 'contact':
-                    // For contact, just trim and lowercase (phone numbers usually don't have spaces)
-                    searchText = String(data.contact || '').trim().toLowerCase();
-                    break;
-                default:
-                    searchText = normalizeText(item.label);
-            }
-            
-            return searchText;
-        };
-        
-        // Fast path: simple includes check first
         const quickMatches: Array<{ item: CustomDropdownOption; distance: number }> = [];
         const fuzzyMatches: Array<{ item: CustomDropdownOption; distance: number }> = [];
         
-        for (let i = 0; i < options.length && (quickMatches.length + fuzzyMatches.length) < maxResults; i++) {
-            const item = options[i];
-            const searchText = getSearchText(item);
-            
-            // Skip if search text is empty (field not available)
-            if (!searchText || searchText.trim() === '') {
-                continue;
-            }
-            
-            // EXACT MATCH (Highest Priority): Full string exact match (after normalization)
-            if (searchText === lowercasedSearchTerm) {
-                quickMatches.push({ item, distance: 0 });
-                continue;
-            }
-            
-            // EXACT WORD MATCH: Check if search term matches a complete word (word boundary)
-            // Split by common delimiters
-            const words = searchText.split(/[\s\-\(\)\.\|,;:]+/);
-            let exactWordMatch = false;
-            for (const word of words) {
-                const normalizedWord = normalizeText(word);
-                if (normalizedWord === lowercasedSearchTerm && normalizedWord.length > 0) {
-                    exactWordMatch = true;
-                    break;
-                }
-            }
-            if (exactWordMatch) {
-                quickMatches.push({ item, distance: 0 });
-                continue;
-            }
-            
-            // EXACT STARTS WITH: Check if field starts with search term (for autocomplete-like behavior)
-            if (searchText.startsWith(lowercasedSearchTerm) && lowercasedSearchTerm.length > 0) {
-                quickMatches.push({ item, distance: 0 }); // Highest priority
-                continue;
-            }
-            
-            // PARTIAL EXACT MATCH: Check if search term is contained exactly (substring match)
-            if (searchText.includes(lowercasedSearchTerm) && lowercasedSearchTerm.length > 0) {
-                // Give partial matches slightly lower priority (0.1) so startsWith always comes first
-                quickMatches.push({ item, distance: 0.1 });
-                continue;
-            }
-                
-            // FUZZY MATCHING: Only if no exact match found (for spelling mistakes)
-            if (quickMatches.length < 50) {
-                const textParts = searchText.split(/[\s\-\(\)\.]+/);
-                let minDistance = Infinity;
-                
-                // Check each word part
-                for (const part of textParts) {
-                    if (part.length === 0) continue;
-                    
-                    // If part starts with search term, it's a close match
-                    if (part.startsWith(lowercasedSearchTerm) || lowercasedSearchTerm.startsWith(part)) {
-                        minDistance = Math.min(minDistance, Math.abs(part.length - lowercasedSearchTerm.length));
-                        continue;
-                    }
-                    
-                    // Calculate Levenshtein distance
-                    const distance = levenshteinDistance(lowercasedSearchTerm, part);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                    }
-                }
-                
-                // Also check full text distance
-                const fullDistance = levenshteinDistance(lowercasedSearchTerm, searchText);
-                minDistance = Math.min(minDistance, fullDistance);
-                
-                // Allow fuzzy matching based on search term length
-                // Threshold logic:
-                // - Term length <= 3: No fuzzy matching (too noisy)
-                // - Term length 4-5: Max 1 character difference
-                // - Term length 6-9: Max 2 character differences
-                // - Term length 10+: Max 3 character differences
-                let threshold = 0;
-                if (lowercasedSearchTerm.length > 9) threshold = 3;
-                else if (lowercasedSearchTerm.length > 5) threshold = 2;
-                else if (lowercasedSearchTerm.length > 3) threshold = 1;
+        const searchLen = lowercasedSearchTerm.length;
+        const fuzzyThreshold = searchLen > 9 ? 3 : (searchLen > 5 ? 2 : (searchLen > 3 ? 1 : 0));
 
-                if (minDistance > 0 && minDistance <= threshold) {
-                    fuzzyMatches.push({ item, distance: minDistance });
+        for (let i = 0; i < options.length; i++) {
+            const item = options[i];
+            const data = item.data || {};
+            let searchText = '';
+            
+            // Fast text extraction
+            if (currentSearchType === 'all') {
+                searchText = `${data.name || item.label || ''} ${data.fatherName || data.so || ''} ${data.address || ''} ${data.contact || ''}`;
+            } else if (currentSearchType === 'name') {
+                searchText = data.name || item.label || '';
+            } else if (currentSearchType === 'contact') {
+                searchText = String(data.contact || '');
+            } else {
+                searchText = String(data[currentSearchType] || item.label || '');
+            }
+            
+            const lowerText = searchText.toLowerCase();
+
+            // 1. EXACT MATCH / STARTS WITH (Highest Priority)
+            if (lowerText === lowercasedSearchTerm || lowerText.startsWith(lowercasedSearchTerm)) {
+                quickMatches.push({ item, distance: 0 });
+            } 
+            // 2. CONTAINS (High Priority)
+            else if (lowerText.includes(lowercasedSearchTerm)) {
+                quickMatches.push({ item, distance: 1 });
+            }
+            // 3. FUZZY MATCH (Only if we don't have enough quick matches)
+            else if (quickMatches.length < 20 && fuzzyThreshold > 0) {
+                const distance = levenshteinDistance(lowercasedSearchTerm, lowerText.slice(0, lowercasedSearchTerm.length + 3));
+                if (distance <= fuzzyThreshold) {
+                    fuzzyMatches.push({ item, distance: distance + 2 });
                 }
             }
+
+            // Early exit if we have plenty of matches
+            if (quickMatches.length >= maxResults) break;
         }
         
-            // Combine and sort: Exact matches first (distance 0), then by distance (less mismatch = higher priority)
-            // Also prioritize exact matches by length (shorter exact matches first, then longer)
         const allMatches = [...quickMatches, ...fuzzyMatches]
-                .sort((a, b) => {
-                    // First priority: Exact matches (distance 0) come before fuzzy matches
-                    if (a.distance === 0 && b.distance !== 0) return -1;
-                    if (a.distance !== 0 && b.distance === 0) return 1;
-                    
-                    // Second priority: If both are exact (distance 0), prefer shorter matches (more specific)
-                    if (a.distance === 0 && b.distance === 0) {
-                        const aText = getSearchText(a.item);
-                        const bText = getSearchText(b.item);
-                        const aMatchLength = aText.length;
-                        const bMatchLength = bText.length;
-                        // Shorter exact matches first (more specific)
-                        return aMatchLength - bMatchLength;
-                    }
-                    
-                    // Third priority: Sort by distance (less mismatch = better = higher in list)
-                    return a.distance - b.distance;
-                })
+            .sort((a, b) => a.distance - b.distance)
             .slice(0, maxResults);
         
         return allMatches.map(m => m.item);
-    }, [debouncedSearchTerm, options, selectedItem, currentSearchType]);
+    }, [debouncedSearchTerm, options, currentSearchType]);
 
      // Virtual scrolling: only render visible items
     const ITEM_HEIGHT = 28; // Reduced for compact, high-density UI

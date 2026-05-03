@@ -620,7 +620,7 @@ export default function CustomerEntryClient() {
         if (currentIndex > -1 && currentIndex < allFocusable.length - 1) {
           event.preventDefault();
           event.stopPropagation();
-          allFocusable[currentIndex + 1].focus();
+          allFocusable[currentIndex + 1]?.focus();
         }
       }
     };
@@ -714,7 +714,7 @@ export default function CustomerEntryClient() {
         // Find next focusable element
         const nextElement = formElements[currentElementIndex + 1];
         if (nextElement) {
-          nextElement.focus();
+          nextElement?.focus();
           // If it's an input, select the text if it's 0 or 0.00
           if (nextElement instanceof HTMLInputElement && (nextElement.value === '0' || nextElement.value === '0.00')) {
             setTimeout(() => nextElement.select(), 0);
@@ -722,7 +722,7 @@ export default function CustomerEntryClient() {
         }
       } else if (currentElementIndex === -1 && formElements.length > 0) {
         // If current element not found, focus first element
-        formElements[0].focus();
+        formElements[0]?.focus();
       }
     }
   };

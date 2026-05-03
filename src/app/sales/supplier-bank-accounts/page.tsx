@@ -26,7 +26,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { toTitleCase } from '@/lib/utils';
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
 
 interface SupplierBankAccountsPageProps {
   embedded?: boolean;
@@ -41,6 +42,70 @@ const supplierBankAccountSchema = z.object({
 });
 
 type SupplierBankAccountFormData = z.infer<typeof supplierBankAccountSchema>;
+const AccountTableRow = memo(({ 
+  account, 
+  onEdit, 
+  onDelete 
+}: { 
+  account: BankAccount; 
+  onEdit: (account: BankAccount) => void;
+  onDelete: (account: BankAccount) => void;
+}) => {
+  return (
+    <TableRow key={account.id} className="h-8">
+      <TableCell className="text-[11px] py-1.5 px-2 truncate">
+        {account.accountHolderName}
+      </TableCell>
+      <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
+        {account.accountNumber}
+      </TableCell>
+      <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.bankName}</TableCell>
+      <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
+        {account.ifscCode}
+      </TableCell>
+      <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.branchName}</TableCell>
+      <TableCell className="text-right py-1.5 px-2">
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onEdit(account)}
+            title="Edit"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6" title="Delete">
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Supplier Bank Account</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this supplier bank account? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDelete(account)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+});
+
+AccountTableRow.displayName = "AccountTableRow";
 
 
 export default function SupplierBankAccountsPage({ embedded = false }: SupplierBankAccountsPageProps = {}) {
@@ -49,15 +114,14 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
   const globalData = useGlobalData();
   const banks = globalData.banks;
   const bankBranches = globalData.bankBranches;
-  // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.supplierBankAccounts);
-  const [loading, setLoading] = useState(false); // ✅ FIX: Start with false since we have initial data
+  const bankAccounts = globalData.supplierBankAccounts;
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
   const [showAddForm, setShowAddForm] = useState(true); // Always show form by default
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [searchFilter, setSearchFilter] = useState<string>('all'); // 'all', 'name', 'account', 'bank', 'branch', 'ifsc'
 
   const {
@@ -85,53 +149,48 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
   // State to track if account exists
   const [existingAccountInfo, setExistingAccountInfo] = useState<BankAccount | null>(null);
 
-  // Bank options for dropdown
+  // Bank options for dropdown - deduplicated by name
   const bankOptions = useMemo(() => {
     if (!Array.isArray(banks)) return [];
-    return banks.map((bank: any) => ({
-      value: bank.name,
-      label: (bank.name || '').toUpperCase()
-    }));
+    const uniqueBanks = new Map<string, string>();
+    banks.forEach((bank: any) => {
+      const name = (bank.name || '').trim();
+      if (name && !uniqueBanks.has(name.toUpperCase())) {
+        uniqueBanks.set(name.toUpperCase(), name);
+      }
+    });
+    
+    return Array.from(uniqueBanks.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([upperName, originalName]) => ({
+        value: upperName, // Use uppercase as the stable value
+        label: originalName.toUpperCase()
+      }));
   }, [banks]);
 
-  // Branch options filtered by selected bank
+  // Branch options filtered by selected bank (case-insensitive)
   const branchOptions = useMemo(() => {
     if (!watchedBankName || !Array.isArray(bankBranches)) return [];
+    const searchBankUpper = watchedBankName.toUpperCase();
     const uniqueBranches = new Map<string, { value: string; label: string; ifsc: string }>();
+    
     bankBranches
-      .filter((branch: any) => branch.bankName === watchedBankName)
+      .filter((branch: any) => (branch.bankName || '').toUpperCase() === searchBankUpper)
       .forEach((branch: any) => {
-        if (!uniqueBranches.has(branch.branchName)) {
-          uniqueBranches.set(branch.branchName, { 
+        const branchNameUpper = (branch.branchName || '').toUpperCase();
+        if (branchNameUpper && !uniqueBranches.has(branchNameUpper)) {
+          uniqueBranches.set(branchNameUpper, { 
             value: branch.branchName, 
             label: (branch.branchName || '').toUpperCase(),
             ifsc: branch.ifscCode || ''
           });
         }
       });
-    return Array.from(uniqueBranches.values());
+    return Array.from(uniqueBranches.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [watchedBankName, bankBranches]);
 
-  // ✅ FIX: Sync from globalData to prevent data loss on navigation
-  useEffect(() => {
-    // Always sync from globalData on mount and when it changes
-    setBankAccounts(globalData.supplierBankAccounts);
-    setLoading(false);
-  }, [globalData.supplierBankAccounts]);
-  
-  // ✅ OPTIMIZED: Keep realtime listener for updates (non-blocking)
-  useEffect(() => {
-    const unsubscribe = getSupplierBankAccountsRealtime(
-      (accounts) => {
-        setBankAccounts(accounts);
-      },
-      (error) => {
-        // Silent fail - data will come from globalData
-      }
-    );
-
-    return () => unsubscribe();
-  }, []); // Removed toast from dependencies to prevent re-subscriptions
+  // No local loading state needed, data is synced from globalData
+  const loading = false;
 
   // Reset form when editing account changes
   useEffect(() => {
@@ -171,11 +230,11 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
 
   // Filter bank accounts based on search term and selected filter
   const filteredBankAccounts = useMemo(() => {
-    if (!searchTerm.trim()) {
+    if (!debouncedSearchTerm.trim()) {
       return bankAccounts;
     }
     
-    const searchLower = searchTerm.toLowerCase().trim();
+    const searchLower = debouncedSearchTerm.toLowerCase().trim();
     return bankAccounts.filter((account) => {
       const accountHolderName = (account.accountHolderName || '').toLowerCase();
       const accountNumber = (account.accountNumber || '').toLowerCase();
@@ -206,7 +265,7 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
           );
       }
     });
-  }, [bankAccounts, searchTerm, searchFilter]);
+  }, [bankAccounts, debouncedSearchTerm, searchFilter]);
 
   // Handle account number blur - check if account exists in real-time
   const handleAccountNumberBlur = () => {
@@ -741,57 +800,13 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
                     </TableCell>
                   </TableRow>
                 ) : (
-                          filteredBankAccounts.map((account) => (
-                            <TableRow key={account.id} className="h-8">
-                              <TableCell className="text-[11px] py-1.5 px-2 truncate">
-                        {account.accountHolderName}
-                      </TableCell>
-                              <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
-                        {account.accountNumber}
-                      </TableCell>
-                              <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.bankName}</TableCell>
-                              <TableCell className="text-[11px] font-mono py-1.5 px-2 truncate">
-                        {account.ifscCode}
-                      </TableCell>
-                              <TableCell className="text-[11px] py-1.5 px-2 truncate">{account.branchName}</TableCell>
-                              <TableCell className="text-right py-1.5 px-2">
-                              <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                            onClick={() => handleEdit(account)}
-                                  title="Edit"
-                          >
-                                  <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Delete">
-                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Supplier Bank Account</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this supplier bank account? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(account)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                  filteredBankAccounts.map((account) => (
+                    <AccountTableRow 
+                      key={account.id} 
+                      account={account} 
+                      onEdit={handleEdit} 
+                      onDelete={handleDelete} 
+                    />
                   ))
                 )}
               </TableBody>

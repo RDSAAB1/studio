@@ -146,8 +146,8 @@ function printViaIframe(fullHtml: string, isFullDocument: boolean = false) {
       printWindow.close();
     });
 
-    printWindow.focus();
-    printWindow.print();
+    printWindow?.focus();
+    printWindow?.print();
     
     // Fallback cleanup
     setTimeout(() => {

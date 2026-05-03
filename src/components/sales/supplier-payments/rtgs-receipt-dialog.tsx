@@ -56,7 +56,7 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
 
     return (
         <Dialog open={!!payment} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0">
+            <DialogContent className="max-w-4xl p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                 {payment && settings && <RtgsReceiptView payment={payment} settings={settings} onPrint={handleActualPrint}/>}
             </DialogContent>
         </Dialog>

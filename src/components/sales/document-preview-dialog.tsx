@@ -368,7 +368,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="max-w-7xl w-[95vw] grid grid-cols-1 lg:grid-cols-3 gap-0 p-0 bg-background overflow-hidden" style={{ maxHeight: '95vh' }}>
+            <DialogContent className="max-w-7xl w-[95vw] grid grid-cols-1 lg:grid-cols-3 gap-0 p-0 bg-background overflow-hidden" style={{ maxHeight: '95vh' }} onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div className="lg:col-span-2 order-2 lg:order-1 h-[90vh] bg-white overflow-auto border-r border-border" style={{ backgroundColor: '#ffffff' }}>
                     <ScrollArea className="h-full w-full">
                         <div id="document-content" className="p-4 sm:p-6 bg-white min-h-full" style={{ backgroundColor: '#ffffff', color: '#000000' }}>

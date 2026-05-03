@@ -32,9 +32,17 @@ import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { useSupplierData } from "@/hooks/use-supplier-data";
+import { AccountLedgerView } from "../finance/daily-business-report/components/account-ledger-view";
+import { generateAccountLedgers } from "@/lib/financial-ledger-utils";
 
-const StatCard = React.memo(({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
-    <Card className="bg-card/60 backdrop-blur-sm border-white/10">
+const StatCard = React.memo(({ title, value, icon, colorClass, description, onClick }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string, onClick?: () => void }) => (
+    <Card 
+        className={cn(
+            "bg-card/60 backdrop-blur-sm border-white/10 transition-all duration-200",
+            onClick && "cursor-pointer hover:bg-slate-50 hover:shadow-lg hover:-translate-y-1 active:scale-95"
+        )}
+        onClick={onClick}
+    >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-3">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <div className="text-muted-foreground">{icon}</div>
@@ -262,6 +270,7 @@ export default function CashBankClient() {
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
     const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
     const [currentFundTransaction, setCurrentFundTransaction] = useState<Partial<FundTransaction> | null>(null);
+    const [selectedAccount, setSelectedAccount] = useState<{ id: string, name: string, accountNumber?: string } | null>(null);
 
     useEffect(() => {
         // Ensure isClient is set on client-side
@@ -593,13 +602,36 @@ export default function CashBankClient() {
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
                         const account = bankAccounts.find(acc => acc.id === key);
                         if (account) {
-                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
+                            return <StatCard 
+                                key={key} 
+                                title={account.accountHolderName} 
+                                value={formatCurrency(balance)} 
+                                icon={<Landmark />} 
+                                colorClass="text-blue-500" 
+                                description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} 
+                                onClick={() => setSelectedAccount({ id: account.id, name: account.bankName, accountNumber: account.accountNumber })}
+                            />
                         }
                         if (key === 'CashInHand') {
-                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                            return <StatCard 
+                                key={key} 
+                                title="Cash in Hand" 
+                                value={formatCurrency(balance)} 
+                                icon={<HandCoins />} 
+                                colorClass="text-yellow-500" 
+                                description="At Mill/Office"
+                                onClick={() => setSelectedAccount({ id: 'CashInHand', name: 'Cash in Hand' })}
+                            />
                         }
                         if (key === 'CashAtHome') {
-                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+                            return <StatCard 
+                                key={key} 
+                                title="Cash at Home" 
+                                value={formatCurrency(balance)} 
+                                icon={<Home />} 
+                                colorClass="text-orange-500" 
+                                onClick={() => setSelectedAccount({ id: 'CashAtHome', name: 'Cash at Home' })}
+                            />
                         }
                         return null;
                     })}
@@ -607,6 +639,36 @@ export default function CashBankClient() {
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
             </Card>
+
+            {/* LEDGER OVERLAY */}
+            {selectedAccount && (() => {
+                const globalDataMock = {
+                    supplierPayments,
+                    customerPayments,
+                    incomes,
+                    expenses,
+                    fundTransactions,
+                    suppliers,
+                    customers: globalData.customers,
+                    bankAccounts
+                };
+                // Show from start of current year to now
+                const end = new Date();
+                const start = new Date(end.getFullYear(), 0, 1); 
+                const ledgers = generateAccountLedgers(globalDataMock, start, end, financialState.balances);
+                const ledgerData = ledgers[selectedAccount.id] || [];
+
+                return (
+                    <div className="fixed inset-0 z-[100] bg-white overflow-hidden animate-in slide-in-from-bottom duration-300">
+                        <AccountLedgerView 
+                            accountName={selectedAccount.name} 
+                            accountNumber={selectedAccount.accountNumber}
+                            ledgerData={ledgerData} 
+                            onBack={() => setSelectedAccount(null)}
+                        />
+                    </div>
+                );
+            })()}
 
             <Tabs defaultValue="funds" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">

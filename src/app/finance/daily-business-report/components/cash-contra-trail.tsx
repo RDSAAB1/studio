@@ -13,10 +13,84 @@ interface TransactionTrailProps {
     setViewMode: (v: ViewMode) => void;
 }
 
-export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, viewMode, setViewMode }) => {
+export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, viewMode, setViewMode }) => {
 
     const getProcessedData = (isCredit: boolean) => {
-        let ledger = [...reportData.consolidatedLedger];
+        const isCash = (acc: string) => acc === 'CashInHand' || acc === 'CashAtHome';
+
+        let ledger = [...reportData.consolidatedLedger].filter((t: any) => {
+            if (t.type === 'Opening Balance' && t.id === 'OP-BANK') return false;
+            
+            if (t.type === 'Internal Transfer') {
+                const srcCash = isCash(t.transferSource);
+                const destCash = isCash(t.transferDest);
+
+                if (srcCash && destCash) return false;
+                if (!srcCash && destCash) return t.credit > 0;
+                if (srcCash && !destCash) return t.debit > 0;
+                return true;
+            }
+            return true;
+        });
+        const contraEntries: any[] = [];
+        
+        // Generate contra entries for all non-cash transactions
+        ledger.forEach((t: any) => {
+            const p = t.particulars || '';
+            const methodMatch = p.match(/\((.*?)\)/);
+            const method = methodMatch ? methodMatch[1] : '';
+            const [baseType, typeMethod] = t.type.split('::');
+            
+            // ONLY generate contra entries for bank-based transactions
+            // EXP-CASH & pure cash entries never get contra. EXP-BOB (bank charges) DO get contra.
+            const isCashExpense = baseType.startsWith('EXP-') && baseType.endsWith('CASH');
+            const isCashIncome  = baseType.startsWith('INC-') && baseType.endsWith('CASH');
+            const isPureCash    = isCashExpense || isCashIncome ||
+                                  baseType === 'PURCH' || baseType === 'CD Received' ||
+                                  baseType === 'Adjustment' || baseType === 'Labour' || baseType === 'Kanta';
+            if (isPureCash) return;
+
+            // Handle new short tag format: SP-BOB, CR-BOB, EXP-BOB etc.
+            let activeMethod = typeMethod || method || '';
+            if (!activeMethod) {
+                const dashParts = t.type.split('-');
+                if (dashParts.length > 1) {
+                    activeMethod = dashParts.slice(1).join('-');
+                }
+            }
+            
+            const isBank = activeMethod && activeMethod.toLowerCase() !== 'cash' && activeMethod !== 'CashInHand' && activeMethod !== 'CashAtHome' && activeMethod !== 'P ADJUSTMENT';
+            
+            // Friendly display label for particulars
+            const bankLabel = activeMethod || 'Bank';
+            
+            if (isBank && baseType !== 'Opening Balance' && baseType !== 'Opening Bal.') {
+                if (t.credit > 0) {
+                    // It was an inflow to Bank. Add a contra outflow from Cash.
+                    contraEntries.push({
+                         ...t,
+                         id: `contra-${t.id || Math.random()}`,
+                         type: `Contra::${bankLabel}`,
+                         particulars: `${bankLabel} Contra (${baseType})`,
+                         debit: t.credit,
+                         credit: 0
+                    });
+                } else if (t.debit > 0) {
+                    // It was an outflow from Bank (e.g. SP-BOB). Add a contra inflow to Cash side.
+                    contraEntries.push({
+                         ...t,
+                         id: `contra-${t.id || Math.random()}`,
+                         type: `Contra::${bankLabel}`,
+                         particulars: `${bankLabel} Contra (${baseType})`,
+                         credit: t.debit,
+                         debit: 0,
+                         priority: t.priority || 3
+                    });
+                }
+            }
+        });
+        
+        ledger = [...ledger, ...contraEntries];
 
         // --- CONSOLIDATION LOGIC: Group by Check Number ---
         const groupedMap = new Map<string, any>();
@@ -32,7 +106,8 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             const canGroup = t.credit > 0 && check && (
                 type.startsWith('SP-') || 
                 type.startsWith('CR-') || 
-                type.startsWith('CD Received')
+                type.startsWith('CD Received') || 
+                type.startsWith('Contra')
             );
             
             if (canGroup) {
@@ -48,6 +123,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                     const g = groupedMap.get(key);
                     g.debit += t.debit;
                     g.credit += t.credit;
+                    // For contra entries, particulars are the same, for others they differ
                     if (!g._originalParticulars.includes(t.particulars)) {
                          g._originalParticulars.push(t.particulars);
                     }
@@ -63,7 +139,11 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             const baseP = g.particulars;
             
             if (count > 1) {
-                g.particulars = `${checkLabel} | ${count} Rec/Pay | ${g._originalParticulars[0].split('|')[0]} & Others`;
+                if (g.type.startsWith('Contra')) {
+                    g.particulars = `${checkLabel} | ${count} Payments | ${baseP}`;
+                } else {
+                    g.particulars = `${checkLabel} | ${count} Rec/Pay | ${g._originalParticulars[0].split('|')[0]} & Others`;
+                }
             } else {
                 g.particulars = `${checkLabel} | ${baseP}`;
             }
@@ -73,7 +153,18 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
         ledger = finalLedger;
         // --- END CONSOLIDATION ---
 
-        const transactions = ledger.filter((t: any) => isCredit ? t.credit > 0 : t.debit > 0);
+        const transactions = ledger.filter((t: any) => {
+            const baseTag = t.type?.split('::')[0] || '';
+            if (isCredit) {
+                // Inflow side: never show pure expense entries
+                if (baseTag.startsWith('EXP') || baseTag.startsWith('Expense')) return false;
+                return t.credit > 0;
+            } else {
+                // Outflow side: never show pure income entries
+                if (baseTag.startsWith('INC') || baseTag.startsWith('Income')) return false;
+                return t.debit > 0;
+            }
+        });
         
         if (viewMode === 'DETAIL') {
             return transactions.map((t: any) => ({
@@ -229,6 +320,14 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                     groups[gKey].amount += amt;
                     groups[gKey].count += (t.count || 1);
 
+                } else if (t.type.startsWith('Contra')) {
+                    const method = t.type.split('::')[1];
+                    const gKey = `Contra-${method}`;
+                    ensure(gKey, 'Contra', `${method} Contra`);
+                    groups[gKey].amount += amt;
+                    groups[gKey].count += (t.count || 1);
+                    const baseMatch = t.particulars.match(/\((.*?)\)/);
+                    if (baseMatch) groups[gKey].extras.lines.push(baseMatch[1]);
                 } else if (t.type === 'CD Received') {
                     if (isCredit) {
                         ensure('CD-Rec-Acc', 'CD Received', 'CD Received Account');
@@ -306,6 +405,9 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                     if (uniqueLines.length > 0) {
                         g.particulars = `${g.particulars}::${uniqueLines.join(' | ')}`;
                     }
+                } else if (g.type === 'Contra') {
+                    const uniqueLines = [...new Set(g.extras.lines as string[])];
+                    g.particulars = `${g.count} Records | ${g.particulars}${uniqueLines.length > 0 ? `::${uniqueLines.join(' | ')}` : ''}`;
                 } else if (g.type.includes('Transfer')) {
                     g.particulars = `${g.count} Records`;
                 } else if (g.type === 'Customer Receipt' || g.type === 'Expense' || g.type === 'Income' || g.type.startsWith('EX::')) {
@@ -351,6 +453,8 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                 displayParticulars = 'Fund Transfer';
                 groupType = 'Fund Transfer';
             } else if (baseType === 'Opening Balance') {
+                displayParticulars = p;
+            } else if (baseType === 'Contra') {
                 displayParticulars = p;
             } else if (baseType === 'Supplier Payment' || baseType === 'Customer Receipt') {
                 displayParticulars = p;
@@ -484,6 +588,8 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                 }
             } else if (baseType === 'Supplier Payment') {
                 item.particulars = item.particulars.split('::')[0];
+            } else if (baseType === 'Contra') {
+                item.particulars = `${item.count} Records | ${item.particulars}`;
             }
 
             return item;
@@ -535,6 +641,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             'Kanta': 'KANTA',
             'Expense': 'EX',
             'Income': 'IN',
+            'Contra': 'BANK',
         };
 
         let displayType = shortForms[type] || type;
@@ -569,6 +676,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             'Adjustment': 'bg-amber-600 text-white',
             'Sale': 'bg-green-600 text-white',
             'Income': 'bg-teal-600 text-white',
+            'Contra': 'bg-sky-600 text-white',
         };
         const defaultStyle = 'bg-emerald-600 text-white';
         return (
@@ -597,9 +705,9 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             <CardHeader className="bg-slate-900 border-b py-3 flex flex-row items-center justify-between text-white">
                 <div className="flex flex-col">
                     <CardTitle className="text-[13px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                        <FileText size={14} className="text-slate-300" /> Section Y: Horizontal Transaction Trail
+                        <FileText size={14} className="text-slate-300" /> Section Y-II: Cash Book Ledger (Contra Mode)
                     </CardTitle>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Chronological Double-Entry Ledger</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Double-Entry Ledger with Auto-Contra for Bank/Online</p>
                 </div>
                 <div className="flex gap-1 bg-slate-800 p-1 rounded-md">
                     <button onClick={() => setViewMode('DETAIL')} className={`text-[11px] font-black uppercase px-3 py-1 rounded transition-colors ${viewMode === 'DETAIL' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>Detailed</button>

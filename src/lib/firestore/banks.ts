@@ -64,13 +64,40 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
     const normalizedBranchName = branchName.trim().toUpperCase();
     const normalizedIfsc = ifscCode.trim().toUpperCase();
     
-    const q = query(bankBranchesCollection, 
-        where("ifscCode", "==", normalizedIfsc),
-        where("branchName", "==", normalizedBranchName),
-        where("bankName", "==", normalizedBankName)
-    );
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
+    // ✅ FIX: Duplicate check ab SQLite (local db) se hoga, Firestore se nahi.
+    // Kyunki UI bhi SQLite se read karta hai (createLocalSubscription).
+    // Pehle Firestore se check karne par purani/orphan entries duplicate error deti thi
+    // jabki SQLite mein (UI mein) branch dikhi nahi thi.
+    let isDuplicate = false;
+    if (typeof window !== 'undefined' && db) {
+      try {
+        const localBranches = await db.bankBranches.toArray();
+        isDuplicate = localBranches.some(
+          b =>
+            b.bankName?.trim().toUpperCase() === normalizedBankName &&
+            b.branchName?.trim().toUpperCase() === normalizedBranchName &&
+            b.ifscCode?.trim().toUpperCase() === normalizedIfsc
+        );
+      } catch { /* ignore, fallback to Firestore check below */ }
+    }
+    
+    if (!isDuplicate) {
+      // Fallback: Firestore check bhi karo (agar SQLite available nahi)
+      try {
+        const q = query(bankBranchesCollection, 
+            where("ifscCode", "==", normalizedIfsc),
+            where("branchName", "==", normalizedBranchName),
+            where("bankName", "==", normalizedBankName)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty && typeof window === 'undefined') {
+          // Only block on Firestore duplicate if we have no local db to check
+          isDuplicate = true;
+        }
+      } catch { /* ignore Firestore errors */ }
+    }
+
+    if (isDuplicate) {
         throw new Error(`This exact branch already exists for ${normalizedBankName}.`);
     }
 
@@ -93,6 +120,7 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
     
     const newBranch = { id: docRef.id, ...(dataWithTimestamp as any) } as BankBranch;
     
+    // ✅ SQLite mein HAMESHA save karo - chahe isSqliteMode ho ya na ho
     if (typeof window !== 'undefined' && db) {
       try {
         await db.bankBranches.put(newBranch);

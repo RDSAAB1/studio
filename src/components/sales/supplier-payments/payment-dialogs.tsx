@@ -52,7 +52,10 @@ export function PaymentDialogs({
     <>
       {/* Overall Statement Dialog (Generate Statement) */}
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 printable-statement-container bg-card">
+        <DialogContent 
+          className="max-w-5xl max-h-[90vh] flex flex-col p-0 printable-statement-container bg-card"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>Overall Statement</DialogTitle>
           </DialogHeader>
@@ -67,7 +70,10 @@ export function PaymentDialogs({
       </Dialog>
 
       <Dialog open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
-        <DialogContent className="max-w-[min(1400px,98vw)] w-[min(1400px,98vw)] p-0 overflow-hidden">
+        <DialogContent 
+          className="max-w-[min(1400px,98vw)] w-[min(1400px,98vw)] p-0 overflow-hidden"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <div className="flex h-[min(88vh,820px)] flex-col">
             <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-primary via-primary/95 to-primary/90 text-white shadow-[0_12px_30px_rgba(88,28,135,0.55)]">
               <div className="flex items-center justify-between gap-3">
@@ -222,7 +228,10 @@ export function PaymentDialogs({
 
       {/* Full Screen History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0">
+        <DialogContent 
+          className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="text-lg font-semibold">
               {selectedHistoryType === 'cash' && 'Cash History'}

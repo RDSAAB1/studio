@@ -568,7 +568,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
 
             if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
                 e.preventDefault();
-                formElements[currentElementIndex + 1].focus();
+                formElements[currentElementIndex + 1]?.focus();
             } else if (currentElementIndex === formElements.length - 1) {
                  e.preventDefault();
                  (form.querySelector('[type=submit]') as HTMLButtonElement)?.click();
@@ -586,7 +586,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
 
             if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
                 e.preventDefault();
-                formElements[currentElementIndex + 1].focus();
+                formElements[currentElementIndex + 1]?.focus();
             } else if (currentElementIndex === formElements.length - 1) {
                  e.preventDefault();
                  handleBankAccountSave();
@@ -979,7 +979,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
-                <DialogContent className="max-w-md p-0 grid-rows-[auto_1fr_auto]" onKeyDown={handleDialogKeyDown}>
+                <DialogContent className="max-w-md p-0 grid-rows-[auto_1fr_auto]" onKeyDown={handleDialogKeyDown} onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader className="p-6 pb-0">
                         <DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle>
                     </DialogHeader>
